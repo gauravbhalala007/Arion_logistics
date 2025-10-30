@@ -55,7 +55,6 @@ logger.info(
 --------------------------------------------------------- */
 type ParserRow = {
   ["Transporter ID"]: string;
-  Delivered?: number | null;          // <-- added
   POD?: any;
   CC?: any;
   DCR?: any;
@@ -63,7 +62,6 @@ type ParserRow = {
   ["LoR DPMO"]?: any;
   ["DNR DPMO"]?: any;
   ["CDF DPMO"]?: any;
-
   POD_Score?: number;
   CC_Score?: number;
   DCR_Score?: number;
@@ -72,19 +70,6 @@ type ParserRow = {
   DNR_Score?: number;
   CDF_Score?: number;
   FinalScore?: number;
-
-  // new from parser
-  rank?: number | null;               // <-- added
-  statusBucket?: string | null;       // <-- added
-};
-
-type ParserSummary = {
-  overallScore?: number | null;
-  reliabilityScore?: number | null;
-  rankAtStation?: number | null;
-  stationCount?: number | null;
-  rankDeltaWoW?: number | null;
-  weekText?: string | null;
 };
 
 const bucketFor = (finalScore: number | null) => {
@@ -255,30 +240,11 @@ export const onReportPDFUpload = onObjectFinalized(
         timeout: 60_000,
       });
 
-      const data = resp.data as {
-        drivers: ParserRow[];
-        count: number;
-        summary?: ParserSummary | null;
-      };
+      const data = resp.data as { drivers: ParserRow[]; count: number };
 
       const batch = db.batch();
       const year = dayjs(reportDate).year();
       const week = dayjs(reportDate).isoWeek();
-
-      // --- NEW: persist summary on report document
-      const summary = data.summary || {};
-      batch.update(reportRef, {
-        status: "computing",
-        summary: {
-          overallScore: summary.overallScore ?? null,
-          reliabilityScore: summary.reliabilityScore ?? null,
-          rankAtStation: summary.rankAtStation ?? null,
-          stationCount: summary.stationCount ?? null,
-          rankDeltaWoW: summary.rankDeltaWoW ?? null,
-          weekText: summary.weekText ?? null,
-        },
-        updatedAt: FieldValue.serverTimestamp(),
-      });
 
       for (const row of data.drivers) {
         const transporterId = (row["Transporter ID"] || "").toString().trim();
@@ -307,14 +273,8 @@ export const onReportPDFUpload = onObjectFinalized(
           );
         }
 
-        // prefer parser-provided bucket/rank; fall back to local bucket if needed
-        const computedBucket = bucketFor(row.FinalScore ?? null);
-        const statusBucket = row.statusBucket ?? computedBucket;
-        const rank = row.rank ?? null;
-
         const scoreRef = db.collection("scores").doc();
         const kpis = {
-          Delivered: row.Delivered ?? null, // <-- NEW surfaced
           POD: row.POD ?? null,
           CC: row.CC ?? null,
           DCR: row.DCR ?? null,
@@ -333,6 +293,7 @@ export const onReportPDFUpload = onObjectFinalized(
           CDF_Score: row.CDF_Score ?? null,
           FinalScore: row.FinalScore ?? null,
         };
+        const statusBucket = bucketFor(comp.FinalScore as number | null);
 
         batch.set(scoreRef, {
           driverRef,
@@ -343,8 +304,7 @@ export const onReportPDFUpload = onObjectFinalized(
           reportDate: Timestamp.fromDate(reportDate),
           kpis,
           comp,
-          rank,            // <-- NEW
-          statusBucket,    // <-- NEW (from parser when available)
+          statusBucket,
           computedAt: FieldValue.serverTimestamp(),
         });
 

@@ -74,9 +74,29 @@ class _ScoreboardPageState extends State<ScoreboardPage> {
     }
   }
 
-  // ---------------- Data streams ----------------
+  // ---------------- Data helpers ----------------
 
-  /// Stream all drivers into a cache: transporterId -> driverName
+  /// Latest report (with summary) stream
+  Stream<QueryDocumentSnapshot<Map<String, dynamic>>?> _latestReport() {
+    return FirebaseFirestore.instance
+        .collection('reports')
+        .orderBy('reportDate', descending: true)
+        .limit(1)
+        .snapshots()
+        .map((snap) => snap.docs.isEmpty ? null : snap.docs.first);
+  }
+
+  /// Scores for given report doc ref (sorting done client-side)
+  Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _scoresForReport(
+      DocumentReference reportRef) {
+    return FirebaseFirestore.instance
+        .collection('scores')
+        .where('reportRef', isEqualTo: reportRef)
+        .snapshots()
+        .map((s) => s.docs);
+  }
+
+  /// Map transporterId -> driverName
   Stream<Map<String, String>> _driversNameMap() {
     return FirebaseFirestore.instance.collection('drivers').snapshots().map(
       (snap) {
@@ -92,66 +112,16 @@ class _ScoreboardPageState extends State<ScoreboardPage> {
     );
   }
 
-  /// Find most recent (year, weekNumber) with any scores.
-  Future<(int year, int week)> _latestYearWeek() async {
-    final snap = await FirebaseFirestore.instance
-        .collection('scores')
-        .orderBy('reportDate', descending: true)
-        .limit(1)
-        .get();
-
-    if (snap.docs.isEmpty) {
-      final now = DateTime.now();
-      final week = _isoWeekOf(now);
-      return (now.year, week);
-    }
-    final d = snap.docs.first.data() as Map<String, dynamic>;
-    return ((d['year'] ?? DateTime.now().year) as int,
-        (d['weekNumber'] ?? _isoWeekOf(DateTime.now())) as int);
-  }
-
-  /// Scores stream for a specific year+week.
-  Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _scoresFor(
-      int year, int week) {
-    return FirebaseFirestore.instance
-        .collection('scores')
-        .where('year', isEqualTo: year)
-        .where('weekNumber', isEqualTo: week)
-        .orderBy('comp.FinalScore', descending: true)
-        .snapshots()
-        .map((s) => s.docs);
-  }
-
   // ---------------- Utils ----------------
 
-  // Accepts numbers or strings ("92,68", "92.68") and returns a double.
   double _num(dynamic v) {
     if (v == null) return 0;
     if (v is num) return v.toDouble();
     if (v is String) {
       final s = v.trim().replaceAll('%', '');
-      // Convert "92,68" → "92.68"
       return double.tryParse(s.replaceAll(',', '.')) ?? 0;
     }
     return 0;
-  }
-
-  int _isoWeekOf(DateTime d) {
-    final thursday = d.add(Duration(days: (3 - ((d.weekday + 6) % 7))));
-    final firstThursday =
-        DateTime(thursday.year, 1, 4).add(Duration(days: (3 - ((DateTime(thursday.year, 1, 4).weekday + 6) % 7))));
-    return 1 + ((thursday.difference(firstThursday).inDays) ~/ 7);
-  }
-
-  String _weekRangeText(int year, int week) {
-    // Approximate Monday of ISO week:
-    final jan4 = DateTime(year, 1, 4);
-    final jan4Weekday = (jan4.weekday + 6) % 7; // 0..6 with Monday=0
-    final mondayOfWeek1 = jan4.subtract(Duration(days: jan4Weekday));
-    final monday = mondayOfWeek1.add(Duration(days: (week - 1) * 7));
-    final sunday = monday.add(const Duration(days: 6));
-    final df = DateFormat('dd.MM.yyyy');
-    return '${df.format(monday)} – ${df.format(sunday)}';
   }
 
   String _statusLabel(double v) {
@@ -161,46 +131,58 @@ class _ScoreboardPageState extends State<ScoreboardPage> {
     return 'POOR';
   }
 
+  String _weekRangeFromReport(Map<String, dynamic> report) {
+    final summary = (report['summary'] ?? {}) as Map<String, dynamic>;
+    final weekText = (summary['weekText'] ?? '').toString();
+    if (weekText.isNotEmpty) return weekText;
+
+    final ts = report['reportDate'];
+    DateTime? d;
+    if (ts is Timestamp) d = ts.toDate();
+    d ??= DateTime.now();
+    final df = DateFormat('dd.MM.yyyy');
+    return df.format(d);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-
     return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ======= HEADER BAR =======
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 980;
+          final headerTitleSize = isNarrow ? 22.0 : 34.0;
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'SCORECARD',
-                  style: TextStyle(
-                    fontSize: width < 700 ? 22 : 34,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.0,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  'WEEK',
-                  style: TextStyle(
-                      fontSize: width < 700 ? 22 : 34,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.black54),
-                ),
-                const SizedBox(width: 6),
-                const Text(
-                  '…',
-                  style:
-                      TextStyle(fontSize: 34, fontWeight: FontWeight.w800),
-                ),
-                const Spacer(),
+                // ======= HEADER BAR =======
                 Wrap(
-                  spacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 10,
+                  runSpacing: 12,
                   children: [
+                    Text(
+                      'SCORECARD',
+                      style: TextStyle(
+                        fontSize: headerTitleSize,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                    Text(
+                      'WEEK',
+                      style: TextStyle(
+                        fontSize: headerTitleSize,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.black54,
+                      ),
+                    ),
+                    const Text('…',
+                        style: TextStyle(
+                            fontSize: 34, fontWeight: FontWeight.w800)),
+                    const SizedBox(width: 14),
                     FilledButton.icon(
                       onPressed:
                           _busyUpload ? null : () => _uploadFile(isCsv: true),
@@ -218,139 +200,198 @@ class _ScoreboardPageState extends State<ScoreboardPage> {
                     ),
                   ],
                 ),
-              ],
-            ),
 
-            const SizedBox(height: 8),
+                const SizedBox(height: 8),
 
-            FutureBuilder<(int, int)>(
-              future: _latestYearWeek(),
-              builder: (context, latestSnap) {
-                final loading = latestSnap.connectionState ==
-                    ConnectionState.waiting;
-                final (year, week) =
-                    latestSnap.data ?? (DateTime.now().year, _isoWeekOf(DateTime.now()));
+                // ======= LATEST REPORT =======
+                StreamBuilder<QueryDocumentSnapshot<Map<String, dynamic>>?>(
+                  stream: _latestReport(),
+                  builder: (context, repSnap) {
+                    final reportDoc = repSnap.data;
+                    if (repSnap.connectionState == ConnectionState.waiting) {
+                      return const Padding(
+                        padding: EdgeInsets.all(24.0),
+                        child: Center(child: CircularProgressIndicator()),
+                      );
+                    }
+                    if (reportDoc == null) {
+                      return const Padding(
+                        padding: EdgeInsets.all(24.0),
+                        child: Text('No report uploaded yet.'),
+                      );
+                    }
 
-                final rangeText = _weekRangeText(year, week);
+                    final report = reportDoc.data();
+                    final summary =
+                        (report['summary'] ?? {}) as Map<String, dynamic>;
 
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      rangeText,
-                      style: const TextStyle(
-                          color: Colors.black54, fontWeight: FontWeight.w500),
-                    ),
-                    const SizedBox(height: 14),
+                    final overall = (summary['overallScore'] as num?)?.toDouble();
+                    final reliability =
+                        (summary['reliabilityScore'] as num?)?.toDouble();
+                    final rankAtStation =
+                        (summary['rankAtStation'] as num?)?.toInt();
+                    final stationCount =
+                        (summary['stationCount'] as num?)?.toInt();
+                    final rankDeltaWoW =
+                        (summary['rankDeltaWoW'] as num?)?.toInt();
+                    final weekText = _weekRangeFromReport(report);
 
-                    // ======= KPI CARDS =======
-                    StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
-                      stream: _scoresFor(year, week),
-                      builder: (context, scoreSnap) {
-                        final scoreDocs = scoreSnap.data ?? [];
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          weekText,
+                          style: const TextStyle(
+                              color: Colors.black54,
+                              fontWeight: FontWeight.w500),
+                        ),
+                        const SizedBox(height: 14),
 
-                        // Aggregate company KPIs
-                        double avgFinal = 0;
-                        double avgCC = 0;
-                        if (scoreDocs.isNotEmpty) {
-                          for (final doc in scoreDocs) {
-                            final comp = (doc['comp'] ?? {}) as Map<String, dynamic>;
-                            avgFinal += _num(comp['FinalScore']);
-                            avgCC += _num(comp['CC_Score']);
-                          }
-                          avgFinal /= scoreDocs.length;
-                          avgCC /= scoreDocs.length;
-                        }
-
-                        return Column(
+                        // ======= KPI CARDS (responsive Wrap) =======
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
                           children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _KpiCard(
-                                    title: 'TOTAL COMPANY SCORE',
-                                    value: '${_pct.format(avgFinal)} %',
-                                    subtitle: _statusLabel(avgFinal),
-                                    accent: const Color(0xFF16A34A),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                const Expanded(
-                                  child: _KpiCard(
-                                    title: 'RANK IN STATION',
-                                    value: '4 of 7',
-                                    subtitle: '-3 from WoW',
-                                    accent: Colors.black87,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _KpiCard(
-                                    title: 'RELIABILITY SCORE',
-                                    value: '${_pct.format(avgCC)} %',
-                                    subtitle: _statusLabel(avgCC),
-                                    accent: const Color(0xFF16A34A),
-                                  ),
-                                ),
-                              ],
+                            _KpiCard(
+                              title: 'TOTAL COMPANY SCORE',
+                              value: overall == null
+                                  ? '—'
+                                  : '${_pct.format(overall)} %',
+                              subtitle: overall == null
+                                  ? ''
+                                  : _statusLabel(overall),
+                              accent: const Color(0xFF16A34A),
+                              width: _cardWidthFor(constraints.maxWidth),
                             ),
-                            const SizedBox(height: 18),
+                            _KpiCard(
+                              title: 'RANK IN STATION',
+                              value: (rankAtStation == null ||
+                                      stationCount == null)
+                                  ? '—'
+                                  : '${rankAtStation} of $stationCount',
+                              subtitle: (rankDeltaWoW == null ||
+                                      rankDeltaWoW == 0)
+                                  ? 'WoW unchanged'
+                                  : (rankDeltaWoW! > 0
+                                      ? '+$rankDeltaWoW from WoW'
+                                      : '$rankDeltaWoW from WoW'),
+                              accent: Colors.black87,
+                              width: _cardWidthFor(constraints.maxWidth),
+                            ),
+                            _KpiCard(
+                              title: 'RELIABILITY SCORE',
+                              value: reliability == null
+                                  ? '—'
+                                  : '${_pct.format(reliability)} %',
+                              subtitle: reliability == null
+                                  ? ''
+                                  : _statusLabel(reliability),
+                              accent: const Color(0xFF16A34A),
+                              width: _cardWidthFor(constraints.maxWidth),
+                            ),
+                          ],
+                        ),
 
-                            if (_uploadMsg != null)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: Text(
-                                  _uploadMsg!,
-                                  style: const TextStyle(
-                                      color: Colors.black54, fontSize: 12),
+                        const SizedBox(height: 18),
+
+                        if (_uploadMsg != null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Text(
+                              _uploadMsg!,
+                              style: const TextStyle(
+                                  color: Colors.black54, fontSize: 12),
+                            ),
+                          ),
+
+                        // ======= DRIVER TABLE =======
+                        StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+                          stream: _scoresForReport(reportDoc.reference),
+                          builder: (context, scoreSnap) {
+                            if (scoreSnap.connectionState ==
+                                ConnectionState.waiting) {
+                              return const Padding(
+                                padding: EdgeInsets.all(24.0),
+                                child: Center(child: CircularProgressIndicator()),
+                              );
+                            }
+                            final scoreDocs = scoreSnap.data ?? [];
+
+                            if (scoreDocs.isEmpty) {
+                              return const Padding(
+                                padding: EdgeInsets.all(24.0),
+                                child: Center(
+                                  child: Text('No scores for this report yet.'),
                                 ),
-                              ),
+                              );
+                            }
 
-                            // ======= DRIVER TABLE =======
-                            StreamBuilder<Map<String, String>>(
+                            return StreamBuilder<Map<String, String>>(
                               stream: _driversNameMap(),
                               builder: (context, namesSnap) {
                                 final nameMap = namesSnap.data ?? {};
-                                if (loading ||
-                                    scoreSnap.connectionState ==
-                                        ConnectionState.waiting ||
-                                    namesSnap.connectionState ==
-                                        ConnectionState.waiting) {
-                                  return const Center(
-                                      child: Padding(
+                                if (namesSnap.connectionState ==
+                                    ConnectionState.waiting) {
+                                  return const Padding(
                                     padding: EdgeInsets.all(24.0),
-                                    child: CircularProgressIndicator(),
-                                  ));
-                                }
-
-                                if (scoreDocs.isEmpty) {
-                                  return const Center(
-                                    child: Padding(
-                                      padding: EdgeInsets.all(24.0),
-                                      child: Text('No scores for this week yet.'),
-                                    ),
+                                    child: Center(
+                                        child: CircularProgressIndicator()),
                                   );
                                 }
 
-                                return _DriverTable(
-                                  scoreDocs: scoreDocs,
-                                  nameMap: nameMap,
-                                  numConv: _num,
+                                // Sort: rank asc if present, else FinalScore desc
+                                final docs = [...scoreDocs];
+                                final hasAnyRank =
+                                    docs.any((d) => (d.data()['rank'] != null));
+                                if (hasAnyRank) {
+                                  docs.sort((a, b) {
+                                    final ra =
+                                        (a.data()['rank'] as num?)?.toInt() ??
+                                            999999;
+                                    final rb =
+                                        (b.data()['rank'] as num?)?.toInt() ??
+                                            999999;
+                                    return ra.compareTo(rb);
+                                  });
+                                } else {
+                                  docs.sort((a, b) {
+                                    final ca = (a.data()['comp'] ?? {})
+                                        as Map<String, dynamic>;
+                                    final cb = (b.data()['comp'] ?? {})
+                                        as Map<String, dynamic>;
+                                    final fa = _num(ca['FinalScore']);
+                                    final fb = _num(cb['FinalScore']);
+                                    return fb.compareTo(fa);
+                                  });
+                                }
+
+                                // === Horizontal scroll + explicit table width (NO Expanded) ===
+                                // 
+                                return _DriverTableResponsive(
+                                    scoreDocs: docs,
+                                    nameMap: nameMap,
+                                    numConv: _num,
                                 );
                               },
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                  ],
-                );
-              },
+                            );
+                          },
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
+  }
+
+  double _cardWidthFor(double maxWidth) {
+    if (maxWidth >= 1200) return (maxWidth - 18 * 2 - 12 * 2) / 3;
+    if (maxWidth >= 900) return (maxWidth - 18 * 2 - 12) / 2;
+    return maxWidth - 18 * 2;
   }
 }
 
@@ -360,58 +401,284 @@ class _KpiCard extends StatelessWidget {
   final String value;
   final String subtitle;
   final Color accent;
+  final double width;
   const _KpiCard({
     required this.title,
     required this.value,
     required this.subtitle,
     required this.accent,
+    required this.width,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 0.5,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 22),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title,
-                style:
-                    const TextStyle(fontSize: 13, color: Colors.black54, letterSpacing: 0.6)),
-            const SizedBox(height: 10),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 30,
-                fontWeight: FontWeight.w800,
-                color: accent,
+    return SizedBox(
+      width: width,
+      child: Card(
+        elevation: 0.5,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 22),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title,
+                  style: const TextStyle(
+                      fontSize: 13, color: Colors.black54, letterSpacing: 0.6)),
+              const SizedBox(height: 10),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.w800,
+                  color: accent,
+                ),
               ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              subtitle,
-              style: const TextStyle(
-                fontSize: 13,
-                color: Colors.black54,
-                fontWeight: FontWeight.w600,
+              const SizedBox(height: 6),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Colors.black54,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-/// ----- DRIVER TABLE -----
-class _DriverTable extends StatelessWidget {
+// /// ----- DRIVER TABLE (fixed widths, no Expanded) -----
+// class _DriverTableFixed extends StatelessWidget {
+//   final List<QueryDocumentSnapshot<Map<String, dynamic>>> scoreDocs;
+//   final Map<String, String> nameMap;
+//   final double Function(dynamic) numConv;
+//   final double nameColW;
+//   final double colW;
+//   final double statusW;
+
+//   const _DriverTableFixed({
+//     required this.scoreDocs,
+//     required this.nameMap,
+//     required this.numConv,
+//     required this.nameColW,
+//     required this.colW,
+//     required this.statusW,
+//   });
+
+//   Color _statusColor(double v) {
+//     if (v >= 85) return const Color(0xFF16A34A);
+//     if (v >= 70) return const Color(0xFF22C55E);
+//     if (v >= 55) return const Color(0xFFF59E0B);
+//     return const Color(0xFFEF4444);
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     // Header row
+//     final headers = [
+//       'RANK',
+//       'TOTAL',
+//       'DELIVERED',
+//       'DCR',
+//       'DNR_Score',
+//       'LoR_Score',
+//       'POD',
+//       'CC',
+//       'CE',
+//       'CDF DPMO',
+//     ];
+
+//     return Card(
+//       clipBehavior: Clip.hardEdge,
+//       elevation: 0.5,
+//       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+//       child: Padding(
+//         padding: const EdgeInsets.symmetric(vertical: 8),
+//         child: Column(
+//           children: [
+//             // header
+//             Padding(
+//               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+//               child: Row(
+//                 children: [
+//                   SizedBox(
+//                     width: nameColW,
+//                     child: const Text(
+//                       'DRIVER',
+//                       style: TextStyle(
+//                         fontSize: 12,
+//                         color: Colors.black54,
+//                         fontWeight: FontWeight.w700,
+//                       ),
+//                     ),
+//                   ),
+//                   for (final h in headers)
+//                     SizedBox(
+//                       width: colW,
+//                       child: Text(
+//                         h,
+//                         textAlign: TextAlign.center,
+//                         style: const TextStyle(
+//                           fontSize: 12,
+//                           color: Colors.black54,
+//                           fontWeight: FontWeight.w700,
+//                         ),
+//                       ),
+//                     ),
+//                   SizedBox(width: statusW), // status pill col (no header)
+//                 ],
+//               ),
+//             ),
+//             const Divider(height: 1),
+
+//             // rows
+//             ListView.separated(
+//               shrinkWrap: true,
+//               physics: const NeverScrollableScrollPhysics(),
+//               itemCount: scoreDocs.length,
+//               separatorBuilder: (_, __) => const Divider(height: 1),
+//               itemBuilder: (context, i) {
+//                 final doc = scoreDocs[i];
+//                 final data = doc.data();
+//                 final comp =
+//                     (data['comp'] ?? <String, dynamic>{}) as Map<String, dynamic>;
+//                 final kpis =
+//                     (data['kpis'] ?? <String, dynamic>{}) as Map<String, dynamic>;
+
+//                 final transporterId = (data['transporterId'] ?? '').toString();
+//                 final name = (nameMap[transporterId] ?? '').isNotEmpty
+//                     ? nameMap[transporterId]!
+//                     : '(No Name)';
+
+//                 final score = numConv(comp['FinalScore']);
+//                 final dcr = numConv(comp['DCR_Score']);
+//                 final pod = numConv(comp['POD_Score']);
+//                 final cc = numConv(comp['CC_Score']);
+//                 final ce = numConv(comp['CE_Score']);
+
+//                 final deliveredRaw =
+//                     kpis['Delivered'] ?? kpis['DELIVERED'] ?? kpis['delivered'];
+//                 final delivered = numConv(deliveredRaw);
+
+//                 final dnr =
+//                     numConv(comp['DNR_Score']);
+//                 final lorScore = numConv(comp['LoR_Score']);
+//                 final cdf =
+//                     numConv(kpis['CDF DPMO'] ?? kpis['CDF'] ?? kpis['cdf']);
+
+//                 final rank = (data['rank'] as num?)?.toInt();
+//                 final rankDisplay = rank != null ? '#$rank' : '#${i + 1}';
+
+//                 final statusBucket = (data['statusBucket'] ?? '').toString();
+//                 final statusText = statusBucket.isNotEmpty
+//                     ? statusBucket
+//                     : _statusText(score);
+
+//                 return Padding(
+//                   padding:
+//                       const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+//                   child: Row(
+//                     crossAxisAlignment: CrossAxisAlignment.center,
+//                     children: [
+//                       // Driver name + ID (fixed width)
+//                       SizedBox(
+//                         width: nameColW,
+//                         child: Column(
+//                           crossAxisAlignment: CrossAxisAlignment.start,
+//                           children: [
+//                             Text(name,
+//                                 maxLines: 1,
+//                                 overflow: TextOverflow.ellipsis,
+//                                 style: const TextStyle(
+//                                     fontWeight: FontWeight.w700, fontSize: 15)),
+//                             const SizedBox(height: 2),
+//                             Text(
+//                               transporterId,
+//                               style: const TextStyle(
+//                                   color: Colors.black54, fontSize: 12),
+//                             ),
+//                           ],
+//                         ),
+//                       ),
+
+//                       // Metric cells (fixed width)
+//                       _metricCell(rankDisplay, colW),
+//                       _metricCell(_pct.format(score), colW),
+//                       _metricCell(_int.format(delivered.round()), colW),
+//                       _metricCell(_pct.format(dcr), colW),
+//                       _metricCell(_int.format(dnr.round()), colW),
+//                       _metricCell(_pct.format(lorScore), colW),
+//                       _metricCell(_pct.format(pod), colW),
+//                       _metricCell(_pct.format(cc), colW),
+//                       _metricCell(_pct.format(ce), colW),
+//                       _metricCell(_int.format(cdf.round()), colW),
+
+//                       // Status pill (fixed width cell)
+//                       SizedBox(
+//                         width: statusW,
+//                         child: Align(
+//                           alignment: Alignment.center,
+//                           child: Container(
+//                             padding: const EdgeInsets.symmetric(
+//                                 horizontal: 10, vertical: 6),
+//                             decoration: BoxDecoration(
+//                               color: _statusColor(score).withOpacity(0.12),
+//                               borderRadius: BorderRadius.circular(999),
+//                             ),
+//                             child: Text(
+//                               statusText,
+//                               overflow: TextOverflow.ellipsis,
+//                               style: TextStyle(
+//                                 color: _statusColor(score),
+//                                 fontWeight: FontWeight.w700,
+//                                 fontSize: 11,
+//                               ),
+//                             ),
+//                           ),
+//                         ),
+//                       ),
+//                     ],
+//                   ),
+//                 );
+//               },
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+
+//   static Widget _metricCell(String text, double width) => SizedBox(
+//         width: width,
+//         child: Center(
+//           child: Text(
+//             text,
+//             overflow: TextOverflow.ellipsis,
+//             style: const TextStyle(
+//               fontWeight: FontWeight.w700,
+//             ),
+//           ),
+//         ),
+//       );
+
+//   static String _statusText(double v) {
+//     if (v >= 85) return 'Fantastic';
+//     if (v >= 70) return 'Great';
+//     if (v >= 55) return 'Fair';
+//     return 'Poor';
+//   }
+// }
+/// ----- DRIVER TABLE (responsive, no horizontal scroll) -----
+class _DriverTableResponsive extends StatelessWidget {
   final List<QueryDocumentSnapshot<Map<String, dynamic>>> scoreDocs;
   final Map<String, String> nameMap;
   final double Function(dynamic) numConv;
 
-  const _DriverTable({
+  const _DriverTableResponsive({
     required this.scoreDocs,
     required this.nameMap,
     required this.numConv,
@@ -424,16 +691,54 @@ class _DriverTable extends StatelessWidget {
     return const Color(0xFFEF4444);
   }
 
+  static String _statusText(double v) {
+    if (v >= 85) return 'Fantastic';
+    if (v >= 70) return 'Great';
+    if (v >= 55) return 'Fair';
+    return 'Poor';
+  }
+
+  Widget _headCell(String text, {int flex = 1}) => Expanded(
+        flex: flex,
+        child: Text(
+          text,
+          textAlign: TextAlign.center,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontSize: 12,
+            color: Colors.black54,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
+
+  Widget _cell(String text, {int flex = 1}) => Expanded(
+        flex: flex,
+        child: Center(
+          child: Text(
+            text,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
-    // Header row
-    final headers = [
+    // Column order kept same as your current UI (but no horizontal scroll).
+    // We give the DRIVER column a larger flex so the row fits.
+    // All other metric columns share equal flex to fit the width.
+    const nameFlex = 3; // wider for name+ID
+    const colFlex = 2;  // metrics
+    const statusFlex = 2;
+
+    final headers = const [
       'RANK',
       'TOTAL',
       'DELIVERED',
       'DCR',
-      'DNR DPMO',
-      'LoR DPMO',
+      'DNR_Score',
+      'LoR_Score',
       'POD',
       'CC',
       'CE',
@@ -441,35 +746,39 @@ class _DriverTable extends StatelessWidget {
     ];
 
     return Card(
+      clipBehavior: Clip.hardEdge,
       elevation: 0.5,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Column(
           children: [
-            // header
+            // Header
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               child: Row(
                 children: [
-                  const SizedBox(width: 260, child: Text('DRIVER')),
-                  for (final h in headers)
-                    Expanded(
-                      child: Text(
-                        h,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.black54,
-                            fontWeight: FontWeight.w700),
+                  // DRIVER header
+                  Expanded(
+                    flex: nameFlex,
+                    child: const Text(
+                      'DRIVER',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.black54,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
+                  ),
+                  for (final h in headers) _headCell(h, flex: colFlex),
+                  _headCell('', flex: statusFlex), // status col, no title
                 ],
               ),
             ),
             const Divider(height: 1),
 
-            // rows
+            // Rows
             ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -494,68 +803,90 @@ class _DriverTable extends StatelessWidget {
                 final cc = numConv(comp['CC_Score']);
                 final ce = numConv(comp['CE_Score']);
 
-                // Delivered might not exist in your data; attempt a few keys
-                final deliveredRaw = kpis['Delivered'] ?? kpis['DELIVERED'] ?? kpis['delivered'];
+                final deliveredRaw =
+                    kpis['Delivered'] ?? kpis['DELIVERED'] ?? kpis['delivered'];
                 final delivered = numConv(deliveredRaw);
 
-                final dnr = numConv(kpis['DNR DPMO'] ?? kpis['DNR'] ?? kpis['dnr']);
-                final lor = numConv(kpis['LoR DPMO'] ?? kpis['LoR'] ?? kpis['lor']);
+                final dnr = numConv(comp['DNR_Score']);
+                final lorScore = numConv(comp['LoR_Score']);
                 final cdf = numConv(kpis['CDF DPMO'] ?? kpis['CDF'] ?? kpis['cdf']);
 
+                final rank = (data['rank'] as num?)?.toInt();
+                final rankDisplay = rank != null ? '#$rank' : '#${i + 1}';
+
+                final statusBucket = (data['statusBucket'] ?? '').toString();
+                final statusText =
+                    statusBucket.isNotEmpty ? statusBucket : _statusText(score);
+
                 return Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      // Driver name + ID
-                      SizedBox(
-                        width: 260,
+                      // DRIVER (name + ID)
+                      Expanded(
+                        flex: nameFlex,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w700, fontSize: 15)),
+                            Text(
+                              name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                              ),
+                            ),
                             const SizedBox(height: 2),
                             Text(
                               transporterId,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                  color: Colors.black54, fontSize: 12),
+                                color: Colors.black54,
+                                fontSize: 12,
+                              ),
                             ),
                           ],
                         ),
                       ),
 
-                      // Metric cells
-                      _metricCell('#${i + 1}'),
-                      _metricCell(_pct.format(score)),
-                      _metricCell(_int.format(delivered.round())),
-                      _metricCell(_pct.format(dcr)),
-                      _metricCell(_int.format(dnr.round())),
-                      _metricCell(_int.format(lor.round())),
-                      _metricCell(_pct.format(pod)),
-                      _metricCell(_pct.format(cc)),
-                      _metricCell(_pct.format(ce)),
-                      _metricCell(_int.format(cdf.round())),
+                      // Metrics
+                      _cell(rankDisplay, flex: colFlex),
+                      _cell(NumberFormat.decimalPattern('de').format(score), flex: colFlex),
+                      _cell(NumberFormat.decimalPattern('de').format(delivered.round()), flex: colFlex),
+                      _cell(NumberFormat.decimalPattern('de').format(dcr), flex: colFlex),
+                      _cell(NumberFormat.decimalPattern('de').format(dnr), flex: colFlex),
+                      _cell(NumberFormat.decimalPattern('de').format(lorScore), flex: colFlex),
+                      _cell(NumberFormat.decimalPattern('de').format(pod), flex: colFlex),
+                      _cell(NumberFormat.decimalPattern('de').format(cc), flex: colFlex),
+                      _cell(NumberFormat.decimalPattern('de').format(ce), flex: colFlex),
+                      _cell(NumberFormat.decimalPattern('de').format(cdf.round()), flex: colFlex),
 
-                      // Status pill
-                      const SizedBox(width: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: _statusColor(score).withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          _statusText(score),
-                          style: TextStyle(
-                            color: _statusColor(score),
-                            fontWeight: FontWeight.w700,
-                            fontSize: 11,
+                      // Status
+                      Expanded(
+                        flex: statusFlex,
+                        child: Align(
+                          alignment: Alignment.center,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: _statusColor(score).withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                statusText,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: _statusColor(score),
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -568,23 +899,5 @@ class _DriverTable extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  static Widget _metricCell(String text) => Expanded(
-        child: Center(
-          child: Text(
-            text,
-            style: const TextStyle(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-      );
-
-  static String _statusText(double v) {
-    if (v >= 85) return 'Fantastic';
-    if (v >= 70) return 'Great';
-    if (v >= 55) return 'Fair';
-    return 'Poor';
   }
 }
