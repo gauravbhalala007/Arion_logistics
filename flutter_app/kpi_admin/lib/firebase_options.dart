@@ -55,8 +55,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '467245134639',
     projectId: 'gaurav-arion-001-e533e',
     authDomain: 'gaurav-arion-001-e533e.firebaseapp.com',
-    //storageBucket: 'gaurav-arion-001-e533e.firebasestorage.app',
-    storageBucket: 'gaurav-arion-001-e533e.appspot.com',
+    storageBucket: 'gaurav-arion-001-e533e.firebasestorage.app',
     measurementId: 'G-9978J44FZS',
   );
 
@@ -68,4 +67,5 @@ class DefaultFirebaseOptions {
     storageBucket: 'gaurav-arion-001-e533e.firebasestorage.app',
     iosBundleId: 'com.example.kpiAdmin',
   );
+
 }
