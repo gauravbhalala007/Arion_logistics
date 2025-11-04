@@ -1,1 +1,46 @@
-{"flutter":{"platforms":{"macos":{"default":{"projectId":"gaurav-arion-001-e533e","appId":"1:467245134639:ios:d21ebb7fdc28694022a7da","uploadDebugSymbols":false,"fileOutput":"macos/Runner/GoogleService-Info.plist"}},"dart":{"lib/firebase_options.dart":{"projectId":"gaurav-arion-001-e533e","configurations":{"macos":"1:467245134639:ios:d21ebb7fdc28694022a7da","web":"1:467245134639:web:f4b8eb4b574b916b22a7da"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "macos": {
+        "default": {
+          "projectId": "gaurav-arion-001-e533e",
+          "appId": "1:467245134639:ios:d21ebb7fdc28694022a7da",
+          "uploadDebugSymbols": false,
+          "fileOutput": "macos/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "gaurav-arion-001-e533e",
+          "configurations": {
+            "macos": "1:467245134639:ios:d21ebb7fdc28694022a7da",
+            "web": "1:467245134639:web:f4b8eb4b574b916b22a7da"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "database": "gaurav-arion-001-e533e",
+    "location": "eur3",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "hosting": {
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
+  "storage": {
+    "rules": "storage.rules"
+  }
+}

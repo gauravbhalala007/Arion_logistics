@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 import 'firebase_options.dart';
-import 'screens/scoreboard_page.dart';
+import 'screens/scorecard_overview.dart';
 
 /// Toggle this to false for production.
 const bool useEmulators = true;
@@ -51,7 +51,8 @@ class App extends StatelessWidget {
         fontFamily: 'SF Pro',
         scaffoldBackgroundColor: const Color(0xFFF6F7F5),
       ),
-      home: const ScoreboardPage(),
+      // home: const ScoreboardPage(),
+      home: const ScorecardOverviewPage(),
       debugShowCheckedModeBanner: false,
     );
   }

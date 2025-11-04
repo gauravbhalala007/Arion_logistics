@@ -133,8 +133,26 @@ class _ScoreboardPageState extends State<ScoreboardPage> {
 
   String _weekRangeFromReport(Map<String, dynamic> report) {
     final summary = (report['summary'] ?? {}) as Map<String, dynamic>;
-    final weekText = (summary['weekText'] ?? '').toString();
-    if (weekText.isNotEmpty) return weekText;
+    // Prefer explicit week number/year if provided by parser
+    final week = (summary['weekNumber'] as num?)?.toInt();
+    final year = (summary['year'] as num?)?.toInt();
+    final explicitText = (summary['weekText'] ?? '').toString();
+
+      if (week != null && year != null) {
+        // ISO week: Monday is the first day
+        // Algorithm: Monday of week 1 = Monday of the week containing Jan 4
+        DateTime jan4 = DateTime(year, 1, 4);
+        int jan4WeekdayIso = (jan4.weekday + 6) % 7; // Mon=0..Sun=6
+        DateTime mondayOfWeek1 = jan4.subtract(Duration(days: jan4WeekdayIso));
+        DateTime monday = mondayOfWeek1.add(Duration(days: (week - 1) * 7));
+        DateTime sunday = monday.add(const Duration(days: 6));
+
+        final df = DateFormat('dd.MM.yyyy');
+        return '${df.format(monday)} – ${df.format(sunday)}';
+    }
+
+    // Fallback to any text the parser extracted, then to reportDate
+    if (explicitText.isNotEmpty) return explicitText;
 
     final ts = report['reportDate'];
     DateTime? d;
@@ -142,7 +160,8 @@ class _ScoreboardPageState extends State<ScoreboardPage> {
     d ??= DateTime.now();
     final df = DateFormat('dd.MM.yyyy');
     return df.format(d);
-  }
+    
+}
 
   @override
   Widget build(BuildContext context) {
@@ -226,15 +245,20 @@ class _ScoreboardPageState extends State<ScoreboardPage> {
                         (report['summary'] ?? {}) as Map<String, dynamic>;
 
                     final overall = (summary['overallScore'] as num?)?.toDouble();
-                    final reliability =
+                    final reliabilityNext =
+                        (summary['reliabilityNextDay'] as num?)?.toDouble() ??
                         (summary['reliabilityScore'] as num?)?.toDouble();
-                    final rankAtStation =
-                        (summary['rankAtStation'] as num?)?.toInt();
+
+                    final reliabilitySame =
+                        (summary['reliabilitySameDay'] as num?)?.toDouble();
+                    final rankAtStation = (summary['rankAtStation'] as num?)?.toInt();
+                    final stationCode = (summary['stationCode'] ?? '').toString();
                     final stationCount =
                         (summary['stationCount'] as num?)?.toInt();
-                    final rankDeltaWoW =
-                        (summary['rankDeltaWoW'] as num?)?.toInt();
-                    final weekText = _weekRangeFromReport(report);
+                    final rankDeltaWoW = (summary['rankDeltaWoW'] as num?)?.toInt();
+                    final weekNumber = (summary['weekNumber'] as num?)?.toInt();
+                    final year = (summary['year'] as num?)?.toInt();
+                    final weekText = (summary['weekText'] ?? 'KW $weekNumber/$year').toString();
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -249,47 +273,58 @@ class _ScoreboardPageState extends State<ScoreboardPage> {
 
                         // ======= KPI CARDS (responsive Wrap) =======
                         Wrap(
-                          spacing: 12,
-                          runSpacing: 12,
-                          children: [
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
                             _KpiCard(
-                              title: 'TOTAL COMPANY SCORE',
-                              value: overall == null
-                                  ? '—'
-                                  : '${_pct.format(overall)} %',
-                              subtitle: overall == null
-                                  ? ''
-                                  : _statusLabel(overall),
-                              accent: const Color(0xFF16A34A),
-                              width: _cardWidthFor(constraints.maxWidth),
+                            title: 'TOTAL COMPANY SCORE',
+                            value: overall == null
+                                ? '—'
+                                : '${_pct.format(overall)} %',
+                            subtitle: overall == null
+                                ? ''
+                                : _statusLabel(overall),
+                            accent: const Color(0xFF16A34A),
+                            width: _cardWidthFor(constraints.maxWidth),
                             ),
                             _KpiCard(
-                              title: 'RANK IN STATION',
-                              value: (rankAtStation == null ||
-                                      stationCount == null)
-                                  ? '—'
-                                  : '${rankAtStation} of $stationCount',
-                              subtitle: (rankDeltaWoW == null ||
-                                      rankDeltaWoW == 0)
-                                  ? 'WoW unchanged'
-                                  : (rankDeltaWoW! > 0
-                                      ? '+$rankDeltaWoW from WoW'
-                                      : '$rankDeltaWoW from WoW'),
-                              accent: Colors.black87,
-                              width: _cardWidthFor(constraints.maxWidth),
+                            title: 'RANK IN STATION',
+                            value: (rankAtStation == null ||
+                                    stationCount == null)
+                                ? '${rankAtStation ?? "-"} in $stationCode'
+                                : '#$rankAtStation of $stationCount ($stationCode)',
+                            subtitle: (rankDeltaWoW == null ||
+                                    rankDeltaWoW == 0)
+                                ? 'WoW unchanged'
+                                : (rankDeltaWoW! > 0
+                                    ? '+$rankDeltaWoW from WoW'
+                                    : '$rankDeltaWoW from WoW'),
+                            accent: Colors.black87,
+                            width: _cardWidthFor(constraints.maxWidth),
                             ),
                             _KpiCard(
-                              title: 'RELIABILITY SCORE',
-                              value: reliability == null
-                                  ? '—'
-                                  : '${_pct.format(reliability)} %',
-                              subtitle: reliability == null
-                                  ? ''
-                                  : _statusLabel(reliability),
-                              accent: const Color(0xFF16A34A),
-                              width: _cardWidthFor(constraints.maxWidth),
+                            title: 'RELIABILITY NEXT DAY',
+                            value: reliabilityNext == null
+                                ? '—'
+                                : '${_pct.format(reliabilityNext)} %',
+                            subtitle: reliabilityNext == null
+                                ? ''
+                                : _statusLabel(reliabilityNext),
+                            accent: const Color(0xFF0EA5E9),
+                            width: _cardWidthFor(constraints.maxWidth),
                             ),
-                          ],
+                            _KpiCard(
+                            title: 'RELIABILITY SAME DAY',
+                            value: reliabilitySame == null
+                                ? '—'
+                                : '${_pct.format(reliabilitySame)} %',
+                            subtitle: reliabilitySame == null
+                                ? ''
+                                : _statusLabel(reliabilitySame),
+                            accent: const Color(0xFF2563EB),
+                            width: _cardWidthFor(constraints.maxWidth),
+                            ),
+                        ],
                         ),
 
                         const SizedBox(height: 18),
@@ -451,227 +486,6 @@ class _KpiCard extends StatelessWidget {
   }
 }
 
-// /// ----- DRIVER TABLE (fixed widths, no Expanded) -----
-// class _DriverTableFixed extends StatelessWidget {
-//   final List<QueryDocumentSnapshot<Map<String, dynamic>>> scoreDocs;
-//   final Map<String, String> nameMap;
-//   final double Function(dynamic) numConv;
-//   final double nameColW;
-//   final double colW;
-//   final double statusW;
-
-//   const _DriverTableFixed({
-//     required this.scoreDocs,
-//     required this.nameMap,
-//     required this.numConv,
-//     required this.nameColW,
-//     required this.colW,
-//     required this.statusW,
-//   });
-
-//   Color _statusColor(double v) {
-//     if (v >= 85) return const Color(0xFF16A34A);
-//     if (v >= 70) return const Color(0xFF22C55E);
-//     if (v >= 55) return const Color(0xFFF59E0B);
-//     return const Color(0xFFEF4444);
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     // Header row
-//     final headers = [
-//       'RANK',
-//       'TOTAL',
-//       'DELIVERED',
-//       'DCR',
-//       'DNR_Score',
-//       'LoR_Score',
-//       'POD',
-//       'CC',
-//       'CE',
-//       'CDF DPMO',
-//     ];
-
-//     return Card(
-//       clipBehavior: Clip.hardEdge,
-//       elevation: 0.5,
-//       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-//       child: Padding(
-//         padding: const EdgeInsets.symmetric(vertical: 8),
-//         child: Column(
-//           children: [
-//             // header
-//             Padding(
-//               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-//               child: Row(
-//                 children: [
-//                   SizedBox(
-//                     width: nameColW,
-//                     child: const Text(
-//                       'DRIVER',
-//                       style: TextStyle(
-//                         fontSize: 12,
-//                         color: Colors.black54,
-//                         fontWeight: FontWeight.w700,
-//                       ),
-//                     ),
-//                   ),
-//                   for (final h in headers)
-//                     SizedBox(
-//                       width: colW,
-//                       child: Text(
-//                         h,
-//                         textAlign: TextAlign.center,
-//                         style: const TextStyle(
-//                           fontSize: 12,
-//                           color: Colors.black54,
-//                           fontWeight: FontWeight.w700,
-//                         ),
-//                       ),
-//                     ),
-//                   SizedBox(width: statusW), // status pill col (no header)
-//                 ],
-//               ),
-//             ),
-//             const Divider(height: 1),
-
-//             // rows
-//             ListView.separated(
-//               shrinkWrap: true,
-//               physics: const NeverScrollableScrollPhysics(),
-//               itemCount: scoreDocs.length,
-//               separatorBuilder: (_, __) => const Divider(height: 1),
-//               itemBuilder: (context, i) {
-//                 final doc = scoreDocs[i];
-//                 final data = doc.data();
-//                 final comp =
-//                     (data['comp'] ?? <String, dynamic>{}) as Map<String, dynamic>;
-//                 final kpis =
-//                     (data['kpis'] ?? <String, dynamic>{}) as Map<String, dynamic>;
-
-//                 final transporterId = (data['transporterId'] ?? '').toString();
-//                 final name = (nameMap[transporterId] ?? '').isNotEmpty
-//                     ? nameMap[transporterId]!
-//                     : '(No Name)';
-
-//                 final score = numConv(comp['FinalScore']);
-//                 final dcr = numConv(comp['DCR_Score']);
-//                 final pod = numConv(comp['POD_Score']);
-//                 final cc = numConv(comp['CC_Score']);
-//                 final ce = numConv(comp['CE_Score']);
-
-//                 final deliveredRaw =
-//                     kpis['Delivered'] ?? kpis['DELIVERED'] ?? kpis['delivered'];
-//                 final delivered = numConv(deliveredRaw);
-
-//                 final dnr =
-//                     numConv(comp['DNR_Score']);
-//                 final lorScore = numConv(comp['LoR_Score']);
-//                 final cdf =
-//                     numConv(kpis['CDF DPMO'] ?? kpis['CDF'] ?? kpis['cdf']);
-
-//                 final rank = (data['rank'] as num?)?.toInt();
-//                 final rankDisplay = rank != null ? '#$rank' : '#${i + 1}';
-
-//                 final statusBucket = (data['statusBucket'] ?? '').toString();
-//                 final statusText = statusBucket.isNotEmpty
-//                     ? statusBucket
-//                     : _statusText(score);
-
-//                 return Padding(
-//                   padding:
-//                       const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-//                   child: Row(
-//                     crossAxisAlignment: CrossAxisAlignment.center,
-//                     children: [
-//                       // Driver name + ID (fixed width)
-//                       SizedBox(
-//                         width: nameColW,
-//                         child: Column(
-//                           crossAxisAlignment: CrossAxisAlignment.start,
-//                           children: [
-//                             Text(name,
-//                                 maxLines: 1,
-//                                 overflow: TextOverflow.ellipsis,
-//                                 style: const TextStyle(
-//                                     fontWeight: FontWeight.w700, fontSize: 15)),
-//                             const SizedBox(height: 2),
-//                             Text(
-//                               transporterId,
-//                               style: const TextStyle(
-//                                   color: Colors.black54, fontSize: 12),
-//                             ),
-//                           ],
-//                         ),
-//                       ),
-
-//                       // Metric cells (fixed width)
-//                       _metricCell(rankDisplay, colW),
-//                       _metricCell(_pct.format(score), colW),
-//                       _metricCell(_int.format(delivered.round()), colW),
-//                       _metricCell(_pct.format(dcr), colW),
-//                       _metricCell(_int.format(dnr.round()), colW),
-//                       _metricCell(_pct.format(lorScore), colW),
-//                       _metricCell(_pct.format(pod), colW),
-//                       _metricCell(_pct.format(cc), colW),
-//                       _metricCell(_pct.format(ce), colW),
-//                       _metricCell(_int.format(cdf.round()), colW),
-
-//                       // Status pill (fixed width cell)
-//                       SizedBox(
-//                         width: statusW,
-//                         child: Align(
-//                           alignment: Alignment.center,
-//                           child: Container(
-//                             padding: const EdgeInsets.symmetric(
-//                                 horizontal: 10, vertical: 6),
-//                             decoration: BoxDecoration(
-//                               color: _statusColor(score).withOpacity(0.12),
-//                               borderRadius: BorderRadius.circular(999),
-//                             ),
-//                             child: Text(
-//                               statusText,
-//                               overflow: TextOverflow.ellipsis,
-//                               style: TextStyle(
-//                                 color: _statusColor(score),
-//                                 fontWeight: FontWeight.w700,
-//                                 fontSize: 11,
-//                               ),
-//                             ),
-//                           ),
-//                         ),
-//                       ),
-//                     ],
-//                   ),
-//                 );
-//               },
-//             ),
-//           ],
-//         ),
-//       ),
-//     );
-//   }
-
-//   static Widget _metricCell(String text, double width) => SizedBox(
-//         width: width,
-//         child: Center(
-//           child: Text(
-//             text,
-//             overflow: TextOverflow.ellipsis,
-//             style: const TextStyle(
-//               fontWeight: FontWeight.w700,
-//             ),
-//           ),
-//         ),
-//       );
-
-//   static String _statusText(double v) {
-//     if (v >= 85) return 'Fantastic';
-//     if (v >= 70) return 'Great';
-//     if (v >= 55) return 'Fair';
-//     return 'Poor';
-//   }
-// }
 /// ----- DRIVER TABLE (responsive, no horizontal scroll) -----
 class _DriverTableResponsive extends StatelessWidget {
   final List<QueryDocumentSnapshot<Map<String, dynamic>>> scoreDocs;

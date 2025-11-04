@@ -1,6 +1,7 @@
 # app.py
 # Robust FastAPI Parser for Amazon DSP KPI PDFs with ranking & status bucket
 from fastapi import FastAPI, File, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import io, re
@@ -8,6 +9,33 @@ import pdfplumber
 import pandas as pd
 
 app = FastAPI(title="Amazon DSP KPI Parser")
+
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=[
+#         "http://localhost:3000",
+#         "http://127.0.0.1:3000",
+#         "http://localhost:4000",
+#         "http://127.0.0.1:4000",
+#         "http://localhost:5000",
+#         "http://127.0.0.1:5000",
+#         "http://localhost:8080",
+#         "http://127.0.0.1:8080",
+#         # you can also temporarily allow all for local:
+#         # "*"
+#     ],
+#     allow_credentials=False,
+#     allow_methods=["*"],     # POST included
+#     allow_headers=["*"],     # Content-Type, etc.
+# )
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # or your exact Hosting origin(s)
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # ===============================
 # MODELS
@@ -44,6 +72,12 @@ class ParserSummary(BaseModel):
     stationCount: Optional[int] = None
     rankDeltaWoW: Optional[int] = None
     weekText: Optional[str] = None
+    weekNumber: Optional[int] = None
+    year: Optional[int] = None
+    stationCode: Optional[str] = None  # e.g., DBY5 if present
+
+    reliabilityNextDay: Optional[float] = None
+    reliabilitySameDay: Optional[float] = None
 
 class ParserResponse(BaseModel):
     count: int
@@ -394,28 +428,47 @@ def extract_summary(pdf: pdfplumber.PDF) -> Dict[str, Any]:
     text = "\n".join(filter(None, (p.extract_text() for p in pdf.pages))) or ""
     res: Dict[str, Any] = {}
 
-    def pick(pats: List[str]) -> Optional[str]:
-        for pat in pats:
-            m = re.search(pat, text, flags=re.IGNORECASE)
-            if m:
-                return m.group(1)
-        return None
+    def grab(rex: str, flags=re.IGNORECASE):
+        m = re.search(rex, text, flags)
+        return m
 
-    if m := pick([r"(?:Overall\s+Score|Gesamtscore|TOTAL\s+COMPANY\s+SCORE)\D*([\d.,]+)\s*%"]):
-        res["overallScore"] = to_num(m)
-    if m := pick([r"(?:Reliability\s*Score|Reliability)\D*([\d.,]+)\s*%"]):
-        res["reliabilityScore"] = to_num(m)
-    if m := re.search(r"(?:Rank\s+(?:in\s+Station|at\s+DBY\s*5)|RANK\s+IN\s+STATION)\D*(\d+)\D*(?:of|/|von)\D*(\d+)", text, re.IGNORECASE):
-        res["rankAtStation"], res["stationCount"] = int(m.group(1)), int(m.group(2))
-    if m := re.search(r"([+-]\s*\d+)\s*from\s*WoW", text, re.IGNORECASE):
-        val = to_num(m.group(1))
-        if val is not None:
-            res["rankDeltaWoW"] = int(val)
-    if m := re.search(r"\bWoche\s*\d{1,2}\b.*", text, re.IGNORECASE):
-        res["weekText"] = clean_str(m.group(0))
+    # Week number & year  e.g. "Week 42 - 2025"
+    if m := grab(r"\bWeek\s+(\d{1,2})\s*-\s*(\d{4})\b"):
+        res["weekNumber"] = int(m.group(1))
+        res["year"] = int(m.group(2))
+        res["weekText"] = f"Week {m.group(1)} - {m.group(2)}"
+
+    # Overall score  e.g. "Overall Score: 84.98 | Fantastic"
+    if m := grab(r"Overall\s+Score:\s*([\d.,]+)"):
+        # to_num converts "84,98" or "84.98" -> float
+        res["overallScore"] = to_num(m.group(1))
+
+    # Rank at station + WoW delta  e.g. "Rank at DBY5: 1 ( 0 WoW)"
+    if m := grab(r"Rank\s+at\s+([A-Z0-9\-]+)\s*:\s*(\d+)\s*\(\s*([+-]?\s*\d+)\s*WoW", re.IGNORECASE):
+        res["stationCode"] = clean_str(m.group(1))
+        res["rankAtStation"] = int(m.group(2))
+        # may include a leading plus/minus with space: "+ 3" / "0" / "- 2"
+        res["rankDeltaWoW"] = int(to_num(m.group(3)) or 0)
+
+    # Reliability (two flavors)
+    # Next Day Capacity Reliability 102.08%
+    if m := grab(r"Next\s+Day\s+Capacity\s+Reliability\s+([\d.,]+)\s*%"):
+        res["reliabilityNextDay"] = to_num(m.group(1))
+
+    # Same Day / Sub-Same Day Capacity Reliability 107%
+    if m := grab(r"(?:Same\s+Day|Sub-?Same\s+Day)[^%]*?Capacity\s+Reliability\s+([\d.,]+)\s*%"):
+        res["reliabilitySameDay"] = to_num(m.group(1))
+
+    # For backward compatibility, also populate 'reliabilityScore' with Next-Day if available
+    if res.get("reliabilityNextDay") is not None:
+        res["reliabilityScore"] = res["reliabilityNextDay"]
+
+    # Rank “in station X of Y” pattern (if such a variant exists in other PDFs)
+    if m := grab(r"(?:Rank\s+(?:in\s+Station|at\s+[A-Z0-9\-]+))\D*(\d+)\D*(?:of|/|von)\D*(\d+)", re.IGNORECASE):
+        res["rankAtStation"] = int(m.group(1))
+        res["stationCount"] = int(m.group(2))
 
     return res
-
 # ===============================
 # RANKING
 # ===============================
