@@ -1,19 +1,84 @@
-rules_version = '2';
+// ====================== FIRESTORE SECURITY RULES ======================
+// Project: DSP Copilot (Flutter + Firebase Auth + Firestore)
+// Features:
+// - Each authenticated user has a private subcollection (reports, scores).
+// - Users must be approved (approved == true) before reading/writing data.
+// - Admins are defined by documents in /admins/{uid}.
+// ======================================================================
 
+rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // This rule allows anyone with your Firestore database reference to view, edit,
-    // and delete all data in your Firestore database. It is useful for getting
-    // started, but it is configured to expire after 30 days because it
-    // leaves your app open to attackers. At that time, all client
-    // requests to your Firestore database will be denied.
-    //
-    // Make sure to write security rules for your app before that time, or else
-    // all client requests to your Firestore database will be denied until you Update
-    // your rules
+    // --- Utility functions ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function isApprovedUser() {
+      return isSignedIn() &&
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.approved == true;
+    }
+
+    // ==================================================================
+    // Admins collection — superusers list
+    // ==================================================================
+    match /admins/{adminId} {
+      allow read: if isAdmin();                // only admins can read admin list
+      allow create: if isAdmin();              // only admins can add other admins
+      allow delete, update: if false;          // prevent deleting admin accidentally
+    }
+
+    // ==================================================================
+    // Users collection — registration & approval
+    // ==================================================================
+    match /users/{userId} {
+      // User can read their own doc, admin can read all
+      allow read: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
+
+      // User can write their own doc only during signup
+      allow create: if request.auth != null && request.auth.uid == userId;
+
+      // Admins can approve users (set approved=true)
+      allow update: if isAdmin();
+
+      // Normal users cannot update approval or others' data
+      allow delete: if false;
+    }
+
+    // ==================================================================
+    // Reports subcollection for each user
+    // ==================================================================
+    match /users/{userId}/reports/{reportId} {
+      // User or Admin may read/write their reports
+      allow read, write: if isAdmin() || (isApprovedUser() && request.auth.uid == userId);
+    }
+
+    // ==================================================================
+    // Scores subcollection for each user
+    // ==================================================================
+    match /users/{userId}/scores/{scoreId} {
+      allow read, write: if isAdmin() || (isApprovedUser() && request.auth.uid == userId);
+    }
+
+    // ==================================================================
+    // Admin Inbox (for signup approval requests)
+    // ==================================================================
+    match /adminInbox/{msgId} {
+      allow create: if isSignedIn();           // anyone can trigger new signup request
+      allow read, update, delete: if isAdmin();
+    }
+
+    // ==================================================================
+    // Default deny for everything else
+    // ==================================================================
     match /{document=**} {
-      allow read, write: if request.time < timestamp.date(2025, 12, 4);
+      allow read, write: if false;
     }
   }
 }

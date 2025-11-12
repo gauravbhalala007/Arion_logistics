@@ -21,8 +21,8 @@
     }
   },
   "firestore": {
-    "database": "gaurav-arion-001-e533e",
-    "location": "eur3",
+    "database": "(default)",
+    "location": "nam5",
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },

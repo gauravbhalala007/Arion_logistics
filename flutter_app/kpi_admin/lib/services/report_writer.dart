@@ -1,4 +1,6 @@
+// lib/services/report_writer.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ReportWriter {
   static String _normStation(String? code) {
@@ -14,20 +16,10 @@ class ReportWriter {
     return '${station}_${year}-W$week';
   }
 
-  // simple ISO week calc (adequate for our use)
   static int _isoWeekOfYear(DateTime date) {
     final thursday = date.add(Duration(days: (4 - (date.weekday == 7 ? 0 : date.weekday))));
     final firstThursday = DateTime(thursday.year, 1, 4);
     return ((thursday.difference(firstThursday).inDays) / 7).floor() + 1;
-  }
-
-  static String _bucketFor(num? finalScore) {
-    if (finalScore == null) return 'Unknown';
-    final fs = finalScore.toDouble();
-    if (fs >= 85) return 'Fantastic';
-    if (fs >= 70) return 'Great';
-    if (fs >= 55) return 'Fair';
-    return 'Poor';
   }
 
   static Future<void> writeReportAndScores({
@@ -35,12 +27,13 @@ class ReportWriter {
     required String storagePath,
   }) async {
     final db = FirebaseFirestore.instance;
+    final uid = FirebaseAuth.instance.currentUser!.uid;
 
     final summary = (parserJson['summary'] as Map?)?.map((k, v) => MapEntry(k.toString(), v)) ?? <String, dynamic>{};
     final drivers = (parserJson['drivers'] as List?)?.cast<Map>() ?? const [];
 
     final reportId = makeReportId(summary);
-    final reportRef = db.collection('reports').doc(reportId);
+    final reportRef = db.collection('users').doc(uid).collection('reports').doc(reportId);
 
     final year = (summary['year'] as num?)?.toInt();
     final week = (summary['weekNumber'] as num?)?.toInt();
@@ -70,6 +63,15 @@ class ReportWriter {
       'createdAt'  : FieldValue.serverTimestamp(),
       'updatedAt'  : FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+
+    // NEW: load user driver dictionary once
+    final driverDictSnap = await db
+        .collection('users').doc(uid)
+        .collection('drivers').get();
+    final driverDict = <String, String>{
+      for (final d in driverDictSnap.docs)
+        (d.data()['transporterId'] ?? d.id).toString(): (d.data()['driverName'] ?? '').toString(),
+    };
 
     final batch = db.batch();
 
@@ -101,24 +103,38 @@ class ReportWriter {
       };
 
       final rank = (m['rank'] as num?)?.toInt();
-      final bucket = _bucketFor(comp['FinalScore'] as num?);
 
-      // deterministic score doc id → prevents duplicates for same reportId + transporter
+      final incomingBucket = (m['statusBucket'] ?? '').toString().trim();
+      final bucket = incomingBucket.isNotEmpty ? incomingBucket : 'Unknown';
+
       final scoreId = '${reportId}_$transporterId';
-      final scoreRef = db.collection('scores').doc(scoreId);
+      final scoreRef = db.collection('users').doc(uid).collection('scores').doc(scoreId);
+
+      final driverName = driverDict[transporterId];
 
       batch.set(scoreRef, {
-        'reportRef'   : reportRef,
+        'reportRef'    : reportRef,
         'transporterId': transporterId,
-        'year'        : year,
-        'weekNumber'  : week,
-        'reportDate'  : FieldValue.serverTimestamp(),
-        'kpis'        : kpis,
-        'comp'        : comp,
-        'rank'        : rank,
-        'statusBucket': bucket,
-        'computedAt'  : FieldValue.serverTimestamp(),
+        'driverName'   : driverName, // <-- attach if known
+        'year'         : year,
+        'weekNumber'   : week,
+        'reportDate'   : FieldValue.serverTimestamp(),
+        'kpis'         : kpis,
+        'comp'         : comp,
+        'rank'         : rank,
+        'statusBucket' : bucket,
+        'computedAt'   : FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
+
+      // Also reflect into this report’s /driverNames for convenience
+      if (driverName != null && driverName.isNotEmpty) {
+        final dnRef = reportRef.collection('driverNames').doc(transporterId);
+        batch.set(dnRef, {
+          'transporterId': transporterId,
+          'driverName'   : driverName,
+          'updatedAt'    : FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
     }
 
     await batch.commit();
