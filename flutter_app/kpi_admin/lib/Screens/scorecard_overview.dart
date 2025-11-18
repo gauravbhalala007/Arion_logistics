@@ -135,34 +135,50 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
   Future<void> _uploadWeeklyPdf() async {
     if (_busyUpload) return;
     setState(() => _busyUpload = true);
+
     try {
       final picked = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf'],
         withData: true,
+        allowMultiple: true, // 👈 allow selecting multiple PDFs
       );
+
       if (picked == null || picked.files.isEmpty) {
-        setState(() => _busyUpload = false);
-        return;
+        return; // user cancelled
       }
-      final f = picked.files.single;
-      final Uint8List? bytes = f.bytes;
-      if (bytes == null) throw Exception('No file bytes');
 
-      // ✅ Parse directly (no Firebase Storage)
-      final parsed = await ParserApi.parsePdf(bytes, filename: f.name);
+      int successCount = 0;
 
-      // ✅ Write to Firestore — keep a pseudo storagePath for traceability
-      final date = DateFormat('yyyy-MM-dd').format(DateTime.now());
-      final pseudoPath = 'inline/$date/${f.name}'; // informational only
-      await ReportWriter.writeReportAndScores(
-        parserJson: parsed,
-        storagePath: pseudoPath,
-      );
+      for (final f in picked.files) {
+        final Uint8List? bytes = f.bytes;
+        if (bytes == null) continue; // skip weird cases
+
+        // ✅ Parse directly (no Firebase Storage)
+        final parsed = await ParserApi.parsePdf(bytes, filename: f.name);
+
+        // ✅ Write to Firestore — keep a pseudo storagePath for traceability
+        final date = DateFormat('yyyy-MM-dd').format(DateTime.now());
+        final pseudoPath = 'inline/$date/${f.name}'; // informational only
+
+        await ReportWriter.writeReportAndScores(
+          parserJson: parsed,
+          storagePath: pseudoPath,
+        );
+
+        successCount++;
+      }
 
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Parsed & saved. Dashboard updated.')),
+        SnackBar(
+          content: Text(
+            successCount == 1
+                ? '1 scorecard parsed & saved. Dashboard updated.'
+                : '$successCount scorecards parsed & saved. Dashboard updated.',
+          ),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
@@ -173,6 +189,7 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
       if (mounted) setState(() => _busyUpload = false);
     }
   }
+
 
   Future<void> _uploadDriverCsv() async {
     if (_busyCsv) return;
@@ -360,7 +377,7 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                           // ======== EMPTY STATE (upload panel + summary) ========
                           if (list.isEmpty) {
                             final uploadPanel = _Panel(
-                              title: 'UPLOAD SCORECARD, Driver CSV, DNR CSV',
+                              title: 'UPLOAD SCORECARD PDF',
                               trailing: Icon(Icons.more_horiz,
                                   color: _UI.textSecondary,
                                   size: _sp(20, w)),
@@ -543,7 +560,7 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                             ),
                             SizedBox(height: _pad(16, w)),
                             _Panel(
-                              title: 'UPLOAD SCORECARD, Driver CSV, DNR CSV',
+                              title: 'UPLOAD SCORECARD PDF',
                               trailing: Icon(Icons.more_horiz,
                                   color: _UI.textSecondary,
                                   size: _sp(20, w)),
@@ -748,7 +765,14 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                                   child: ListView(children: leftColumnContent),
                                 ),
                                 SizedBox(width: _pad(16, w)),
-                                Expanded(flex: 2, child: rightPanel),
+                                Expanded(
+                                  flex: 2,
+                                  child: ListView(
+                                    children: [
+                                      rightPanel,
+                                    ],
+                                  ),
+                                ),
                               ],
                             );
                           }
@@ -772,7 +796,53 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
         active: AppNav.dashboard,
       ),
       title: shellTitle,
-      body: Container(color: _UI.bg, child: body),
+      body: Stack(
+        children: [
+          Container(color: _UI.bg, child: body),
+
+          if (_busyUpload) ...[
+            Positioned.fill(
+              child: Container(
+                color: Colors.black.withOpacity(0.08),
+                child: Center(
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.12),
+                          blurRadius: 20,
+                          offset: Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(
+                          width: 26,
+                          height: 26,
+                          child: CircularProgressIndicator(strokeWidth: 3),
+                        ),
+                        const SizedBox(width: 16),
+                        const Text(
+                          'Uploading & processing scorecards…',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

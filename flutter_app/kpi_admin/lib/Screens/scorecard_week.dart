@@ -556,7 +556,7 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
                               final dcr = _numOr0(comp['DCR_Score']);
                               final pod = _numOr0(comp['POD_Score']);
                               final cc  = _numOr0(comp['CC_Score']);
-                              final ce  = _numOr0(comp['CE_Score']);
+                              final ce  = _numOr0(comp['CE']);
 
                               final delivered = _numOr0(kpis['Delivered'] ?? kpis['DELIVERED'] ?? kpis['delivered']);
                               final dnr = _numOr0(kpis['DNR'] ?? kpis['DNR DPMO']);
