@@ -1,84 +1,98 @@
-// ====================== FIRESTORE SECURITY RULES ======================
-// Project: DSP Copilot (Flutter + Firebase Auth + Firestore)
-// Features:
-// - Each authenticated user has a private subcollection (reports, scores).
-// - Users must be approved (approved == true) before reading/writing data.
-// - Admins are defined by documents in /admins/{uid}.
-// ======================================================================
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- Utility functions ---
-    function isSignedIn() {
+    function signedIn() {
       return request.auth != null;
     }
 
+    function isSelf(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    // Read the caller's user doc safely
+    function me() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
     function isAdmin() {
-      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      return signedIn() && me().data.role == 'admin';
     }
 
-    function isApprovedUser() {
-      return isSignedIn() &&
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.approved == true;
+    function isApproved(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data.approved == true;
     }
 
-    // ==================================================================
-    // Admins collection — superusers list
-    // ==================================================================
-    match /admins/{adminId} {
-      allow read: if isAdmin();                // only admins can read admin list
-      allow create: if isAdmin();              // only admins can add other admins
-      allow delete, update: if false;          // prevent deleting admin accidentally
+    // driver user created by Cloud Function
+    function isDriver() {
+      return signedIn() && me().data.role == 'driver';
     }
 
-    // ==================================================================
-    // Users collection — registration & approval
-    // ==================================================================
+    // is the caller a driver that belongs to this DSP userId?
+    // (requires users/{driverUid} to have a field "dspUid")
+    function isDriverOf(userId) {
+      return isDriver() && me().data.dspUid == userId;
+    }
+
     match /users/{userId} {
-      // User can read their own doc, admin can read all
-      allow read: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
+      // Created by the user at signup (DSP/admin + also driver profiles)
+      allow create: if isSelf(userId);
 
-      // User can write their own doc only during signup
-      allow create: if request.auth != null && request.auth.uid == userId;
+      // Everyone can read their OWN user doc; admin can read all
+      allow read: if isSelf(userId) || isAdmin();
 
-      // Admins can approve users (set approved=true)
+      // Only admins may update/delete user docs (for now)
       allow update: if isAdmin();
+      allow delete: if isAdmin();
 
-      // Normal users cannot update approval or others' data
-      allow delete: if false;
-    }
+      // ---------- reports (scorecards) ----------
+      // users/{userId}/reports/{reportId}
+      match /reports/{reportId} {
+        // DSP itself can read + write its own reports (and must be approved)
+        allow read: if isSelf(userId) && isApproved(userId);
+        allow write: if isSelf(userId) && isApproved(userId);
 
-    // ==================================================================
-    // Reports subcollection for each user
-    // ==================================================================
-    match /users/{userId}/reports/{reportId} {
-      // User or Admin may read/write their reports
-      allow read, write: if isAdmin() || (isApprovedUser() && request.auth.uid == userId);
-    }
+        // Drivers of this DSP can READ reports (for dashboard)
+        allow read: if isDriverOf(userId) && isApproved(userId);
 
-    // ==================================================================
-    // Scores subcollection for each user
-    // ==================================================================
-    match /users/{userId}/scores/{scoreId} {
-      allow read, write: if isAdmin() || (isApprovedUser() && request.auth.uid == userId);
-    }
+        // per-report driver name mappings
+        match /driverNames/{nameId} {
+          // DSP full access
+          allow read: if isSelf(userId) && isApproved(userId);
+          allow write: if isSelf(userId) && isApproved(userId);
 
-    // ==================================================================
-    // Admin Inbox (for signup approval requests)
-    // ==================================================================
-    match /adminInbox/{msgId} {
-      allow create: if isSignedIn();           // anyone can trigger new signup request
-      allow read, update, delete: if isAdmin();
-    }
+          // drivers of this DSP can read for display
+          allow read: if isDriverOf(userId) && isApproved(userId);
+        }
+      }
 
-    // ==================================================================
-    // Default deny for everything else
-    // ==================================================================
-    match /{document=**} {
-      allow read, write: if false;
+      // ---------- scores for a report ----------
+      // users/{userId}/scores/{scoreId}
+      match /scores/{scoreId} {
+        // DSP full access
+        allow read: if isSelf(userId) && isApproved(userId);
+        allow write: if isSelf(userId) && isApproved(userId);
+
+        // drivers of this DSP can read all scores (for ranking view)
+        allow read: if isDriverOf(userId) && isApproved(userId);
+      }
+
+      // ---------- driver master data ----------
+      // users/{userId}/drivers/{driverId}   (driverId == TransporterID)
+      match /drivers/{driverId} {
+
+        // DSP can fully manage its driver list
+        allow read: if isSelf(userId) && isApproved(userId);
+        allow create, delete: if isSelf(userId) && isApproved(userId);
+        allow update: if isSelf(userId) && isApproved(userId);
+
+        // Driver can read + update ONLY his own driver doc
+        // requires users/{driverUid} to have:
+        //   dspUid: <dspUid>
+        //   transporterId: <TransporterID string>
+        allow read, update: if isDriverOf(userId)
+          && me().data.transporterId == driverId;
+      }
     }
   }
 }

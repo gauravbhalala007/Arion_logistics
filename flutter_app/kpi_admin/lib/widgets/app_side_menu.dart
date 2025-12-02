@@ -1,3 +1,5 @@
+// lib/widgets/app_side_menu.dart
+import 'dart:convert'; // 👈 for base64Decode
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -86,7 +88,7 @@ class AppSideMenu extends StatelessWidget {
               const _ThinDivider(),
               const SizedBox(height: 12),
 
-              // ---- Profile card (uses live Firebase user + Firestore name) ----
+              // ---- Profile card (uses live Firebase user + Firestore name + base64 photo) ----
               StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
                 stream: _userDocStream(),
                 builder: (context, snap) {
@@ -101,44 +103,70 @@ class AppSideMenu extends StatelessWidget {
                   })();
                   final email = u?.email ?? (profile?['email'] ?? '—');
 
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(.08),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    padding: const EdgeInsets.all(14),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            const CircleAvatar(
-                              radius: 18,
-                              backgroundColor: Colors.white24,
-                              child: Icon(Icons.person, color: Colors.white),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _ProfileText(
-                                name: name,
-                                email: email.toString(),
+                  // 👇 Try to load profile image from base64 (either directly or inside onboarding)
+                  final onboardingRaw = profile?['onboarding'];
+                  final base64Direct = profile?['profilePhotoBase64'];
+                  final img = _profileImageFromUserData(
+                    onboardingRaw: onboardingRaw,
+                    directBase64: base64Direct,
+                  );
+
+                  return InkWell(
+                    onTap: () {
+                      // 👇 Open DSP profile page (make sure /profile route exists)
+                      Navigator.of(context).pushNamed('/profile');
+                    },
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(.08),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      padding: const EdgeInsets.all(14),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 18,
+                                backgroundColor: Colors.white24,
+                                backgroundImage: img,
+                                child: img == null
+                                    ? const Icon(Icons.person, color: Colors.white)
+                                    : null,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: _ProfileText(
+                                  name: name,
+                                  email: email.toString(),
+                                ),
+                              ),
+                              const Icon(Icons.chevron_right, color: Colors.white70),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton.icon(
+                              onPressed: () async {
+                                await AuthService.signOut();
+                                if (!context.mounted) return;
+                                // 👇 After sign-out, go back to login
+                                Navigator.of(context).pushNamedAndRemoveUntil(
+                                  '/login',
+                                  (route) => false,
+                                );
+                              },
+                              icon: const Icon(Icons.logout, color: Colors.white70),
+                              label: const Text(
+                                'Sign out',
+                                style: TextStyle(color: Colors.white70),
                               ),
                             ),
-                            const Icon(Icons.chevron_right, color: Colors.white70),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: TextButton.icon(
-                            onPressed: () async => AuthService.signOut(),
-                            icon: const Icon(Icons.logout, color: Colors.white70),
-                            label: const Text(
-                              'Sign out',
-                              style: TextStyle(color: Colors.white70),
-                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   );
                 },
@@ -255,5 +283,41 @@ class _ThinDivider extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 4),
       color: Colors.white.withOpacity(0.12),
     );
+  }
+}
+
+/// 👇 Helper to decode profile photo from base64
+ImageProvider? _profileImageFromUserData({
+  dynamic onboardingRaw,
+  dynamic directBase64,
+}) {
+  // Prefer a direct field if you ever add it
+  String? base64String;
+
+  if (directBase64 != null && directBase64.toString().isNotEmpty) {
+    base64String = directBase64.toString();
+  } else if (onboardingRaw != null) {
+    Map<String, dynamic> onboarding;
+    if (onboardingRaw is Map<String, dynamic>) {
+      onboarding = onboardingRaw;
+    } else if (onboardingRaw is Map) {
+      onboarding = onboardingRaw.map((k, v) => MapEntry(k.toString(), v));
+    } else {
+      onboarding = const {};
+    }
+
+    final val = onboarding['profilePhotoBase64'];
+    if (val != null && val.toString().isNotEmpty) {
+      base64String = val.toString();
+    }
+  }
+
+  if (base64String == null || base64String.isEmpty) return null;
+
+  try {
+    final bytes = base64Decode(base64String);
+    return MemoryImage(bytes);
+  } catch (_) {
+    return null;
   }
 }
