@@ -5,7 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../Screens/login_page.dart';
 import '../Screens/scorecard_overview.dart';
-import '../Screens/driver_dashboard_page.dart';
+import '../Screens/driver_home_shell.dart';  
 import '../localization/app_localizations.dart'; // 🔹 for localeController
 
 /// Decides whether we show:
@@ -68,7 +68,7 @@ class AuthGate extends StatelessWidget {
                     (data['transporterId'] ?? '').toString();
 
                 if (dspUid.isNotEmpty && transporterId.isNotEmpty) {
-                  return DriverDashboardPage(
+                  return DriverHomeShell(
                     dspUid: dspUid,
                     driverTransporterId: transporterId,
                   );
@@ -141,7 +141,7 @@ class _DriverRouteResolver extends StatelessWidget {
         }
         final dspUid = parent.id;
 
-        return DriverDashboardPage(
+        return DriverHomeShell(
           dspUid: dspUid,
           driverTransporterId: transporterId,
         );

@@ -43,6 +43,15 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
   final _tShirtSizeCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
 
+  // extra origin + uniform fields
+  final _birthCityCtrl = TextEditingController(); // City of Birth
+  final _birthStateCtrl = TextEditingController(); // State of Birth
+  final _nationalityCtrl = TextEditingController(); // Nationality (ID CARD)
+  final _shoeSizeCtrl = TextEditingController(); // Uniform shoe size
+
+  // ID / passport expiry (step 5 field)
+  final _idDocExpiryCtrl = TextEditingController();
+
   bool _loadingInitial = true;
   bool _saving = false;
   bool _uploadingDocs = false;
@@ -56,21 +65,43 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
   // current UI language for this driver (stored in Firestore)
   String _lang = 'de';
 
+  // wizard step (0 = welcome, then 1..6 as in mockup)
+  int _step = 0;
+  static const int _lastStep = 6;
+
+  // which document type was chosen on the “ID Card, Passport” step
+  // 'id_card' or 'passport'
+  String? _selectedIdDocType;
+
   AppLocalizations get _loc => AppLocalizations.of(context);
   String get _currentLangCode => _loc.locale.languageCode.toLowerCase();
-
   String _t(String key) => _loc.t(key);
 
   String _docTypeLabel(String docType) {
     switch (docType) {
       case 'resident_permit':
         return _t('doc_resident_permit');
-      case 'driver_license':
-        return _t('doc_driver_license');
+
+      case 'driver_license_front':
+        return _t('driver_license_front');
+      case 'driver_license_back':
+        return _t('driver_license_back');
+
       case 'tax_id':
         return _t('doc_tax_id');
       case 'insurance':
         return _t('doc_insurance');
+
+      case 'id_card_front':
+        return _t('id_card_front');
+      case 'id_card_back':
+        return _t('id_card_back');
+
+      case 'passport_front':
+        return _t('passport_front');
+      case 'passport_back':
+        return _t('passport_back');
+
       default:
         return _t('doc_other_doc');
     }
@@ -123,6 +154,14 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
     _taxIdCtrl.dispose();
     _tShirtSizeCtrl.dispose();
     _notesCtrl.dispose();
+
+    _birthCityCtrl.dispose();
+    _birthStateCtrl.dispose();
+    _nationalityCtrl.dispose();
+    _shoeSizeCtrl.dispose();
+
+    _idDocExpiryCtrl.dispose();
+
     super.dispose();
   }
 
@@ -142,10 +181,11 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
       _dobCtrl.text = (onboarding['dateOfBirth'] ?? '').toString();
       _resPermitExpiryCtrl.text =
           (onboarding['residencePermitExpiry'] ?? '').toString();
-      _licenseNumberCtrl.text =
-          (onboarding['licenseNumber'] ?? '').toString();
-      _licenseExpiryCtrl.text =
-          (onboarding['licenseExpiry'] ?? '').toString();
+
+      _idDocExpiryCtrl.text = (onboarding['idDocExpiry'] ?? '').toString();
+
+      _licenseNumberCtrl.text = (onboarding['licenseNumber'] ?? '').toString();
+      _licenseExpiryCtrl.text = (onboarding['licenseExpiry'] ?? '').toString();
       _emergencyNameCtrl.text =
           (onboarding['emergencyContactName'] ?? '').toString();
       _emergencyPhoneCtrl.text =
@@ -157,16 +197,20 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
       _tShirtSizeCtrl.text = (onboarding['tShirtSize'] ?? '').toString();
       _notesCtrl.text = (onboarding['notes'] ?? '').toString();
 
+      _birthCityCtrl.text = (onboarding['birthCity'] ?? '').toString();
+      _birthStateCtrl.text = (onboarding['birthState'] ?? '').toString();
+      _nationalityCtrl.text =
+          (onboarding['nationalityIdCard'] ?? '').toString();
+      _shoeSizeCtrl.text = (onboarding['shoeSize'] ?? '').toString();
+
       // restore profile photo fields if present
       final profileBase64 =
           (onboarding['profilePhotoBase64'] ?? '').toString();
-      _profilePhotoBase64 =
-          profileBase64.isEmpty ? null : profileBase64;
+      _profilePhotoBase64 = profileBase64.isEmpty ? null : profileBase64;
 
       final profileUrl = (onboarding['profilePhotoUrl'] ?? '').toString();
       _profilePhotoUrl = profileUrl.isEmpty ? null : profileUrl;
 
-      // restore language if stored, otherwise use current app locale
       final storedLang = (onboarding['language'] ?? '').toString();
       if (storedLang.isNotEmpty) {
         _lang = storedLang;
@@ -174,7 +218,6 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
         _lang = _currentLangCode;
       }
     } catch (_) {
-      // ignore, just start empty
       _lang = _currentLangCode;
     } finally {
       if (mounted) {
@@ -201,6 +244,7 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
           'country': _countryCtrl.text.trim(),
           'dateOfBirth': _dobCtrl.text.trim(),
           'residencePermitExpiry': _resPermitExpiryCtrl.text.trim(),
+          'idDocExpiry': _idDocExpiryCtrl.text.trim(),
           'licenseNumber': _licenseNumberCtrl.text.trim(),
           'licenseExpiry': _licenseExpiryCtrl.text.trim(),
           'emergencyContactName': _emergencyNameCtrl.text.trim(),
@@ -210,12 +254,14 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
           'taxId': _taxIdCtrl.text.trim(),
           'tShirtSize': _tShirtSizeCtrl.text.trim(),
           'notes': _notesCtrl.text.trim(),
+          'birthCity': _birthCityCtrl.text.trim(),
+          'birthState': _birthStateCtrl.text.trim(),
+          'nationalityIdCard': _nationalityCtrl.text.trim(),
+          'shoeSize': _shoeSizeCtrl.text.trim(),
           'language': _lang,
-          // keep whatever photo is currently in state
           if (_profilePhotoBase64 != null)
             'profilePhotoBase64': _profilePhotoBase64,
-          if (_profilePhotoUrl != null)
-            'profilePhotoUrl': _profilePhotoUrl,
+          if (_profilePhotoUrl != null) 'profilePhotoUrl': _profilePhotoUrl,
         },
         'onboardingSubmittedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -223,10 +269,7 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
       // Mirror the same photo onto the auth user's document
       final user = FirebaseAuth.instance.currentUser;
       if (user != null && _profilePhotoBase64 != null) {
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .set(
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set(
           {
             'profilePhotoBase64': _profilePhotoBase64,
             if (_profilePhotoUrl != null) 'profilePhotoUrl': _profilePhotoUrl,
@@ -239,7 +282,7 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Onboarding form saved.')),
+        SnackBar(content: Text(_t('button_save'))),
       );
     } catch (e) {
       if (!mounted) return;
@@ -253,21 +296,26 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
     }
   }
 
+  // ✅ IMPORTANT: store exactly one Firestore doc per slot (docId == docType)
   Future<void> _pickAndUploadDocs(String docType) async {
     setState(() {
       _uploadingDocs = true;
       _uploadingDocType = docType;
     });
+
     try {
       final result = await FilePicker.platform.pickFiles(
         allowMultiple: false,
         withData: true,
       );
+
       if (result == null || result.files.isEmpty) {
-        setState(() {
-          _uploadingDocs = false;
-          _uploadingDocType = null;
-        });
+        if (mounted) {
+          setState(() {
+            _uploadingDocs = false;
+            _uploadingDocType = null;
+          });
+        }
         return;
       }
 
@@ -276,43 +324,42 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
 
       final f = result.files.first;
       final bytes = f.bytes;
-      if (bytes != null) {
-        final originalName = f.name;
-        final typeLabel = _docTypeLabel(docType);
-
-        // build a clean display name like "Resident permit.pdf"
-        String displayName = typeLabel;
-        final dotIndex = originalName.lastIndexOf('.');
-        if (dotIndex != -1 && dotIndex < originalName.length - 1) {
-          final ext = originalName.substring(dotIndex + 1);
-          displayName = '$typeLabel.$ext';
-        }
-
-        final ref = storage
-            .ref()
-            .child('driver_docs')
-            .child(widget.driverRef.id)
-            .child('${DateTime.now().millisecondsSinceEpoch}_$originalName');
-
-        await ref.putData(bytes);
-        final url = await ref.getDownloadURL();
-
-        await docsCol.add({
-          'fileName': displayName,
-          'downloadUrl': url,
-          'uploadedAt': FieldValue.serverTimestamp(),
-          'size': f.size,
-          'docType': docType,
-        });
+      if (bytes == null) {
+        throw Exception('Could not read file bytes.');
       }
 
+      final originalName = f.name;
+      final typeLabel = _docTypeLabel(docType);
+
+      String displayName = typeLabel;
+      final dotIndex = originalName.lastIndexOf('.');
+      if (dotIndex != -1 && dotIndex < originalName.length - 1) {
+        final ext = originalName.substring(dotIndex + 1);
+        displayName = '$typeLabel.$ext';
+      }
+
+      final ref = storage
+          .ref()
+          .child('driver_docs')
+          .child(widget.driverRef.id)
+          .child('${DateTime.now().millisecondsSinceEpoch}_$originalName');
+
+      await ref.putData(bytes);
+      final url = await ref.getDownloadURL();
+
+      await docsCol.doc(docType).set({
+        'fileName': displayName,
+        'downloadUrl': url,
+        'uploadedAt': FieldValue.serverTimestamp(),
+        'uploadedAtClient': Timestamp.now(),
+        'size': f.size,
+        'docType': docType,
+      }, SetOptions(merge: true));
+
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '${_docTypeLabel(docType)} uploaded.',
-          ),
-        ),
+        SnackBar(content: Text('${_docTypeLabel(docType)} uploaded.')),
       );
     } catch (e) {
       if (!mounted) return;
@@ -355,9 +402,7 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
-              'Could not read image bytes from file picker.',
-            ),
+            content: Text('Could not read image bytes from file picker.'),
           ),
         );
         setState(() {
@@ -373,8 +418,7 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
           .ref()
           .child('driver_profile_photos')
           .child(widget.driverRef.id)
-          .child(
-              'profile_${DateTime.now().millisecondsSinceEpoch}_${f.name}');
+          .child('profile_${DateTime.now().millisecondsSinceEpoch}_${f.name}');
 
       await ref.putData(bytes);
       final url = await ref.getDownloadURL();
@@ -393,16 +437,12 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Profile photo updated.'),
-        ),
+        const SnackBar(content: Text('Profile photo updated.')),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to upload profile photo: $e'),
-        ),
+        SnackBar(content: Text('Failed to upload profile photo: $e')),
       );
     } finally {
       if (mounted) {
@@ -413,9 +453,128 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
     }
   }
 
+  // ---------------------------------------------------
+  // WIZARD NAVIGATION + MAIN BUILD
+  // ---------------------------------------------------
+
+  void _goNext() {
+    // Validate only main data step
+    if (_step == 1) {
+      if (!_formKey.currentState!.validate()) return;
+    }
+    if (_step < _lastStep) {
+      setState(() => _step += 1);
+    } else {
+      _save();
+    }
+  }
+
+  void _goBack() {
+    if (_step > 0) {
+      setState(() => _step -= 1);
+    }
+  }
+
+  // derive first name from email if full name is empty
+  String _derivedFirstNameFromEmail() {
+    final email = FirebaseAuth.instance.currentUser?.email ?? '';
+    final at = email.indexOf('@');
+    if (at <= 0) return 'Driver';
+    final local = email.substring(0, at);
+    final first = local.split(RegExp(r'[._-]')).first;
+    if (first.isEmpty) return 'Driver';
+    return '${first[0].toUpperCase()}${first.substring(1)}';
+  }
+
+  // derive company name from email domain
+  String _derivedCompanyFromEmail() {
+    final email = FirebaseAuth.instance.currentUser?.email ?? '';
+    final at = email.indexOf('@');
+    if (at < 0 || at >= email.length - 1) return '(Company Name)';
+    final domain = email.substring(at + 1);
+    final lastDot = domain.lastIndexOf('.');
+    final main = lastDot > 0 ? domain.substring(0, lastDot) : domain;
+    final cleaned = main.replaceAll(RegExp(r'[_\-]'), ' ');
+    final parts = cleaned.split(RegExp(r'\s+')).where((p) => p.isNotEmpty);
+    if (parts.isEmpty) return '(Company Name)';
+    final capitalized = parts
+        .map((p) => '${p[0].toUpperCase()}${p.substring(1).toLowerCase()}')
+        .join(' ');
+    return capitalized;
+  }
+
+  // ✅ Slot widget: shows uploaded doc in-place, otherwise shows upload placeholder
+  Widget _docSlot({
+    required String docType,
+    required Widget Function() placeholder,
+    Widget Function(Map<String, dynamic> data)? uploadedBuilder,
+  }) {
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: widget.driverRef.collection('documents').doc(docType).snapshots(),
+      builder: (context, snap) {
+        final uploadingThis = _uploadingDocs && _uploadingDocType == docType;
+
+        // While uploading, keep placeholder visible (with spinner) instead of flickering.
+        if (uploadingThis) return placeholder();
+
+        final data = snap.data?.data();
+        final url = (data?['downloadUrl'] ?? '').toString();
+
+        if (data == null || url.isEmpty) {
+          return placeholder();
+        }
+
+        if (uploadedBuilder != null) return uploadedBuilder(data);
+
+        final fileName = (data['fileName'] ?? 'Document').toString();
+
+        return InkWell(
+          onTap: () async {
+            final uri = Uri.parse(url);
+            if (await canLaunchUrl(uri)) {
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
+            }
+          },
+          borderRadius: BorderRadius.circular(18),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF4F4F4),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: Colors.grey.shade400, width: 1.2),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.insert_drive_file_outlined, size: 26),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    fileName,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  tooltip: _t('replace'),
+                  onPressed: () => _pickAndUploadDocs(docType),
+                  icon: const Icon(Icons.upload_outlined, size: 20),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // keep _lang consistent with current app locale if not loaded yet
     final appLang = _currentLangCode;
     if (_loadingInitial && _lang != appLang) {
       _lang = appLang;
@@ -425,404 +584,40 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    final width = MediaQuery.of(context).size.width;
-    final bool isMobile = width < 720;
-    final bool isNarrow = width < 960;
-    final double maxWidth = isNarrow ? width - 24 : 960.0;
-
     return Directionality(
       textDirection: _lang == 'ar' ? TextDirection.rtl : TextDirection.ltr,
-      child: ColoredBox(
-        color: const Color(0xFFF4F5FB),
+      child: Container(
+        color: Colors.transparent,
         child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: maxWidth),
-              child: Card(
-                elevation: 6,
-                shadowColor: Colors.black12,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(26),
-                ),
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isMobile ? 18 : 32,
-                    vertical: isMobile ? 18 : 28,
-                  ),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // ---------- Header row ----------
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .primary
-                                    .withOpacity(0.08),
-                                borderRadius: BorderRadius.circular(18),
-                              ),
-                              child: Icon(
-                                Icons.assignment_ind_outlined,
-                                color:
-                                    Theme.of(context).colorScheme.primary,
-                                size: 26,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: Column(
+              children: [
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      return SingleChildScrollView(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 12),
+                        child: ConstrainedBox(
+                          constraints:
+                              BoxConstraints(minHeight: constraints.maxHeight),
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 5000),
+                              child: Form(
+                                key: _formKey,
+                                child: _buildStepContent(context),
                               ),
                             ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _t('header_title'),
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleLarge
-                                        ?.copyWith(
-                                          fontWeight: FontWeight.w800,
-                                          letterSpacing: 0.3,
-                                        ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    _t('subtitle'),
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.black54,
-                                      height: 1.4,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(
-                                  _t('language_label'),
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.black54,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    borderRadius:
-                                        BorderRadius.circular(999),
-                                    border:
-                                        Border.all(color: Colors.black12),
-                                  ),
-                                  child: DropdownButtonHideUnderline(
-                                    child: DropdownButton<String>(
-                                      value: _lang,
-                                      isDense: true,
-                                      items: const [
-                                        DropdownMenuItem(
-                                          value: 'de',
-                                          child: Text('🇩🇪 Deutsch'),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: 'en',
-                                          child: Text('🇬🇧 English'),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: 'sq',
-                                          child: Text('🇦🇱 Shqip'),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: 'hu',
-                                          child: Text('🇭🇺 Magyar'),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: 'ro',
-                                          child: Text('🇷🇴 Română'),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: 'hr',
-                                          child: Text('🇭🇷 Hrvatski'),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: 'ar',
-                                          child: Text('🇸🇾 العربية'),
-                                        ),
-                                      ],
-                                      onChanged: (v) {
-                                        if (v == null) return;
-                                        setState(() {
-                                          _lang = v;
-                                        });
-                                        // update global app locale as well
-                                        localeController
-                                            .setLocale(Locale(v));
-                                      },
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 16),
-
-                        // profile photo row (avatar + upload button)
-                        _buildProfilePhotoRow(context),
-
-                        const SizedBox(height: 18),
-                        Divider(
-                          height: 1,
-                          color: Colors.grey.shade200,
-                        ),
-                        const SizedBox(height: 12),
-
-                        LayoutBuilder(
-                          builder: (context, constraints) {
-                            final bool twoCols =
-                                constraints.maxWidth > 720;
-
-                            Widget leftColumn = Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.start,
-                              children: [
-                                // PERSONAL
-                                _sectionTitle(context, _t('section_personal')),
-                                if (twoCols)
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: _textField(
-                                          controller: _fullNameCtrl,
-                                          label: _t('label_full_name'),
-                                          required: true,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 14),
-                                      Expanded(
-                                        child: _dateField(
-                                          controller: _dobCtrl,
-                                          label: _t('label_dob'),
-                                          hint: _t('hint_dob'),
-                                        ),
-                                      ),
-                                    ],
-                                  )
-                                else ...[
-                                  _textField(
-                                    controller: _fullNameCtrl,
-                                    label: _t('label_full_name'),
-                                    required: true,
-                                  ),
-                                  _dateField(
-                                    controller: _dobCtrl,
-                                    label: _t('label_dob'),
-                                    hint: _t('hint_dob'),
-                                  ),
-                                ],
-                                _textField(
-                                  controller: _nameAtBirthCtrl,
-                                  label: _t('label_name_at_birth'),
-                                ),
-                                _textField(
-                                  controller: _phoneCtrl,
-                                  label: _t('label_phone'),
-                                  required: true,
-                                ),
-
-                                // ADDRESS
-                                _sectionTitle(
-                                    context, _t('section_address')),
-                                _textField(
-                                  controller: _addressCtrl,
-                                  label: _t('label_street'),
-                                ),
-                                if (twoCols)
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: _textField(
-                                          controller: _cityCtrl,
-                                          label: _t('label_city'),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 14),
-                                      Expanded(
-                                        child: _textField(
-                                          controller: _postalCodeCtrl,
-                                          label: _t('label_postal'),
-                                        ),
-                                      ),
-                                    ],
-                                  )
-                                else ...[
-                                  _textField(
-                                    controller: _cityCtrl,
-                                    label: _t('label_city'),
-                                  ),
-                                  _textField(
-                                    controller: _postalCodeCtrl,
-                                    label: _t('label_postal'),
-                                  ),
-                                ],
-                                _textField(
-                                  controller: _countryCtrl,
-                                  label: _t('label_country'),
-                                ),
-                                _dateField(
-                                  controller: _resPermitExpiryCtrl,
-                                  label:
-                                      _t('label_residence_permit_expiry'),
-                                  hint: _t('hint_residence_permit_expiry'),
-                                ),
-                                _docUploadRow(
-                                  context: context,
-                                  docType: 'resident_permit',
-                                ),
-
-                                // LICENSE
-                                _sectionTitle(
-                                    context, _t('section_license')),
-                                _textField(
-                                  controller: _licenseNumberCtrl,
-                                  label: _t('label_license_number'),
-                                ),
-                                _dateField(
-                                  controller: _licenseExpiryCtrl,
-                                  label: _t('label_license_expiry'),
-                                  hint: _t('hint_license_expiry'),
-                                ),
-                                _docUploadRow(
-                                  context: context,
-                                  docType: 'driver_license',
-                                ),
-
-                                // EMERGENCY
-                                _sectionTitle(
-                                    context, _t('section_emergency')),
-                                _textField(
-                                  controller: _emergencyNameCtrl,
-                                  label: _t('label_emergency_name'),
-                                ),
-                                _textField(
-                                  controller: _emergencyPhoneCtrl,
-                                  label: _t('label_emergency_phone'),
-                                ),
-                              ],
-                            );
-
-                            Widget rightColumn = Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.start,
-                              children: [
-                                // PAYMENT & EQUIPMENT
-                                _sectionTitle(
-                                    context, _t('section_payment')),
-                                _textField(
-                                  controller: _ibanCtrl,
-                                  label: _t('label_iban'),
-                                ),
-                                _textField(
-                                  controller: _insuranceCompanyCtrl,
-                                  label: _t('label_insurance_company'),
-                                ),
-                                _docUploadRow(
-                                  context: context,
-                                  docType: 'insurance',
-                                ),
-                                _textField(
-                                  controller: _taxIdCtrl,
-                                  label: _t('label_tax_id'),
-                                ),
-                                _docUploadRow(
-                                  context: context,
-                                  docType: 'tax_id',
-                                ),
-                                _textField(
-                                  controller: _tShirtSizeCtrl,
-                                  label: _t('label_tshirt'),
-                                  hint: _t('hint_tshirt'),
-                                ),
-
-                                // NOTES
-                                _sectionTitle(
-                                    context, _t('section_notes')),
-                                _textField(
-                                  controller: _notesCtrl,
-                                  label: _t('label_notes'),
-                                  maxLines: 4,
-                                ),
-
-                                // DOCUMENTS OVERVIEW
-                                _sectionTitle(
-                                    context, _t('section_documents')),
-                                _DriverDocsPreview(
-                                  driverRef: widget.driverRef,
-                                ),
-                              ],
-                            );
-
-                            if (!twoCols) {
-                              return Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
-                                children: [
-                                  leftColumn,
-                                  const SizedBox(height: 16),
-                                  rightColumn,
-                                ],
-                              );
-                            }
-
-                            return Row(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.start,
-                              children: [
-                                Expanded(child: leftColumn),
-                                const SizedBox(width: 28),
-                                Expanded(child: rightColumn),
-                              ],
-                            );
-                          },
-                        ),
-
-                        const SizedBox(height: 24),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: FilledButton.icon(
-                            onPressed: _saving ? null : _save,
-                            icon: _saving
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor:
-                                          AlwaysStoppedAnimation<Color>(
-                                              Colors.white),
-                                    ),
-                                  )
-                                : const Icon(Icons.save_outlined,
-                                    size: 18),
-                            label: Text(_t('button_save')),
                           ),
                         ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
                 ),
-              ),
+                _buildBottomBar(context),
+              ],
             ),
           ),
         ),
@@ -830,182 +625,1021 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
     );
   }
 
-  // small row with avatar + upload button
-  Widget _buildProfilePhotoRow(BuildContext context) {
-    ImageProvider? provider;
-    if (_profilePhotoBase64 != null &&
-        _profilePhotoBase64!.isNotEmpty) {
-      try {
-        final bytes = base64Decode(_profilePhotoBase64!);
-        provider = MemoryImage(bytes);
-      } catch (_) {
-        provider = null;
-      }
+  Widget _buildBottomBar(BuildContext context) {
+    // On WORK PERMIT selection step we don't show "continue" (auto advance)
+    if (_step == 2) {
+      return Padding(
+        padding:
+            const EdgeInsets.only(left: 20, right: 20, bottom: 8, top: 6),
+        child: Row(
+          children: [
+            TextButton(
+              onPressed: _goBack,
+              child: Text(_t('back')),
+            ),
+            const Spacer(),
+          ],
+        ),
+      );
     }
 
-    return Align(
-      alignment: Alignment.centerLeft,
+    final bool isLast = _step == _lastStep;
+
+    return Padding(
+      padding: const EdgeInsets.only(left: 20, right: 20, bottom: 8, top: 6),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 26,
-            backgroundColor: const Color(0xFFE5E7EB),
-            backgroundImage: provider,
-            child: provider == null
-                ? const Icon(
-                    Icons.person,
-                    color: Color(0xFF6B7280),
-                  )
-                : null,
+          if (_step > 0)
+            TextButton(
+              onPressed: _goBack,
+              child: Text(_t('back')),
+            )
+          else
+            const SizedBox(width: 72),
+          const Spacer(),
+          SizedBox(
+            width: 180,
+            height: 46,
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF00B26B),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              onPressed: _saving ? null : _goNext,
+              child: _saving
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          isLast ? _t('button_save') : _t('continue'),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Icon(Icons.arrow_forward_rounded, size: 18),
+                      ],
+                    ),
+            ),
           ),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepContent(BuildContext context) {
+    switch (_step) {
+      case 0:
+        return _buildWelcomeStep(context);
+      case 1:
+        return _buildAddressOriginStep(context);
+      case 2:
+        return _buildWorkPermitSelectionStep(context);
+      case 3:
+        return _buildWorkPermitUploadStep(context);
+      case 4:
+        return _buildIdPassportChoiceStep(context);
+      case 5:
+        return _buildIdPassportUploadStep(context);
+      case 6:
+      default:
+        return _buildDriverLicenseStep(context);
+    }
+  }
+
+  // ----------------- STEP 0: WELCOME -----------------
+
+  Widget _buildWelcomeStep(BuildContext context) {
+    final name = _fullNameCtrl.text.trim().isNotEmpty
+        ? _fullNameCtrl.text.trim()
+        : _derivedFirstNameFromEmail();
+    final company = _derivedCompanyFromEmail();
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Text(
+          _t('hi_name').replaceAll('{name}', name),
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          _t('welcome_to_company').replaceAll('{company}', company),
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 20),
+        Text(
+          _t('welcome_desc'),
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 16,
+            height: 1.4,
+            color: Colors.black54,
+          ),
+        ),
+        const SizedBox(height: 40),
+        Text(
+          _t('codriver'),
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 12,
+            letterSpacing: 2,
+            color: Colors.black38.withOpacity(0.9),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ----------------- STEP 1: ADDRESS + ORIGIN + UNIFORM --------
+
+  Widget _buildAddressOriginStep(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    final email = user?.email ?? '';
+    final displayName = _fullNameCtrl.text.trim().isNotEmpty
+        ? _fullNameCtrl.text.trim()
+        : _derivedFirstNameFromEmail();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 24),
+        Text(
+          displayName,
+          style: const TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        if (email.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(
+            email,
+            style: const TextStyle(
+              fontSize: 13,
+              color: Colors.black54,
+            ),
+          ),
+        ],
+        const SizedBox(height: 24),
+        _sectionHeaderWithRequired(_t('your_address')),
+        const SizedBox(height: 8),
+        _pillInput(
+          controller: _addressCtrl,
+          hint: _t('hint_street_house'),
+          requiredField: true,
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: _pillInput(
+                controller: _postalCodeCtrl,
+                hint: _t('hint_postal_code'),
+                requiredField: true,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _pillInput(
+                controller: _cityCtrl,
+                hint: _t('hint_city'),
+                requiredField: true,
+              ),
+            ),
+          ],
+        ),
+        _pillInput(
+          controller: _countryCtrl,
+          hint: _t('hint_country'),
+          requiredField: true,
+        ),
+        const SizedBox(height: 20),
+        _sectionHeaderWithRequired(_t('your_origin')),
+        const SizedBox(height: 8),
+        _pillDateField(
+          controller: _dobCtrl,
+          hint: _t('hint_birthday'),
+          requiredField: true,
+        ),
+        _pillInput(
+          controller: _birthCityCtrl,
+          hint: _t('hint_birth_city'),
+          requiredField: false,
+        ),
+        _pillInput(
+          controller: _birthStateCtrl,
+          hint: _t('hint_birth_state'),
+          requiredField: false,
+        ),
+        _pillInput(
+          controller: _nationalityCtrl,
+          hint: _t('hint_nationality'),
+          requiredField: true,
+        ),
+        const SizedBox(height: 20),
+        _sectionHeaderWithRequired(_t('uniform')),
+        const SizedBox(height: 8),
+        _textField(
+          controller: _tShirtSizeCtrl,
+          label: _t('label_cloth_size'),
+          hint: _t('hint_cloth_size'),
+        ),
+        _textField(
+          controller: _shoeSizeCtrl,
+          label: _t('label_shoe_size'),
+          hint: _t('hint_shoe_size'),
+        ),
+        _textField(
+          controller: _notesCtrl,
+          label: _t('label_notes'),
+          maxLines: 3,
+        ),
+      ],
+    );
+  }
+
+  // ----------------- STEP 2: WORK PERMIT SELECTION -----
+
+  Widget _buildWorkPermitSelectionStep(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const SizedBox(height: 40),
+        Text(
+          _t('work_permit'),
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.0,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Text(
+            _t('work_permit_question'),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 16,
+              height: 1.4,
+              color: Colors.black54,
+            ),
+          ),
+        ),
+        const SizedBox(height: 32),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: _permitButtonColumn(),
+        ),
+      ],
+    );
+  }
+
+  Widget _permitButtonColumn() {
+    Widget buildButton(String label) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 14),
+        child: SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(
+                color: Color(0xFFFF7A00),
+                width: 1.4,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(999),
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            onPressed: () {
+              _goNext(); // auto advance
+            },
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        buildButton(_t('permit_german_id')),
+        buildButton(_t('permit_eu_id')),
+        buildButton(_t('permit_work_visa')),
+      ],
+    );
+  }
+
+  // ----------------- STEP 3: WORK PERMIT UPLOAD --------
+
+  Widget _buildWorkPermitUploadStep(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const SizedBox(height: 40),
+        Text(
+          _t('your_work_permit'),
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.0,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          _t('please_upload_doc'),
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 14,
+            color: Colors.black54,
+          ),
+        ),
+        const SizedBox(height: 18),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Text(
+            _t('upload_quality_hint'),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 13,
+              height: 1.4,
+              color: Color(0xFFFF7A00),
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: _docSlot(
+            docType: 'resident_permit',
+            placeholder: () => _workPermitUploadTile(),
+          ),
+        ),
+        const SizedBox(height: 24),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Column(
+            children: [
+              _pillDateField(
+                controller: _resPermitExpiryCtrl,
+                hint: _t('hint_select_expiry'),
+                requiredField: true,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _workPermitUploadTile() {
+    const docType = 'resident_permit';
+    final uploadingThis = _uploadingDocs && _uploadingDocType == docType;
+
+    return InkWell(
+      onTap: uploadingThis ? null : () => _pickAndUploadDocs(docType),
+      borderRadius: BorderRadius.circular(26),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF4F4F4),
+          borderRadius: BorderRadius.circular(26),
+          border: Border.all(
+            color: const Color(0xFFBDBDBD),
+            width: 1.2,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.upload_outlined, size: 32),
+            const SizedBox(height: 12),
+            Text(
+              _t('upload_your_file'),
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _t('file_formats_generic'),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 11,
+                color: Colors.black54,
+              ),
+            ),
+            if (uploadingThis) ...[
+              const SizedBox(height: 12),
+              const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ----------------- STEP 4: ID / PASSPORT CHOICE -----
+
+  Widget _buildIdPassportChoiceStep(BuildContext context) {
+    final effectiveSelection = _selectedIdDocType ?? 'id_card';
+
+    Widget choiceButton(String label, String value) {
+      final selected = effectiveSelection == value;
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 14),
+        child: SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(
+                color: const Color(0xFFFF7A00),
+                width: selected ? 1.6 : 1.2,
+              ),
+              backgroundColor:
+                  selected ? const Color(0xFFFF7A00).withOpacity(0.08) : null,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(999),
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            onPressed: () {
+              setState(() {
+                _selectedIdDocType = value;
+              });
+            },
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const SizedBox(height: 40),
+        Text(
+          _t('id_passport_title'),
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          _t('please_upload_doc'),
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 14,
+            color: Colors.black54,
+          ),
+        ),
+        const SizedBox(height: 18),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Text(
+            _t('upload_quality_hint'),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 13,
+              height: 1.4,
+              color: Color(0xFFFF7A00),
+            ),
+          ),
+        ),
+        const SizedBox(height: 32),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Column(
+            children: [
+              choiceButton(_t('id_card'), 'id_card'),
+              Text(
+                _t('or'),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Colors.black54,
+                ),
+              ),
+              const SizedBox(height: 8),
+              choiceButton(_t('passport'), 'passport'),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ----------------- STEP 5: ID / PASSPORT UPLOAD -----
+
+  String get _effectiveIdDocType => _selectedIdDocType ?? 'id_card';
+
+  Widget _buildIdPassportUploadStep(BuildContext context) {
+    final isPassport = _effectiveIdDocType == 'passport';
+    final title = isPassport ? _t('your_passport') : _t('your_id_card');
+
+    final frontType = isPassport ? 'passport_front' : 'id_card_front';
+    final backType = isPassport ? 'passport_back' : 'id_card_back';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(0, 22, 0, 22),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _t('please_upload_doc'),
+                style: const TextStyle(fontSize: 12, color: Colors.black54),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                _t('upload_quality_hint'),
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: Color(0xFFFF7A00),
+                ),
+              ),
+              const SizedBox(height: 16),
+              _docSlot(
+                docType: frontType,
+                placeholder: () => _idPassportUploadTile(
+                  docType: frontType,
+                  sideLabel: _t('frontside'),
+                ),
+              ),
+              const SizedBox(height: 14),
+              _docSlot(
+                docType: backType,
+                placeholder: () => _idPassportUploadTile(
+                  docType: backType,
+                  sideLabel: _t('backside'),
+                ),
+              ),
+              const SizedBox(height: 14),
+              _pillDateField(
+                controller: _idDocExpiryCtrl,
+                hint: _t('hint_select_expiry'),
+                requiredField: true,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _idPassportUploadTile({
+    required String docType,
+    required String sideLabel,
+  }) {
+    final uploadingThis = _uploadingDocs && _uploadingDocType == docType;
+
+    return InkWell(
+      onTap: uploadingThis ? null : () => _pickAndUploadDocs(docType),
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF4F4F4),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: Colors.grey.shade400,
+            width: 1.2,
+          ),
+        ),
+        child: Stack(
+          children: [
+            Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
+                const SizedBox(height: 6),
+                const Icon(Icons.cloud_upload_outlined, size: 28),
+                const SizedBox(height: 10),
                 Text(
-                  'Profile photo',
-                  style: TextStyle(
-                    fontSize: 13,
+                  _t('upload_your_file'),
+                  style: const TextStyle(
                     fontWeight: FontWeight.w600,
+                    fontSize: 13,
                   ),
                 ),
-                SizedBox(height: 2),
+                const SizedBox(height: 4),
                 Text(
-                  'Optional. Used in driver hub and internal view.',
-                  style: TextStyle(
+                  _t('file_formats_generic'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
                     fontSize: 11,
                     color: Colors.black54,
                   ),
                 ),
+                if (uploadingThis) ...[
+                  const SizedBox(height: 10),
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ],
               ],
             ),
-          ),
-          const SizedBox(width: 12),
-          TextButton.icon(
-            onPressed:
-                _uploadingProfilePhoto ? null : _pickAndUploadProfilePhoto,
-            icon: _uploadingProfilePhoto
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.upload_outlined, size: 18),
-            label: Text(
-              _uploadingProfilePhoto ? 'Uploading...' : 'Upload',
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _docUploadRow({
-    required BuildContext context,
-    required String docType,
-  }) {
-    final typeLabel = _docTypeLabel(docType);
-    final uploadingThis =
-        _uploadingDocs && _uploadingDocType == docType;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: InkWell(
-        onTap: uploadingThis ? null : () => _pickAndUploadDocs(docType),
-        borderRadius: BorderRadius.circular(14),
-        child: Ink(
-          decoration: BoxDecoration(
-            color: const Color(0xFFFAFAFF),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: Colors.indigo.withOpacity(0.15),
-            ),
-          ),
-          padding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
+            Positioned(
+              top: 0,
+              right: 0,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.indigo.withOpacity(0.06),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: const Color(0xFFFF7A00),
+                    width: 1,
+                  ),
+                  color: Colors.white,
                 ),
-                child: Icon(
-                  Icons.upload_file_outlined,
-                  color: Colors.indigo.shade600,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      typeLabel,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      uploadingThis
-                          ? _t('label_uploading')
-                          : 'PDF, JPG, PNG…',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  sideLabel,
+                  style: const TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFFFF7A00),
+                  ),
                 ),
               ),
-              const SizedBox(width: 8),
-              if (uploadingThis)
-                const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              else
-                Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  size: 14,
-                  color: Colors.grey.shade500,
-                ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _sectionTitle(BuildContext context, String text) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 20, bottom: 10),
-      child: Row(
-        children: [
-          Container(
-            width: 4,
-            height: 18,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary,
-              borderRadius: BorderRadius.circular(999),
-            ),
+  // ----------------- STEP 6: DRIVER LICENSE + DOCS -----
+
+  Widget _buildDriverLicenseStep(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(0, 22, 0, 22),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _t('your_drivers_license'),
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _t('please_upload_doc'),
+                style: const TextStyle(fontSize: 12, color: Colors.black54),
+              ),
+              const SizedBox(height: 12),
+              _docSlot(
+                docType: 'driver_license_front',
+                placeholder: () => _docUploadTileMobile(
+                  title: _t('upload_file_front'),
+                  subtitle: _t('file_formats_license'),
+                  docType: 'driver_license_front',
+                ),
+              ),
+              const SizedBox(height: 12),
+              _docSlot(
+                docType: 'driver_license_back',
+                placeholder: () => _docUploadTileMobile(
+                  title: _t('upload_file_back'),
+                  subtitle: _t('file_formats_license'),
+                  docType: 'driver_license_back',
+                ),
+              ),
+              const SizedBox(height: 14),
+              _dateField(
+                controller: _licenseExpiryCtrl,
+                label: _t('label_license_expiry'),
+                hint: _t('hint_license_expiry'),
+                required: true,
+              ),
+              const SizedBox(height: 18),
+              Text(
+                _t('tax_document'),
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _t('please_upload_tax_id'),
+                style: const TextStyle(fontSize: 12, color: Colors.black54),
+              ),
+              const SizedBox(height: 12),
+              _docSlot(
+                docType: 'tax_id',
+                placeholder: () => _docUploadTileMobile(
+                  title: _t('upload_tax_id'),
+                  subtitle: _t('file_formats_tax'),
+                  docType: 'tax_id',
+                ),
+              ),
+              const SizedBox(height: 18),
+              _textField(
+                controller: _ibanCtrl,
+                label: _t('label_iban'),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          Text(
-            text,
+        ),
+        const SizedBox(height: 18),
+        _DriverDocsPreview(driverRef: widget.driverRef),
+      ],
+    );
+  }
+
+  // ----------------- SMALL HELPERS -------------------
+
+  Widget _sectionHeaderWithRequired(String title) {
+    return Row(
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: const Color(0xFFFF7A00), width: 1),
+          ),
+          child: Text(
+            _t('required'),
             style: const TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 15,
+              color: Color(0xFFFF7A00),
+              fontSize: 9,
+              fontWeight: FontWeight.w500,
             ),
           ),
-        ],
+        ),
+      ],
+    );
+  }
+
+  Widget _pillInput({
+    required TextEditingController controller,
+    required String hint,
+    bool requiredField = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: FormField<String>(
+        validator: (_) {
+          if (requiredField && controller.text.trim().isEmpty) {
+            return _t('error_required_short');
+          }
+          return null;
+        },
+        builder: (state) {
+          final hasError = state.hasError;
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextFormField(
+                controller: controller,
+                decoration: InputDecoration(
+                  hintText: hint,
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  isDense: true,
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(999),
+                    borderSide: BorderSide(
+                      color: hasError ? Colors.red : const Color(0xFFE0E0E0),
+                      width: 1.3,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(999),
+                    borderSide: BorderSide(
+                      color: hasError ? Colors.red : const Color(0xFF00A884),
+                      width: 1.6,
+                    ),
+                  ),
+                ),
+                onChanged: (_) => state.didChange(controller.text),
+              ),
+              if (hasError)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6, left: 4),
+                  child: Text(
+                    state.errorText ?? _t('error_required_short'),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.red,
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _pillDateField({
+    required TextEditingController controller,
+    required String hint,
+    bool requiredField = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: FormField<String>(
+        validator: (_) {
+          if (requiredField && controller.text.trim().isEmpty) {
+            return _t('error_required_short');
+          }
+          return null;
+        },
+        builder: (state) {
+          final hasError = state.hasError;
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextFormField(
+                controller: controller,
+                readOnly: true,
+                decoration: InputDecoration(
+                  hintText: hint,
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  suffixIcon: Icon(
+                    Icons.calendar_today_outlined,
+                    size: 18,
+                    color: hasError ? Colors.red : const Color(0xFF00A884),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(999),
+                    borderSide: BorderSide(
+                      color: hasError ? Colors.red : const Color(0xFFE0E0E0),
+                      width: 1.3,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(999),
+                    borderSide: BorderSide(
+                      color: hasError ? Colors.red : const Color(0xFF00A884),
+                      width: 1.6,
+                    ),
+                  ),
+                ),
+                onTap: () async {
+                  final initial = _parseExistingOrNow(controller.text);
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: initial,
+                    firstDate: DateTime(1900),
+                    lastDate: DateTime(2100),
+                  );
+                  if (picked != null) {
+                    controller.text = _formatDate(picked);
+                    state.didChange(controller.text);
+                  }
+                },
+              ),
+              if (hasError)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6, left: 4),
+                  child: Text(
+                    state.errorText ?? _t('error_required_short'),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.red,
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _docUploadTileMobile({
+    required String title,
+    required String subtitle,
+    required String docType,
+  }) {
+    final uploadingThis = _uploadingDocs && _uploadingDocType == docType;
+
+    return InkWell(
+      onTap: uploadingThis ? null : () => _pickAndUploadDocs(docType),
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF9FAFF),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: Colors.grey.shade400,
+            width: 1.2,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_upload_outlined, size: 32),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.grey.shade600,
+              ),
+            ),
+            if (uploadingThis) ...[
+              const SizedBox(height: 12),
+              const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -1045,8 +1679,8 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
               width: 1.4,
             ),
           ),
-          contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12, vertical: 10),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         ),
         validator: !required
             ? null
@@ -1095,8 +1729,8 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
               width: 1.4,
             ),
           ),
-          contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12, vertical: 10),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         ),
         validator: !required
             ? null
@@ -1123,6 +1757,10 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
   }
 }
 
+// ===================================================================
+// PREVIEW OF UPLOADED DOCUMENTS
+// ===================================================================
+
 class _DriverDocsPreview extends StatelessWidget {
   final DocumentReference<Map<String, dynamic>> driverRef;
 
@@ -1135,12 +1773,22 @@ class _DriverDocsPreview extends StatelessWidget {
     switch (docType) {
       case 'resident_permit':
         return loc.t('doc_resident_permit');
-      case 'driver_license':
-        return loc.t('doc_driver_license');
+      case 'driver_license_front':
+        return loc.t('driver_license_front');
+      case 'driver_license_back':
+        return loc.t('driver_license_back');
       case 'tax_id':
         return loc.t('doc_tax_id');
       case 'insurance':
         return loc.t('doc_insurance');
+      case 'id_card_front':
+        return loc.t('id_card_front');
+      case 'id_card_back':
+        return loc.t('id_card_back');
+      case 'passport_front':
+        return loc.t('passport_front');
+      case 'passport_back':
+        return loc.t('passport_back');
       default:
         return loc.t('doc_other_doc');
     }
@@ -1153,7 +1801,7 @@ class _DriverDocsPreview extends StatelessWidget {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: driverRef
           .collection('documents')
-          .orderBy('uploadedAt', descending: true)
+          .orderBy('uploadedAtClient', descending: true)
           .snapshots(),
       builder: (ctx, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
@@ -1201,8 +1849,7 @@ class _DriverDocsPreview extends StatelessWidget {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             name,
@@ -1212,8 +1859,7 @@ class _DriverDocsPreview extends StatelessWidget {
                           ),
                           if (typeLabel.isNotEmpty)
                             Padding(
-                              padding:
-                                  const EdgeInsets.only(top: 2.0),
+                              padding: const EdgeInsets.only(top: 2.0),
                               child: Text(
                                 typeLabel,
                                 style: TextStyle(
@@ -1235,16 +1881,12 @@ class _DriverDocsPreview extends StatelessWidget {
                               if (await canLaunchUrl(uri)) {
                                 await launchUrl(
                                   uri,
-                                  mode:
-                                      LaunchMode.externalApplication,
+                                  mode: LaunchMode.externalApplication,
                                 );
                               } else {
-                                ScaffoldMessenger.of(context)
-                                    .showSnackBar(
+                                ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    content: Text(
-                                      'Could not open document URL',
-                                    ),
+                                    content: Text('Could not open document URL'),
                                   ),
                                 );
                               }
@@ -1257,17 +1899,13 @@ class _DriverDocsPreview extends StatelessWidget {
                         try {
                           await d.reference.delete();
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Document deleted.'),
-                            ),
+                            const SnackBar(content: Text('Document deleted.')),
                           );
                         } catch (e) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text(
-                                'Failed to delete document: $e',
-                              ),
-                            ),
+                                content:
+                                    Text('Failed to delete document: $e')),
                           );
                         }
                       },

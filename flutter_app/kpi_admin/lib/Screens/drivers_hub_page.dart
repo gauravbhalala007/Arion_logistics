@@ -16,6 +16,12 @@ import '../services/driver_csv.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/app_side_menu.dart';
 
+
+// 🔹 Default password for all newly created / reset driver logins
+const String kDefaultDriverPassword = 'Pommersfelden2024!';
+
+
+
 class DriversHubPage extends StatefulWidget {
   const DriversHubPage({super.key});
 
@@ -31,6 +37,15 @@ class _DriversHubPageState extends State<DriversHubPage> {
 
   bool _busyCsv = false;
   bool _busyList = false;
+
+  // 🔹 New: bulk/default password controller + bulk action busy flag
+  final TextEditingController _bulkPwdCtrl =
+      TextEditingController(text: kDefaultDriverPassword);
+  bool _busyBulkLogins = false;
+  // 🔹 New: visibility toggle for default password field
+  bool _bulkPwdVisible = false;
+
+
   String _search = '';
 
   @override
@@ -386,8 +401,15 @@ class _DriversHubPageState extends State<DriversHubPage> {
     final emailCtrl = TextEditingController(
       text: existingEmail.isNotEmpty ? existingEmail : suggestedEmail,
     );
-    final pwdCtrl = TextEditingController();
-    final pwd2Ctrl = TextEditingController();
+    // 🔹 Use the current default/bulk password from the top field, fallback to constant
+    final defaultPwd = _bulkPwdCtrl.text.trim().isEmpty
+        ? kDefaultDriverPassword
+        : _bulkPwdCtrl.text.trim();
+
+    final pwdCtrl = TextEditingController(text: defaultPwd);
+    final pwd2Ctrl = TextEditingController(text: defaultPwd);
+
+
 
     // --- Custom dialog with white background + pill fields ---
     final ok = await showDialog<bool>(
@@ -663,6 +685,140 @@ class _DriversHubPageState extends State<DriversHubPage> {
     );
   }
 
+    Future<void> _onCreateLoginsForAllDrivers() async {
+    if (_uid == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You must be logged in to manage driver logins.'),
+        ),
+      );
+      return;
+    }
+
+    final pwd = _bulkPwdCtrl.text.trim().isEmpty
+        ? kDefaultDriverPassword
+        : _bulkPwdCtrl.text.trim();
+
+    if (pwd.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Default password cannot be empty.')),
+      );
+      return;
+    }
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Create logins for all drivers'),
+        content: Text(
+          'This will create logins for all drivers that do not yet have a login,\n'
+          'using the password:\n\n'
+          '$pwd\n\n'
+          'Continue?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+
+    if (ok != true) return;
+
+    setState(() => _busyBulkLogins = true);
+    try {
+      final db = FirebaseFirestore.instance;
+      final driversSnap = await db
+          .collection('users')
+          .doc(_uid!)
+          .collection('drivers')
+          .get();
+
+      if (driversSnap.docs.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No drivers found for this DSP.')),
+        );
+        return;
+      }
+
+      final callable =
+          FirebaseFunctions.instance.httpsCallable('createDriverLogin');
+
+      int created = 0;
+      int skipped = 0;
+
+      for (final d in driversSnap.docs) {
+        final data = d.data();
+        final hasLogin = (data['hasLogin'] as bool?) ?? false;
+        final tidRaw = (data['transporterId'] ?? '').toString().trim();
+
+        if (tidRaw.isEmpty) {
+          skipped++;
+          continue;
+        }
+
+        // 🔹 Only create logins for drivers that don't already have one
+        if (hasLogin) {
+          skipped++;
+          continue;
+        }
+
+        final tid = tidRaw.toUpperCase();
+
+        // ensure transporterId is uppercase
+        await d.reference.set(
+          {
+            'transporterId': tid,
+            'updatedAt': FieldValue.serverTimestamp(),
+          },
+          SetOptions(merge: true),
+        );
+
+        await callable.call(<String, dynamic>{
+          'dspUid': _uid!,
+          'transporterId': tid,
+          'password': pwd,
+        });
+
+        await d.reference.set(
+          {
+            'hasLogin': true,
+            'updatedAt': FieldValue.serverTimestamp(),
+          },
+          SetOptions(merge: true),
+        );
+
+        created++;
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Created logins for $created drivers. Skipped $skipped (already had login or missing ID).',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to create logins: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _busyBulkLogins = false);
+      }
+    }
+  }
+
+
+
   // ---------------------------------------------------------------------------
   // Driver details dialog: responsive layout (no stats / weekly scores)
   // ---------------------------------------------------------------------------
@@ -818,6 +974,7 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                       }
 
                                       // ----- full list of fields, grouped into sections -----
+
                                       final personalSection = Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
@@ -833,6 +990,26 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                           _detailRow('Full name', onboarding['fullName']),
                                           _detailRow('Name at birth', onboarding['nameAtBirth']),
                                           _detailRow('Date of birth', onboarding['dateOfBirth']),
+                                          _detailRow('Phone', onboarding['phone']),
+                                        ],
+                                      );
+
+                                      final originSection = Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const SizedBox(height: 10),
+                                          const Text(
+                                            'Origin',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                              color: Color(0xFFA8a29e),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          _detailRow('City of birth', onboarding['birthCity']),
+                                          _detailRow('State of birth', onboarding['birthState']),
+                                          _detailRow('Nationality (ID card)', onboarding['nationalityIdCard']),
                                         ],
                                       );
 
@@ -856,6 +1033,24 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                         ],
                                       );
 
+                                      final documentsDatesSection = Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const SizedBox(height: 10),
+                                          const Text(
+                                            'Document expiry dates',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                              color: Color(0xFFA8a29e),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          _detailRow('Work permit expiry', onboarding['residencePermitExpiry']),
+                                          _detailRow('ID card / passport expiry', onboarding['idDocExpiry']),
+                                        ],
+                                      );
+
                                       final licenseSection = Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
@@ -869,18 +1064,8 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                             ),
                                           ),
                                           const SizedBox(height: 4),
-                                          _detailRow(
-                                            'Residence permit expiry date',
-                                            onboarding['residencePermitExpiry'],
-                                          ),
-                                          _detailRow(
-                                            'Driving license number',
-                                            onboarding['licenseNumber'],
-                                          ),
-                                          _detailRow(
-                                            'License expiry date',
-                                            onboarding['licenseExpiry'],
-                                          ),
+                                          _detailRow('Driving license number', onboarding['licenseNumber']),
+                                          _detailRow('License expiry date', onboarding['licenseExpiry']),
                                         ],
                                       );
 
@@ -897,14 +1082,8 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                             ),
                                           ),
                                           const SizedBox(height: 4),
-                                          _detailRow(
-                                            'Emergency contact name',
-                                            onboarding['emergencyContactName'],
-                                          ),
-                                          _detailRow(
-                                            'Emergency contact phone',
-                                            onboarding['emergencyContactPhone'],
-                                          ),
+                                          _detailRow('Emergency contact name', onboarding['emergencyContactName']),
+                                          _detailRow('Emergency contact phone', onboarding['emergencyContactPhone']),
                                         ],
                                       );
 
@@ -913,7 +1092,7 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                         children: [
                                           const SizedBox(height: 10),
                                           const Text(
-                                            'Payment & equipment',
+                                            'Payment & tax',
                                             style: TextStyle(
                                               fontSize: 13,
                                               fontWeight: FontWeight.w600,
@@ -921,10 +1100,27 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                             ),
                                           ),
                                           const SizedBox(height: 4),
-                                          _detailRow('Bank IBAN (optional)', onboarding['bankIban']),
+                                          _detailRow('Bank IBAN', onboarding['bankIban']),
                                           _detailRow('Insurance company', onboarding['insuranceCompany']),
                                           _detailRow('Tax ID', onboarding['taxId']),
-                                          _detailRow('T-shirt size (optional)', onboarding['tShirtSize']),
+                                        ],
+                                      );
+
+                                      final uniformSection = Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const SizedBox(height: 10),
+                                          const Text(
+                                            'Uniform',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                              color: Color(0xFFA8a29e),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          _detailRow('T-shirt size', onboarding['tShirtSize']),
+                                          _detailRow('Shoe size', onboarding['shoeSize']),
                                         ],
                                       );
 
@@ -946,20 +1142,23 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                       );
 
                                       if (narrow) {
-                                        // 🔹 Mobile / narrow: all sections in ONE column
+                                        // Mobile / narrow: all sections in ONE column
                                         return Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             personalSection,
+                                            originSection,
                                             addressSection,
+                                            documentsDatesSection,
                                             licenseSection,
                                             emergencySection,
                                             paymentSection,
+                                            uniformSection,
                                             notesSection,
                                           ],
                                         );
                                       } else {
-                                        // 🖥️ Wide: split sections into two columns
+                                        // Wide: split sections into two columns
                                         return Row(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
@@ -968,8 +1167,9 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                                 crossAxisAlignment: CrossAxisAlignment.start,
                                                 children: [
                                                   personalSection,
+                                                  originSection,
                                                   addressSection,
-                                                  emergencySection,
+                                                  // emergencySection,
                                                 ],
                                               ),
                                             ),
@@ -978,9 +1178,11 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                               child: Column(
                                                 crossAxisAlignment: CrossAxisAlignment.start,
                                                 children: [
+                                                  documentsDatesSection,
                                                   licenseSection,
                                                   paymentSection,
-                                                  notesSection,
+                                                  uniformSection,
+                                                  // notesSection,
                                                 ],
                                               ),
                                             ),
@@ -1224,19 +1426,92 @@ class _DriversHubPageState extends State<DriversHubPage> {
 
     return Column(
       children: [
-        TextField(
-          decoration: InputDecoration(
-            prefixIcon: const Icon(Icons.search),
-            hintText: 'Search by name or email...',
-            isDense: isSmall,
-          ),
-          onChanged: (value) {
-            setState(() {
-              _search = value.toLowerCase();
-            });
-          },
+        // 🔹 Top row: default password + "Create login for all" button
+        Row(
+            children: [
+                // 🔍 Search pill
+                Expanded(
+                flex: 3,
+                child: TextField(
+                    decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.search),
+                    hintText: 'Search by name or email...',
+                    isDense: isSmall,
+                    filled: true,
+                    fillColor: const Color(0xFFF9FAFB),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(999),
+                        borderSide: BorderSide.none,
+                    ),
+                    ),
+                    onChanged: (value) {
+                    setState(() {
+                        _search = value.toLowerCase();
+                    });
+                    },
+                ),
+                ),
+                const SizedBox(width: 12),
+
+                // 🔐 Default password pill + eye icon
+                Expanded(
+                flex: 2,
+                child: TextField(
+                    controller: _bulkPwdCtrl,
+                    obscureText: !_bulkPwdVisible,
+                    decoration: InputDecoration(
+                    labelText: 'Default driver password',
+                    isDense: isSmall,
+                    filled: true,
+                    fillColor: const Color(0xFFF9FAFB),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(999),
+                        borderSide: BorderSide.none,
+                    ),
+                    suffixIcon: IconButton(
+                        icon: Icon(
+                        _bulkPwdVisible
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        ),
+                        onPressed: () {
+                        setState(() {
+                            _bulkPwdVisible = !_bulkPwdVisible;
+                        });
+                        },
+                    ),
+                    ),
+                ),
+                ),
+                const SizedBox(width: 12),
+
+                // 🔑 "Create login for all" button
+                SizedBox(
+                height: isSmall ? 32 : 36,
+                child: FilledButton.icon(
+                    onPressed:
+                        _busyBulkLogins ? null : _onCreateLoginsForAllDrivers,
+                    icon: _busyBulkLogins
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                        )
+                        : const Icon(Icons.vpn_key_outlined, size: 18),
+                    label: Text(
+                    'Create login for all',
+                    style: TextStyle(fontSize: isSmall ? 11 : 13),
+                    ),
+                ),
+                ),
+            ],
         ),
         const SizedBox(height: 16),
+
         Expanded(
           child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
             stream: FirebaseFirestore.instance
@@ -1534,6 +1809,7 @@ class _DriversHubPageState extends State<DriversHubPage> {
       ],
     );
   }
+
 }
 
 // ---------------------------------------------------------------------------
@@ -1863,17 +2139,16 @@ Widget _expiryChipFromOnboardingRaw(dynamic onboardingRaw) {
     onboarding = onboardingRaw.map((k, v) => MapEntry(k.toString(), v));
   }
 
-  if (onboarding.isEmpty) {
-    return const SizedBox.shrink();
-  }
+  if (onboarding.isEmpty) return const SizedBox.shrink();
 
-  // Parse dates
+  final workPermitDate =
+      _parseIsoDate(onboarding['residencePermitExpiry']?.toString());
   final licenseDate =
       _parseIsoDate(onboarding['licenseExpiry']?.toString());
-  final permitDate =
-      _parseIsoDate(onboarding['residencePermitExpiry']?.toString());
+  final idDocDate =
+      _parseIsoDate(onboarding['idDocExpiry']?.toString());
 
-  if (licenseDate == null && permitDate == null) {
+  if (workPermitDate == null && licenseDate == null && idDocDate == null) {
     return const SizedBox.shrink();
   }
 
@@ -1893,29 +2168,25 @@ Widget _expiryChipFromOnboardingRaw(dynamic onboardingRaw) {
     }
   }
 
+  check(workPermitDate);
   check(licenseDate);
-  check(permitDate);
+  check(idDocDate);
 
-  if (expiredCount == 0 && soonCount == 0) {
-    return const SizedBox.shrink();
-  }
+  if (expiredCount == 0 && soonCount == 0) return const SizedBox.shrink();
 
   late String label;
   late Color bg;
   late Color fg;
 
   if (expiredCount > 0) {
-    // e.g. "1 document expired", "2 documents expired"
-    label =
-        '$expiredCount document${expiredCount > 1 ? 's' : ''} expired';
+    label = '$expiredCount document${expiredCount > 1 ? 's' : ''} expired';
     bg = const Color(0xFFFEE2E2);
     fg = const Color(0xFF991B1B);
   } else {
-    // only "soon"
-    label =
-        '$soonCount document${soonCount > 1 ? 's' : ''} expiring soon';
-    bg = const Color(0xFFFCA5A5);
-    fg = const Color(0xFFB91C1C);
+    label = '$soonCount document${soonCount > 1 ? 's' : ''} expiring soon';
+    // ✅ ORANGE for "soon"
+    bg = const Color(0xFFFFEDD5);
+    fg = const Color(0xFF9A3412);
   }
 
   return Container(
@@ -1934,6 +2205,7 @@ Widget _expiryChipFromOnboardingRaw(dynamic onboardingRaw) {
     ),
   );
 }
+
 
 
 
@@ -1952,26 +2224,23 @@ Widget _expiryChipDetailedFromOnboardingRaw(dynamic onboardingRaw) {
     onboarding = onboardingRaw.map((k, v) => MapEntry(k.toString(), v));
   }
 
-  if (onboarding.isEmpty) {
-    return const SizedBox.shrink();
-  }
+  if (onboarding.isEmpty) return const SizedBox.shrink();
 
-  final licenseDate =
-      _parseIsoDate(onboarding['licenseExpiry']?.toString());
-  final permitDate =
+  final workPermitDate =
       _parseIsoDate(onboarding['residencePermitExpiry']?.toString());
+  final licenseDate = _parseIsoDate(onboarding['licenseExpiry']?.toString());
+  final idDocDate = _parseIsoDate(onboarding['idDocExpiry']?.toString());
 
-  if (licenseDate == null && permitDate == null) {
+  if (workPermitDate == null && licenseDate == null && idDocDate == null) {
     return const SizedBox.shrink();
   }
 
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
 
-  bool licenseExpired = false;
-  bool licenseSoon = false;
-  bool permitExpired = false;
-  bool permitSoon = false;
+  bool wpExpired = false, wpSoon = false;
+  bool licExpired = false, licSoon = false;
+  bool idExpired = false, idSoon = false;
 
   void check(DateTime? d, void Function() markExpired, void Function() markSoon) {
     if (d == null) return;
@@ -1983,60 +2252,77 @@ Widget _expiryChipDetailedFromOnboardingRaw(dynamic onboardingRaw) {
     }
   }
 
-  check(licenseDate, () => licenseExpired = true, () => licenseSoon = true);
-  check(permitDate, () => permitExpired = true, () => permitSoon = true);
+  check(workPermitDate, () => wpExpired = true, () => wpSoon = true);
+  check(licenseDate, () => licExpired = true, () => licSoon = true);
+  check(idDocDate, () => idExpired = true, () => idSoon = true);
 
   final expiredDocs = <String>[];
   final soonDocs = <String>[];
 
-  if (licenseExpired) expiredDocs.add('Driving licence');
-  if (permitExpired) expiredDocs.add('Residence permit');
+  if (wpExpired) expiredDocs.add('Work permit');
+  if (licExpired) expiredDocs.add('Driving licence');
+  if (idExpired) expiredDocs.add('ID / Passport');
 
-  if (!licenseExpired && licenseSoon) soonDocs.add('Driving licence');
-  if (!permitExpired && permitSoon) soonDocs.add('Residence permit');
+  if (!wpExpired && wpSoon) soonDocs.add('Work permit');
+  if (!licExpired && licSoon) soonDocs.add('Driving licence');
+  if (!idExpired && idSoon) soonDocs.add('ID / Passport');
 
-  if (expiredDocs.isEmpty && soonDocs.isEmpty) {
-    return const SizedBox.shrink();
-  }
+  if (expiredDocs.isEmpty && soonDocs.isEmpty) return const SizedBox.shrink();
 
-  late String label;
-  late Color bg;
-  late Color fg;
-
-  if (expiredDocs.isNotEmpty && soonDocs.isEmpty) {
-    // Only expired
-    label = '${_joinNames(expiredDocs)} expired';
-    bg = const Color(0xFFFEE2E2);
-    fg = const Color(0xFF991B1B);
-  } else if (expiredDocs.isEmpty && soonDocs.isNotEmpty) {
-    // Only expiring soon
-    label = '${_joinNames(soonDocs)} expiring soon';
-    bg = const Color(0xFFFCA5A5);
-    fg = const Color(0xFFB91C1C);
-  } else {
-    // Both types present
-    label =
-        '${_joinNames(expiredDocs)} expired; ${_joinNames(soonDocs)} expiring soon';
-    bg = const Color(0xFFFCA5A5);
-    fg = const Color(0xFFB91C1C);
-  }
-
-  return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-    decoration: BoxDecoration(
-      color: bg,
-      borderRadius: BorderRadius.circular(999),
-    ),
-    child: Text(
-      label,
-      style: TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w600,
-        color: fg,
+  Widget pill(String label, {required Color bg, required Color fg}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
       ),
-    ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: fg,
+        ),
+      ),
+    );
+  }
+
+  // Build separate pills (red + orange), stacked neatly
+  final pills = <Widget>[];
+
+  if (expiredDocs.isNotEmpty) {
+    pills.add(
+      pill(
+        '${_joinNames(expiredDocs)} expired',
+        bg: const Color(0xFFFEE2E2),
+        fg: const Color(0xFF991B1B),
+      ),
+    );
+  }
+
+  if (soonDocs.isNotEmpty) {
+    pills.add(
+      pill(
+        '${_joinNames(soonDocs)} expiring soon',
+        bg: const Color(0xFFFFEDD5), // orange
+        fg: const Color(0xFF9A3412),
+      ),
+    );
+  }
+
+  if (pills.length == 1) return pills.first;
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      pills[0],
+      const SizedBox(height: 6),
+      pills[1],
+    ],
   );
 }
+
+
 
 
 // ---------------------------------------------------------------------------
