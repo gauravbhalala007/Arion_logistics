@@ -23,6 +23,14 @@
         {"fieldPath": "reportRef", "order": "ASCENDING"},
         {"fieldPath": "comp.FinalScore", "order": "DESCENDING"}
       ]
+    },
+    {
+      "collectionGroup": "notifications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

@@ -1,19 +1,128 @@
-rules_version='2'
-
+rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      // This rule allows anyone with your database reference to view, edit,
-      // and delete all data in your database. It is useful for getting
-      // started, but it is configured to expire after 30 days because it
-      // leaves your app open to attackers. At that time, all client
-      // requests to your database will be denied.
-      //
-      // Make sure to write security rules for your app before that time, or
-      // else all client requests to your database will be denied until you
-      // update your rules.
-      allow read, write: if request.time < timestamp.date(2025, 11, 26);
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    // Read the caller's user doc safely
+    function me() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function isAdmin() {
+      return signedIn() && me().data.role == 'admin';
+    }
+
+    function isApproved(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data.approved == true;
+    }
+
+    // driver user created by Cloud Function
+    function isDriver() {
+      return signedIn() && me().data.role == 'driver';
+    }
+
+    // is the caller a driver that belongs to this DSP userId?
+    // (requires users/{driverUid} to have a field "dspUid")
+    function isDriverOf(userId) {
+      return isDriver() && me().data.dspUid == userId;
+    }
+
+    match /users/{userId} {
+    
+    	// ---------- admin notifications ----------
+      match /notifications/{notificationId} {
+        // Admin (DSP owner) can create + read notification history
+        allow read, write: if isSelf(userId) && isApproved(userId);
+      }
+      
+      // Created by the user at signup (DSP/admin + also driver profiles)
+      allow create: if isSelf(userId);
+
+      // Everyone can read their OWN user doc; admin can read all
+      allow read: if isSelf(userId) || isAdmin();
+
+      // Only admins may update/delete user docs (for now)
+      allow update: if isAdmin() || isSelf(userId); 
+      allow delete: if isAdmin();
+
+      // ---------- reports (scorecards) ----------
+      // users/{userId}/reports/{reportId}
+      match /reports/{reportId} {
+        // DSP itself can read + write its own reports (and must be approved)
+        allow read: if isSelf(userId) && isApproved(userId);
+        allow write: if isSelf(userId) && isApproved(userId);
+
+        // Drivers of this DSP can READ reports (for dashboard)
+        allow read: if isDriverOf(userId) && isApproved(userId);
+
+        // per-report driver name mappings
+        match /driverNames/{nameId} {
+          // DSP full access
+          allow read: if isSelf(userId) && isApproved(userId);
+          allow write: if isSelf(userId) && isApproved(userId);
+
+          // drivers of this DSP can read for display
+          allow read: if isDriverOf(userId) && isApproved(userId);
+        }
+      }
+
+      // ---------- scores for a report ----------
+      // users/{userId}/scores/{scoreId}
+      match /scores/{scoreId} {
+        // DSP full access
+        allow read: if isSelf(userId) && isApproved(userId);
+        allow write: if isSelf(userId) && isApproved(userId);
+
+        // drivers of this DSP can read all scores (for ranking view)
+        allow read: if isDriverOf(userId) && isApproved(userId);
+      }
+
+      // ---------- driver master data ----------
+      // users/{userId}/drivers/{driverId}   (driverId == TransporterID)
+      match /drivers/{driverId} {
+      
+      	// ---------- driver notifications ----------
+        match /notifications/{notificationId} {
+          // DSP can create notifications for drivers
+          allow create: if isSelf(userId) && isApproved(userId);
+
+          // DSP can read/update/delete notifications (optional but useful for admin UI)
+          allow read, update, delete: if isSelf(userId) && isApproved(userId);
+
+          // Driver can read
+          allow read: if isDriverOf(userId)
+            && me().data.transporterId == driverId;
+
+          // Driver can ONLY update read/confirm fields (no editing content)
+          allow update: if isDriverOf(userId)
+            && me().data.transporterId == driverId
+            && request.resource.data.diff(resource.data).changedKeys()
+                .hasOnly(['readAt', 'confirmedAt', 'updatedAt']);
+        }
+
+
+        // DSP can fully manage its driver list
+        allow read: if isSelf(userId) && isApproved(userId);
+        allow create, delete: if isSelf(userId) && isApproved(userId);
+        allow update: if isSelf(userId) && isApproved(userId);
+
+        // Driver can read + update ONLY his own driver doc
+        allow read, update: if isDriverOf(userId)
+          && me().data.transporterId == driverId;
+
+        // ---------- driver documents subcollection ----------
+        match /documents/{docId} {
+          allow read, write: if isSelf(userId) && isApproved(userId)
+            || (isDriverOf(userId) && me().data.transporterId == driverId);
+        }
+      }
     }
   }
 }
-

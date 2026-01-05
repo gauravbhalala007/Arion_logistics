@@ -15,8 +15,12 @@ import 'package:file_picker/file_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart' as fb;
 
 import '../localization/app_localizations.dart';
+import '../models/driver_notification.dart';
 import 'driver_onboarding_page.dart';
 import 'driver_dashboard_page.dart' show DashboardTabBody;
+import 'driver_notification_detail_view.dart';
+import 'driver_notifications_view.dart';
+import 'driver_rules_view.dart';
 
 // same colors as in dashboard
 const _kBg = Color(0xFFF3F6F7);
@@ -35,6 +39,15 @@ ImageProvider? _profileImageFromUserData({dynamic directBase64}) {
   }
 }
 
+// ✅ internal single-page views
+enum DriverView {
+  dashboard,
+  onboarding,
+  notifications,
+  rules,
+  notificationDetail,
+}
+
 class DriverHomeShell extends StatefulWidget {
   final String dspUid;
   final String driverTransporterId;
@@ -51,6 +64,18 @@ class DriverHomeShell extends StatefulWidget {
 
 class _DriverHomeShellState extends State<DriverHomeShell> {
   int _tabIndex = 0; // 0 = dashboard, 2 = onboarding, others later
+
+  DriverView _view = DriverView.dashboard;
+  DriverNotification? _selectedNotification;
+
+  CollectionReference<Map<String, dynamic>> _driverNotifsCol() {
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.dspUid)
+        .collection('drivers')
+        .doc(widget.driverTransporterId.toUpperCase())
+        .collection('notifications');
+  }
 
   /// Use the SAME logic as DriverOnboardingPage._pickAndUploadProfilePhoto
   /// so data is consistent everywhere.
@@ -144,7 +169,8 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
     }
 
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
+      stream:
+          FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
       builder: (context, accountSnap) {
         final accountData = accountSnap.data?.data() ?? <String, dynamic>{};
         final accountImage = _profileImageFromUserData(
@@ -167,11 +193,28 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
               children: [
                 // ---------- HEADER (always visible) ----------
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                  child: _HeaderBar(
-                    driverName: driverName,
-                    profileImage: accountImage,
-                    onChangePhoto: () => _changeProfilePhoto(context),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                    stream: _driverNotifsCol()
+                        .where('status', isEqualTo: 'unread')
+                        .snapshots(),
+                    builder: (ctx, notifSnap) {
+                      final unreadCount = notifSnap.data?.docs.length ?? 0;
+
+                      return _HeaderBar(
+                        driverName: driverName,
+                        profileImage: accountImage,
+                        unreadCount: unreadCount,
+                        onChangePhoto: () => _changeProfilePhoto(context),
+                        onOpenNotifications: () {
+                          setState(() {
+                            _view = DriverView.notifications;
+                            _tabIndex = 0;
+                          });
+                        },
+                      );
+                    },
                   ),
                 ),
 
@@ -191,7 +234,20 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
             padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
             child: _DriverBottomNav(
               index: _tabIndex,
-              onTap: (i) => setState(() => _tabIndex = i),
+              onTap: (i) {
+                setState(() {
+                  _tabIndex = i;
+
+                  // keep your existing tabs intact, and add "Rules" internal view on index 3
+                  if (i == 0) {
+                    _view = DriverView.dashboard;
+                  } else if (i == 2) {
+                    _view = DriverView.onboarding;
+                  } else if (i == 3) {
+                    _view = DriverView.rules;
+                  }
+                });
+              },
             ),
           ),
         );
@@ -202,14 +258,14 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
   Widget _buildTabContent(BuildContext context) {
     final loc = AppLocalizations.of(context);
 
-    switch (_tabIndex) {
-      case 0:
+    switch (_view) {
+      case DriverView.dashboard:
         return DashboardTabBody(
           dspUid: widget.dspUid,
           driverTransporterId: widget.driverTransporterId,
         );
 
-      case 2:
+      case DriverView.onboarding:
         final driverRef = FirebaseFirestore.instance
             .collection('users')
             .doc(widget.dspUid)
@@ -217,8 +273,44 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
             .doc(widget.driverTransporterId.toUpperCase());
         return DriverOnboardingPage(driverRef: driverRef);
 
-      default:
-        return Center(child: Text(loc.t('coming_soon')));
+      case DriverView.notifications:
+        return DriverNotificationsView(
+          dspUid: widget.dspUid,
+          driverTransporterId: widget.driverTransporterId,
+          onOpen: (n) {
+            setState(() {
+              _selectedNotification = n;
+              _view = DriverView.notificationDetail;
+            });
+          },
+        );
+
+      case DriverView.rules:
+        return DriverRulesView(
+          dspUid: widget.dspUid,
+          driverTransporterId: widget.driverTransporterId,
+          onOpen: (n) {
+            setState(() {
+              _selectedNotification = n;
+              _view = DriverView.notificationDetail;
+            });
+          },
+        );
+
+      case DriverView.notificationDetail:
+        if (_selectedNotification == null) {
+          return Center(child: Text(loc.t('coming_soon')));
+        }
+        return DriverNotificationDetailView(
+          dspUid: widget.dspUid,
+          driverTransporterId: widget.driverTransporterId,
+          notification: _selectedNotification!,
+          onBack: () {
+            setState(() {
+              _view = DriverView.notifications;
+            });
+          },
+        );
     }
   }
 }
@@ -229,11 +321,16 @@ class _HeaderBar extends StatelessWidget {
   final String driverName;
   final ImageProvider? profileImage;
   final Future<void> Function() onChangePhoto;
+  final VoidCallback onOpenNotifications;
+
+  final int unreadCount;
 
   const _HeaderBar({
     required this.driverName,
     this.profileImage,
     required this.onChangePhoto,
+    required this.onOpenNotifications,
+    required this.unreadCount,
   });
 
   // languageCode -> asset path
@@ -286,8 +383,7 @@ class _HeaderBar extends StatelessWidget {
   }
 
   Widget _notificationBubble(VoidCallback onTap) {
-    // TODO: wire real count here later
-    const int notificationCount = 0;
+    final int notificationCount = unreadCount;
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -307,16 +403,17 @@ class _HeaderBar extends StatelessWidget {
               right: -1,
               top: -1,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                 decoration: const BoxDecoration(
                   color: Color(0xFFE9741A),
                   shape: BoxShape.circle,
                 ),
                 constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
-                child: const Center(
+                child: Center(
                   child: Text(
-                    '3', // placeholder
-                    style: TextStyle(
+                    notificationCount > 9 ? '9+' : '$notificationCount',
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
@@ -369,7 +466,8 @@ class _HeaderBar extends StatelessWidget {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 420),
               child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                margin:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(24),
@@ -385,7 +483,8 @@ class _HeaderBar extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
                       child: Row(
                         children: [
                           Expanded(
@@ -414,7 +513,8 @@ class _HeaderBar extends StatelessWidget {
                           final asset = _flagAssetForLang(code);
 
                           return ListTile(
-                            leading: SvgPicture.asset(asset, width: 26, height: 20),
+                            leading:
+                                SvgPicture.asset(asset, width: 26, height: 20),
                             title: Text(
                               languageLabel(code),
                               style: const TextStyle(
@@ -457,101 +557,6 @@ class _HeaderBar extends StatelessWidget {
     }
   }
 
-  Future<void> _openNotifications(BuildContext context) async {
-    final loc = AppLocalizations.of(context);
-
-    // TODO: replace with real notifications from Firestore later
-    final List<String> notifications = [];
-
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: false,
-      builder: (ctx) {
-        return GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => Navigator.of(ctx).pop(),
-          child: Stack(
-            children: [
-              Align(
-                alignment: Alignment.bottomCenter,
-                child: GestureDetector(
-                  onTap: () {}, // prevent closing when tapping inside
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 360),
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.12),
-                            blurRadius: 16,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    loc.t('sheet_notifications'),
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const Divider(height: 1),
-                          if (notifications.isEmpty)
-                            SizedBox(
-                              height: 80,
-                              child: Center(
-                                child: Text(
-                                  loc.t('no_notifications'),
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.black54,
-                                  ),
-                                ),
-                              ),
-                            )
-                          else
-                            Flexible(
-                              child: ListView.separated(
-                                shrinkWrap: true,
-                                padding: EdgeInsets.zero,
-                                itemCount: notifications.length,
-                                separatorBuilder: (_, __) => const Divider(height: 1),
-                                itemBuilder: (_, i) => ListTile(
-                                  title: Text(notifications[i]),
-                                ),
-                              ),
-                            ),
-                          const SizedBox(height: 8),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
   Future<void> _onProfileTap(BuildContext context) async {
     final loc = AppLocalizations.of(context);
 
@@ -573,8 +578,10 @@ class _HeaderBar extends StatelessWidget {
                 child: GestureDetector(
                   onTap: () {}, // stop closing when tapping inside
                   child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                    margin: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 20),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(24),
@@ -598,7 +605,6 @@ class _HeaderBar extends StatelessWidget {
                             borderRadius: BorderRadius.circular(999),
                           ),
                         ),
-
                         Row(
                           children: [
                             CircleAvatar(
@@ -631,10 +637,7 @@ class _HeaderBar extends StatelessWidget {
                             ),
                           ],
                         ),
-
                         const SizedBox(height: 16),
-
-                        // Change profile photo
                         SizedBox(
                           width: double.infinity,
                           child: OutlinedButton(
@@ -653,10 +656,7 @@ class _HeaderBar extends StatelessWidget {
                             ),
                           ),
                         ),
-
                         const SizedBox(height: 10),
-
-                        // Logout
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
@@ -666,12 +666,14 @@ class _HeaderBar extends StatelessWidget {
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 12),
                             ),
                             onPressed: () async {
                               Navigator.of(ctx).pop();
                               await FirebaseAuth.instance.signOut();
-                              Navigator.of(context).popUntil((r) => r.isFirst);
+                              Navigator.of(context)
+                                  .popUntil((r) => r.isFirst);
                             },
                             child: Text(
                               loc.t('profile_logout'),
@@ -700,7 +702,8 @@ class _HeaderBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context);
 
-    final currentLocale = localeController.locale ?? Localizations.localeOf(context);
+    final currentLocale =
+        localeController.locale ?? Localizations.localeOf(context);
     final langCode = currentLocale.languageCode;
     final flagAsset = _flagAssetForLang(langCode);
 
@@ -732,7 +735,6 @@ class _HeaderBar extends StatelessWidget {
             ],
           ),
         ),
-
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -753,7 +755,7 @@ class _HeaderBar extends StatelessWidget {
               onTap: () => _selectLanguage(context),
             ),
             const SizedBox(width: 10),
-            _notificationBubble(() => _openNotifications(context)),
+            _notificationBubble(onOpenNotifications),
             const SizedBox(width: 10),
             _profileChip(() => _onProfileTap(context)),
           ],
@@ -801,11 +803,21 @@ class _DriverBottomNav extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          GestureDetector(onTap: () => onTap(0), child: _icon(Icons.home_outlined, 0)),
-          GestureDetector(onTap: () => onTap(1), child: _icon(Icons.leaderboard_outlined, 1)),
-          GestureDetector(onTap: () => onTap(2), child: _icon(Icons.note_add_outlined, 2)),
-          GestureDetector(onTap: () => onTap(3), child: _icon(Icons.receipt_long_outlined, 3)),
-          GestureDetector(onTap: () => onTap(4), child: _icon(Icons.person_outline, 4)),
+          GestureDetector(
+              onTap: () => onTap(0),
+              child: _icon(Icons.home_outlined, 0)),
+          GestureDetector(
+              onTap: () => onTap(1),
+              child: _icon(Icons.leaderboard_outlined, 1)),
+          GestureDetector(
+              onTap: () => onTap(2),
+              child: _icon(Icons.note_add_outlined, 2)),
+          GestureDetector(
+              onTap: () => onTap(3),
+              child: _icon(Icons.receipt_long_outlined, 3)),
+          GestureDetector(
+              onTap: () => onTap(4),
+              child: _icon(Icons.person_outline, 4)),
         ],
       ),
     );

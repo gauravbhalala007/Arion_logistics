@@ -1,3 +1,4 @@
+// lib/widgets/app_shell.dart
 import 'package:flutter/material.dart';
 
 class AppShell extends StatelessWidget {

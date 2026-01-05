@@ -5,7 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
 
-enum AppNav { dashboard, drivers, comingSoon, adminApprovals }
+enum AppNav { dashboard, drivers, notifications, comingSoon, adminApprovals }
 
 class AppSideMenu extends StatelessWidget {
   final double width;
@@ -60,6 +60,12 @@ class AppSideMenu extends StatelessWidget {
                 label: 'Drivers Hub',
                 active: active == AppNav.drivers,
                 onTap: () => _goIfNeeded(context, '/drivers'),
+              ),
+              _MenuItem(
+                icon: Icons.notifications_none,
+                label: 'Notifications',
+                active: active == AppNav.notifications,
+                onTap: () => _goIfNeeded(context, '/notifications'),
               ),
               _MenuItem(
                 icon: Icons.timer_outlined,

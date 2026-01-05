@@ -50,21 +50,20 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyCiqVpXCj7MTX6izuHpuTXD0PMu0YAhU0k',
-    appId: '1:467245134639:web:f4b8eb4b574b916b22a7da',
-    messagingSenderId: '467245134639',
-    projectId: 'gaurav-arion-001-e533e',
-    authDomain: 'gaurav-arion-001-e533e.firebaseapp.com',
-    storageBucket: 'gaurav-arion-001-e533e.firebasestorage.app',
-    measurementId: 'G-9978J44FZS',
+    apiKey: "AIzaSyBOADpH-ncKO9Zlpr5PknM2cvE9x4vA8xc",
+  authDomain: "gaurav-arion-001-3d94a.firebaseapp.com",
+  projectId: "gaurav-arion-001-3d94a",
+  storageBucket: "gaurav-arion-001-3d94a.firebasestorage.app",
+  messagingSenderId: "835979174130",
+  appId: "1:835979174130:web:53e028fa890ddc33dff06b"
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
     apiKey: 'AIzaSyCpviyS7NfWWWad7QgmHCyu1zRzefszSs8',
     appId: '1:467245134639:ios:d21ebb7fdc28694022a7da',
     messagingSenderId: '467245134639',
-    projectId: 'gaurav-arion-001-e533e',
-    storageBucket: 'gaurav-arion-001-e533e.firebasestorage.app',
+    projectId: 'gaurav-arion-001-3d94a',
+    storageBucket: 'gaurav-arion-001-3d94a.firebasestorage.app',
     iosBundleId: 'com.example.kpiAdmin',
   );
 

@@ -1,3 +1,5 @@
+// /lib/Screens/login_page.dart
+
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart'; // Ensure this path is correct
 
@@ -158,6 +160,10 @@ class _LoginPageState extends State<LoginPage> {
                         const SizedBox(height: 16),
                         
                         // Forgot Password Link
+                        TextButton(
+                  onPressed: () => Navigator.of(context).pushReplacementNamed('/signup'),
+                  child: const Text('New here?? SignUp.'),
+                ),
                         TextButton(
                           onPressed: _reset,
                           child: Text(

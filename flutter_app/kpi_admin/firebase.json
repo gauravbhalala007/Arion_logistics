@@ -3,18 +3,18 @@
     "platforms": {
       "macos": {
         "default": {
-          "projectId": "gaurav-arion-001-e533e",
-          "appId": "1:467245134639:ios:d21ebb7fdc28694022a7da",
+          "projectId": "gaurav-arion-001-3d94a",
+          "appId": "1:835979174130:web:53e028fa890ddc33dff06b",
           "uploadDebugSymbols": false,
           "fileOutput": "macos/Runner/GoogleService-Info.plist"
         }
       },
       "dart": {
         "lib/firebase_options.dart": {
-          "projectId": "gaurav-arion-001-e533e",
+          "projectId": "gaurav-arion-001-3d94a",
           "configurations": {
             "macos": "1:467245134639:ios:d21ebb7fdc28694022a7da",
-            "web": "1:467245134639:web:f4b8eb4b574b916b22a7da"
+            "web": "1:835979174130:web:53e028fa890ddc33dff06b"
           }
         }
       }
