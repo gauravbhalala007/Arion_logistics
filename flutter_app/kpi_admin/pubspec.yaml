@@ -1,5 +1,5 @@
 name: kpi_admin
-description: "A new Flutter project."
+description: "A logistics and operations management application designed to streamline driver onboarding, document verification, user administration, and internal workflows. The platform supports role-based access, real-time data handling, and multi-language localization with a modular and scalable architecture."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev

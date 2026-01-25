@@ -9,7 +9,9 @@ import * as logger from "firebase-functions/logger";
 
 import {initializeApp} from "firebase-admin/app";
 import {getFirestore, FieldValue} from "firebase-admin/firestore";
-import {getAuth, UserRecord} from "firebase-admin/auth";
+import { getAuth, UserRecord } from "firebase-admin/auth";
+
+import {onSchedule} from "firebase-functions/v2/scheduler";
 
 // Initialize Admin SDK once
 initializeApp();
@@ -39,6 +41,11 @@ type PublishNotificationData = {
 type DriverNotificationActionData = {
   dspUid?: string;
   transporterId?: string;
+  notificationId?: string;
+};
+
+type DeleteNotificationData = {
+  dspUid?: string;
   notificationId?: string;
 };
 
@@ -236,7 +243,8 @@ export const publishNotificationToAllDrivers = onCall(async (request) => {
   const type = (data.type || "").trim();
   const title = (data.title || "").trim();
   const body = (data.body || "").trim();
-  const requiresConfirmation = !!data.requiresConfirmation;
+  const requiresConfirmation = true;
+
 
   if (!dspUid || !type || (title.length === 0 && body.length === 0)) {
     throw new HttpsError(
@@ -472,4 +480,458 @@ export const confirmDriverNotification = onCall(async (request) => {
   });
 
   return { ok: true };
+});
+
+/**
+ * Scheduled job: create/update/delete document-expiry notifications for drivers.
+ *
+ * Writes ONLY to:
+ * users/{dspUid}/drivers/{transporterId}/notifications/{notificationId}
+ *
+ * No admin history.
+ *
+ * Deduping:
+ * - Uses deterministic doc IDs per document field.
+ *
+ * Behavior:
+ * - daysLeft <= 0  => "expired"
+ * - 0 < daysLeft <= 30 => "expiring soon"
+ * - daysLeft > 30 => delete existing expiry notification (if any)
+ *
+ * Re-notify rule:
+ * - If expiry date string changed, reset status to "unread" (even if still expiring soon)
+ * - Otherwise do not spam: keep current status/readAt as-is
+ */
+export const syncDriverDocExpiryNotifications = onSchedule(
+  {
+    schedule: "every 12 hours", // UTC time by default; adjust if you want
+    region: "us-central1",
+    timeZone: "Europe/Berlin",
+    memory: "256MiB",
+  },
+  async () => {
+    const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+    /**
+     * Parses a YYYY-MM-DD string into a UTC Date at 00:00.
+     * @param {string} ymd date string in YYYY-MM-DD format
+     * @return {Date|null} parsed UTC date or null if invalid
+     */
+    function parseYmdToUtcDate(ymd: string): Date | null {
+      const s = (ymd || "").trim();
+      // expected YYYY-MM-DD
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+      if (!m) return null;
+      const y = Number(m[1]);
+      const mo = Number(m[2]);
+      const d = Number(m[3]);
+      if (!y || mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+      return new Date(Date.UTC(y, mo - 1, d, 0, 0, 0));
+    }
+
+    /**
+     * Returns today's date at UTC midnight.
+     * @return {Date} UTC start-of-day
+     */
+    function utcStartOfToday(): Date {
+      const now = new Date();
+      return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0));
+    }
+
+    /**
+     * Calculates full-day difference between today and expiry.
+     * @param {Date} todayUtc UTC start-of-today
+     * @param {Date} expiryUtc UTC expiry date
+     * @return {number} number of days until expiry
+     */
+    function daysBetweenUtc(todayUtc: Date, expiryUtc: Date): number {
+      const diff = expiryUtc.getTime() - todayUtc.getTime();
+      return Math.floor(diff / MS_PER_DAY);
+    }
+
+    const todayUtc = utcStartOfToday();
+
+    // Get DSPs (admins). Adjust this if your DSP docs are identified differently.
+    const dspSnap = await db
+      .collection("users")
+      .where("role", "==", "admin")
+      .where("approved", "==", true)
+      .get();
+
+    for (const dspDoc of dspSnap.docs) {
+      const dspUid = dspDoc.id;
+
+      const driversSnap = await db
+        .collection("users")
+        .doc(dspUid)
+        .collection("drivers")
+        .get();
+
+      // Batch per DSP (avoid 500 limit by chunking)
+      const writes: Array<Promise<unknown>> = [];
+
+      for (const driverDoc of driversSnap.docs) {
+        const transporterId = driverDoc.id; // already uppercase in your structure
+        const driverData = driverDoc.data() || {};
+        const onboarding = (driverData.onboarding || {}) as Record<string, unknown>;
+
+        // Exact keys you provided
+        const fields: Array<{key: "licenseExpiry" | "idDocExpiry" | "residencePermitExpiry"; label: string}> = [
+          {key: "licenseExpiry", label: "Driving License"},
+          {key: "idDocExpiry", label: "ID/Passport"},
+          {key: "residencePermitExpiry", label: "Work/Residence Permit"},
+        ];
+
+        for (const f of fields) {
+          const raw = (onboarding[f.key] ?? "").toString().trim();
+          const notifId = `docExpiry_${f.key}`;
+
+          const notifRef = db
+            .collection("users")
+            .doc(dspUid)
+            .collection("drivers")
+            .doc(transporterId)
+            .collection("notifications")
+            .doc(notifId);
+
+          // If missing/unparseable date -> remove existing notification (clean)
+          const expiryUtc = parseYmdToUtcDate(raw);
+          if (!expiryUtc) {
+            writes.push(
+              notifRef.get().then((s) => (s.exists ? notifRef.delete() : null)),
+            );
+            continue;
+          }
+
+          const daysLeft = daysBetweenUtc(todayUtc, expiryUtc);
+
+          // If not within 30 days -> delete existing expiry notification
+          if (daysLeft > 30) {
+            writes.push(
+              notifRef.get().then((s) => (s.exists ? notifRef.delete() : null)),
+            );
+            continue;
+          }
+
+          const severity = daysLeft <= 0 ? "expired" : "expiringSoon";
+
+          const title =
+            severity === "expired" ?
+              `${f.label} expired` :
+              `${f.label} expiring soon`;
+
+          const body =
+            severity === "expired" ?
+              `${f.label} expired on ${raw}. Please update your document.` :
+              `${f.label} will expire on ${raw} (in ${daysLeft} day${daysLeft === 1 ? "" : "s"}). Please renew soon.`;
+
+          // Dedup + re-notify only if expiry date changed:
+          writes.push(
+            (async () => {
+              const existing = await notifRef.get();
+              const existingData = existing.data() || {};
+              const existingExpiry = (existingData["expiryDate"] ?? "").toString().trim();
+
+              const expiryChanged = existingExpiry && existingExpiry !== raw;
+
+              // If expiry changed and still within range -> reset to unread
+              const shouldResetUnread = expiryChanged;
+
+              const patch: Record<string, unknown> = {
+                type: "docExpiry",
+                docKey: f.key,
+                docLabel: f.label,
+                severity,
+                title,
+                body,
+                expiryDate: raw,
+                // keep requiresConfirmation false for these
+                requiresConfirmation: true,
+                updatedAt: FieldValue.serverTimestamp(),
+              };
+
+              // First time create
+              if (!existing.exists) {
+                patch["status"] = "unread";
+                patch["createdAt"] = FieldValue.serverTimestamp();
+                patch["readAt"] = null;
+                patch["confirmedAt"] = null;
+                await notifRef.set(patch, {merge: true});
+                return;
+              }
+
+              // Update existing
+              if (shouldResetUnread) {
+                patch["status"] = "unread";
+                patch["readAt"] = null;
+                patch["confirmedAt"] = null;
+              }
+
+              await notifRef.set(patch, {merge: true});
+            })(),
+          );
+        }
+      }
+
+      // Avoid unbounded parallelism: flush in chunks
+      const CHUNK = 250;
+      for (let i = 0; i < writes.length; i += CHUNK) {
+        await Promise.allSettled(writes.slice(i, i + CHUNK));
+      }
+    }
+
+    logger.info("syncDriverDocExpiryNotifications: completed");
+  },
+);
+
+/**
+ * Deletes a broadcast notification from:
+ * - users/{dspUid}/notifications/{notificationId}           (admin history)
+ * - users/{dspUid}/drivers/{transporterId}/notifications/{notificationId} (all drivers)
+ *
+ * Security:
+ * - caller must be authenticated
+ * - caller uid must equal dspUid
+ */
+export const deleteNotificationEverywhere = onCall(async (request) => {
+  const callerUid = requireAuthUid(request.auth);
+  const data = (request.data || {}) as DeleteNotificationData;
+
+  const dspUid = (data.dspUid || "").trim();
+  const notificationId = (data.notificationId || "").trim();
+
+  if (!dspUid || !notificationId) {
+    throw new HttpsError("invalid-argument", "dspUid and notificationId are required.");
+  }
+
+  if (callerUid !== dspUid) {
+    throw new HttpsError("permission-denied", "You can only delete notifications for your own DSP.");
+  }
+
+  const adminNotifRef = db
+    .collection("users")
+    .doc(dspUid)
+    .collection("notifications")
+    .doc(notificationId);
+
+  const driversSnap = await db
+    .collection("users")
+    .doc(dspUid)
+    .collection("drivers")
+    .get();
+
+  const drivers = driversSnap.docs;
+
+  // If no drivers, still delete admin doc.
+  if (drivers.length === 0) {
+    await adminNotifRef.delete().catch(() => null);
+    return { ok: true, deletedFromDrivers: 0 };
+  }
+
+  // Batch delete from driver subcollections + admin doc
+  const chunkSize = 450;
+  for (let i = 0; i < drivers.length; i += chunkSize) {
+    const chunk = drivers.slice(i, i + chunkSize);
+    const batch = db.batch();
+
+    for (const d of chunk) {
+      const driverNotifRef = d.ref.collection("notifications").doc(notificationId);
+      batch.delete(driverNotifRef);
+    }
+
+    // delete admin doc once
+    if (i === 0) {
+      batch.delete(adminNotifRef);
+    }
+
+    await batch.commit();
+  }
+
+  logger.info(`deleteNotificationEverywhere: deleted ${notificationId} for dspUid=${dspUid} (drivers=${drivers.length})`);
+  return { ok: true, deletedFromDrivers: drivers.length };
+});
+
+type CleanupSyntheticDriverLoginsData = {
+  dspUid?: string;
+  dryRun?: boolean; // if true: only report what would be deleted
+  limit?: number; // safety cap per run
+};
+
+export const cleanupSyntheticDriverLogins = onCall(async (request) => {
+  const ctx = request.auth;
+  if (!ctx || !ctx.uid) {
+    throw new HttpsError("unauthenticated", "You must be signed in.");
+  }
+
+  const data = (request.data || {}) as CleanupSyntheticDriverLoginsData;
+  const dspUid = (data.dspUid || "").trim();
+  const dryRun = !!data.dryRun;
+  const limit = Math.max(1, Math.min(Number(data.limit ?? 500), 1000)); // cap hard
+
+  if (!dspUid) {
+    throw new HttpsError("invalid-argument", "dspUid is required.");
+  }
+
+  // DSP can only clean their own drivers
+  if (ctx.uid !== dspUid) {
+    throw new HttpsError("permission-denied", "You can only manage your own DSP.");
+  }
+
+  const driversCol = db.collection("users").doc(dspUid).collection("drivers");
+  const snap = await driversCol.get();
+
+  if (snap.empty) {
+    return { ok: true, scanned: 0, matched: 0, deletedAuth: 0, deletedUserDocs: 0, clearedDriverLinks: 0, dryRun };
+  }
+
+  const toProcess: Array<{
+    transporterId: string;
+    authUid: string;
+    loginEmail: string;
+    driverRefPath: string;
+  }> = [];
+
+  for (const doc of snap.docs) {
+    const d = doc.data() || {};
+    const authUid = (d.authUid ?? "").toString().trim();
+    const loginEmail = (d.loginEmail ?? "").toString().trim();
+    const transporterId = (d.transporterId ?? doc.id).toString().trim();
+
+    // Match only the synthetic ones
+    if (!loginEmail.endsWith("@drivers.dsp-copilot.local")) continue;
+
+    // We can delete by authUid. If missing, we'll try resolving via email.
+    toProcess.push({
+      transporterId,
+      authUid,
+      loginEmail,
+      driverRefPath: doc.ref.path,
+    });
+
+    if (toProcess.length >= limit) break;
+  }
+
+  let deletedAuth = 0;
+  let deletedUserDocs = 0;
+  let clearedDriverLinks = 0;
+
+  const results: Array<{
+    transporterId: string;
+    loginEmail: string;
+    authUid?: string;
+    authDeleted?: boolean;
+    userDocDeleted?: boolean;
+    driverLinkCleared?: boolean;
+    error?: string;
+  }> = [];
+
+  for (const item of toProcess) {
+    const driverRef = db.doc(item.driverRefPath);
+
+    if (dryRun) {
+      results.push({
+        transporterId: item.transporterId,
+        loginEmail: item.loginEmail,
+        authUid: item.authUid || undefined,
+        authDeleted: false,
+        userDocDeleted: false,
+        driverLinkCleared: false,
+      });
+      continue;
+    }
+
+    let uidToDelete = item.authUid;
+
+    // If authUid missing, resolve via email
+    if (!uidToDelete) {
+      try {
+        const u = await auth.getUserByEmail(item.loginEmail);
+        uidToDelete = u.uid;
+      } catch (err) {
+        results.push({
+          transporterId: item.transporterId,
+          loginEmail: item.loginEmail,
+          authUid: undefined,
+          error: `Could not resolve auth user by email: ${String(err)}`,
+        });
+        // Still clear linkage (since it’s synthetic), even if auth delete failed
+        try {
+          await driverRef.set(
+            {
+              hasLogin: false,
+              authUid: FieldValue.delete(),
+              loginEmail: FieldValue.delete(),
+              updatedAt: FieldValue.serverTimestamp(),
+            },
+            { merge: true }
+          );
+          clearedDriverLinks++;
+          results[results.length - 1].driverLinkCleared = true;
+        } catch (e2) {
+          // ignore
+        }
+        continue;
+      }
+    }
+
+    // 1) Delete Auth user
+    let authDeleted = false;
+    try {
+      await auth.deleteUser(uidToDelete);
+      deletedAuth++;
+      authDeleted = true;
+    } catch (err) {
+      // If already deleted, continue
+      logger.warn(`Auth delete failed uid=${uidToDelete}`, err);
+    }
+
+    // 2) Delete top-level users/{driverUid}
+    let userDocDeleted = false;
+    try {
+      await db.collection("users").doc(uidToDelete).delete();
+      deletedUserDocs++;
+      userDocDeleted = true;
+    } catch (err) {
+      logger.warn(`Firestore user doc delete failed uid=${uidToDelete}`, err);
+    }
+
+    // 3) Clear linkage on DSP driver doc (keeps driver entry intact)
+    let driverLinkCleared = false;
+    try {
+      await driverRef.set(
+        {
+          hasLogin: false,
+          authUid: FieldValue.delete(),
+          loginEmail: FieldValue.delete(),
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+      clearedDriverLinks++;
+      driverLinkCleared = true;
+    } catch (err) {
+      logger.warn(`Driver link clear failed ref=${item.driverRefPath}`, err);
+    }
+
+    results.push({
+      transporterId: item.transporterId,
+      loginEmail: item.loginEmail,
+      authUid: uidToDelete,
+      authDeleted,
+      userDocDeleted,
+      driverLinkCleared,
+    });
+  }
+
+  return {
+    ok: true,
+    scanned: snap.size,
+    matched: toProcess.length,
+    deletedAuth,
+    deletedUserDocs,
+    clearedDriverLinks,
+    dryRun,
+    limit,
+    results, // keep for debugging in console/logs; you may omit in prod
+  };
 });

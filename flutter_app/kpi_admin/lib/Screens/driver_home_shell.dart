@@ -22,6 +22,11 @@ import 'driver_notification_detail_view.dart';
 import 'driver_notifications_view.dart';
 import 'driver_rules_view.dart';
 
+import '../widgets/notification_pin_dialogs.dart';
+import 'driver_profile_page.dart';
+import 'driver_faq_page.dart';
+
+
 // same colors as in dashboard
 const _kBg = Color(0xFFF3F6F7);
 const _kPrimaryGreen = Color(0xFF1D7F5A);
@@ -42,11 +47,14 @@ ImageProvider? _profileImageFromUserData({dynamic directBase64}) {
 // ✅ internal single-page views
 enum DriverView {
   dashboard,
+  faq,
   onboarding,
   notifications,
   rules,
   notificationDetail,
+  profile,
 }
+
 
 class DriverHomeShell extends StatefulWidget {
   final String dspUid;
@@ -76,6 +84,37 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
         .doc(widget.driverTransporterId.toUpperCase())
         .collection('notifications');
   }
+
+  bool _pinPromptShown = false;
+
+  Future<void> _ensurePinOnLogin() async {
+    if (_pinPromptShown) return;
+    _pinPromptShown = true;
+
+    try {
+      final pin = await NotificationPinService.getPin(
+        dspUid: widget.dspUid,
+        transporterId: widget.driverTransporterId.toUpperCase(),
+      );
+
+      if (!mounted) return;
+
+      if (pin == null) {
+        await showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => SetNotificationPinDialog(
+            dspUid: widget.dspUid,
+            transporterId: widget.driverTransporterId.toUpperCase(),
+            force: true,
+          ),
+        );
+      }
+    } catch (_) {
+      // silent fail; we don't want to block login if Firestore fails
+    }
+  }
+
 
   /// Use the SAME logic as DriverOnboardingPage._pickAndUploadProfilePhoto
   /// so data is consistent everywhere.
@@ -165,8 +204,13 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
     if (uid == null) {
       return Scaffold(
         body: Center(child: Text(loc.t('error_must_be_logged_in_driver'))),
-      );
+      );     
     }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _ensurePinOnLogin();
+    });
+
 
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream:
@@ -241,10 +285,14 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
                   // keep your existing tabs intact, and add "Rules" internal view on index 3
                   if (i == 0) {
                     _view = DriverView.dashboard;
+                  } else if (i == 1) {
+                  _view = DriverView.faq;
                   } else if (i == 2) {
                     _view = DriverView.onboarding;
                   } else if (i == 3) {
                     _view = DriverView.rules;
+                  } else if (i == 4) {
+                    _view = DriverView.profile;
                   }
                 });
               },
@@ -264,6 +312,9 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
           dspUid: widget.dspUid,
           driverTransporterId: widget.driverTransporterId,
         );
+
+      case DriverView.faq:
+      return const DriverFaqPage();
 
       case DriverView.onboarding:
         final driverRef = FirebaseFirestore.instance
@@ -295,6 +346,12 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
               _view = DriverView.notificationDetail;
             });
           },
+        );
+
+      case DriverView.profile:
+        return DriverProfilePage(
+          dspUid: widget.dspUid,
+          driverTransporterId: widget.driverTransporterId,
         );
 
       case DriverView.notificationDetail:
@@ -808,7 +865,7 @@ class _DriverBottomNav extends StatelessWidget {
               child: _icon(Icons.home_outlined, 0)),
           GestureDetector(
               onTap: () => onTap(1),
-              child: _icon(Icons.leaderboard_outlined, 1)),
+              child: _icon(Icons.help_outline_rounded, 1)),
           GestureDetector(
               onTap: () => onTap(2),
               child: _icon(Icons.note_add_outlined, 2)),

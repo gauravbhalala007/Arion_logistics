@@ -93,8 +93,8 @@ class _LoginPageState extends State<LoginPage> {
                       // Replace 'assets/codriver_logo.png' with your actual image path.
                       Image.asset(
                         'assets/codriver_logo.png', 
-                        width: 250, // Adjust size as needed for your full logo image
-                        height: 100, 
+                        width: 350, // Adjust size as needed for your full logo image
+                        height: 200, 
                         fit: BoxFit.contain,
                       ),
                     ],
@@ -185,7 +185,7 @@ class _LoginPageState extends State<LoginPage> {
                 Align(
                   alignment: Alignment.center,
                   child: Text(
-                    'K kreativvwerk', 
+                    'Kreativvwerk', 
                     style: TextStyle(
                       color: Colors.grey.shade500,
                       fontWeight: FontWeight.bold,

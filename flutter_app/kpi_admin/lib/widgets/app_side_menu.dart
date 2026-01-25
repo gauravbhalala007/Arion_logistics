@@ -5,7 +5,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
 
-enum AppNav { dashboard, drivers, notifications, comingSoon, adminApprovals }
+enum AppNav { home, dashboard, drivers, notifications, comingSoon, adminApprovals }
+
 
 class AppSideMenu extends StatelessWidget {
   final double width;
@@ -37,17 +38,21 @@ class AppSideMenu extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'DSP COPILOT',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 18,
-                  letterSpacing: .8,
-                ),
-              ),
+              Image.asset(
+                        'assets/Codriver_logo_dark.png', 
+                        width: 300, // Adjust size as needed for your full logo image
+                        height: 61, 
+                        fit: BoxFit.contain,
+                      ),
               const SizedBox(height: 18),
               const _ThinDivider(),
+
+              _MenuItem(
+                icon: Icons.home_outlined,
+                label: 'Home',
+                active: active == AppNav.home,
+                onTap: () => _goIfNeeded(context, '/home'),
+              ),
 
               _MenuItem(
                 icon: Icons.dashboard,

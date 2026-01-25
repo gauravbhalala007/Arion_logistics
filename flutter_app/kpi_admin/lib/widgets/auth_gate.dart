@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../Screens/admin_home_page.dart';
 import '../Screens/login_page.dart';
 import '../Screens/scorecard_overview.dart';
 import '../Screens/driver_home_shell.dart';  
@@ -84,7 +85,7 @@ class AuthGate extends StatelessWidget {
               if (!approved) {
                 return _AwaitApproval(email: user.email ?? '');
               }
-              return const ScorecardOverviewPage();
+              return const AdminHomePage();
             }
 
             // ---------- CASE B: no users/{uid} doc ----------

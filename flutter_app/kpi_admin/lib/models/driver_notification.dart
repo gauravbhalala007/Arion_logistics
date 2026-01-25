@@ -79,8 +79,8 @@ class DriverNotification {
     final body = (data['body'] ?? '').toString();
 
     final createdAt = _parseDate(data['createdAt']);
-    final requiresConfirmation = (data['requiresConfirmation'] as bool?) ??
-        (typeRaw == 'rule');
+    final requiresConfirmation = (data['requiresConfirmation'] as bool?) ?? true;
+
 
     return DriverNotification(
       id: doc.id,

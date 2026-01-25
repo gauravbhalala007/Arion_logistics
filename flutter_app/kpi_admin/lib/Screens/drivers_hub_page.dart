@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:firebase_storage/firebase_storage.dart' as fb;
 
 import '../services/driver_csv.dart';
 import '../widgets/app_shell.dart';
@@ -44,6 +45,9 @@ class _DriversHubPageState extends State<DriversHubPage> {
   bool _busyBulkLogins = false;
   // 🔹 New: visibility toggle for default password field
   bool _bulkPwdVisible = false;
+
+  bool _busyCleanup = false;
+
 
 
   String _search = '';
@@ -92,9 +96,120 @@ class _DriversHubPageState extends State<DriversHubPage> {
     );
   }
 
-  // ---------- Reusable detail row with copy button ----------
-  // (label + value are selectable)
-  Widget _detailRow(String label, dynamic value) {
+
+  // ---------------------------------------------------------------------------
+  // ADMIN: Inline edit any onboarding field (pencil icon per row)
+  // ---------------------------------------------------------------------------
+
+  Future<void> _adminEditField({
+    required DocumentReference<Map<String, dynamic>> driverRef,
+    required String label,
+    required String fieldKey,
+    required String initialValue,
+    bool isDate = false,
+  }) async {
+    final ctrl = TextEditingController(text: initialValue);
+
+    String _formatDate(DateTime d) {
+      final y = d.year.toString().padLeft(4, '0');
+      final m = d.month.toString().padLeft(2, '0');
+      final day = d.day.toString().padLeft(2, '0');
+      return '$y-$m-$day';
+    }
+
+    DateTime _parseExistingOrNow(String text) {
+      if (text.trim().isEmpty) return DateTime.now();
+      try {
+        return DateTime.parse(text.trim());
+      } catch (_) {
+        return DateTime.now();
+      }
+    }
+
+    Future<void> _pickDate() async {
+      final initial = _parseExistingOrNow(ctrl.text);
+      final picked = await showDatePicker(
+        context: context,
+        initialDate: initial,
+        firstDate: DateTime(1900),
+        lastDate: DateTime(2100),
+      );
+      if (picked != null) {
+        ctrl.text = _formatDate(picked);
+      }
+    }
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Edit $label'),
+        content: SizedBox(
+          width: 520,
+          child: TextFormField(
+            controller: ctrl,
+            readOnly: isDate,
+            decoration: InputDecoration(
+              labelText: label,
+              hintText: isDate ? 'YYYY-MM-DD' : null,
+              border: const OutlineInputBorder(),
+              suffixIcon: isDate
+                  ? IconButton(
+                      icon: const Icon(Icons.calendar_today_outlined, size: 18),
+                      onPressed: _pickDate,
+                    )
+                  : null,
+            ),
+            onTap: isDate ? _pickDate : null,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (ok != true) {
+      ctrl.dispose();
+      return;
+    }
+
+    try {
+      await driverRef.set({
+        'onboarding': {
+          fieldKey: ctrl.text.trim(),
+        },
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$label updated.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update $label: $e')),
+      );
+    } finally {
+      ctrl.dispose();
+    }
+  }
+
+  // ---------- Reusable detail row with copy & edit button ----------
+  Widget _detailRowEditable({
+    required DocumentReference<Map<String, dynamic>> driverRef,
+    required String label,
+    required dynamic value,
+    required String fieldKey,
+    bool isDate = false,
+  }) {
     final text = (value ?? '').toString();
 
     return Padding(
@@ -122,7 +237,25 @@ class _DriversHubPageState extends State<DriversHubPage> {
                     style: const TextStyle(fontSize: 13),
                   ),
                 ),
-                if (text.isNotEmpty)
+
+                // ✏️ Edit
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined, size: 16),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  tooltip: 'Edit $label',
+                  onPressed: () => _adminEditField(
+                    driverRef: driverRef,
+                    label: label,
+                    fieldKey: fieldKey,
+                    initialValue: text,
+                    isDate: isDate,
+                  ),
+                ),
+
+                // 📋 Copy
+                if (text.isNotEmpty) ...[
+                  const SizedBox(width: 8),
                   IconButton(
                     icon: const Icon(Icons.copy, size: 16),
                     padding: EdgeInsets.zero,
@@ -136,6 +269,7 @@ class _DriversHubPageState extends State<DriversHubPage> {
                       );
                     },
                   ),
+                ],
               ],
             ),
           ),
@@ -143,6 +277,7 @@ class _DriversHubPageState extends State<DriversHubPage> {
       ),
     );
   }
+
 
   // ---------------------------------------------------------------------------
   // Header
@@ -763,7 +898,7 @@ class _DriversHubPageState extends State<DriversHubPage> {
           continue;
         }
 
-        // 🔹 Only create logins for drivers that don't already have one
+        // Only create logins for drivers that don't already have one
         if (hasLogin) {
           skipped++;
           continue;
@@ -771,21 +906,42 @@ class _DriversHubPageState extends State<DriversHubPage> {
 
         final tid = tidRaw.toUpperCase();
 
-        // ensure transporterId is uppercase
+        // ✅ Ensure driver has an email before calling the function
+        final existingEmail = (data['email'] ?? '').toString().trim();
+        String emailToUse = existingEmail;
+
+        if (emailToUse.isEmpty) {
+          final driverName = (data['driverName'] ?? '').toString();
+          emailToUse = _buildSuggestedDriverEmail(
+            driverName: driverName,
+            transporterId: tid,
+          );
+        }
+
+        // If still empty, skip (avoids creating @drivers.dsp-copilot.local)
+        if (emailToUse.isEmpty) {
+          skipped++;
+          continue;
+        }
+
+        // ✅ Update driver doc FIRST (same behavior as single-driver flow)
         await d.reference.set(
           {
             'transporterId': tid,
+            'email': emailToUse,
             'updatedAt': FieldValue.serverTimestamp(),
           },
           SetOptions(merge: true),
         );
 
+        // Call function
         await callable.call(<String, dynamic>{
           'dspUid': _uid!,
           'transporterId': tid,
           'password': pwd,
         });
 
+        // Mark login state
         await d.reference.set(
           {
             'hasLogin': true,
@@ -796,6 +952,7 @@ class _DriversHubPageState extends State<DriversHubPage> {
 
         created++;
       }
+
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -817,6 +974,244 @@ class _DriversHubPageState extends State<DriversHubPage> {
     }
   }
 
+
+Future<void> _cleanupSyntheticDriverLogins() async {
+  if (_uid == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('You must be logged in.')),
+    );
+    return;
+  }
+
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Delete synthetic driver logins'),
+      content: const Text(
+        'This will delete ALL driver accounts that were created with '
+        '"@drivers.dsp-copilot.local" from:\n\n'
+        '• Firebase Auth\n'
+        '• Firestore users/{driverUid}\n\n'
+        'It will also clear hasLogin/authUid/loginEmail from your drivers list.\n\n'
+        'Continue?',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(ctx).pop(true),
+          child: const Text('Delete'),
+        ),
+      ],
+    ),
+  );
+
+  if (ok != true) return;
+
+  setState(() => _busyCleanup = true);
+  try {
+    final callable = FirebaseFunctions.instance
+        .httpsCallable('cleanupSyntheticDriverLogins');
+
+    // If you ever hit callable timeouts, run in chunks by setting limit: 50, repeat.
+    final res = await callable.call(<String, dynamic>{
+      'dspUid': _uid!,
+      'dryRun': false,
+      'limit': 500,
+    });
+
+    final data = Map<String, dynamic>.from(res.data as Map);
+
+    final matched = data['matched'] ?? 0;
+    final deletedAuth = data['deletedAuth'] ?? 0;
+    final deletedUserDocs = data['deletedUserDocs'] ?? 0;
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Cleanup done. Matched: $matched | Auth deleted: $deletedAuth | '
+          'users/{uid} deleted: $deletedUserDocs',
+        ),
+      ),
+    );
+  } catch (e) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Cleanup failed: $e')),
+    );
+  } finally {
+    if (mounted) setState(() => _busyCleanup = false);
+  }
+}
+
+
+
+
+  // ---------------------------------------------------------------------------
+  // ADMIN: Upload docs + edit expiry dates (contract + other expiry)
+  // ---------------------------------------------------------------------------
+
+  String _adminDocTypeLabel(String docType) {
+    switch (docType) {
+      case 'resident_permit':
+        return 'Work permit';
+      case 'driver_license_front':
+        return 'Driving licence (front)';
+      case 'driver_license_back':
+        return 'Driving licence (back)';
+      case 'id_card_front':
+        return 'ID card (front)';
+      case 'id_card_back':
+        return 'ID card (back)';
+      case 'passport_front':
+        return 'Passport (front)';
+      case 'passport_back':
+        return 'Passport (back)';
+      case 'tax_id':
+        return 'Tax ID';
+      case 'insurance':
+        return 'Insurance';
+      case 'contract':
+        return 'Contract';
+      default:
+        return docType;
+    }
+  }
+
+  Future<void> _adminPickAndUploadDriverDoc({
+    required DocumentReference<Map<String, dynamic>> driverRef,
+    required String docType,
+  }) async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: false,
+        withData: true,
+      );
+
+      if (result == null || result.files.isEmpty) return;
+
+      final f = result.files.first;
+      final bytes = f.bytes;
+      if (bytes == null) throw Exception('Could not read file bytes.');
+
+      final originalName = f.name;
+      final typeLabel = _adminDocTypeLabel(docType);
+
+      String displayName = typeLabel;
+      final dotIndex = originalName.lastIndexOf('.');
+      if (dotIndex != -1 && dotIndex < originalName.length - 1) {
+        final ext = originalName.substring(dotIndex + 1);
+        displayName = '$typeLabel.$ext';
+      }
+
+      final storage = fb.FirebaseStorage.instance;
+      final docsCol = driverRef.collection('documents');
+
+      final ref = storage
+          .ref()
+          .child('driver_docs')
+          .child(driverRef.id)
+          .child('${DateTime.now().millisecondsSinceEpoch}_$originalName');
+
+      await ref.putData(bytes);
+      final url = await ref.getDownloadURL();
+
+      await docsCol.doc(docType).set({
+        'fileName': displayName,
+        'downloadUrl': url,
+        'uploadedAt': FieldValue.serverTimestamp(),
+        'uploadedAtClient': Timestamp.now(),
+        'size': f.size,
+        'docType': docType,
+        'uploadedBy': 'admin',
+      }, SetOptions(merge: true));
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$typeLabel uploaded.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to upload document: $e')),
+      );
+    }
+  }
+
+  Future<void> _showAdminUploadDocDialog(
+    DocumentReference<Map<String, dynamic>> driverRef,
+  ) async {
+    String selected = 'contract';
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx2, setLocal) {
+            return AlertDialog(
+              title: const Text('Upload driver document'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String>(
+                    value: selected,
+                    decoration: const InputDecoration(
+                      labelText: 'Document type',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'contract', child: Text('Contract')),
+                      DropdownMenuItem(value: 'resident_permit', child: Text('Work permit')),
+                      DropdownMenuItem(value: 'id_card_front', child: Text('ID card (front)')),
+                      DropdownMenuItem(value: 'id_card_back', child: Text('ID card (back)')),
+                      DropdownMenuItem(value: 'passport_front', child: Text('Passport (front)')),
+                      DropdownMenuItem(value: 'passport_back', child: Text('Passport (back)')),
+                      DropdownMenuItem(value: 'driver_license_front', child: Text('Driving licence (front)')),
+                      DropdownMenuItem(value: 'driver_license_back', child: Text('Driving licence (back)')),
+                      DropdownMenuItem(value: 'tax_id', child: Text('Tax ID')),
+                      DropdownMenuItem(value: 'insurance', child: Text('Insurance')),
+                    ],
+                    onChanged: (v) {
+                      if (v == null) return;
+                      setLocal(() => selected = v);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'This will create/replace the slot: documents/$selected',
+                      style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx2).pop(),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton.icon(
+                  onPressed: () async {
+                    Navigator.of(ctx2).pop();
+                    await _adminPickAndUploadDriverDoc(
+                      driverRef: driverRef,
+                      docType: selected,
+                    );
+                  },
+                  icon: const Icon(Icons.upload_outlined, size: 18),
+                  label: const Text('Choose file'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
 
 
   // ---------------------------------------------------------------------------
@@ -987,10 +1382,31 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                             ),
                                           ),
                                           const SizedBox(height: 4),
-                                          _detailRow('Full name', onboarding['fullName']),
-                                          _detailRow('Name at birth', onboarding['nameAtBirth']),
-                                          _detailRow('Date of birth', onboarding['dateOfBirth']),
-                                          _detailRow('Phone', onboarding['phone']),
+                                          _detailRowEditable(
+                                            driverRef: snap.data!.reference,
+                                            label: 'Full name',
+                                            value: onboarding['fullName'],
+                                            fieldKey: 'fullName',
+                                          ),
+
+                                          _detailRowEditable(
+                                            driverRef: snap.data!.reference,
+                                            label: 'Name at birth',
+                                            value: onboarding['nameAtBirth'],
+                                            fieldKey: 'nameAtBirth'
+                                          ),
+                                          _detailRowEditable(
+                                            driverRef: snap.data!.reference,
+                                            label: 'Date of birth',
+                                            value: onboarding['dateOfBirth'],
+                                            fieldKey: 'dateOfBirth',
+                                          ),
+                                          _detailRowEditable(
+                                            driverRef: snap.data!.reference,
+                                            label: 'Phone',
+                                            value: onboarding['phone'],
+                                            fieldKey: 'phone',
+                                          ),
                                         ],
                                       );
 
@@ -1007,9 +1423,24 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                             ),
                                           ),
                                           const SizedBox(height: 4),
-                                          _detailRow('City of birth', onboarding['birthCity']),
-                                          _detailRow('State of birth', onboarding['birthState']),
-                                          _detailRow('Nationality (ID card)', onboarding['nationalityIdCard']),
+                                          _detailRowEditable(
+                                            driverRef: snap.data!.reference,
+                                            label: 'City of birth',
+                                            value: onboarding['birthCity'],
+                                            fieldKey: 'birthCity',
+                                          ),
+                                          _detailRowEditable(
+                                            driverRef: snap.data!.reference,
+                                            label: 'State of birth',
+                                            value: onboarding['birthState'],
+                                            fieldKey: 'birthState',
+                                          ),
+                                          _detailRowEditable(
+                                            driverRef: snap.data!.reference,
+                                            label: 'Nationality (ID card)',
+                                            value: onboarding['nationalityIdCard'],
+                                            fieldKey: 'nationalityIdCard',
+                                          ),
                                         ],
                                       );
 
@@ -1026,10 +1457,30 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                             ),
                                           ),
                                           const SizedBox(height: 4),
-                                          _detailRow('Street address', onboarding['address']),
-                                          _detailRow('City', onboarding['city']),
-                                          _detailRow('Postal code', onboarding['postalCode']),
-                                          _detailRow('Country', onboarding['country']),
+                                          _detailRowEditable(
+                                            driverRef: snap.data!.reference,
+                                            label: 'Street address',
+                                            value: onboarding['address'],
+                                            fieldKey: 'address',
+                                          ),
+                                          _detailRowEditable(
+                                            driverRef: snap.data!.reference,
+                                            label: 'City',
+                                            value: onboarding['city'],
+                                            fieldKey: 'city',
+                                          ),
+                                          _detailRowEditable(
+                                            driverRef: snap.data!.reference,
+                                            label: 'Postal code',
+                                            value: onboarding['postalCode'],
+                                            fieldKey: 'postalCode',
+                                          ),
+                                          _detailRowEditable(
+                                            driverRef: snap.data!.reference,
+                                            label: 'Country',
+                                            value: onboarding['country'],
+                                            fieldKey: 'country',
+                                          ),
                                         ],
                                       );
 
@@ -1046,8 +1497,30 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                             ),
                                           ),
                                           const SizedBox(height: 4),
-                                          _detailRow('Work permit expiry', onboarding['residencePermitExpiry']),
-                                          _detailRow('ID card / passport expiry', onboarding['idDocExpiry']),
+
+                                          // ✅ Contract expiry now visible
+                                          _detailRowEditable(
+                                            driverRef: snap.data!.reference,
+                                            label: 'Contract expiry',
+                                            value: onboarding['contractExpiry'],
+                                            fieldKey: 'contractExpiry',
+                                            isDate: true,
+                                          ),
+
+                                          _detailRowEditable(
+                                            driverRef: snap.data!.reference,
+                                            label: 'Work permit expiry',
+                                            value: onboarding['residencePermitExpiry'],
+                                            fieldKey: 'residencePermitExpiry',
+                                            isDate: true,
+                                          ),
+                                          _detailRowEditable(
+                                            driverRef: snap.data!.reference,
+                                            label: 'ID card / passport expiry',
+                                            value: onboarding['idDocExpiry'],
+                                            fieldKey: 'idDocExpiry',
+                                            isDate: true,
+                                          ),
                                         ],
                                       );
 
@@ -1064,8 +1537,18 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                             ),
                                           ),
                                           const SizedBox(height: 4),
-                                          _detailRow('Driving license number', onboarding['licenseNumber']),
-                                          _detailRow('License expiry date', onboarding['licenseExpiry']),
+                                          _detailRowEditable(
+                                            driverRef: snap.data!.reference,
+                                            label: 'Driving license number',
+                                            value: onboarding['licenseNumber'],
+                                            fieldKey: 'licenseNumber',
+                                          ),
+                                          _detailRowEditable(
+                                            driverRef: snap.data!.reference,
+                                            label: 'License expiry date',
+                                            value: onboarding['licenseExpiry'],
+                                            fieldKey: 'licenseExpiry',
+                                          ),
                                         ],
                                       );
 
@@ -1082,8 +1565,18 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                             ),
                                           ),
                                           const SizedBox(height: 4),
-                                          _detailRow('Emergency contact name', onboarding['emergencyContactName']),
-                                          _detailRow('Emergency contact phone', onboarding['emergencyContactPhone']),
+                                          _detailRowEditable(
+                                            driverRef: snap.data!.reference,
+                                            label: 'Emergency contact name',
+                                            value: onboarding['emergencyContactName'],
+                                            fieldKey: 'emergencyContactName',
+                                          ),
+                                          _detailRowEditable(
+                                            driverRef: snap.data!.reference,
+                                            label: 'Emergency contact phone',
+                                            value: onboarding['emergencyContactPhone'],
+                                            fieldKey: 'emergencyContactPhone',
+                                          ),
                                         ],
                                       );
 
@@ -1100,9 +1593,24 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                             ),
                                           ),
                                           const SizedBox(height: 4),
-                                          _detailRow('Bank IBAN', onboarding['bankIban']),
-                                          _detailRow('Insurance company', onboarding['insuranceCompany']),
-                                          _detailRow('Tax ID', onboarding['taxId']),
+                                          _detailRowEditable(
+                                            driverRef: snap.data!.reference,
+                                            label: 'Bank IBAN',
+                                            value: onboarding['bankIban'],
+                                            fieldKey: 'bankIban',
+                                          ),
+                                          _detailRowEditable(
+                                            driverRef: snap.data!.reference,
+                                            label: 'Insurance company',
+                                            value: onboarding['insuranceCompany'],
+                                            fieldKey: 'insuranceCompany',
+                                          ),
+                                          _detailRowEditable(
+                                            driverRef: snap.data!.reference,
+                                            label: 'Tax ID',
+                                            value: onboarding['taxId'],
+                                            fieldKey: 'taxId',
+                                          ),
                                         ],
                                       );
 
@@ -1119,8 +1627,18 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                             ),
                                           ),
                                           const SizedBox(height: 4),
-                                          _detailRow('T-shirt size', onboarding['tShirtSize']),
-                                          _detailRow('Shoe size', onboarding['shoeSize']),
+                                          _detailRowEditable(
+                                            driverRef: snap.data!.reference,
+                                            label: 'T-shirt size',
+                                            value: onboarding['tShirtSize'],
+                                            fieldKey: 'tShirtSize',
+                                          ),
+                                          _detailRowEditable(
+                                            driverRef: snap.data!.reference,
+                                            label: 'Shoe size',
+                                            value: onboarding['shoeSize'],
+                                            fieldKey: 'shoeSize',
+                                          ),
                                         ],
                                       );
 
@@ -1137,7 +1655,12 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                             ),
                                           ),
                                           const SizedBox(height: 4),
-                                          _detailRow('Notes', onboarding['notes']),
+                                          _detailRowEditable(
+                                            driverRef: snap.data!.reference,
+                                            label: 'Notes',
+                                            value: onboarding['notes'],
+                                            fieldKey: 'notes',
+                                          ),
                                         ],
                                       );
 
@@ -1289,8 +1812,17 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                     ),
                                   ],
                                 ),
-                                child: _DriverDocumentsList(
-                                  driverRef: snap.data!.reference,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _AdminDriverToolsRow(
+                                      onUploadDoc: () => _showAdminUploadDocDialog(snap.data!.reference),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    _DriverDocumentsList(
+                                      driverRef: snap.data!.reference,
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
@@ -1806,6 +2338,26 @@ class _DriversHubPageState extends State<DriversHubPage> {
             },
           ),
         ),
+        const SizedBox(width: 12),
+
+SizedBox(
+  height: isSmall ? 32 : 36,
+  child: OutlinedButton.icon(
+    onPressed: _busyCleanup ? null : _cleanupSyntheticDriverLogins,
+    icon: _busyCleanup
+        ? const SizedBox(
+            height: 18,
+            width: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        : const Icon(Icons.delete_sweep_outlined, size: 18),
+    label: Text(
+      'Cleanup wrong logins',
+      style: TextStyle(fontSize: isSmall ? 11 : 13),
+    ),
+  ),
+),
+
       ],
     );
   }
@@ -1894,6 +2446,37 @@ class _CopyRow extends StatelessWidget {
     );
   }
 }
+
+class _AdminDriverToolsRow extends StatelessWidget {
+  final VoidCallback onUploadDoc;
+
+  const _AdminDriverToolsRow({
+    required this.onUploadDoc,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Text(
+          'Admin tools',
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 13,
+          ),
+        ),
+        const Spacer(),
+        FilledButton.icon(
+          onPressed: onUploadDoc,
+          icon: const Icon(Icons.upload_outlined, size: 18),
+          label: const Text('Upload doc'),
+        ),
+      ],
+    );
+  }
+}
+
+
 
 class _DriverDocumentsList extends StatelessWidget {
   final DocumentReference<Map<String, dynamic>> driverRef;
@@ -2141,6 +2724,9 @@ Widget _expiryChipFromOnboardingRaw(dynamic onboardingRaw) {
 
   if (onboarding.isEmpty) return const SizedBox.shrink();
 
+  final contractDate =
+      _parseIsoDate(onboarding['contractExpiry']?.toString());
+
   final workPermitDate =
       _parseIsoDate(onboarding['residencePermitExpiry']?.toString());
   final licenseDate =
@@ -2148,7 +2734,7 @@ Widget _expiryChipFromOnboardingRaw(dynamic onboardingRaw) {
   final idDocDate =
       _parseIsoDate(onboarding['idDocExpiry']?.toString());
 
-  if (workPermitDate == null && licenseDate == null && idDocDate == null) {
+  if (contractDate == null && workPermitDate == null && licenseDate == null && idDocDate == null) {
     return const SizedBox.shrink();
   }
 
@@ -2168,6 +2754,7 @@ Widget _expiryChipFromOnboardingRaw(dynamic onboardingRaw) {
     }
   }
 
+  check(contractDate);
   check(workPermitDate);
   check(licenseDate);
   check(idDocDate);
@@ -2226,18 +2813,21 @@ Widget _expiryChipDetailedFromOnboardingRaw(dynamic onboardingRaw) {
 
   if (onboarding.isEmpty) return const SizedBox.shrink();
 
+  final contractDate =
+      _parseIsoDate(onboarding['contractExpiry']?.toString());
   final workPermitDate =
       _parseIsoDate(onboarding['residencePermitExpiry']?.toString());
   final licenseDate = _parseIsoDate(onboarding['licenseExpiry']?.toString());
   final idDocDate = _parseIsoDate(onboarding['idDocExpiry']?.toString());
 
-  if (workPermitDate == null && licenseDate == null && idDocDate == null) {
+  if (contractDate == null && workPermitDate == null && licenseDate == null && idDocDate == null) {
     return const SizedBox.shrink();
   }
 
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
 
+  bool cExpired = false, cSoon = false;
   bool wpExpired = false, wpSoon = false;
   bool licExpired = false, licSoon = false;
   bool idExpired = false, idSoon = false;
@@ -2252,6 +2842,7 @@ Widget _expiryChipDetailedFromOnboardingRaw(dynamic onboardingRaw) {
     }
   }
 
+  check(contractDate, () => cExpired = true, () => cSoon = true);
   check(workPermitDate, () => wpExpired = true, () => wpSoon = true);
   check(licenseDate, () => licExpired = true, () => licSoon = true);
   check(idDocDate, () => idExpired = true, () => idSoon = true);
@@ -2259,10 +2850,12 @@ Widget _expiryChipDetailedFromOnboardingRaw(dynamic onboardingRaw) {
   final expiredDocs = <String>[];
   final soonDocs = <String>[];
 
+  if (cExpired) expiredDocs.add('Contract');
   if (wpExpired) expiredDocs.add('Work permit');
   if (licExpired) expiredDocs.add('Driving licence');
   if (idExpired) expiredDocs.add('ID / Passport');
 
+  if (!cExpired && cSoon) soonDocs.add('Contract');
   if (!wpExpired && wpSoon) soonDocs.add('Work permit');
   if (!licExpired && licSoon) soonDocs.add('Driving licence');
   if (!idExpired && idSoon) soonDocs.add('ID / Passport');

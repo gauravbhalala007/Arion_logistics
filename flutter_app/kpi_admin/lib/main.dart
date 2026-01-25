@@ -15,6 +15,8 @@ import 'Screens/admin_approvals_page.dart';
 import 'Screens/driver_dashboard_page.dart';
 import 'screens/dsp_profile_page.dart';
 import 'screens/notifications_page.dart';
+import 'screens/admin_home_page.dart';
+
 
 
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -98,6 +100,7 @@ class App extends StatelessWidget {
             '/admin-approvals': (_) => const AdminApprovalsPage(),
             '/profile': (context) => const DspProfilePage(),
             '/notifications': (context) => const NotificationsPage(),
+            '/home': (_) => const AdminHomePage(),
           },
         );
       },

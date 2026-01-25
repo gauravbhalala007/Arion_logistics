@@ -938,6 +938,28 @@ class _FilterPillRow extends StatelessWidget {
     required this.onWeekChanged,
   });
 
+  // ✅ MOVED OUT OF build() so _showWeekPickerDialog() can access them
+  int _weekOf(int i) {
+    final d = reports[i].data();
+    final summary = d['summary'];
+    final s = summary is Map ? Map<String, dynamic>.from(summary as Map) : <String, dynamic>{};
+    return (s['weekNumber'] as num?)?.toInt() ?? (d['weekNumber'] as num?)?.toInt() ?? 0;
+  }
+
+  int _yearOf(int i) {
+    final d = reports[i].data();
+    final summary = d['summary'];
+    final s = summary is Map ? Map<String, dynamic>.from(summary as Map) : <String, dynamic>{};
+    return (s['year'] as num?)?.toInt() ?? (d['year'] as num?)?.toInt() ?? DateTime.now().year;
+  }
+
+  String _weekPillLabel(BuildContext context, int idx) {
+    final loc = AppLocalizations.of(context);
+    final w = _weekOf(idx);
+    final y = _yearOf(idx);
+    return '${loc.t('dash_week').toUpperCase()} $w • $y';
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context);
@@ -971,7 +993,7 @@ class _FilterPillRow extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: Container(
         height: pillHeight,
-        padding: const EdgeInsets.symmetric(horizontal: 18),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: _pillDec(bg: Colors.white, border: _kPrimaryGreen),
         child: Center(
           child: FittedBox(
@@ -988,30 +1010,29 @@ class _FilterPillRow extends StatelessWidget {
       ),
     );
 
-    final weekPill = Container(
-      height: pillHeight,
-      padding: const EdgeInsets.symmetric(horizontal: 18),
-      decoration: _pillDec(bg: Colors.white, border: _kPrimaryGreen),
-      child: Center(
-        child: DropdownButtonHideUnderline(
-          child: DropdownButton<int>(
-            value: selectedIndex,
-            isDense: true,
-            icon: const Icon(Icons.keyboard_arrow_down, size: 16, color: Colors.black87),
-            items: [
-              for (var i = 0; i < reports.length; i++)
-                DropdownMenuItem(
-                  value: i,
-                  child: Text(
-                    '${loc.t('dash_week').toUpperCase()} ${_s(reports[i].data()['weekNumber'] ?? (reports[i].data()['summary']?['weekNumber']))}',
-                    style: pillTextStyle,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+    final weekPill = InkWell(
+      onTap: () async {
+        await _showWeekPickerDialog(context);
+      },
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        height: pillHeight,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: _pillDec(bg: Colors.white, border: _kPrimaryGreen),
+        child: Center(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              children: [
+                Text(
+                  _weekPillLabel(context, selectedIndex),
+                  style: pillTextStyle,
+                  overflow: TextOverflow.ellipsis,
                 ),
-            ],
-            onChanged: (v) {
-              if (v != null) onWeekChanged(v);
-            },
+                const SizedBox(width: 6),
+                const Icon(Icons.keyboard_arrow_down, size: 16, color: Colors.black87),
+              ],
+            ),
           ),
         ),
       ),
@@ -1023,7 +1044,7 @@ class _FilterPillRow extends StatelessWidget {
       onTap: !isCompany ? null : () async => _showTimeFilterDialog(context),
       child: Container(
         height: pillHeight,
-        padding: const EdgeInsets.symmetric(horizontal: 18),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: _pillDec(
           bg: Colors.white,
           border: isCompany ? _kPrimaryGreen : Colors.grey.shade400,
@@ -1063,7 +1084,7 @@ class _FilterPillRow extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             weekPill,
-            const SizedBox(width: 10),
+            const SizedBox(width: 5),
             monthPill,
           ],
         ),
@@ -1232,8 +1253,184 @@ class _FilterPillRow extends StatelessWidget {
     );
   }
 
+  Future<void> _showWeekPickerDialog(BuildContext context) async {
+    final loc = AppLocalizations.of(context);
+
+    // Group report indices by year
+    final Map<int, List<int>> byYear = {};
+    for (int i = 0; i < reports.length; i++) {
+      final y = _yearOf(i);
+      byYear.putIfAbsent(y, () => []).add(i);
+    }
+
+    // Sort years (desc) and weeks (desc)
+    final yearsSorted = byYear.keys.toList()..sort((a, b) => b.compareTo(a));
+    for (final y in yearsSorted) {
+      byYear[y]!.sort((a, b) => _weekOf(b).compareTo(_weekOf(a)));
+    }
+
+    // Default active year is year of currently selected report
+    int activeYear = _yearOf(selectedIndex);
+    if (!yearsSorted.contains(activeYear) && yearsSorted.isNotEmpty) {
+      activeYear = yearsSorted.first;
+    }
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setState) {
+            final list = byYear[activeYear] ?? const <int>[];
+
+            return Dialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          loc.t('dash_select_period'),
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 18),
+                          onPressed: () => Navigator.of(ctx).pop(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        loc.t('dash_best_da_year'),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    SizedBox(
+                      height: 34,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: yearsSorted.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                        itemBuilder: (_, i) {
+                          final y = yearsSorted[i];
+                          final selected = y == activeYear;
+                          return ChoiceChip(
+                            label: Text(
+                              y.toString(),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: selected ? Colors.white : Colors.black87,
+                              ),
+                            ),
+                            selected: selected,
+                            selectedColor: _kPrimaryGreen,
+                            onSelected: (_) => setState(() => activeYear = y),
+                          );
+                        },
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    Row(
+                      children: [
+                        Text(
+                          '${loc.t('dash_weekly_view')} • $activeYear',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '${list.length}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 420),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: list.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (_, i) {
+                          final idx = list[i];
+                          final w = _weekOf(idx);
+                          final isSelected = idx == selectedIndex;
+
+                          return InkWell(
+                            onTap: () {
+                              onWeekChanged(idx);
+                              Navigator.of(ctx).pop();
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? _kPrimaryGreen.withOpacity(0.10)
+                                    : const Color(0xFFF7F8F8),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isSelected ? _kPrimaryGreen : Colors.black12,
+                                  width: isSelected ? 1.2 : 1.0,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Text(
+                                    '${loc.t('dash_week').toUpperCase()} $w',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.4,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  if (isSelected)
+                                    const Icon(Icons.check_circle, size: 18, color: _kPrimaryGreen)
+                                  else
+                                    const Icon(Icons.chevron_right, size: 18, color: Color(0xFF9CA3AF)),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   String _shortMonthName(BuildContext context, int m) {
-    // Use localization month_short_* from app_localizations.dart
     final loc = AppLocalizations.of(context);
     switch (m) {
       case 1:
@@ -1265,6 +1462,7 @@ class _FilterPillRow extends StatelessWidget {
     }
   }
 }
+
 
 // ---------- Summary strip ----------
 
