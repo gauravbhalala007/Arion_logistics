@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../localization/app_localizations.dart';
 import '../widgets/notification_pin_dialogs.dart';
 
 const _kBg = Color(0xFFF3F6F7);
@@ -23,7 +24,6 @@ class DriverProfilePage extends StatefulWidget {
 class _DriverProfilePageState extends State<DriverProfilePage> {
   bool _busy = false;
   String? _pin;
-  bool _showPin = false;
 
   Future<void> _load() async {
     setState(() => _busy = true);
@@ -73,6 +73,8 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context);
+
     return Container(
       color: _kBg,
       padding: const EdgeInsets.symmetric(horizontal: 18),
@@ -135,48 +137,23 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Used to confirm important notifications.',
+                  loc.t('pin_change_with_old'),
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: _kMuted.withOpacity(0.9),
                   ),
                 ),
-                const SizedBox(height: 14),
-
-                Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF2F3F5),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Text(
-                          _pin == null
-                              ? 'Not set'
-                              : (_showPin ? _pin! : '••••'),
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 2,
-                            color: _kText,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    IconButton(
-                      tooltip: _showPin ? 'Hide' : 'Show',
-                      onPressed: _pin == null ? null : () => setState(() => _showPin = !_showPin),
-                      icon: Icon(_showPin ? Icons.visibility_off : Icons.visibility),
-                    ),
-                  ],
+                const SizedBox(height: 6),
+                Text(
+                  loc.t('pin_forgot_contact_admin'),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: _kMuted.withOpacity(0.9),
+                  ),
                 ),
-
                 const SizedBox(height: 14),
-
                 Row(
                   children: [
                     Expanded(
@@ -196,7 +173,7 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
                               }
                             : _resetPin,
                         icon: const Icon(Icons.lock_reset),
-                        label: Text(_pin == null ? 'Set PIN' : 'Reset PIN'),
+                        label: Text(_pin == null ? 'Set PIN' : 'Change PIN'),
                       ),
                     ),
                   ],

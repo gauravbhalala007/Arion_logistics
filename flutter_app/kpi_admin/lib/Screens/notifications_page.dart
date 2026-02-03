@@ -3,8 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_functions/cloud_functions.dart';
-import '../widgets/app_shell.dart';
-import '../widgets/app_side_menu.dart';
 
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
@@ -289,13 +287,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   // ------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
-    return AppShell(
-      menuWidth: 280,
-      sideMenu: const AppSideMenu(
-        width: 280,
-        active: AppNav.notifications,
-      ),
-      body: Padding(
+    return Padding(
         padding: const EdgeInsets.all(24),
         child: LayoutBuilder(
           builder: (ctx, constraints) {
@@ -303,7 +295,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
             final h = constraints.maxHeight;
 
             // Breakpoints (tune if needed)
-            final bool stack = w < 1100;
+            final bool stack = w < 800;
 
             // Space taken by title row + spacing
             const headerBlock = 22.0 + 16.0;
@@ -384,8 +376,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
             );
           },
         ),
-      ),
-    );
+      );
   }
 }
 

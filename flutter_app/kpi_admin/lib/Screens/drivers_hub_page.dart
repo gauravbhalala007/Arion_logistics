@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -14,8 +15,9 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:firebase_storage/firebase_storage.dart' as fb;
 
 import '../services/driver_csv.dart';
-import '../widgets/app_shell.dart';
-import '../widgets/app_side_menu.dart';
+import '../widgets/web_preview.dart'
+    if (dart.library.html) '../widgets/web_preview_web.dart';
+import '../widgets/notification_pin_dialogs.dart';
 
 
 // 🔹 Default password for all newly created / reset driver logins
@@ -46,21 +48,13 @@ class _DriversHubPageState extends State<DriversHubPage> {
   // 🔹 New: visibility toggle for default password field
   bool _bulkPwdVisible = false;
 
-  bool _busyCleanup = false;
-
 
 
   String _search = '';
 
   @override
   Widget build(BuildContext context) {
-    return AppShell(
-      menuWidth: 280,
-      sideMenu: AppSideMenu(
-        width: 280,
-        active: AppNav.drivers,
-      ),
-      body: Padding(
+    return Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -70,8 +64,7 @@ class _DriversHubPageState extends State<DriversHubPage> {
             Expanded(child: _buildDriversList()),
           ],
         ),
-      ),
-    );
+      );
   }
 
   // ---------- Common pill-shaped text field decoration ----------
@@ -108,23 +101,45 @@ class _DriversHubPageState extends State<DriversHubPage> {
     required String initialValue,
     bool isDate = false,
   }) async {
-    final ctrl = TextEditingController(text: initialValue);
-
     String _formatDate(DateTime d) {
-      final y = d.year.toString().padLeft(4, '0');
-      final m = d.month.toString().padLeft(2, '0');
       final day = d.day.toString().padLeft(2, '0');
-      return '$y-$m-$day';
+      final m = d.month.toString().padLeft(2, '0');
+      final y = d.year.toString().padLeft(4, '0');
+      return '$day/$m/$y';
+    }
+
+    DateTime? _parseDate(String text) {
+      final cleaned = text.trim();
+      if (cleaned.isEmpty) return null;
+      final slashMatch = RegExp(r'^(\d{1,2})\/(\d{1,2})\/(\d{4})$');
+      final match = slashMatch.firstMatch(cleaned);
+      if (match != null) {
+        final d = int.tryParse(match.group(1)!);
+        final m = int.tryParse(match.group(2)!);
+        final y = int.tryParse(match.group(3)!);
+        if (d != null && m != null && y != null) {
+          return DateTime(y, m, d);
+        }
+      }
+      try {
+        return DateTime.parse(cleaned);
+      } catch (_) {
+        return null;
+      }
+    }
+
+    String _normalizeDateText(String text) {
+      final parsed = _parseDate(text);
+      return parsed == null ? text : _formatDate(parsed);
     }
 
     DateTime _parseExistingOrNow(String text) {
-      if (text.trim().isEmpty) return DateTime.now();
-      try {
-        return DateTime.parse(text.trim());
-      } catch (_) {
-        return DateTime.now();
-      }
+      return _parseDate(text) ?? DateTime.now();
     }
+
+    final ctrl = TextEditingController(
+      text: isDate ? _normalizeDateText(initialValue) : initialValue,
+    );
 
     Future<void> _pickDate() async {
       final initial = _parseExistingOrNow(ctrl.text);
@@ -150,7 +165,7 @@ class _DriversHubPageState extends State<DriversHubPage> {
             readOnly: isDate,
             decoration: InputDecoration(
               labelText: label,
-              hintText: isDate ? 'YYYY-MM-DD' : null,
+              hintText: isDate ? 'DD/MM/YYYY' : null,
               border: const OutlineInputBorder(),
               suffixIcon: isDate
                   ? IconButton(
@@ -203,6 +218,15 @@ class _DriversHubPageState extends State<DriversHubPage> {
   }
 
   // ---------- Reusable detail row with copy & edit button ----------
+  String _formatDisplayDate(String raw) {
+    final parsed = _parseIsoDate(raw);
+    if (parsed == null) return raw;
+    final day = parsed.day.toString().padLeft(2, '0');
+    final month = parsed.month.toString().padLeft(2, '0');
+    final year = parsed.year.toString().padLeft(4, '0');
+    return '$day/$month/$year';
+  }
+
   Widget _detailRowEditable({
     required DocumentReference<Map<String, dynamic>> driverRef,
     required String label,
@@ -210,7 +234,9 @@ class _DriversHubPageState extends State<DriversHubPage> {
     required String fieldKey,
     bool isDate = false,
   }) {
-    final text = (value ?? '').toString();
+    final rawText = (value ?? '').toString();
+    final displayText = isDate ? _formatDisplayDate(rawText) : rawText;
+    final hasText = displayText.trim().isNotEmpty;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
@@ -233,7 +259,7 @@ class _DriversHubPageState extends State<DriversHubPage> {
               children: [
                 Expanded(
                   child: SelectableText(
-                    text.isEmpty ? '—' : text,
+                    hasText ? displayText : '—',
                     style: const TextStyle(fontSize: 13),
                   ),
                 ),
@@ -248,13 +274,13 @@ class _DriversHubPageState extends State<DriversHubPage> {
                     driverRef: driverRef,
                     label: label,
                     fieldKey: fieldKey,
-                    initialValue: text,
+                    initialValue: rawText,
                     isDate: isDate,
                   ),
                 ),
 
                 // 📋 Copy
-                if (text.isNotEmpty) ...[
+                if (hasText) ...[
                   const SizedBox(width: 8),
                   IconButton(
                     icon: const Icon(Icons.copy, size: 16),
@@ -262,7 +288,9 @@ class _DriversHubPageState extends State<DriversHubPage> {
                     constraints: const BoxConstraints(),
                     tooltip: 'Copy $label',
                     onPressed: () async {
-                      await Clipboard.setData(ClipboardData(text: text));
+                      await Clipboard.setData(
+                        ClipboardData(text: displayText),
+                      );
                       if (!mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text('$label copied')),
@@ -786,8 +814,16 @@ class _DriversHubPageState extends State<DriversHubPage> {
   Future<void> _onDeleteDriver(
     DocumentSnapshot<Map<String, dynamic>> driverDoc,
   ) async {
+    if (_uid == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You must be logged in.')),
+      );
+      return;
+    }
+
     final data = driverDoc.data() ?? {};
     final name = (data['driverName'] ?? '').toString();
+    final tid = (data['transporterId'] ?? driverDoc.id).toString().trim();
 
     final confirm = await showDialog<bool>(
       context: context,
@@ -795,7 +831,7 @@ class _DriversHubPageState extends State<DriversHubPage> {
         title: const Text('Delete driver'),
         content: Text(
           'Are you sure you want to delete driver "$name"?\n'
-          'This will remove them from your DSP list.',
+          'This will remove them and delete their login.',
         ),
         actions: [
           TextButton(
@@ -812,7 +848,20 @@ class _DriversHubPageState extends State<DriversHubPage> {
 
     if (confirm != true) return;
 
-    await driverDoc.reference.delete();
+    try {
+      final callable = FirebaseFunctions.instance
+          .httpsCallable('deleteDriverAccount');
+      await callable.call(<String, dynamic>{
+        'dspUid': _uid,
+        'transporterId': tid,
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Delete failed: $e')),
+      );
+      return;
+    }
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -975,77 +1024,6 @@ class _DriversHubPageState extends State<DriversHubPage> {
   }
 
 
-Future<void> _cleanupSyntheticDriverLogins() async {
-  if (_uid == null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('You must be logged in.')),
-    );
-    return;
-  }
-
-  final ok = await showDialog<bool>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text('Delete synthetic driver logins'),
-      content: const Text(
-        'This will delete ALL driver accounts that were created with '
-        '"@drivers.dsp-copilot.local" from:\n\n'
-        '• Firebase Auth\n'
-        '• Firestore users/{driverUid}\n\n'
-        'It will also clear hasLogin/authUid/loginEmail from your drivers list.\n\n'
-        'Continue?',
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop(false),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(ctx).pop(true),
-          child: const Text('Delete'),
-        ),
-      ],
-    ),
-  );
-
-  if (ok != true) return;
-
-  setState(() => _busyCleanup = true);
-  try {
-    final callable = FirebaseFunctions.instance
-        .httpsCallable('cleanupSyntheticDriverLogins');
-
-    // If you ever hit callable timeouts, run in chunks by setting limit: 50, repeat.
-    final res = await callable.call(<String, dynamic>{
-      'dspUid': _uid!,
-      'dryRun': false,
-      'limit': 500,
-    });
-
-    final data = Map<String, dynamic>.from(res.data as Map);
-
-    final matched = data['matched'] ?? 0;
-    final deletedAuth = data['deletedAuth'] ?? 0;
-    final deletedUserDocs = data['deletedUserDocs'] ?? 0;
-
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Cleanup done. Matched: $matched | Auth deleted: $deletedAuth | '
-          'users/{uid} deleted: $deletedUserDocs',
-        ),
-      ),
-    );
-  } catch (e) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Cleanup failed: $e')),
-    );
-  } finally {
-    if (mounted) setState(() => _busyCleanup = false);
-  }
-}
 
 
 
@@ -1225,51 +1203,56 @@ Future<void> _cleanupSyntheticDriverLogins() async {
       context: context,
       builder: (ctx) {
         final media = MediaQuery.of(ctx).size;
+        bool showPin = false;
 
-        return Dialog(
-          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: 980,
-              maxHeight: media.height - 32,
-            ),
-            child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-              stream: driverDoc.reference.snapshots(),
-              builder: (ctx2, snap) {
-                if (!snap.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+        return StatefulBuilder(
+          builder: (ctxState, setStateDialog) {
+            return Dialog(
+              insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: 980,
+                  maxHeight: media.height - 32,
+                ),
+                child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                  stream: driverDoc.reference.snapshots(),
+                  builder: (ctx2, snap) {
+                    if (!snap.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
 
-                final data = snap.data!.data() ?? {};
-                final name = (data['driverName'] ?? '').toString();
-                final email = (data['email'] ?? '').toString();
-                final tid = (data['transporterId'] ?? '').toString();
+                    final data = snap.data!.data() ?? {};
+                    final name = (data['driverName'] ?? '').toString();
+                    final email = (data['email'] ?? '').toString();
+                    final tid = (data['transporterId'] ?? '').toString();
+                    final pin = (data['notificationPin'] ?? '').toString().trim();
+                    final canEditPin = (_uid != null && tid.isNotEmpty);
 
-                // onboarding map
-                final raw = data['onboarding'];
-                Map<String, dynamic> onboarding = const {};
-                if (raw is Map<String, dynamic>) {
-                  onboarding = raw;
-                } else if (raw is Map) {
-                  onboarding =
-                      raw.map((k, v) => MapEntry(k.toString(), v));
-                }
-                final hasOnboarding = onboarding.isNotEmpty;
-                final profileImage = _profileImageFromOnboarding(onboarding);
+                    // onboarding map
+                    final raw = data['onboarding'];
+                    Map<String, dynamic> onboarding = const {};
+                    if (raw is Map<String, dynamic>) {
+                      onboarding = raw;
+                    } else if (raw is Map) {
+                      onboarding =
+                          raw.map((k, v) => MapEntry(k.toString(), v));
+                    }
+                    final hasOnboarding = onboarding.isNotEmpty;
+                    final profileImage = _profileImageFromOnboarding(onboarding);
 
-                return Container(
-                  color: const Color(0xFFF4F5FB),
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    children: [
-                      // Scrollable content
-                      Expanded(
-                        child: SingleChildScrollView(
-                          child: Column(
-                            children: [
+                    return Container(
+                      color: const Color(0xFFF4F5FB),
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        children: [
+                          // Scrollable content
+                          Expanded(
+                            child: SingleChildScrollView(
+                              child: Column(
+                                children: [
                               // ------------------------------------------------------------------
                               // TOP CARD (responsive)
                               // ------------------------------------------------------------------
@@ -1318,38 +1301,134 @@ Future<void> _cleanupSyntheticDriverLogins() async {
                                           const SizedBox(height: 12),
                                           ClipRRect(
                                             borderRadius: BorderRadius.circular(14),
-                                            child: Container(
-                                              height: 80,
-                                              width: double.infinity,
-                                              color: const Color(0xFFF3F4F6),
-                                              padding: const EdgeInsets.all(10),
-                                              child: Row(
-                                                children: [
-                                                  Container(
-                                                    padding: const EdgeInsets.all(6),
-                                                    decoration: BoxDecoration(
-                                                      color: const Color(0xFFE5E7EB)
-                                                          .withOpacity(0.9),
-                                                      borderRadius: BorderRadius.circular(10),
-                                                    ),
-                                                    child: const Icon(
-                                                      Icons.badge,
-                                                      size: 24,
-                                                      color: Color(0xFF4B5563),
-                                                    ),
-                                                  ),
-                                                  const SizedBox(width: 10),
-                                                  const Expanded(
-                                                    child: Text(
-                                                      'ID / licence document preview',
-                                                      style: TextStyle(
-                                                        fontSize: 11,
+                                            child: StreamBuilder<
+                                                DocumentSnapshot<Map<String, dynamic>>>(
+                                              stream: snap.data!.reference
+                                                  .collection('documents')
+                                                  .doc('driver_license_front')
+                                                  .snapshots(),
+                                              builder: (context, docSnap) {
+                                                final docData =
+                                                    docSnap.data?.data() ??
+                                                        const <String, dynamic>{};
+                                                final url =
+                                                    (docData['downloadUrl'] ?? '')
+                                                        .toString();
+                                                final fileName =
+                                                    (docData['fileName'] ?? '')
+                                                        .toString();
+                                                final hasUrl = url.isNotEmpty;
+                                                final path = Uri.tryParse(url)
+                                                        ?.path
+                                                        .toLowerCase() ??
+                                                    '';
+                                                final isImage = path.endsWith('.png') ||
+                                                    path.endsWith('.jpg') ||
+                                                    path.endsWith('.jpeg') ||
+                                                    path.endsWith('.webp');
+
+                                                Widget child;
+                                                if (!hasUrl) {
+                                                  child = Row(
+                                                    children: [
+                                                      Container(
+                                                        padding:
+                                                            const EdgeInsets.all(6),
+                                                        decoration: BoxDecoration(
+                                                          color: const Color(0xFFE5E7EB)
+                                                              .withOpacity(0.9),
+                                                          borderRadius:
+                                                              BorderRadius.circular(10),
+                                                        ),
+                                                        child: const Icon(
+                                                          Icons.badge,
+                                                          size: 24,
+                                                          color: Color(0xFF4B5563),
+                                                        ),
+                                                      ),
+                                                      const SizedBox(width: 10),
+                                                      const Expanded(
+                                                        child: Text(
+                                                          'Driving licence (front) preview',
+                                                          style: TextStyle(
+                                                            fontSize: 11,
+                                                            color:
+                                                                Color(0xFF6B7280),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  );
+                                                } else if (isImage) {
+                                                  child = kIsWeb
+                                                      ? buildWebImagePreview(url)
+                                                      : Image.network(
+                                                          url,
+                                                          fit: BoxFit.cover,
+                                                          loadingBuilder: (context,
+                                                              child,
+                                                              loadingProgress) {
+                                                            if (loadingProgress ==
+                                                                null) {
+                                                              return child;
+                                                            }
+                                                            return const Center(
+                                                              child:
+                                                                  CircularProgressIndicator(
+                                                                      strokeWidth:
+                                                                          2),
+                                                            );
+                                                          },
+                                                          errorBuilder: (context,
+                                                              error, stackTrace) {
+                                                            return const Center(
+                                                              child: Icon(
+                                                                Icons
+                                                                    .image_not_supported_outlined,
+                                                                color:
+                                                                    Color(0xFF9CA3AF),
+                                                              ),
+                                                            );
+                                                          },
+                                                        );
+                                                } else {
+                                                  child = Row(
+                                                    children: [
+                                                      const Icon(
+                                                        Icons.insert_drive_file,
+                                                        size: 18,
                                                         color: Color(0xFF6B7280),
                                                       ),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
+                                                      const SizedBox(width: 8),
+                                                      Expanded(
+                                                        child: Text(
+                                                          fileName.isEmpty
+                                                              ? 'Driving licence (front)'
+                                                              : fileName,
+                                                          maxLines: 1,
+                                                          overflow:
+                                                              TextOverflow.ellipsis,
+                                                          style: const TextStyle(
+                                                            fontSize: 11,
+                                                            color:
+                                                                Color(0xFF6B7280),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  );
+                                                }
+
+                                                return Container(
+                                                  height: 80,
+                                                  width: double.infinity,
+                                                  color: const Color(0xFFF3F4F6),
+                                                  padding: hasUrl && isImage
+                                                      ? EdgeInsets.zero
+                                                      : const EdgeInsets.all(10),
+                                                  child: child,
+                                                );
+                                              },
                                             ),
                                           ),
                                         ],
@@ -1358,16 +1437,6 @@ Future<void> _cleanupSyntheticDriverLogins() async {
 
                                     // ---------- Onboarding details with sections ----------
                                     Widget buildOnboardingDetails(bool narrow) {
-                                      if (!hasOnboarding) {
-                                        return const Text(
-                                          'Onboarding not completed yet.',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: Color(0xFF6B7280),
-                                          ),
-                                        );
-                                      }
-
                                       // ----- full list of fields, grouped into sections -----
 
                                       final personalSection = Column(
@@ -1400,6 +1469,7 @@ Future<void> _cleanupSyntheticDriverLogins() async {
                                             label: 'Date of birth',
                                             value: onboarding['dateOfBirth'],
                                             fieldKey: 'dateOfBirth',
+                                            isDate: true,
                                           ),
                                           _detailRowEditable(
                                             driverRef: snap.data!.reference,
@@ -1548,6 +1618,7 @@ Future<void> _cleanupSyntheticDriverLogins() async {
                                             label: 'License expiry date',
                                             value: onboarding['licenseExpiry'],
                                             fieldKey: 'licenseExpiry',
+                                            isDate: true,
                                           ),
                                         ],
                                       );
@@ -1764,6 +1835,81 @@ Future<void> _cleanupSyntheticDriverLogins() async {
                                             ),
                                           ],
                                         ),
+                                        const SizedBox(height: 12),
+                                        Container(
+                                          width: double.infinity,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 14,
+                                            vertical: 12,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(16),
+                                            border: Border.all(color: const Color(0xFFE5E7EB)),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    const Text(
+                                                      'Notification PIN',
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        fontWeight: FontWeight.w700,
+                                                        color: Color(0xFF6B7280),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 6),
+                                                    Text(
+                                                      pin.isEmpty
+                                                          ? 'Not set'
+                                                          : (showPin ? pin : '••••'),
+                                                      style: const TextStyle(
+                                                        fontSize: 16,
+                                                        fontWeight: FontWeight.w800,
+                                                        color: Color(0xFF111827),
+                                                        letterSpacing: 2,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              if (pin.isNotEmpty)
+                                                IconButton(
+                                                  tooltip: showPin ? 'Hide PIN' : 'Show PIN',
+                                                  onPressed: () =>
+                                                      setStateDialog(() => showPin = !showPin),
+                                                  icon: Icon(
+                                                    showPin
+                                                        ? Icons.visibility_off
+                                                        : Icons.visibility,
+                                                    color: const Color(0xFF6B7280),
+                                                  ),
+                                                ),
+                                              const SizedBox(width: 6),
+                                              OutlinedButton(
+                                                onPressed: !canEditPin
+                                                    ? null
+                                                    : () async {
+                                                        await showDialog<void>(
+                                                          context: ctx2,
+                                                          barrierDismissible: false,
+                                                          builder: (_) => SetNotificationPinDialog(
+                                                            dspUid: _uid!,
+                                                            transporterId: tid.toUpperCase(),
+                                                            force: true,
+                                                          ),
+                                                        );
+                                                      },
+                                                child: Text(
+                                                  pin.isEmpty ? 'Set PIN' : 'Change PIN',
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
                                         const SizedBox(height: 18),
                                         buildOnboardingDetails(isNarrow),
                                       ],
@@ -1821,6 +1967,12 @@ Future<void> _cleanupSyntheticDriverLogins() async {
                                     const SizedBox(height: 12),
                                     _DriverDocumentsList(
                                       driverRef: snap.data!.reference,
+                                      driverName: name,
+                                      onUploadDoc: (docType) =>
+                                          _adminPickAndUploadDriverDoc(
+                                        driverRef: snap.data!.reference,
+                                        docType: docType,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -1830,35 +1982,37 @@ Future<void> _cleanupSyntheticDriverLogins() async {
                         ),
                       ),
 
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          TextButton(
-                            onPressed: () => Navigator.of(ctx).pop(),
-                            child: const Text('Close'),
-                          ),
-                          const SizedBox(width: 8),
-                          FilledButton(
-                            onPressed: !hasOnboarding
-                                ? null
-                                : () {
-                                    _exportOnboardingPdf(
-                                      driverName: name,
-                                      transporterId: tid,
-                                      onboarding: onboarding,
-                                    );
-                                  },
-                            child: const Text('Export PDF'),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              TextButton(
+                                onPressed: () => Navigator.of(ctx).pop(),
+                                child: const Text('Close'),
+                              ),
+                              const SizedBox(width: 8),
+                              FilledButton(
+                                onPressed: !hasOnboarding
+                                    ? null
+                                    : () {
+                                        _exportOnboardingPdf(
+                                          driverName: name,
+                                          transporterId: tid,
+                                          onboarding: onboarding,
+                                        );
+                                      },
+                                child: const Text('Export PDF'),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
+                    );
+                  },
+                ),
+              ),
+            );
+          },
         );
       },
     );
@@ -2338,26 +2492,6 @@ Future<void> _cleanupSyntheticDriverLogins() async {
             },
           ),
         ),
-        const SizedBox(width: 12),
-
-SizedBox(
-  height: isSmall ? 32 : 36,
-  child: OutlinedButton.icon(
-    onPressed: _busyCleanup ? null : _cleanupSyntheticDriverLogins,
-    icon: _busyCleanup
-        ? const SizedBox(
-            height: 18,
-            width: 18,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          )
-        : const Icon(Icons.delete_sweep_outlined, size: 18),
-    label: Text(
-      'Cleanup wrong logins',
-      style: TextStyle(fontSize: isSmall ? 11 : 13),
-    ),
-  ),
-),
-
       ],
     );
   }
@@ -2480,8 +2614,420 @@ class _AdminDriverToolsRow extends StatelessWidget {
 
 class _DriverDocumentsList extends StatelessWidget {
   final DocumentReference<Map<String, dynamic>> driverRef;
+  final String driverName;
+  final Future<void> Function(String docType) onUploadDoc;
 
-  const _DriverDocumentsList({required this.driverRef});
+  const _DriverDocumentsList({
+    required this.driverRef,
+    required this.driverName,
+    required this.onUploadDoc,
+  });
+
+  String _docLabel(String docType) {
+    switch (docType) {
+      case 'resident_permit':
+        return 'Work permit';
+      case 'driver_license_front':
+        return 'Driving licence (front)';
+      case 'driver_license_back':
+        return 'Driving licence (back)';
+      case 'id_card_front':
+        return 'ID card (front)';
+      case 'id_card_back':
+        return 'ID card (back)';
+      case 'passport_front':
+        return 'Passport (front)';
+      case 'passport_back':
+        return 'Passport (back)';
+      case 'tax_id':
+        return 'Tax ID';
+      case 'insurance':
+        return 'Insurance';
+      case 'contract':
+        return 'Contract';
+      default:
+        return docType;
+    }
+  }
+
+  String _fileExtension(String name) {
+    final dot = name.lastIndexOf('.');
+    if (dot == -1 || dot == name.length - 1) return '';
+    return name.substring(dot + 1);
+  }
+
+  String _sanitizeToken(String value) {
+    return value
+        .trim()
+        .replaceAll(RegExp(r'\s*/\s*'), '_')
+        .replaceAll(RegExp(r'[()]'), '')
+        .replaceAll(RegExp(r'[^A-Za-z0-9]+'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'^_+|_+$'), '');
+  }
+
+  String _downloadNameForDoc({
+    required String docType,
+    required String url,
+    required String fileName,
+  }) {
+    final label = _docLabel(docType);
+    var base = _sanitizeToken(label);
+    if (base.isEmpty) base = _sanitizeToken(docType);
+    final driver = _sanitizeToken(driverName);
+    if (driver.isNotEmpty) {
+      base = '${base}_$driver';
+    }
+
+    var ext = fileName.isNotEmpty ? _fileExtension(fileName) : '';
+    if (ext.isEmpty) {
+      final path = Uri.tryParse(url)?.path ?? '';
+      ext = _fileExtension(path.split('/').last);
+    }
+    return ext.isEmpty ? base : '$base.$ext';
+  }
+
+  Future<void> _downloadDoc({
+    required BuildContext context,
+    required String url,
+    required String fileName,
+  }) async {
+    if (url.isEmpty) return;
+    if (kIsWeb) {
+      try {
+        final bytes = await fb.FirebaseStorage.instance
+            .refFromURL(url)
+            .getData(50 * 1024 * 1024);
+        if (bytes != null) {
+          await downloadWebBytes(bytes, fileName);
+          return;
+        }
+      } catch (_) {
+        // Fall back to URL download when blob access is blocked.
+      }
+    }
+    try {
+      await downloadWebFile(url, fileName);
+    } catch (e) {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(
+          uri,
+          mode: LaunchMode.externalApplication,
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not launch document URL'),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteDoc({
+    required BuildContext context,
+    required String docType,
+    required String url,
+  }) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Delete document?'),
+          content: Text('This will delete ${_docLabel(docType)}.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFE11D48),
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (ok != true) return;
+
+    try {
+      if (url.isNotEmpty) {
+        await fb.FirebaseStorage.instance.refFromURL(url).delete();
+      }
+      await driverRef.collection('documents').doc(docType).delete();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${_docLabel(docType)} deleted.')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete document: $e')),
+      );
+    }
+  }
+
+  Future<void> _showDocPreview({
+    required BuildContext context,
+    required String docType,
+    required String label,
+    required String url,
+    required String fileName,
+  }) async {
+    if (url.isEmpty) return;
+
+    final uri = Uri.parse(url);
+    final path = uri.path.toLowerCase();
+    final isImage = path.endsWith('.png') ||
+        path.endsWith('.jpg') ||
+        path.endsWith('.jpeg') ||
+        path.endsWith('.webp');
+    final isPdf = path.endsWith('.pdf');
+
+    if (isImage) {
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) {
+          return Dialog(
+            insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              color: Colors.white,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                    ),
+                  ),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 500),
+                    child: InteractiveViewer(
+                      child: kIsWeb
+                          ? buildWebImagePreview(url)
+                          : Image.network(
+                              url,
+                              fit: BoxFit.contain,
+                              loadingBuilder:
+                                  (context, child, loadingProgress) {
+                                if (loadingProgress == null) return child;
+                                return const Center(
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                );
+                              },
+                              errorBuilder: (context, error, stackTrace) {
+                                return Center(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Text(
+                                        'Preview unavailable for this image.',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Color(0xFF6B7280),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      OutlinedButton(
+                                        onPressed: () => _downloadDoc(
+                                          context: context,
+                                          url: url,
+                                          fileName: _downloadNameForDoc(
+                                            docType: docType,
+                                            url: url,
+                                            fileName: fileName,
+                                          ),
+                                        ),
+                                        child: const Text('Download'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+      return;
+    }
+
+    if (isPdf) {
+      if (kIsWeb) {
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) {
+            return Dialog(
+              insetPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                color: Colors.white,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.of(ctx).pop(),
+                      ),
+                    ),
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 520,
+                      child: buildWebPdfPreview(url),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+        return;
+      }
+
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) {
+          return Dialog(
+            insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              color: Colors.white,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                    ),
+                  ),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 520,
+                    child: FutureBuilder<Uint8List>(
+                      future: () async {
+                        final data = await NetworkAssetBundle(uri).load('');
+                        return data.buffer.asUint8List();
+                      }(),
+                      builder: (context, snap) {
+                        if (snap.connectionState == ConnectionState.waiting) {
+                          return const Center(
+                              child: CircularProgressIndicator(strokeWidth: 2));
+                        }
+                        if (snap.hasError || snap.data == null) {
+                          return Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text('Failed to load PDF preview.'),
+                                const SizedBox(height: 8),
+                                OutlinedButton(
+                                  onPressed: () => _downloadDoc(
+                                    context: context,
+                                    url: url,
+                                    fileName: _downloadNameForDoc(
+                                      docType: docType,
+                                      url: url,
+                                      fileName: fileName,
+                                    ),
+                                  ),
+                                  child: const Text('Download'),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+                        return PdfPreview(
+                          build: (format) async => snap.data!,
+                          canChangeOrientation: false,
+                          canChangePageFormat: false,
+                          allowPrinting: false,
+                          allowSharing: false,
+                          useActions: false,
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+      return;
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text(label),
+          content: const Text(
+            'Preview is not available for this file type. Use Download to open it.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Close'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                await _downloadDoc(
+                  context: context,
+                  url: url,
+                  fileName: _downloadNameForDoc(
+                    docType: docType,
+                    url: url,
+                    fileName: fileName,
+                  ),
+                );
+                if (ctx.mounted) Navigator.of(ctx).pop();
+              },
+              child: const Text('Download'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2499,10 +3045,115 @@ class _DriverDocumentsList extends StatelessWidget {
         }
 
         final docs = snap.data?.docs ?? [];
-        if (docs.isEmpty) {
-          return const Text(
-            'No documents uploaded yet.',
-            style: TextStyle(fontSize: 13, color: Colors.black54),
+        final docsByType = <String, Map<String, dynamic>>{
+          for (final d in docs) (d.data()['docType'] ?? d.id).toString(): d.data(),
+        };
+
+        const docTypes = <String>[
+          'contract',
+          'resident_permit',
+          'tax_id',
+          'insurance',
+        ];
+
+        const docPairs = <List<String>>[
+          ['id_card_front', 'id_card_back'],
+          ['passport_front', 'passport_back'],
+          ['driver_license_front', 'driver_license_back'],
+        ];
+
+        Widget docTile(String docType) {
+          final data = docsByType[docType] ?? const <String, dynamic>{};
+          final name = (data['fileName'] ?? 'Not uploaded').toString();
+          final url = (data['downloadUrl'] ?? '').toString();
+          final hasUrl = url.isNotEmpty;
+
+          return Material(
+            color: Colors.transparent,
+            child: InkWell(
+                  onTap: !hasUrl
+                      ? null
+                      : () => _showDocPreview(
+                            context: context,
+                            docType: docType,
+                            label: _docLabel(docType),
+                            url: url,
+                            fileName: name,
+                          ),
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF7F8F8),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE1E4EA)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.insert_drive_file, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _docLabel(docType),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF374151),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF6B7280),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      onPressed: () => onUploadDoc(docType),
+                      icon: const Icon(Icons.upload_outlined, size: 16),
+                      label: const Text('Upload'),
+                    ),
+                    const SizedBox(width: 6),
+                    IconButton(
+                      icon: const Icon(Icons.download, size: 18),
+                      tooltip: 'Download',
+                      onPressed: !hasUrl
+                          ? null
+                          : () => _downloadDoc(
+                                context: context,
+                                url: url,
+                                fileName: _downloadNameForDoc(
+                                  docType: docType,
+                                  url: url,
+                                  fileName: name,
+                                ),
+                              ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                      tooltip: 'Delete',
+                      onPressed: !hasUrl
+                          ? null
+                          : () => _deleteDoc(
+                                context: context,
+                                docType: docType,
+                                url: url,
+                              ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           );
         }
 
@@ -2517,47 +3168,20 @@ class _DriverDocumentsList extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 6),
-            ...docs.map((d) {
-              final data = d.data();
-              final name = (data['fileName'] ?? 'Document').toString();
-              final url = (data['downloadUrl'] ?? '').toString();
-
+            ...docTypes.map((docType) {
               return Padding(
-                padding: const EdgeInsets.only(bottom: 4),
+                padding: const EdgeInsets.only(bottom: 8),
+                child: docTile(docType),
+              );
+            }),
+            ...docPairs.map((pair) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
                 child: Row(
                   children: [
-                    const Icon(Icons.insert_drive_file, size: 16),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.download, size: 18),
-                      tooltip: 'Download',
-                      onPressed: url.isEmpty
-                          ? null
-                          : () async {
-                              final uri = Uri.parse(url);
-                              if (await canLaunchUrl(uri)) {
-                                await launchUrl(
-                                  uri,
-                                  mode: LaunchMode.externalApplication,
-                                );
-                              } else {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                        'Could not launch document URL'),
-                                  ),
-                                );
-                              }
-                            },
-                    ),
+                    Expanded(child: docTile(pair[0])),
+                    const SizedBox(width: 10),
+                    Expanded(child: docTile(pair[1])),
                   ],
                 ),
               );
@@ -2680,6 +3304,16 @@ Widget _loginChipFromData(Map<String, dynamic> data) {
 DateTime? _parseIsoDate(String? value) {
   final t = value?.trim();
   if (t == null || t.isEmpty) return null;
+  final slashMatch = RegExp(r'^(\d{1,2})\/(\d{1,2})\/(\d{4})$');
+  final match = slashMatch.firstMatch(t);
+  if (match != null) {
+    final d = int.tryParse(match.group(1)!);
+    final m = int.tryParse(match.group(2)!);
+    final y = int.tryParse(match.group(3)!);
+    if (d != null && m != null && y != null) {
+      return DateTime(y, m, d);
+    }
+  }
   try {
     return DateTime.parse(t);
   } catch (_) {

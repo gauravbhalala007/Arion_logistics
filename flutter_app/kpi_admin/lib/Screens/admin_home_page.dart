@@ -5,8 +5,6 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-import '../widgets/app_shell.dart';
-import '../widgets/app_side_menu.dart';
 
 class AdminHomePage extends StatefulWidget {
   const AdminHomePage({super.key});
@@ -213,68 +211,59 @@ class _AdminHomePageState extends State<AdminHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return AppShell(
-      menuWidth: 280,
-      sideMenu: const AppSideMenu(
-        width: 280,
-        active: AppNav.home, // keep as you have it
-      ),
-      body: LayoutBuilder(
+    return Material(
+      color: AdminHomePage._kPageBg,
+      child: LayoutBuilder(
         builder: (ctx, constraints) {
           final w = constraints.maxWidth;
 
-          // scale rules (same as before)
           final scale = _clampDouble(w / 1440.0, 0.78, 1.0);
-
-          // breakpoints
           final bool isStacked = w < 980;
           final bool isTight = w < 1200;
 
           final pad = _r(24, scale);
           final gap = _r(isTight ? 12 : 16, scale);
 
-          return ColoredBox(
-            color: AdminHomePage._kPageBg,
-            child: Padding(
-              padding: EdgeInsets.all(pad),
-              child: isStacked
-                  ? _StackedLayout(
-                      scale: scale,
-                      gap: gap,
-                      dspUid: _uid,
-                      onOpenMissing: (notifId, confirmedCount, targetCount) {
-                        final uid = _uid;
-                        if (uid == null) return;
-                        _openNotConfirmedPopup(
-                          context: context,
-                          dspUid: uid,
-                          notificationId: notifId,
-                          confirmedCount: confirmedCount,
-                          targetCount: targetCount,
-                        );
-                      },
-                    )
-                  : _DesktopLayout(
-                      scale: scale,
-                      gap: gap,
-                      dspUid: _uid,
-                      onOpenMissing: (notifId, confirmedCount, targetCount) {
-                        final uid = _uid;
-                        if (uid == null) return;
-                        _openNotConfirmedPopup(
-                          context: context,
-                          dspUid: uid,
-                          notificationId: notifId,
-                          confirmedCount: confirmedCount,
-                          targetCount: targetCount,
-                        );
-                      },
-                    ),
-            ),
+          return Padding(
+            padding: EdgeInsets.all(pad),
+            child: isStacked
+                ? _StackedLayout(
+                    scale: scale,
+                    gap: gap,
+                    dspUid: _uid,
+                    onOpenMissing: (notifId, confirmedCount, targetCount) {
+                      final uid = _uid;
+                      if (uid == null) return;
+                      _openNotConfirmedPopup(
+                        context: context,
+                        dspUid: uid,
+                        notificationId: notifId,
+                        confirmedCount: confirmedCount,
+                        targetCount: targetCount,
+                      );
+                    },
+                  )
+                : _DesktopLayout(
+                    scale: scale,
+                    gap: gap,
+                    dspUid: _uid,
+                    onOpenMissing: (notifId, confirmedCount, targetCount) {
+                      final uid = _uid;
+                      if (uid == null) return;
+                      _openNotConfirmedPopup(
+                        context: context,
+                        dspUid: uid,
+                        notificationId: notifId,
+                        confirmedCount: confirmedCount,
+                        targetCount: targetCount,
+                      );
+                    },
+                  ),
           );
         },
       ),
     );
+
   }
 }
 

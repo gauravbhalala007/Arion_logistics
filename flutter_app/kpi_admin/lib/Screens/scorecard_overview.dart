@@ -15,14 +15,18 @@ import 'package:file_picker/file_picker.dart';
 import 'scorecard_week.dart';
 
 import 'package:firebase_auth/firebase_auth.dart';
-
-// NEW: shared shell + side menu
 import '../widgets/app_shell.dart';
 import '../widgets/app_side_menu.dart';
 
+
 /// Simple German-style number formatting
 final _pct = NumberFormat.decimalPattern('de');
+final _pct2 = NumberFormat.decimalPattern('de')
+  ..minimumFractionDigits = 2
+  ..maximumFractionDigits = 2;
 final _int = NumberFormat.decimalPattern('de');
+
+String _s(dynamic v) => (v == null) ? '' : v.toString();
 
 /// ---------- Week date helpers (ISO week: Monday start) ----------
 DateTime _isoWeekStartUtc(int year, int week) {
@@ -72,6 +76,7 @@ class _ReportVM {
   final int week;
   final String label; // "Week 23 - 2025"
   final double? overall;
+  final String? overallStatus;
   final double? relNext;
   final double? relSame;
   final int? rankAtStation;
@@ -84,6 +89,7 @@ class _ReportVM {
     required this.week,
     required this.label,
     required this.overall,
+    required this.overallStatus,
     required this.relNext,
     required this.relSame,
     required this.rankAtStation,
@@ -97,6 +103,25 @@ class ScorecardOverviewPage extends StatefulWidget {
 
   @override
   State<ScorecardOverviewPage> createState() => _ScorecardOverviewPageState();
+}
+
+class ScorecardWeekShellPage extends StatelessWidget {
+  final DocumentReference<Map<String, dynamic>> reportRef;
+
+  const ScorecardWeekShellPage({super.key, required this.reportRef});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppShell(
+      menuWidth: 300,
+      sideMenu: const AppSideMenu(
+        width: 300,
+        active: AppNav.dashboard,
+      ),
+      body: ScorecardWeekPage(reportRef: reportRef),
+      title: const Text('SCORECARD WEEK'),
+    );
+  }
 }
 
 class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
@@ -123,6 +148,7 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                 week: w,
                 label: (s['weekText'] ?? 'Week $w - $y').toString(),
                 overall: (s['overallScore'] as num?)?.toDouble(),
+                overallStatus: s['overallStatus'] as String?,
                 relNext: (s['reliabilityNextDay'] as num?)?.toDouble(),
                 relSame: (s['reliabilitySameDay'] as num?)?.toDouble(),
                 rankAtStation: (s['rankAtStation'] as num?)?.toInt(),
@@ -130,6 +156,23 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                 stationCode: s['stationCode'] as String?,
               );
             }).toList());
+  }
+
+  String _prettyStatus(String? raw) {
+    switch (_s(raw).trim().toUpperCase()) {
+      case 'FANTASTIC_PLUS':
+        return 'Fantastic Plus';
+      case 'FANTASTIC':
+        return 'Fantastic';
+      case 'GREAT':
+        return 'Great';
+      case 'FAIR':
+        return 'Fair';
+      case 'POOR':
+        return 'Poor';
+      default:
+        return _s(raw);
+    }
   }
 
   Future<void> _uploadWeeklyPdf() async {
@@ -647,7 +690,7 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                               itemBuilder: (_, i) {
                                 final p = list[i];
                                 final badge =
-                                    (p.overall != null) ? _pct.format(p.overall) : '—';
+                                    (p.overall != null) ? _pct2.format(p.overall) : '—';
 
                                 final start = _isoWeekStartUtc(p.year, p.week);
                                 final end = start.add(const Duration(days: 6));
@@ -656,7 +699,7 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                                 final rankLine =
                                     (p.rankAtStation != null && p.stationCount != null)
                                         ? 'Rank in Station: ${p.rankAtStation} of ${p.stationCount}'
-                                        : (p.stationCode ?? 'FANTASTIC');
+                                        : '${_s(p.stationCode)} • ${_prettyStatus(p.overallStatus)}';
 
                                 final rowTitle =
                                     'Score Card ${p.label.split(" ").last} KW ${p.week}';
@@ -737,12 +780,14 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                                           size: _sp(22, w)),
                                     ],
                                   ),
-                                  onTap: () => Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          ScorecardWeekPage(reportRef: p.ref),
-                                    ),
+                                onTap: () => Navigator.of(context).push(
+                                  PageRouteBuilder(
+                                    pageBuilder: (_, __, ___) =>
+                                        ScorecardWeekShellPage(reportRef: p.ref),
+                                    transitionDuration: Duration.zero,
+                                    reverseTransitionDuration: Duration.zero,
                                   ),
+                                ),
                                 );
                               },
                             ),
@@ -789,14 +834,7 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
     );
 
     // Use shared AppShell + shared side menu
-    return AppShell(
-      menuWidth: 280,
-      sideMenu: AppSideMenu(
-        width: 280,
-        active: AppNav.dashboard,
-      ),
-      title: shellTitle,
-      body: Stack(
+    return Stack(
         children: [
           Container(color: _UI.bg, child: body),
 
@@ -842,8 +880,7 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
             ),
           ],
         ],
-      ),
-    );
+      );
   }
 }
 
@@ -940,7 +977,7 @@ class _StatCard extends StatelessWidget {
           ),
           SizedBox(height: _pad(8, w)),
           Text(
-            value != null ? '${_pct.format(value)} %' : '—',
+            value != null ? '${_pct2.format(value)} %' : '—',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: _sp(28, w),
@@ -964,7 +1001,7 @@ class _StatCard extends StatelessWidget {
                     color: isUp ? _UI.greenDark : Colors.red,
                   ),
                   Text(
-                    '${isUp ? '+' : ''}${_pct.format(delta!.abs())} %',
+                    '${isUp ? '+' : ''}${_pct2.format(delta!.abs())} %',
                     style: TextStyle(
                       fontSize: _sp(13, w),
                       color: isUp ? _UI.greenDark : Colors.red,
@@ -1090,8 +1127,11 @@ class _MiniBarChart extends StatelessWidget {
                               final h = (v / axisMax) * (usableH - _pad(8, w));
                               return GestureDetector(
                                 onTap: () => Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => ScorecardWeekPage(reportRef: p.ref),
+                                  PageRouteBuilder(
+                                    pageBuilder: (_, __, ___) =>
+                                        ScorecardWeekShellPage(reportRef: p.ref),
+                                    transitionDuration: Duration.zero,
+                                    reverseTransitionDuration: Duration.zero,
                                   ),
                                 ),
                                 child: AnimatedContainer(

@@ -16,9 +16,6 @@ import '../main.dart' show storage;
 // 🔸 Added: need current user id to read scores under users/{uid}/scores
 import 'package:firebase_auth/firebase_auth.dart';
 
-// NEW: shared shell + side menu
-import '../widgets/app_shell.dart';
-import '../widgets/app_side_menu.dart';
 
 final _pct = NumberFormat.decimalPattern('de');
 final _int = NumberFormat.decimalPattern('de');
@@ -79,6 +76,7 @@ class ScorecardWeekPage extends StatefulWidget {
 
 class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
   bool _busyUpload = false;
+  late final Stream<DocumentSnapshot<Map<String, dynamic>>> _reportStream;
 
   // UI controls (search + bucket filter)
   String _query = '';
@@ -124,6 +122,12 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
     });
   }
 
+  @override
+  void initState() {
+    super.initState();
+    _reportStream = widget.reportRef.snapshots();
+  }
+
   // ===== summary helpers =====
   String _statusText(double v) {
     if (v >= 85) return 'Fantastic';
@@ -137,6 +141,25 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
     if (v >= 70) return const Color(0xFF22C55E);
     if (v >= 55) return const Color(0xFFF59E0B);
     return const Color(0xFFEF4444);
+  }
+
+  Widget _fitNameText(String name, double fontSize) {
+    return SizedBox(
+      width: double.infinity,
+      child: FittedBox(
+        alignment: Alignment.centerLeft,
+        fit: BoxFit.scaleDown,
+        child: Text(
+          name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: fontSize,
+          ),
+        ),
+      ),
+    );
   }
 
   // ===== API bucket mapping (driver rows) =====
@@ -215,7 +238,7 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
 
     // Title updates via stream (week number)
     final shellTitle = StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: widget.reportRef.snapshots(),
+      stream: _reportStream,
       builder: (context, snap) {
         final Map<String, dynamic> report = snap.data?.data() ?? <String, dynamic>{};
         final rawSummary = report['summary'];
@@ -249,7 +272,7 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
           children: [
             // ===== Top bar: Title + date + controls =====
             StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-              stream: widget.reportRef.snapshots(),
+              stream: _reportStream,
               builder: (context, snap) {
                 final Map<String, dynamic> report = snap.data?.data() ?? <String, dynamic>{};
                 final rawSummary = report['summary'];
@@ -364,7 +387,7 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
 
             // ===== Summary cards (unchanged) =====
             StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-              stream: widget.reportRef.snapshots(),
+              stream: _reportStream,
               builder: (context, snap) {
                 final Map<String, dynamic> report = snap.data?.data() ?? <String, dynamic>{};
                 final rawSummary = report['summary'];
@@ -373,6 +396,7 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
                     : <String, dynamic>{};
 
                 final overall = (summary['overallScore'] as num?)?.toDouble();
+                final overallStatus = _s(summary['overallStatus']);
                 final relNext = (summary['reliabilityNextDay'] as num?)?.toDouble();
                 final relGeneric = (summary['reliabilityScore'] as num?)?.toDouble();
                 final reliability = relNext ?? relGeneric;
@@ -425,7 +449,7 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
                                   w: w,
                                   title: 'TOTAL COMPANY SCORE',
                                   big: overall == null ? '—' : '${_pct.format(overall)} %',
-                                  small: overall == null ? '' : _statusText(overall),
+                                  small: overall == null ? '' : _prettyBucket(overallStatus),
                                   accent: const Color(0xFF16A34A),
                                 ),
                               ),
@@ -598,15 +622,7 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
                                                     child: Column(
                                                       crossAxisAlignment: CrossAxisAlignment.start,
                                                       children: [
-                                                        Text(
-                                                          _s(name),
-                                                          maxLines: 1,
-                                                          overflow: TextOverflow.ellipsis,
-                                                          style: TextStyle(
-                                                            fontWeight: FontWeight.w800,
-                                                            fontSize: _sp(16, w),
-                                                          ),
-                                                        ),
+                                                        _fitNameText(_s(name), _sp(16, w)),
                                                         SizedBox(height: _pad(2, w)),
                                                         Text(
                                                           _s(transporterId),
@@ -683,40 +699,34 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
                                                   flex: 28,
                                                   child: Row(
                                                     children: [
-                                                      Column(
-                                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                                        mainAxisAlignment: MainAxisAlignment.center,
-                                                        children: [
-                                                          Text(
-                                                            _s(name),
-                                                            maxLines: 1,
-                                                            overflow: TextOverflow.ellipsis,
-                                                            style: TextStyle(
-                                                              fontWeight: FontWeight.w800,
-                                                              fontSize: _sp(18, w),
+                                                      Expanded(
+                                                        child: Column(
+                                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                                          mainAxisAlignment: MainAxisAlignment.center,
+                                                          children: [
+                                                            _fitNameText(_s(name), _sp(18, w)),
+                                                            SizedBox(height: _pad(2, w)),
+                                                            Text(
+                                                              _s(transporterId),
+                                                              maxLines: 1,
+                                                              overflow: TextOverflow.ellipsis,
+                                                              style: TextStyle(
+                                                                color: Colors.black54,
+                                                                fontSize: _sp(13, w),
+                                                                fontWeight: FontWeight.w600,
+                                                              ),
                                                             ),
-                                                          ),
-                                                          SizedBox(height: _pad(2, w)),
-                                                          Text(
-                                                            _s(transporterId),
-                                                            maxLines: 1,
-                                                            overflow: TextOverflow.ellipsis,
-                                                            style: TextStyle(
-                                                              color: Colors.black54,
-                                                              fontSize: _sp(13, w),
-                                                              fontWeight: FontWeight.w600,
+                                                            SizedBox(height: _pad(6, w)),
+                                                            Text(
+                                                              _s(statusText),
+                                                              style: TextStyle(
+                                                                fontSize: _sp(13, w),
+                                                                fontWeight: FontWeight.w800,
+                                                                color: statusColor,
+                                                              ),
                                                             ),
-                                                          ),
-                                                          SizedBox(height: _pad(6, w)),
-                                                          Text(
-                                                            _s(statusText),
-                                                            style: TextStyle(
-                                                              fontSize: _sp(13, w),
-                                                              fontWeight: FontWeight.w800,
-                                                              color: statusColor,
-                                                            ),
-                                                          ),
-                                                        ],
+                                                          ],
+                                                        ),
                                                       ),
                                                     ],
                                                   ),
@@ -774,18 +784,9 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
       ),
     );
 
-    return AppShell(
-      menuWidth: 280,
-      sideMenu: const AppSideMenu(
-        width: 280,
-        active: AppNav.drivers,
-      ),
-      title: shellTitle,
-      actions: [csvAction],
-      body: Container(
-        color: const Color(0xFFF5F7F9),
-        child: pageBody,
-      ),
+    return Material(
+      color: const Color(0xFFF5F7F9),
+      child: pageBody,
     );
   }
 }

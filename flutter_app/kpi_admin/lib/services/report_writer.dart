@@ -49,6 +49,7 @@ class ReportWriter {
       'stationCode': station,
       'summary'    : {
         'overallScore'      : (summary['overallScore'] as num?)?.toDouble(),
+        'overallStatus'     : (summary['overallStatus'] ?? '').toString(),
         'reliabilityScore'  : (summary['reliabilityScore'] as num?)?.toDouble(),
         'reliabilityNextDay': (summary['reliabilityNextDay'] as num?)?.toDouble(),
         'reliabilitySameDay': (summary['reliabilitySameDay'] as num?)?.toDouble(),

@@ -49,6 +49,11 @@ type DeleteNotificationData = {
   notificationId?: string;
 };
 
+type DeleteDriverData = {
+  dspUid?: string;
+  transporterId?: string;
+};
+
 /**
  * Returns true if the caller is authenticated.
  * @param {unknown} authCtx onCall request.auth
@@ -217,6 +222,57 @@ export const createDriverLogin = onCall(async (request) => {
     },
     {merge: true},
   );
+
+  // Backfill existing RULE notifications so new drivers can see old rules.
+  const adminRulesSnap = await db
+    .collection("users")
+    .doc(dspUid)
+    .collection("notifications")
+    .where("type", "==", "rule")
+    .get();
+
+  if (!adminRulesSnap.empty) {
+    const driverNotifsCol = driverRef.collection("notifications");
+
+    const existenceChecks = adminRulesSnap.docs.map(async (doc) => {
+      const driverNotifSnap = await driverNotifsCol.doc(doc.id).get();
+      return {doc, exists: driverNotifSnap.exists};
+    });
+
+    const checks = await Promise.all(existenceChecks);
+    const missing = checks.filter((c) => !c.exists).map((c) => c.doc);
+
+    const chunkSize = 200;
+    for (let i = 0; i < missing.length; i += chunkSize) {
+      const chunk = missing.slice(i, i + chunkSize);
+      const batch = db.batch();
+
+      for (const adminDoc of chunk) {
+        const adminData = adminDoc.data() || {};
+        const driverNotifRef = driverNotifsCol.doc(adminDoc.id);
+
+        batch.set(driverNotifRef, {
+          notificationId: adminDoc.id,
+          type: adminData.type || "rule",
+          title: adminData.title || "",
+          body: adminData.body || "",
+          status: "unread",
+          createdAt: adminData.createdAt || FieldValue.serverTimestamp(),
+          readAt: null,
+          confirmedAt: null,
+          requiresConfirmation: adminData.requiresConfirmation ?? true,
+        });
+
+        batch.set(
+          adminDoc.ref,
+          {targetCount: FieldValue.increment(1)},
+          {merge: true},
+        );
+      }
+
+      await batch.commit();
+    }
+  }
 
   return {
     uid: userRecord.uid,
@@ -751,187 +807,85 @@ export const deleteNotificationEverywhere = onCall(async (request) => {
   return { ok: true, deletedFromDrivers: drivers.length };
 });
 
-type CleanupSyntheticDriverLoginsData = {
-  dspUid?: string;
-  dryRun?: boolean; // if true: only report what would be deleted
-  limit?: number; // safety cap per run
-};
+/**
+ * Deletes a driver account end-to-end:
+ * - Firebase Auth user (if linked)
+ * - users/{driverUid} doc (if linked)
+ * - users/{dspUid}/drivers/{transporterId} doc
+ *
+ * Security:
+ * - caller must be authenticated
+ * - caller uid must equal dspUid
+ */
+export const deleteDriverAccount = onCall(async (request) => {
+  const callerUid = requireAuthUid(request.auth);
+  const data = (request.data || {}) as DeleteDriverData;
 
-export const cleanupSyntheticDriverLogins = onCall(async (request) => {
-  const ctx = request.auth;
-  if (!ctx || !ctx.uid) {
-    throw new HttpsError("unauthenticated", "You must be signed in.");
-  }
-
-  const data = (request.data || {}) as CleanupSyntheticDriverLoginsData;
   const dspUid = (data.dspUid || "").trim();
-  const dryRun = !!data.dryRun;
-  const limit = Math.max(1, Math.min(Number(data.limit ?? 500), 1000)); // cap hard
+  const transporterId = (data.transporterId || "").trim().toUpperCase();
 
-  if (!dspUid) {
-    throw new HttpsError("invalid-argument", "dspUid is required.");
+  if (!dspUid || !transporterId) {
+    throw new HttpsError(
+      "invalid-argument",
+      "dspUid and transporterId are required.",
+    );
   }
 
-  // DSP can only clean their own drivers
-  if (ctx.uid !== dspUid) {
-    throw new HttpsError("permission-denied", "You can only manage your own DSP.");
+  if (callerUid !== dspUid) {
+    throw new HttpsError(
+      "permission-denied",
+      "You can only delete drivers for your own DSP.",
+    );
   }
 
-  const driversCol = db.collection("users").doc(dspUid).collection("drivers");
-  const snap = await driversCol.get();
+  const driverRef = db
+    .collection("users")
+    .doc(dspUid)
+    .collection("drivers")
+    .doc(transporterId);
 
-  if (snap.empty) {
-    return { ok: true, scanned: 0, matched: 0, deletedAuth: 0, deletedUserDocs: 0, clearedDriverLinks: 0, dryRun };
+  const driverSnap = await driverRef.get();
+  if (!driverSnap.exists) {
+    throw new HttpsError("not-found", "Driver not found.");
   }
 
-  const toProcess: Array<{
-    transporterId: string;
-    authUid: string;
-    loginEmail: string;
-    driverRefPath: string;
-  }> = [];
+  const driverData = driverSnap.data() || {};
+  let authUid = (driverData.authUid ?? "").toString().trim();
+  const loginEmail = (driverData.loginEmail ?? "").toString().trim();
 
-  for (const doc of snap.docs) {
-    const d = doc.data() || {};
-    const authUid = (d.authUid ?? "").toString().trim();
-    const loginEmail = (d.loginEmail ?? "").toString().trim();
-    const transporterId = (d.transporterId ?? doc.id).toString().trim();
-
-    // Match only the synthetic ones
-    if (!loginEmail.endsWith("@drivers.dsp-copilot.local")) continue;
-
-    // We can delete by authUid. If missing, we'll try resolving via email.
-    toProcess.push({
-      transporterId,
-      authUid,
-      loginEmail,
-      driverRefPath: doc.ref.path,
-    });
-
-    if (toProcess.length >= limit) break;
-  }
-
-  let deletedAuth = 0;
-  let deletedUserDocs = 0;
-  let clearedDriverLinks = 0;
-
-  const results: Array<{
-    transporterId: string;
-    loginEmail: string;
-    authUid?: string;
-    authDeleted?: boolean;
-    userDocDeleted?: boolean;
-    driverLinkCleared?: boolean;
-    error?: string;
-  }> = [];
-
-  for (const item of toProcess) {
-    const driverRef = db.doc(item.driverRefPath);
-
-    if (dryRun) {
-      results.push({
-        transporterId: item.transporterId,
-        loginEmail: item.loginEmail,
-        authUid: item.authUid || undefined,
-        authDeleted: false,
-        userDocDeleted: false,
-        driverLinkCleared: false,
-      });
-      continue;
-    }
-
-    let uidToDelete = item.authUid;
-
-    // If authUid missing, resolve via email
-    if (!uidToDelete) {
-      try {
-        const u = await auth.getUserByEmail(item.loginEmail);
-        uidToDelete = u.uid;
-      } catch (err) {
-        results.push({
-          transporterId: item.transporterId,
-          loginEmail: item.loginEmail,
-          authUid: undefined,
-          error: `Could not resolve auth user by email: ${String(err)}`,
-        });
-        // Still clear linkage (since it’s synthetic), even if auth delete failed
-        try {
-          await driverRef.set(
-            {
-              hasLogin: false,
-              authUid: FieldValue.delete(),
-              loginEmail: FieldValue.delete(),
-              updatedAt: FieldValue.serverTimestamp(),
-            },
-            { merge: true }
-          );
-          clearedDriverLinks++;
-          results[results.length - 1].driverLinkCleared = true;
-        } catch (e2) {
-          // ignore
-        }
-        continue;
-      }
-    }
-
-    // 1) Delete Auth user
-    let authDeleted = false;
+  if (!authUid && loginEmail) {
     try {
-      await auth.deleteUser(uidToDelete);
-      deletedAuth++;
+      const u = await auth.getUserByEmail(loginEmail);
+      authUid = u.uid;
+    } catch (err) {
+      logger.warn(`deleteDriverAccount: auth lookup failed email=${loginEmail}`, err);
+    }
+  }
+
+  let authDeleted = false;
+  let userDocDeleted = false;
+
+  if (authUid) {
+    try {
+      await auth.deleteUser(authUid);
       authDeleted = true;
     } catch (err) {
-      // If already deleted, continue
-      logger.warn(`Auth delete failed uid=${uidToDelete}`, err);
+      logger.warn(`deleteDriverAccount: auth delete failed uid=${authUid}`, err);
     }
 
-    // 2) Delete top-level users/{driverUid}
-    let userDocDeleted = false;
     try {
-      await db.collection("users").doc(uidToDelete).delete();
-      deletedUserDocs++;
+      await db.collection("users").doc(authUid).delete();
       userDocDeleted = true;
     } catch (err) {
-      logger.warn(`Firestore user doc delete failed uid=${uidToDelete}`, err);
+      logger.warn(`deleteDriverAccount: user doc delete failed uid=${authUid}`, err);
     }
-
-    // 3) Clear linkage on DSP driver doc (keeps driver entry intact)
-    let driverLinkCleared = false;
-    try {
-      await driverRef.set(
-        {
-          hasLogin: false,
-          authUid: FieldValue.delete(),
-          loginEmail: FieldValue.delete(),
-          updatedAt: FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
-      clearedDriverLinks++;
-      driverLinkCleared = true;
-    } catch (err) {
-      logger.warn(`Driver link clear failed ref=${item.driverRefPath}`, err);
-    }
-
-    results.push({
-      transporterId: item.transporterId,
-      loginEmail: item.loginEmail,
-      authUid: uidToDelete,
-      authDeleted,
-      userDocDeleted,
-      driverLinkCleared,
-    });
   }
 
-  return {
-    ok: true,
-    scanned: snap.size,
-    matched: toProcess.length,
-    deletedAuth,
-    deletedUserDocs,
-    clearedDriverLinks,
-    dryRun,
-    limit,
-    results, // keep for debugging in console/logs; you may omit in prod
-  };
+  await driverRef.delete();
+
+  logger.info(
+    `deleteDriverAccount: deleted driver ${transporterId} for dspUid=${dspUid} (authDeleted=${authDeleted}, userDocDeleted=${userDocDeleted})`,
+  );
+
+  return { ok: true, authDeleted, userDocDeleted };
 });

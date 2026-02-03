@@ -232,6 +232,7 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
 
         return Scaffold(
           backgroundColor: _kBg,
+          extendBody: true,
           body: SafeArea(
             child: Column(
               children: [
@@ -274,28 +275,31 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
           ),
 
           // ---------- BOTTOM NAV (always visible) ----------
-          bottomNavigationBar: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
-            child: _DriverBottomNav(
-              index: _tabIndex,
-              onTap: (i) {
-                setState(() {
-                  _tabIndex = i;
+          bottomNavigationBar: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
+              child: _DriverBottomNav(
+                index: _tabIndex,
+                onTap: (i) {
+                  setState(() {
+                    _tabIndex = i;
 
-                  // keep your existing tabs intact, and add "Rules" internal view on index 3
-                  if (i == 0) {
-                    _view = DriverView.dashboard;
-                  } else if (i == 1) {
-                  _view = DriverView.faq;
-                  } else if (i == 2) {
-                    _view = DriverView.onboarding;
-                  } else if (i == 3) {
-                    _view = DriverView.rules;
-                  } else if (i == 4) {
-                    _view = DriverView.profile;
-                  }
-                });
-              },
+                    // keep your existing tabs intact, and add "Rules" internal view on index 3
+                    if (i == 0) {
+                      _view = DriverView.dashboard;
+                    } else if (i == 1) {
+                    _view = DriverView.faq;
+                    } else if (i == 2) {
+                      _view = DriverView.onboarding;
+                    } else if (i == 3) {
+                      _view = DriverView.rules;
+                    } else if (i == 4) {
+                      _view = DriverView.profile;
+                    }
+                  });
+                },
+              ),
             ),
           ),
         );
@@ -389,6 +393,27 @@ class _HeaderBar extends StatelessWidget {
     required this.onOpenNotifications,
     required this.unreadCount,
   });
+
+  String _initialsFromName(String name) {
+    final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty);
+    final initials = parts.take(2).map((p) => p[0]).join();
+    return initials.toUpperCase();
+  }
+
+  Widget _avatarFallback({required double fontSize}) {
+    final initials = _initialsFromName(driverName);
+    if (initials.isEmpty) {
+      return const Icon(Icons.person, color: Colors.white, size: 18);
+    }
+    return Text(
+      initials,
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: fontSize,
+        fontWeight: FontWeight.w700,
+      ),
+    );
+  }
 
   // languageCode -> asset path
   String _flagAssetForLang(String code) {
@@ -499,6 +524,7 @@ class _HeaderBar extends StatelessWidget {
         child: CircleAvatar(
           backgroundImage: profileImage,
           backgroundColor: Colors.grey.shade300,
+          child: profileImage == null ? _avatarFallback(fontSize: 12) : null,
         ),
       ),
     );
@@ -620,133 +646,116 @@ class _HeaderBar extends StatelessWidget {
     final user = FirebaseAuth.instance.currentUser;
     final email = user?.email ?? '';
 
-    await showModalBottomSheet<void>(
+    await showDialog<void>(
       context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: false,
       builder: (ctx) {
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () => Navigator.of(ctx).pop(),
-          child: Stack(
-            children: [
-              Align(
-                alignment: Alignment.bottomCenter,
-                child: GestureDetector(
-                  onTap: () {}, // stop closing when tapping inside
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.12),
-                          blurRadius: 16,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
+          child: Center(
+            child: GestureDetector(
+              onTap: () {}, // stop closing when tapping inside
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.12),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
                     ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
                       children: [
-                        Container(
-                          width: 36,
-                          height: 4,
-                          margin: const EdgeInsets.only(bottom: 16),
-                          decoration: BoxDecoration(
-                            color: Colors.black12,
-                            borderRadius: BorderRadius.circular(999),
-                          ),
+                        CircleAvatar(
+                          radius: 30,
+                          backgroundImage: profileImage,
+                          backgroundColor: Colors.grey.shade300,
+                          child: profileImage == null
+                              ? _avatarFallback(fontSize: 18)
+                              : null,
                         ),
-                        Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 30,
-                              backgroundImage: profileImage,
-                              backgroundColor: Colors.grey.shade300,
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    driverName,
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w700,
-                                    ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                driverName,
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              if (email.isNotEmpty)
+                                Text(
+                                  email,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.black54,
                                   ),
-                                  if (email.isNotEmpty)
-                                    Text(
-                                      email,
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        color: Colors.black54,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton(
-                            style: OutlinedButton.styleFrom(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            onPressed: () async {
-                              Navigator.of(ctx).pop();
-                              await onChangePhoto();
-                            },
-                            child: Text(
-                              loc.t('profile_change_photo'),
-                              style: const TextStyle(fontSize: 14),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.redAccent,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                            onPressed: () async {
-                              Navigator.of(ctx).pop();
-                              await FirebaseAuth.instance.signOut();
-                              Navigator.of(context)
-                                  .popUntil((r) => r.isFirst);
-                            },
-                            child: Text(
-                              loc.t('profile_logout'),
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
+                                ),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                  ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed: () async {
+                          Navigator.of(ctx).pop();
+                          await onChangePhoto();
+                        },
+                        child: Text(
+                          loc.t('profile_change_photo'),
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.redAccent,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onPressed: () async {
+                          Navigator.of(ctx).pop();
+                          await FirebaseAuth.instance.signOut();
+                          Navigator.of(context).popUntil((r) => r.isFirst);
+                        },
+                        child: Text(
+                          loc.t('profile_logout'),
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
         );
       },
@@ -833,14 +842,34 @@ class _DriverBottomNav extends StatelessWidget {
     required this.onTap,
   });
 
+  static const String _cardsStarAsset = 'assets/icons/cards_star.svg';
+
   @override
   Widget build(BuildContext context) {
-    Icon _icon(IconData data, int i) {
+    final loc = AppLocalizations.of(context);
+
+    Widget _navItem({
+      required Widget Function(Color color) iconBuilder,
+      required String label,
+      required int i,
+    }) {
       final selected = index == i;
-      return Icon(
-        data,
-        size: 24,
-        color: selected ? _kPrimaryGreen : Colors.black54,
+      final color = selected ? _kPrimaryGreen : Colors.black54;
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          iconBuilder(color),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: color,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ],
       );
     }
 
@@ -856,25 +885,49 @@ class _DriverBottomNav extends StatelessWidget {
           ),
         ],
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           GestureDetector(
               onTap: () => onTap(0),
-              child: _icon(Icons.home_outlined, 0)),
+              child: _navItem(
+                iconBuilder: (color) => SvgPicture.asset(
+                  _cardsStarAsset,
+                  width: 28,
+                  height: 28,
+                  colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+                ),
+                label: loc.t('nav_scorecard'),
+                i: 0,
+              )),
           GestureDetector(
               onTap: () => onTap(1),
-              child: _icon(Icons.help_outline_rounded, 1)),
-          GestureDetector(
-              onTap: () => onTap(2),
-              child: _icon(Icons.note_add_outlined, 2)),
+              child: _navItem(
+                iconBuilder: (color) =>
+                    Icon(Icons.help_outline_rounded, size: 28, color: color),
+                label: loc.t('nav_help'),
+                i: 1,
+              )),
+          // GestureDetector(
+          //     onTap: () => onTap(2),
+          //     child: _icon(Icons.note_add_outlined, 2)),
           GestureDetector(
               onTap: () => onTap(3),
-              child: _icon(Icons.receipt_long_outlined, 3)),
+              child: _navItem(
+                iconBuilder: (color) =>
+                    Icon(Icons.gavel_outlined, size: 28, color: color),
+                label: loc.t('nav_rules'),
+                i: 3,
+              )),
           GestureDetector(
               onTap: () => onTap(4),
-              child: _icon(Icons.person_outline, 4)),
+              child: _navItem(
+                iconBuilder: (color) =>
+                    Icon(Icons.person_outline, size: 28, color: color),
+                label: loc.t('nav_profile'),
+                i: 4,
+              )),
         ],
       ),
     );

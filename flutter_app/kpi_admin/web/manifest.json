@@ -1,11 +1,11 @@
 {
-    "name": "kpi_admin",
-    "short_name": "kpi_admin",
+    "name": "DSP-CoPilot",
+    "short_name": "DSP-CoPilot",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "A logistics and operations management application designed to streamline driver onboarding, document verification, user administration, and internal workflows. The platform supports role-based access, real-time data handling, and multi-language localization with a modular and scalable architecture.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

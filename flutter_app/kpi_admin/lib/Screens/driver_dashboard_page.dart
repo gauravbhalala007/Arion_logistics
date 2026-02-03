@@ -74,6 +74,11 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
   // year selection: 2025, 2026, ...
   int? _selectedYear;
 
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> _reportsStreamCached;
+  late final Stream<Map<String, String>> _globalNamesStreamCached;
+  final Map<String, Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>>> _scoresStreamCache = {};
+  final Map<String, Stream<Map<String, String>>> _weekNamesStreamCache = {};
+
   // All reports for this DSP (sorted latest first)
   Stream<QuerySnapshot<Map<String, dynamic>>> _reportsStream() {
     return FirebaseFirestore.instance
@@ -151,13 +156,42 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
     });
   }
 
+  @override
+  void initState() {
+    super.initState();
+    _reportsStreamCached = _reportsStream();
+    _globalNamesStreamCached = _driversNameMapGlobal();
+  }
+
+  Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _scoresCached(
+    DocumentReference<Map<String, dynamic>> reportRef,
+  ) {
+    return _scoresStreamCache.putIfAbsent(reportRef.path, () => _scores(reportRef));
+  }
+
+  Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _scoresForReportsCached(
+    List<DocumentReference<Map<String, dynamic>>> reportRefs,
+  ) {
+    final refs = [...reportRefs]..sort((a, b) => a.path.compareTo(b.path));
+    final key = refs.map((r) => r.path).join('|');
+    return _scoresStreamCache.putIfAbsent(key, () => _scoresForReports(refs));
+  }
+
+  Stream<Map<String, String>> _driverNamesForWeekCached(
+    DocumentReference<Map<String, dynamic>> reportRef,
+  ) {
+    return _weekNamesStreamCache.putIfAbsent(
+      reportRef.path,
+      () => _driverNamesForWeek(reportRef),
+    );
+  }
+
   // Localized status text from numeric score
   String _statusText(BuildContext context, double v) {
-    final loc = AppLocalizations.of(context);
-    if (v >= 85) return loc.t('status_fantastic');
-    if (v >= 70) return loc.t('status_great');
-    if (v >= 55) return loc.t('status_fair');
-    return loc.t('status_poor');
+    if (v >= 85) return 'Fantastic';
+    if (v >= 70) return 'Great';
+    if (v >= 55) return 'Fair';
+    return 'Poor';
   }
 
   Color _statusColor(double v) {
@@ -167,20 +201,27 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
     return const Color(0xFFEF4444);
   }
 
+  String _statusCodeFromScore(double v) {
+    if (v >= 93) return 'FANTASTIC_PLUS';
+    if (v >= 85) return 'FANTASTIC';
+    if (v >= 70) return 'GREAT';
+    if (v >= 50) return 'FAIR';
+    return 'POOR';
+  }
+
   // Pretty bucket name from API bucket code
   String _prettyBucket(BuildContext context, String raw) {
-    final loc = AppLocalizations.of(context);
     switch (_s(raw).trim().toUpperCase()) {
       case 'FANTASTIC_PLUS':
-        return loc.t('bucket_fantastic_plus');
+        return 'Fantastic Plus';
       case 'FANTASTIC':
-        return loc.t('bucket_fantastic');
+        return 'Fantastic';
       case 'GREAT':
-        return loc.t('bucket_great');
+        return 'Great';
       case 'FAIR':
-        return loc.t('bucket_fair');
+        return 'Fair';
       case 'POOR':
-        return loc.t('bucket_poor');
+        return 'Poor';
       default:
         return _s(raw);
     }
@@ -189,15 +230,16 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
   Color _colorFromApiBucket(String apiBucket) {
     switch (_s(apiBucket).trim().toUpperCase()) {
       case 'FANTASTIC_PLUS':
+        return _kFantasticPlusColor;
       case 'FANTASTIC':
-        return const Color(0xFF16A34A);
+        return _kFantasticColor;
       case 'GREAT':
-        return const Color(0xFF22C55E);
+        return _kGreatColor;
       case 'FAIR':
-        return const Color(0xFFF59E0B);
+        return _kFairColor;
       case 'POOR':
       default:
-        return const Color(0xFFEF4444);
+        return _kPoorColor;
     }
   }
 
@@ -293,7 +335,7 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
     }
 
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: _reportsStream(),
+      stream: _reportsStreamCached,
       builder: (context, reportSnap) {
         if (reportSnap.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -465,20 +507,15 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
           }
         }
 
-        final bucketRaw = (isMonthlyCompany || isYearlyCompany) ? '' : _s(summary['statusBucket']);
-
-        final statusText = bucketRaw.isNotEmpty
-            ? _prettyBucket(context, bucketRaw)
-            : _statusText(context, overall);
-
-        final statusColor =
-            bucketRaw.isNotEmpty ? _colorFromApiBucket(bucketRaw) : _statusColor(overall);
+        final overallStatusRaw = _s(summary['overallStatus']);
+        final statusText = _prettyBucket(context, overallStatusRaw);
+        final statusColor = _colorFromApiBucket(overallStatusRaw);
 
         final reportRef = selectedReport.reference;
 
         final scoreStream = (isMonthlyCompany || isYearlyCompany) && aggReportRefs.isNotEmpty
-            ? _scoresForReports(aggReportRefs)
-            : _scores(reportRef);
+            ? _scoresForReportsCached(aggReportRefs)
+            : _scoresCached(reportRef);
 
         String monthPillLabel;
         if (_viewMode != _ViewMode.company) {
@@ -639,12 +676,12 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
 
               // MAIN CONTENT
               StreamBuilder<Map<String, String>>(
-                stream: _driverNamesForWeek(reportRef),
+                stream: _driverNamesForWeekCached(reportRef),
                 builder: (context, weekSnap) {
                   final weekNames = weekSnap.data ?? const <String, String>{};
 
                   return StreamBuilder<Map<String, String>>(
-                    stream: _driversNameMapGlobal(),
+                    stream: _globalNamesStreamCached,
                     builder: (context, globalSnap) {
                       final globalNames = globalSnap.data ?? const <String, String>{};
 
@@ -729,11 +766,19 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
 
                                   final score = _numOr0(comp['FinalScore']).toDouble();
                                   final rank = (data['rank'] as num?)?.toInt() ?? i + 1;
+                                  final apiBucketRaw = _s(data['statusBucket']);
+                                  final statusCode = apiBucketRaw.isNotEmpty
+                                      ? apiBucketRaw
+                                      : _statusCodeFromScore(score);
+                                  final statusText = _prettyBucket(context, statusCode);
+                                  final statusColor = _colorFromApiBucket(statusCode);
 
                                   return _LeaderboardRowCard(
                                     rank: rank,
                                     score: score,
                                     name: name,
+                                    statusText: statusText,
+                                    statusColor: statusColor,
                                   );
                                 },
                               );
@@ -786,11 +831,16 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
                                   final name = _s(nameMap[e.transporterId]).isNotEmpty
                                       ? _s(nameMap[e.transporterId])
                                       : loc.t('dash_no_name');
+                                  final statusCode = _statusCodeFromScore(e.avgScore);
+                                  final statusText = _prettyBucket(context, statusCode);
+                                  final statusColor = _colorFromApiBucket(statusCode);
 
                                   return _LeaderboardRowCard(
                                     rank: i + 1,
                                     score: e.avgScore,
                                     name: name,
+                                    statusText: statusText,
+                                    statusColor: statusColor,
                                     backgroundColor: _monthlyBucketColorFromScore(e.avgScore),
                                   );
                                 },
@@ -953,11 +1003,21 @@ class _FilterPillRow extends StatelessWidget {
     return (s['year'] as num?)?.toInt() ?? (d['year'] as num?)?.toInt() ?? DateTime.now().year;
   }
 
+  String _stationOf(int i) {
+    final d = reports[i].data();
+    final summary = d['summary'];
+    final s = summary is Map ? Map<String, dynamic>.from(summary as Map) : <String, dynamic>{};
+    return _s(s['stationCode'] ?? d['stationCode']).toUpperCase();
+  }
+
   String _weekPillLabel(BuildContext context, int idx) {
     final loc = AppLocalizations.of(context);
     final w = _weekOf(idx);
     final y = _yearOf(idx);
-    return '${loc.t('dash_week').toUpperCase()} $w • $y';
+    final station = _stationOf(idx);
+    return station.isNotEmpty
+        ? '${loc.t('dash_week').toUpperCase()} $w • $y • $station'
+        : '${loc.t('dash_week').toUpperCase()} $w • $y';
   }
 
   @override
@@ -1073,22 +1133,44 @@ class _FilterPillRow extends StatelessWidget {
       ),
     );
 
-    return Row(
-      children: [
-        ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 130),
-          child: scorePill,
-        ),
-        const Spacer(),
-        Row(
-          mainAxisSize: MainAxisSize.min,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isTight = constraints.maxWidth < 720;
+
+        if (!isTight) {
+          return Row(
+            children: [
+              ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 130),
+                child: scorePill,
+              ),
+              const Spacer(),
+              weekPill,
+              const SizedBox(width: 5),
+              monthPill,
+            ],
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            weekPill,
-            const SizedBox(width: 5),
-            monthPill,
+            Row(
+              children: [
+                Expanded(child: scorePill),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: weekPill),
+                const SizedBox(width: 5),
+                Expanded(child: monthPill),
+              ],
+            ),
           ],
-        ),
-      ],
+        );
+      },
     );
   }
 
@@ -1378,6 +1460,7 @@ class _FilterPillRow extends StatelessWidget {
                         itemBuilder: (_, i) {
                           final idx = list[i];
                           final w = _weekOf(idx);
+                          final station = _stationOf(idx);
                           final isSelected = idx == selectedIndex;
 
                           return InkWell(
@@ -1401,7 +1484,9 @@ class _FilterPillRow extends StatelessWidget {
                               child: Row(
                                 children: [
                                   Text(
-                                    '${loc.t('dash_week').toUpperCase()} $w',
+                                    station.isNotEmpty
+                                        ? '${loc.t('dash_week').toUpperCase()} $w • $station'
+                                        : '${loc.t('dash_week').toUpperCase()} $w',
                                     style: const TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w800,
@@ -1545,14 +1630,6 @@ class _SummaryStrip extends StatelessWidget {
 
     final cells = <Widget>[
       _cell(
-        label: loc.t('dash_week'),
-        value: weekNumber?.toString() ?? '—',
-      ),
-      _cell(
-        label: loc.t('dash_total_score'),
-        value: totalScoreStr,
-      ),
-      _cell(
         label: loc.t('dash_rank_in_station'),
         value: rankText,
       ),
@@ -1646,25 +1723,42 @@ class _MySummaryStrip extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(
-            label.toUpperCase(),
-            style: TextStyle(
-              fontSize: 8,
-              letterSpacing: 1.1,
-              color: Colors.white.withOpacity(0.85),
-              fontWeight: FontWeight.w700,
+          SizedBox(
+            width: double.infinity,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.center,
+              child: Text(
+                label.toUpperCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 8,
+                  letterSpacing: 1.1,
+                  color: Colors.white.withOpacity(0.85),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 4),
-          Text(
-            value,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: isStatus ? 14 : 18,
-              height: 1.1,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
+          SizedBox(
+            width: double.infinity,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.center,
+              child: Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                softWrap: false,
+                style: TextStyle(
+                  fontSize: isStatus ? 14 : 18,
+                  height: 1.1,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
+              ),
             ),
           ),
         ],
@@ -1723,12 +1817,16 @@ class _LeaderboardRowCard extends StatelessWidget {
   final int rank;
   final double score;
   final String name;
+  final String statusText;
+  final Color statusColor;
   final Color? backgroundColor;
 
   const _LeaderboardRowCard({
     required this.rank,
     required this.score,
     required this.name,
+    required this.statusText,
+    required this.statusColor,
     this.backgroundColor,
   });
 
@@ -1741,6 +1839,9 @@ class _LeaderboardRowCard extends StatelessWidget {
     final bool isColored = backgroundColor != null;
     final Color textColor = isColored ? Colors.white : const Color(0xFF4B5563);
     final Color labelColor = isColored ? Colors.white70 : const Color(0xFF9CA3AF);
+    final Color pillTextColor = isColored ? Colors.white : statusColor;
+    final Color pillBgColor =
+        isColored ? Colors.white.withOpacity(0.2) : statusColor.withOpacity(0.15);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 16),
@@ -1752,40 +1853,68 @@ class _LeaderboardRowCard extends StatelessWidget {
           width: 1.2,
         ),
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            flex: 1,
-            child: _col(
-              label: loc.t('dash_rank'),
-              value: '#$rank',
-              maxLines: 1,
-              labelColor: labelColor,
-              textColor: textColor,
-            ),
+          Row(
+            children: [
+              Expanded(
+                flex: 1,
+                child: _col(
+                  label: loc.t('dash_rank'),
+                  value: '#$rank',
+                  maxLines: 1,
+                  labelColor: labelColor,
+                  textColor: textColor,
+                ),
+              ),
+              _separator(isColored),
+              Expanded(
+                flex: 1,
+                child: _col(
+                  label: loc.t('dash_score'),
+                  value: scoreStr,
+                  maxLines: 1,
+                  labelColor: labelColor,
+                  textColor: textColor,
+                ),
+              ),
+              _separator(isColored),
+              Expanded(
+                flex: 2,
+                child: _col(
+                  label: loc.t('dash_name'),
+                  value: name.isEmpty ? loc.t('dash_no_name') : name,
+                  maxLines: 2,
+                  labelColor: labelColor,
+                  textColor: textColor,
+                ),
+              ),
+            ],
           ),
-          _separator(isColored),
-          Expanded(
-            flex: 1,
-            child: _col(
-              label: loc.t('dash_score'),
-              value: scoreStr,
-              maxLines: 1,
-              labelColor: labelColor,
-              textColor: textColor,
+          if (statusText.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: pillBgColor,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  statusText.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: pillTextColor,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+              ),
             ),
-          ),
-          _separator(isColored),
-          Expanded(
-            flex: 2,
-            child: _col(
-              label: loc.t('dash_name'),
-              value: name.isEmpty ? loc.t('dash_no_name') : name,
-              maxLines: 2,
-              labelColor: labelColor,
-              textColor: textColor,
-            ),
-          ),
+          ],
         ],
       ),
     );
@@ -1932,7 +2061,7 @@ class _MyScoreKpiList extends StatelessWidget {
           proTip: loc.t('kpi_tip_dcr'),
         ),
         _ExpandableKpiTile(
-          code: 'DNR',
+          code: 'DSC DPMO',
           score: dnrScore,
           value: dnrValue,
           color: _kpiColorFromScore(dnrScore),
@@ -2079,21 +2208,27 @@ class _ExpandableKpiTileState extends State<_ExpandableKpiTile> {
               padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
               child: Row(
                 children: [
-                  Container(
-                    width: 100,
+                  SizedBox(
+                    width: 130,
                     height: 70,
-                    decoration: BoxDecoration(
-                      color: widget.color,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      widget.code.toUpperCase(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 18,
-                        letterSpacing: 1.2,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: widget.color,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      alignment: Alignment.center,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          widget.code.toUpperCase(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 18,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
                       ),
                     ),
                   ),

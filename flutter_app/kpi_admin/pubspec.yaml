@@ -105,6 +105,11 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+  fonts:
+    - family: MaterialSymbolsOutlined
+      fonts:
+        - asset: assets/fonts/MaterialSymbolsOutlined.ttf
   assets:
     - assets/
     - assets/flags/
+    - assets/icons/

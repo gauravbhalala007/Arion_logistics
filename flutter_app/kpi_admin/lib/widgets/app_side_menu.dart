@@ -1,5 +1,5 @@
 // lib/widgets/app_side_menu.dart
-import 'dart:convert'; // 👈 for base64Decode
+import 'dart:convert'; // for base64Decode
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -7,18 +7,33 @@ import '../services/auth_service.dart';
 
 enum AppNav { home, dashboard, drivers, notifications, comingSoon, adminApprovals }
 
-
 class AppSideMenu extends StatelessWidget {
   final double width;
   final AppNav active;
+
+  /// NEW: If provided, menu will switch tabs INSIDE AdminShellPage (IndexedStack).
+  final ValueChanged<AppNav>? onSelect;
+
+  /// NEW: Optional helper for narrow screens to close the Drawer after tap.
+  final VoidCallback? closeDrawerIfOpen;
 
   const AppSideMenu({
     super.key,
     required this.width,
     required this.active,
+    this.onSelect,
+    this.closeDrawerIfOpen,
   });
 
-  void _goIfNeeded(BuildContext context, String routeName) {
+  void _handleNav(BuildContext context, AppNav nav, String routeName) {
+    // If AdminShellPage is controlling selection -> no navigation push.
+    if (onSelect != null) {
+      onSelect!(nav);
+      closeDrawerIfOpen?.call();
+      return;
+    }
+
+    // Fallback: old behavior (route navigation)
     final current = ModalRoute.of(context)?.settings.name;
     if (current != routeName) {
       Navigator.of(context).pushNamedAndRemoveUntil(routeName, (r) => false);
@@ -39,11 +54,11 @@ class AppSideMenu extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Image.asset(
-                        'assets/Codriver_logo_dark.png', 
-                        width: 300, // Adjust size as needed for your full logo image
-                        height: 61, 
-                        fit: BoxFit.contain,
-                      ),
+                'assets/Codriver_logo_dark.png',
+                width: 300,
+                height: 61,
+                fit: BoxFit.contain,
+              ),
               const SizedBox(height: 18),
               const _ThinDivider(),
 
@@ -51,32 +66,25 @@ class AppSideMenu extends StatelessWidget {
                 icon: Icons.home_outlined,
                 label: 'Home',
                 active: active == AppNav.home,
-                onTap: () => _goIfNeeded(context, '/home'),
+                onTap: () => _handleNav(context, AppNav.home, '/home'),
               ),
-
               _MenuItem(
                 icon: Icons.dashboard,
                 label: 'Score Card Dashboard',
                 active: active == AppNav.dashboard,
-                onTap: () => _goIfNeeded(context, '/dashboard'),
+                onTap: () => _handleNav(context, AppNav.dashboard, '/dashboard'),
               ),
               _MenuItem(
                 icon: Icons.badge_outlined,
                 label: 'Drivers Hub',
                 active: active == AppNav.drivers,
-                onTap: () => _goIfNeeded(context, '/drivers'),
+                onTap: () => _handleNav(context, AppNav.drivers, '/drivers'),
               ),
               _MenuItem(
                 icon: Icons.notifications_none,
                 label: 'Notifications',
                 active: active == AppNav.notifications,
-                onTap: () => _goIfNeeded(context, '/notifications'),
-              ),
-              _MenuItem(
-                icon: Icons.timer_outlined,
-                label: 'Coming Soon',
-                active: active == AppNav.comingSoon,
-                onTap: () => _goIfNeeded(context, '/coming-soon'),
+                onTap: () => _handleNav(context, AppNav.notifications, '/notifications'),
               ),
 
               // ---- Admin-only item (auto-detect from Firestore user role) ----
@@ -86,11 +94,16 @@ class AppSideMenu extends StatelessWidget {
                   final role = (snap.data?.data()?['role'] ?? '').toString();
                   final isAdmin = role == 'admin';
                   if (!isAdmin) return const SizedBox.shrink();
+
                   return _MenuItem(
                     icon: Icons.verified_user_outlined,
                     label: 'User Approvals',
                     active: active == AppNav.adminApprovals,
-                    onTap: () => _goIfNeeded(context, '/admin-approvals'),
+                    onTap: () => _handleNav(
+                      context,
+                      AppNav.adminApprovals,
+                      '/admin-approvals',
+                    ),
                   );
                 },
               ),
@@ -99,12 +112,13 @@ class AppSideMenu extends StatelessWidget {
               const _ThinDivider(),
               const SizedBox(height: 12),
 
-              // ---- Profile card (uses live Firebase user + Firestore name + base64 photo) ----
+              // ---- Profile card ----
               StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
                 stream: _userDocStream(),
                 builder: (context, snap) {
                   final u = FirebaseAuth.instance.currentUser;
                   final profile = snap.data?.data();
+
                   final name = (() {
                     final f = (profile?['firstName'] ?? '').toString().trim();
                     final l = (profile?['lastName'] ?? '').toString().trim();
@@ -112,9 +126,9 @@ class AppSideMenu extends StatelessWidget {
                     if (n.isNotEmpty) return n;
                     return u?.displayName ?? 'User';
                   })();
+
                   final email = u?.email ?? (profile?['email'] ?? '—');
 
-                  // 👇 Try to load profile image from base64 (either directly or inside onboarding)
                   final onboardingRaw = profile?['onboarding'];
                   final base64Direct = profile?['profilePhotoBase64'];
                   final img = _profileImageFromUserData(
@@ -124,7 +138,7 @@ class AppSideMenu extends StatelessWidget {
 
                   return InkWell(
                     onTap: () {
-                      // 👇 Open DSP profile page (make sure /profile route exists)
+                      // keep route for profile
                       Navigator.of(context).pushNamed('/profile');
                     },
                     borderRadius: BorderRadius.circular(16),
@@ -163,7 +177,6 @@ class AppSideMenu extends StatelessWidget {
                               onPressed: () async {
                                 await AuthService.signOut();
                                 if (!context.mounted) return;
-                                // 👇 After sign-out, go back to login
                                 Navigator.of(context).pushNamedAndRemoveUntil(
                                   '/login',
                                   (route) => false,
@@ -192,7 +205,6 @@ class AppSideMenu extends StatelessWidget {
   Stream<DocumentSnapshot<Map<String, dynamic>>> _userDocStream() {
     final u = FirebaseAuth.instance.currentUser;
     if (u == null) {
-      // emit a single empty doc-like snapshot
       final ctrl = Stream<DocumentSnapshot<Map<String, dynamic>>>.multi((c) {
         c.close();
       });
@@ -207,6 +219,7 @@ class _MenuItem extends StatelessWidget {
   final String label;
   final bool active;
   final VoidCallback onTap;
+
   const _MenuItem({
     required this.icon,
     required this.label,
@@ -297,12 +310,10 @@ class _ThinDivider extends StatelessWidget {
   }
 }
 
-/// 👇 Helper to decode profile photo from base64
 ImageProvider? _profileImageFromUserData({
   dynamic onboardingRaw,
   dynamic directBase64,
 }) {
-  // Prefer a direct field if you ever add it
   String? base64String;
 
   if (directBase64 != null && directBase64.toString().isNotEmpty) {

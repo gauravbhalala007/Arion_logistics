@@ -65,8 +65,16 @@ class AppLocalizations {
       'select_language': 'Select language',
       'notifications': 'Notifications',
       'no_notifications': 'No notifications',
+      'nav_scorecard': 'Scorecard',
+      'nav_help': 'Help',
+      'nav_rules': 'Rules',
+      'nav_profile': 'Profile',
       'change_profile_photo': 'Change profile photo',
+      'profile_change_photo': 'Change Profile Photo',
       'logout': 'Logout',
+      'profile_logout': 'Logout',
+      'pin_change_with_old': 'You can change your PIN after verifying the old one.',
+      'pin_forgot_contact_admin': 'Forgot your PIN? Contact your admin.',
       'profile_photo_updated': 'Profile photo updated.',
       'failed_upload_profile_photo': 'Failed to upload profile photo: {error}',
       'could_not_read_image_bytes':
@@ -193,42 +201,40 @@ class AppLocalizations {
       'kpi_value': 'VALUE',
       'kpi_pro_tip': 'PRO TIP',
 
-      'kpi_title_dcr': 'Delivery Completion Rate',
-      'kpi_title_dnr': 'Delivery Not Received',
-      'kpi_title_lor': 'Loss on Route',
-      'kpi_title_pod': 'Proof of Delivery',
-      'kpi_title_cc': 'Customer Contact',
-      'kpi_title_ce': 'Customer Experience',
-      'kpi_title_cdf': 'Customer Delivery Failures',
+      'kpi_title_dcr': 'Delivery Success Rate',
+        'kpi_title_dnr': 'Delivery Success Conditions',
+        'kpi_title_lor': 'Lost on Road',
+        'kpi_title_pod': 'Picture on Delivery',
+        'kpi_title_cc': 'Customer Contact',
+        'kpi_title_ce': 'Customer Escalation',
+        'kpi_title_cdf': 'Customer Delivery Feedback',
 
-      'kpi_desc_dcr':
-          'Delivery Completion Rate (DCR) measures how many planned stops were successfully completed.',
-      'kpi_tip_dcr':
-          'Maintain a consistent pace throughout the route and avoid unnecessary detours.',
-      'kpi_desc_dnr':
-          'Delivery Not Received (DNR) Is when you have delivered a package, and clicked "Swipe to finish" button confirming you have delivered the package but the costumer has not received the package due to number of reasons: Package theft, box being empty of the package items and also wrong delivery to the wrong address. Every Tuesday you will receive pictures of every DNR you have received during the week.',
-      'kpi_tip_dnr':
-          'It is very important and to avoid this you simply should inform the costumer beforehand that you are soon going to their house/business and ONLY ring the bell with their nameplate on it',
-      'kpi_desc_lor':
-          'Loss on Route (LoR) tracks lost or damaged packages during the route.',
-      'kpi_tip_lor':
-          'Handle packages carefully and organise the van so that parcels do not get damaged.',
-      'kpi_desc_pod':
-          'Proof of Delivery (POD) measures correct scan and delivery confirmations.',
-      'kpi_tip_pod':
-          'Always scan the package at the door and ensure the correct drop location.',
-      'kpi_desc_cc':
-          'Contact Compliance (CC) Meaning how many times you have reached out to the costumer about their delivery, be it via message or a phone call. The less you interact with the costumer, the less scores you will get in the scorecard and we should keep this section as high as possible because it is actually one of the the easiest categories and it helps a lot in your overall score.',
-      'kpi_tip_cc':
-          'Send messages or call customers when necessary to avoid missed deliveries.',
-      'kpi_desc_ce':
-          'Customer Experience (CE) represents how satisfied customers are with your deliveries.',
-      'kpi_tip_ce':
-          'Be friendly, punctual and careful with parcels to improve customer feedback.',
-      'kpi_desc_cdf':
-          'Customer Delivery Failures (CDF) tracks serious delivery issues.',
-      'kpi_tip_cdf':
-          'Analyse failed deliveries and learn from patterns to avoid repeating mistakes.',
+        'kpi_desc_dcr': 'The higher the value, the better. To achieve a 100% success rate, it is recommended to attempt a redelivery* after a failed delivery.',
+        'kpi_tip_dcr': 'Example: If you cannot deliver a package on a given day for any reason and attempt delivery again later the same day, your DCR value will be higher and closer to 100%, even if the second delivery attempt is also unsuccessful.',
+
+        'kpi_desc_dnr': 'DSC DPMO (Delivery Success Conditions)\n(previously DNR – Delivery Not Received)\n\nThe lower the value, the better.\n\nThis metric measures how correctly and traceably deliveries are carried out.\n\nBasic delivery rules:\n- Delivery to the correct person or the correct location\n- Deliveries to customers, household members, neighbors, or receptionists are low risk when performed correctly\n- Always use the correct scan/reason code so customers receive correct notifications\n\nMailroom / mailbox deliveries:\n- Follow the standard workflow\n- Packages must be fully inside the mailbox or mail slot and must not protrude\n- Use the most accurate scan available\n\nCorrect address & geofence:\n- Delivery within 25 meters of the correct geofence\n- Always match name and address in the app with the package label and the building\n- If the geocode appears incorrect, report it via SDS\n\nPhoto at delivery (POD):\n- Always take a clear photo when prompted\n- Package and surroundings must be clearly visible\n- Especially important for unattended deliveries and customer trust\n\nFollow delivery preferences:\n- Follow customer instructions in the app if they are safe\n- If instructions are unsafe, contact the customer\n- Only use approved safe locations from the app\n\nSimultaneous / group stops:\n- Use “Select all” only when multiple packages are delivered to the same person or location (e.g. reception)\n- Correctly capture recipient name and signature',
+
+        'kpi_tip_dnr': 'Important notice:\n\nRepeated high values in DSC DPMO indicate incorrect or risky deliveries.\n\n- Frequent deviations may be interpreted by Amazon as potential theft\n- This may trigger a loss prevention process\n- In the worst case, this may lead to termination of cooperation\n\nCareful scans, correct photos, and following all delivery rules protect you and your team.',
+
+        'kpi_desc_lor': 'LoR (Lost on Road)\n\nThe lower the value, the better.\n\nThis metric shows whether all undelivered packages are correctly recorded at the end of the route.\n\nAt the end of the route:\n- Check in the scanner how many packages must be returned\n- Ensure this number exactly matches the packages in the vehicle',
+
+        'kpi_tip_lor': 'Important notice:\n\nThis is the category with the highest suspicion of theft.\n\nDiscrepancies between scanner and vehicle inventory may be considered serious errors and can lead to internal investigations or further consequences.',
+
+        'kpi_desc_pod': 'PoD (Picture on Delivery)\n\nThe higher the value, the better.\n\nThis column shows packages for which a photo was taken but which were marked as Invalid or Unsafe.\n\nCommon reasons for POD rejection:\n1. Package label with customer data visible (package must be turned over)\n2. Blurry photo\n3. Person visible in the photo\n4. No package visible in the photo\n5. Package inside the vehicle\n6. Package in hand\n7. Package too close to the camera\n8. Photo too dark',
+
+        'kpi_tip_pod': 'This should be the easiest category\nTarget value: 100%\nSignificantly improves the overall score',
+
+        'kpi_desc_cc': 'CC (Customer Contact)\n\nThe higher the value, the better.\n\nExtremely important:\nYou must ALWAYS send a “No safe location” or “Address not found” message every time you cannot deliver a package because:\n\n- the customer is not at home or\n- the address cannot be found',
+
+        'kpi_tip_cc': 'There is an automatic standard message in the app for every scenario.',
+
+        'kpi_desc_ce': 'CE (Customer Escalation)\n\nThe lower the value, the better.\nThe worst category of all.\n\nCustomers escalate when delivery instructions are not followed.\n\nThe driver is always responsible\nAppeals are nearly impossible without very strong evidence\nHas the strongest impact on your Scorecard\n\nHow to avoid CE\n\nIt is against delivery guidelines to leave packages at unsafe or unattended locations without approval\n\nDelivery Associates must:\n- Ring the doorbell / use intercom or knock\n- Give the customer sufficient time to respond\n\nIf the customer cannot be reached and no safe location is stored:\n- Call the customer twice\n- Send a text message\n- Contact Driver Support if no contact is possible\n\nIf necessary:\n- Scan the package as “Delivery failed – customer unavailable”\n- Retry delivery according to guidelines',
+
+        'kpi_tip_ce': 'Do not leave packages at unsafe or unapproved locations\nAlways follow the correct shipping and delivery processes',
+
+        'kpi_desc_cdf': 'CDF DPMO (Customer Delivery Feedback)\n\nThe lower the value, the better.\n\nLevel 1 (L1)\n- Customer rates the delivery as “Great” (👍) or “Not so good” (👎)\n\nLevel 2 (L2)\n- Additional feedback on why the experience was good or bad',
+
+        'kpi_tip_cdf': 'CDF is calculated exclusively at L1 level',
 
       // Month names (long)
       'month_jan': 'January',
@@ -471,8 +477,16 @@ class AppLocalizations {
       'select_language': 'Sprache auswählen',
       'notifications': 'Benachrichtigungen',
       'no_notifications': 'Keine Benachrichtigungen',
+      'nav_scorecard': 'Scorecard',
+      'nav_help': 'Hilfe',
+      'nav_rules': 'Regeln',
+      'nav_profile': 'Profil',
       'change_profile_photo': 'Profilfoto ändern',
+      'profile_change_photo': 'Profilfoto ändern',
       'logout': 'Abmelden',
+      'profile_logout': 'Abmelden',
+      'pin_change_with_old': 'Du kannst deine PIN nach Eingabe der alten PIN ändern.',
+      'pin_forgot_contact_admin': 'PIN vergessen? Bitte den Admin kontaktieren.',
       'profile_photo_updated': 'Profilfoto aktualisiert.',
       'failed_upload_profile_photo':
           'Profilfoto konnte nicht hochgeladen werden: {error}',
@@ -591,41 +605,41 @@ class AppLocalizations {
       'kpi_pro_tip': 'PRO TIPP',
 
       'kpi_title_dcr': 'Delivery Success Rate',
-      'kpi_title_dnr': 'Nicht erhalten',
-      'kpi_title_lor': 'Verlust auf Route',
-      'kpi_title_pod': 'Zustellnachweis',
-      'kpi_title_cc': 'Kundenkontakt',
-      'kpi_title_ce': 'Kundenerlebnis',
-      'kpi_title_cdf': 'Zustellfehler',
+      'kpi_title_dnr': 'Delivery Success Conditions',
+      'kpi_title_lor': 'Lost on Road',
+      'kpi_title_pod': 'Picture on Delivery',
+      'kpi_title_cc': 'Customer Contact',
+      'kpi_title_ce': 'Customer Escalation',
+      'kpi_title_cdf': 'Customer Delivery Feedback',
 
       'kpi_desc_dcr':
           'Je höher der Wert, desto besser. Um eine 100 % Erfolgsquote zu erreichen, wird empfohlen, eine erneute Zustellung* bei fehlgeschlagener Lieferung durchzuführen. ',
       'kpi_tip_dcr':
           'Beispiel: Wenn du an einem Tag ein Paket aus irgendeinem Grund nicht zustellen kannst und die Zustellung später am selben Tag erneut versuchst, wird dein DCR-Wert höher und näher an 100 % liegen, selbst wenn auch der zweite Zustellversuch nicht erfolgreich ist.',
-      'kpi_desc_dnr':
-          'DNR zählt fehlgeschlagene Zustellungen, bei denen das Paket nicht übergeben werden konnte.',
-      'kpi_tip_dnr':
-          'Prüfe Adressen sorgfältig und nutze Kundenkontakt, um Fehlschläge zu reduzieren.',
-      'kpi_desc_lor':
-          'LoR verfolgt verlorene oder beschädigte Pakete während der Route.',
-      'kpi_tip_lor':
-          'Behandle Pakete vorsichtig und organisiere den Van, damit nichts beschädigt wird.',
-      'kpi_desc_pod':
-          'POD misst korrekte Scans und Zustellbestätigungen.',
-      'kpi_tip_pod':
-          'Scanne immer an der Tür und wähle den korrekten Ablageort.',
-      'kpi_desc_cc':
-          'CC prüft, ob der Fahrer die Kontakt-Schritte bei Bedarf einhält.',
-      'kpi_tip_cc':
-          'Rufe Kunden an oder sende Nachrichten, um verpasste Zustellungen zu vermeiden.',
-      'kpi_desc_ce':
-          'CE zeigt, wie zufrieden Kunden mit deinen Zustellungen sind.',
-      'kpi_tip_ce':
-          'Sei freundlich, pünktlich und sorgfältig mit Paketen.',
-      'kpi_desc_cdf':
-          'CDF verfolgt schwerwiegende Zustellprobleme.',
-      'kpi_tip_cdf':
-          'Analysiere Fehlschläge und vermeide wiederkehrende Muster.',
+      'kpi_desc_dnr': 'DSC DPMO (Delivery Success Conditions)\n(früher DNR – Delivery Not Received)\n\nJe niedriger der Wert, desto besser.\n\nDiese Kennzahl misst, wie korrekt und nachvollziehbar Zustellungen durchgeführt werden.\n\nGrundregeln der Zustellung:\n- Zustellung an die richtige Person oder den richtigen Ort\n- Zustellungen an Kunden, Haushaltsmitglieder, Nachbarn oder Rezeptionisten sind bei korrekter Durchführung risikoarm\n- Immer den korrekten Scan-/Grund-Code verwenden, damit Kunden korrekte Benachrichtigungen erhalten\n\nPostraum- / Briefkastenzustellungen:\n- Standard-Workflow einhalten\n- Pakete müssen vollständig im Briefkasten oder Postschlitz sein und dürfen nicht herausragen\n- Den genauesten verfügbaren Scan verwenden\n\nKorrekte Adresse & Geofence:\n- Zustellung innerhalb von 25 Metern des korrekten Geofence\n- Name und Adresse in der App immer mit dem Paketlabel und dem Gebäude abgleichen\n- Wenn der Geocode falsch erscheint, diesen über SDS melden\n\nFoto bei Zustellung (POD):\n- Immer ein klares Foto aufnehmen, wenn dazu aufgefordert\n- Paket und Umgebung müssen gut sichtbar sein\n- Besonders wichtig bei unbeaufsichtigten Zustellungen und für das Kundenvertrauen\n\nZustellpräferenzen einhalten:\n- Kundenanweisungen in der App befolgen, sofern sie sicher sind\n- Wenn Anweisungen unsicher sind, den Kunden kontaktieren\n- Nur genehmigte sichere Ablageorte aus der App verwenden\n\nGleichzeitige / Gruppen-Stopps:\n- \"Alle auswählen\" nur verwenden, wenn mehrere Pakete an dieselbe Person oder denselben Ort geliefert werden (z. B. Rezeption)\n- Empfängername und Unterschrift korrekt erfassen',
+
+      'kpi_tip_dnr': 'Wichtiger Hinweis:\n\nWiederholt hohe Werte bei DSC DPMO deuten auf fehlerhafte oder riskante Zustellungen hin.\n\n- Häufige Abweichungen können von Amazon als möglicher Diebstahl interpretiert werden\n- Dies kann ein Loss-Prevention-Verfahren auslösen\n- Im schlimmsten Fall kann dies zur Beendigung der Zusammenarbeit führen\n\nSorgfältige Scans, korrekte Fotos und das Einhalten aller Zustellregeln schützen dich und dein Team.',
+
+      'kpi_desc_lor': 'LoR (Lost on Road)\n\nJe niedriger der Wert, desto besser.\n\nDiese Kennzahl zeigt, ob am Ende der Route alle nicht zugestellten Pakete korrekt erfasst wurden.\n\nAm Ende der Route:\n- Im Scanner prüfen, wie viele Pakete zurückzugeben sind\n- Sicherstellen, dass diese Zahl exakt mit den Paketen im Fahrzeug übereinstimmt',
+
+      'kpi_tip_lor': 'Wichtiger Hinweis:\n\nDies ist die Kategorie mit dem höchsten Diebstahlverdacht.\n\nAbweichungen zwischen Scanner und Fahrzeugbestand können als schwerwiegender Fehler gewertet werden und zu internen Prüfungen oder weiteren Konsequenzen führen.',
+
+      'kpi_desc_pod': 'PoD (Picture on Delivery)\n\nJe höher der Wert, desto besser.\n\nDiese Spalte zeigt Pakete, für die ein Foto aufgenommen wurde, die jedoch als Ungültig oder Unsicher markiert wurden.\n\nHäufige Gründe für POD-Ablehnung:\n1. Paketlabel mit Kundendaten sichtbar (Paket muss umgedreht werden)\n2. Unscharfes Foto\n3. Person auf dem Foto sichtbar\n4. Kein Paket auf dem Foto erkennbar\n5. Paket im Fahrzeug\n6. Paket in der Hand\n7. Paket zu nah an der Kamera\n8. Foto zu dunkel',
+
+      'kpi_tip_pod': 'Dies sollte die einfachste Kategorie sein\nZielwert: 100 %\nVerbessert den Gesamt-Score erheblich',
+
+      'kpi_desc_cc': 'CC (Customer Contact)\n\nJe höher der Wert, desto besser.\n\nExtrem wichtig:\nDu musst IMMER eine „Kein sicherer Ablageort“- oder „Adresse nicht gefunden“-Nachricht senden, jedes Mal, wenn du ein Paket nicht zustellen kannst, weil:\n\n- der Kunde nicht zu Hause ist oder\n- die Adresse nicht gefunden werden kann',
+
+      'kpi_tip_cc': 'Für jedes Szenario gibt es eine automatische Standardnachricht in der App.',
+
+      'kpi_desc_ce': 'CE (Customer Escalation)\n\nJe niedriger der Wert, desto besser.\nDie schlechteste Kategorie von allen.\n\nKunden eskalieren, wenn Zustellanweisungen nicht eingehalten werden.\n\nDer Fahrer ist immer verantwortlich\nEinsprüche sind ohne sehr starke Beweise nahezu unmöglich\nHat den stärksten Einfluss auf deine Scorecard\n\nSo vermeidest du CE\n\nEs ist gegen die Zustellrichtlinien, Pakete ohne Genehmigung an unsicheren oder unbeaufsichtigten Orten abzulegen\n\nDelivery Associates müssen:\n- Klingeln / Gegensprechanlage benutzen oder klopfen\n- Dem Kunden ausreichend Zeit zum Antworten geben\n\nWenn der Kunde nicht erreichbar ist und kein sicherer Ablageort hinterlegt wurde:\n- Kunden zweimal anrufen\n- Eine Textnachricht senden\n- Driver Support kontaktieren, wenn kein Kontakt möglich ist\n\nFalls notwendig:\n- Paket scannen als „Zustellung fehlgeschlagen – Kunde nicht verfügbar“\n- Zustellung gemäß Richtlinie erneut versuchen',
+
+      'kpi_tip_ce': 'Keine Pakete an unsicheren oder nicht genehmigten Orten ablegen\nImmer die korrekten Versand- und Zustellprozesse einhalten',
+
+      'kpi_desc_cdf': 'CDF DPMO (Customer Delivery Feedback)\n\nJe niedriger der Wert, desto besser.\n\nLevel 1 (L1)\n- Kunde bewertet die Zustellung als „Großartig“ (👍) oder „Nicht so gut“ (👎)\n\nLevel 2 (L2)\n- Zusätzliche Rückmeldung, warum die Erfahrung gut oder schlecht war',
+
+      'kpi_tip_cdf': 'CDF wird ausschließlich auf L1-Ebene berechnet',
+
 
       'month_jan': 'Januar',
       'month_feb': 'Februar',
@@ -914,8 +928,16 @@ class AppLocalizations {
       'select_language': 'Zgjidh gjuhën',
       'notifications': 'Njoftime',
       'no_notifications': 'Nuk ka njoftime',
+      'nav_scorecard': 'Scorecard',
+      'nav_help': 'Ndihmë',
+      'nav_rules': 'Rregulla',
+      'nav_profile': 'Profil',
       'change_profile_photo': 'Ndrysho foton e profilit',
+      'profile_change_photo': 'Ndrysho foton e profilit',
       'logout': 'Dil',
+      'profile_logout': 'Dil',
+      'pin_change_with_old': 'Mund ta ndryshosh PIN-in pasi të verifikosh PIN-in e vjetër.',
+      'pin_forgot_contact_admin': 'Ke harruar PIN-in? Kontakto administratorin.',
       'profile_photo_updated': 'Fotoja e profilit u përditësua.',
       'failed_upload_profile_photo': 'Dështoi ngarkimi i fotos së profilit: {error}',
       'could_not_read_image_bytes': 'Nuk u lexuan të dhënat e imazhit nga përzgjedhësi i skedarëve.',
@@ -1029,42 +1051,40 @@ class AppLocalizations {
       'kpi_value': 'VLERA',
       'kpi_pro_tip': 'KËSHILLË',
 
-      'kpi_title_dcr': 'Norma e përfundimit të dorëzimeve',
-      'kpi_title_dnr': 'Dorëzim i parealizuar (nuk u mor)',
-      'kpi_title_lor': 'Humbje gjatë rrugës',
-      'kpi_title_pod': 'Provë e dorëzimit',
-      'kpi_title_cc': 'Kontakt me klientin',
-      'kpi_title_ce': 'Përvoja e klientit',
-      'kpi_title_cdf': 'Dështime të dorëzimit te klienti',
+      'kpi_title_dcr': 'Shkalla e Suksesit të Dorëzimit',
+        'kpi_title_dnr': 'Kushtet e Suksesit të Dorëzimit',
+        'kpi_title_lor': 'Humbur Gjatë Rrugës',
+        'kpi_title_pod': 'Foto gjatë Dorëzimit',
+        'kpi_title_cc': 'Kontakt me Klientin',
+        'kpi_title_ce': 'Përshkallëzim nga Klienti',
+        'kpi_title_cdf': 'Vlerësimi i Dorëzimit nga Klienti',
 
-      'kpi_desc_dcr':
-          'DCR mat sa ndalesa të planifikuara u përfunduan me sukses.',
-      'kpi_tip_dcr':
-          'Mbaj një ritëm të qëndrueshëm dhe shmang devijimet e panevojshme.',
-      'kpi_desc_dnr':
-          'DNR numëron dorëzimet e dështuara ku paketa nuk u dorëzua.',
-      'kpi_tip_dnr':
-          'Kontrollo adresat dhe përdor kontaktin me klientin për të ulur dështimet.',
-      'kpi_desc_lor':
-          'LoR ndjek paketat e humbura ose të dëmtuara gjatë rrugës.',
-      'kpi_tip_lor':
-          'Trajto paketat me kujdes dhe organizo furgonin që të mos dëmtohen.',
-      'kpi_desc_pod':
-          'POD mat skanimet e sakta dhe konfirmimet e dorëzimit.',
-      'kpi_tip_pod':
-          'Skanon gjithmonë te dera dhe zgjidh vendin e saktë të lënies.',
-      'kpi_desc_cc':
-          'CC kontrollon nëse shoferi ndjek hapat e ndërveprimit kur nevojitet.',
-      'kpi_tip_cc':
-          'Dërgo mesazhe ose telefono klientët kur është e nevojshme.',
-      'kpi_desc_ce':
-          'CE tregon sa të kënaqur janë klientët me dorëzimet.',
-      'kpi_tip_ce':
-          'Ji i sjellshëm, i përpiktë dhe i kujdesshëm me paketat.',
-      'kpi_desc_cdf':
-          'CDF ndjek probleme serioze të dorëzimit.',
-      'kpi_tip_cdf':
-          'Analizo dështimet dhe mëso nga modelet për të mos i përsëritur.',
+        'kpi_desc_dcr': 'Sa më e lartë vlera, aq më mirë. Për të arritur një shkallë suksesi 100%, rekomandohet të bëhet një përpjekje për ridorëzim* pas një dorëzimi të pasuksesshëm.',
+        'kpi_tip_dcr': 'Shembull: Nëse nuk mund të dorëzosh një paketë gjatë një dite për çfarëdo arsye dhe provon ta dorëzosh sërish më vonë po atë ditë, vlera jote DCR do të jetë më e lartë dhe më afër 100%, edhe nëse përpjekja e dytë e dorëzimit është gjithashtu e pasuksesshme.',
+
+        'kpi_desc_dnr': 'DSC DPMO (Kushtet e Suksesit të Dorëzimit)\n(më parë DNR – Dorëzim i Pa Marrë)\n\nSa më e ulët vlera, aq më mirë.\n\nKjo metrikë mat se sa saktë dhe në mënyrë të gjurmueshme kryhen dorëzimet.\n\nRregullat bazë të dorëzimit:\n- Dorëzim te personi i saktë ose në vendin e saktë\n- Dorëzimet te klientët, anëtarët e familjes, fqinjët ose recepsionistët janë me rrezik të ulët kur kryhen saktë\n- Përdor gjithmonë kodin e saktë të skanimit/arsyes në mënyrë që klientët të marrin njoftime të sakta\n\nDorëzime në dhomë poste / kuti postare:\n- Ndiq rrjedhën standarde të punës\n- Paketat duhet të jenë plotësisht brenda kutisë postare ose hapjes postare dhe nuk duhet të dalin jashtë\n- Përdor skanimin më të saktë të disponueshëm\n\nAdresë e saktë & Geofence:\n- Dorëzim brenda 25 metrave nga geofence i saktë\n- Gjithmonë përputh emrin dhe adresën në aplikacion me etiketën e paketës dhe ndërtesën\n- Nëse geokodi duket i pasaktë, raportoje përmes SDS\n\nFoto gjatë dorëzimit (POD):\n- Gjithmonë bëj një foto të qartë kur kërkohet\n- Paketa dhe ambienti përreth duhet të jenë qartë të dukshme\n- Veçanërisht e rëndësishme për dorëzime pa mbikëqyrje dhe për besimin e klientit\n\nRespekto preferencat e dorëzimit:\n- Ndiq udhëzimet e klientit në aplikacion nëse janë të sigurta\n- Nëse udhëzimet janë të pasigurta, kontakto klientin\n- Përdor vetëm vendet e sigurta të miratuara nga aplikacioni\n\nNdalesa të njëkohshme / në grup:\n- Përdor “Zgjidh të gjitha” vetëm kur disa paketa dorëzohen te i njëjti person ose në të njëjtin vend (p.sh. recepsion)\n- Regjistro saktë emrin e marrësit dhe nënshkrimin',
+
+        'kpi_tip_dnr': 'Njoftim i rëndësishëm:\n\nVlera të larta të përsëritura në DSC DPMO tregojnë dorëzime të pasakta ose të rrezikshme.\n\n- Devijimet e shpeshta mund të interpretohen nga Amazon si vjedhje e mundshme\n- Kjo mund të aktivizojë një proces parandalimi humbjesh\n- Në rastin më të keq, kjo mund të çojë në përfundimin e bashkëpunimit\n\nSkanime të kujdesshme, foto të sakta dhe respektimi i të gjitha rregullave të dorëzimit të mbrojnë ty dhe ekipin tënd.',
+
+        'kpi_desc_lor': 'LoR (Humbur Gjatë Rrugës)\n\nSa më e ulët vlera, aq më mirë.\n\nKjo metrikë tregon nëse të gjitha paketat e pa dorëzuara janë regjistruar saktë në fund të itinerarit.\n\nNë fund të itinerarit:\n- Kontrollo në skaner sa paketa duhet të kthehen\n- Sigurohu që ky numër përputhet saktësisht me paketat në automjet',
+
+        'kpi_tip_lor': 'Njoftim i rëndësishëm:\n\nKjo është kategoria me dyshimin më të lartë për vjedhje.\n\nMospërputhjet midis skanerit dhe inventarit të automjetit mund të konsiderohen gabime serioze dhe mund të çojnë në hetime të brendshme ose pasoja të tjera.',
+
+        'kpi_desc_pod': 'PoD (Foto gjatë Dorëzimit)\n\nSa më e lartë vlera, aq më mirë.\n\nKjo kolonë tregon paketat për të cilat është bërë një foto, por që janë shënuar si të Pavlefshme ose të Pasigurta.\n\nArsyet e zakonshme për refuzimin e POD:\n1. Etiketa e paketës me të dhëna të klientit e dukshme (paketa duhet të kthehet)\n2. Foto e paqartë\n3. Person i dukshëm në foto\n4. Asnjë paketë e dukshme në foto\n5. Paketa brenda automjetit\n6. Paketa në dorë\n7. Paketa shumë afër kamerës\n8. Foto shumë e errët',
+
+        'kpi_tip_pod': 'Kjo duhet të jetë kategoria më e thjeshtë\nVlera e synuar: 100%\nPërmirëson ndjeshëm rezultatin e përgjithshëm',
+
+        'kpi_desc_cc': 'CC (Kontakt me Klientin)\n\nSa më e lartë vlera, aq më mirë.\n\nJashtëzakonisht e rëndësishme:\nDuhet GJITHMONË të dërgosh një mesazh “Nuk ka vend të sigurt” ose “Adresa nuk u gjet”, çdo herë që nuk mund të dorëzosh një paketë sepse:\n\n- klienti nuk është në shtëpi ose\n- adresa nuk mund të gjendet',
+
+        'kpi_tip_cc': 'Ekziston një mesazh standard automatik në aplikacion për çdo skenar.',
+
+        'kpi_desc_ce': 'CE (Përshkallëzim nga Klienti)\n\nSa më e ulët vlera, aq më mirë.\nKategoria më e keqe nga të gjitha.\n\nKlientët përshkallëzojnë kur udhëzimet e dorëzimit nuk respektohen.\n\nShoferi është gjithmonë përgjegjës\nAnkesat janë pothuajse të pamundura pa prova shumë të forta\nKa ndikimin më të fortë në Scorecard-in tënd\n\nSi të shmangësh CE\n\nËshtë kundër udhëzimeve të dorëzimit të lësh paketat në vende të pasigurta ose të pambikëqyrura pa miratim\n\nDelivery Associates duhet:\n- Të bien zilen / të përdorin interfonin ose të trokasin\n- T’i japin klientit kohë të mjaftueshme për t’u përgjigjur\n\nNëse klienti nuk mund të kontaktohet dhe nuk është regjistruar asnjë vend i sigurt:\n- Të telefonojnë klientin dy herë\n- Të dërgojnë një mesazh me tekst\n- Të kontaktojnë Driver Support nëse nuk është i mundur kontakti\n\nNëse është e nevojshme:\n- Të skanojnë paketën si “Dorëzim i dështuar – klienti i padisponueshëm”\n- Të provojnë sërish dorëzimin sipas udhëzimeve',
+
+        'kpi_tip_ce': 'Mos i lër paketat në vende të pasigurta ose të pamiratuara\nRespekto gjithmonë proceset e sakta të dërgimit dhe dorëzimit',
+
+        'kpi_desc_cdf': 'CDF DPMO (Vlerësimi i Dorëzimit nga Klienti)\n\nSa më e ulët vlera, aq më mirë.\n\nNiveli 1 (L1)\n- Klienti e vlerëson dorëzimin si “Shkëlqyeshëm” (👍) ose “Jo aq mirë” (👎)\n\nNiveli 2 (L2)\n- Reagim shtesë pse përvoja ishte e mirë ose e keqe',
+
+        'kpi_tip_cdf': 'CDF llogaritet ekskluzivisht në nivelin L1',
 
       'month_jan': 'Janar',
       'month_feb': 'Shkurt',
@@ -1356,8 +1376,16 @@ class AppLocalizations {
       'select_language': 'Nyelv kiválasztása',
       'notifications': 'Értesítések',
       'no_notifications': 'Nincs értesítés',
+      'nav_scorecard': 'Scorecard',
+      'nav_help': 'Súgó',
+      'nav_rules': 'Szabályok',
+      'nav_profile': 'Profil',
       'change_profile_photo': 'Profilkép módosítása',
+      'profile_change_photo': 'Profilkép módosítása',
       'logout': 'Kijelentkezés',
+      'profile_logout': 'Kijelentkezés',
+      'pin_change_with_old': 'A PIN módosításához add meg a régi PIN-t.',
+      'pin_forgot_contact_admin': 'Elfelejtetted a PIN-t? Vedd fel a kapcsolatot az adminnal.',
       'profile_photo_updated': 'Profilkép frissítve.',
       'failed_upload_profile_photo': 'Nem sikerült feltölteni a profilképet: {error}',
       'could_not_read_image_bytes': 'Nem sikerült beolvasni a képadatokat a fájlválasztóból.',
@@ -1471,42 +1499,40 @@ class AppLocalizations {
       'kpi_value': 'ÉRTÉK',
       'kpi_pro_tip': 'TIPP',
 
-      'kpi_title_dcr': 'Kézbesítési teljesítési arány',
-      'kpi_title_dnr': 'Kézbesítés sikertelen (nem érkezett meg)',
-      'kpi_title_lor': 'Útközbeni veszteség',
-      'kpi_title_pod': 'Kézbesítési igazolás',
-      'kpi_title_cc': 'Ügyfélkapcsolat',
-      'kpi_title_ce': 'Ügyfélélmény',
-      'kpi_title_cdf': 'Ügyfélkézbesítési hibák',
+        'kpi_title_dcr': 'Kézbesítési Sikerességi Arány',
+        'kpi_title_dnr': 'Kézbesítési Sikerfeltételek',
+        'kpi_title_lor': 'Útközben Elveszett',
+        'kpi_title_pod': 'Kézbesítéskori Fénykép',
+        'kpi_title_cc': 'Ügyfélkapcsolat',
+        'kpi_title_ce': 'Ügyfél Eszkaláció',
+        'kpi_title_cdf': 'Ügyfél Kézbesítési Visszajelzés',
 
-      'kpi_desc_dcr':
-          'A DCR azt méri, hogy a tervezett megállók közül mennyit teljesítettél sikeresen.',
-      'kpi_tip_dcr':
-          'Tarts egyenletes tempót az útvonalon és kerüld a felesleges kitérőket.',
-      'kpi_desc_dnr':
-          'A DNR a sikertelen kézbesítéseket számolja, amikor a csomagot nem lehetett átadni.',
-      'kpi_tip_dnr':
-          'Ellenőrizd a címeket és használd az ügyfélkapcsolati lehetőségeket.',
-      'kpi_desc_lor':
-          'A LoR az útközben elveszett vagy megsérült csomagokat követi.',
-      'kpi_tip_lor':
-          'Bánj óvatosan a csomagokkal és rendezd a furgont, hogy ne sérüljenek.',
-      'kpi_desc_pod':
-          'A POD a helyes szkennelést és a kézbesítési visszaigazolást méri.',
-      'kpi_tip_pod':
-          'Mindig az ajtónál szkenneld és válaszd a megfelelő lerakási helyet.',
-      'kpi_desc_cc':
-          'A CC azt ellenőrzi, hogy szükség esetén követed-e a kapcsolattartási lépéseket.',
-      'kpi_tip_cc':
-          'Szükség esetén írj üzenetet vagy hívd fel az ügyfelet.',
-      'kpi_desc_ce':
-          'A CE azt mutatja, mennyire elégedettek az ügyfelek a kézbesítéssel.',
-      'kpi_tip_ce':
-          'Légy udvarias, pontos és óvatos a csomagokkal.',
-      'kpi_desc_cdf':
-          'A CDF a súlyos kézbesítési problémákat követi.',
-      'kpi_tip_cdf':
-          'Elemezd a hibákat és tanulj a mintákból, hogy ne ismétlődjenek.',
+        'kpi_desc_dcr': 'Minél magasabb az érték, annál jobb. A 100%-os sikerességi arány eléréséhez ajánlott sikertelen kézbesítés után újrakézbesítést* megkísérelni.',
+        'kpi_tip_dcr': 'Példa: Ha egy adott napon bármilyen okból nem tudsz kézbesíteni egy csomagot, és még ugyanazon a napon újra megpróbálod a kézbesítést, a DCR értéked magasabb lesz és közelebb kerül a 100%-hoz, még akkor is, ha a második kézbesítési kísérlet sem sikeres.',
+
+        'kpi_desc_dnr': 'DSC DPMO (Kézbesítési Sikerfeltételek)\n(korábban DNR – Kézbesítés nem történt meg)\n\nMinél alacsonyabb az érték, annál jobb.\n\nEz a mutató azt méri, hogy a kézbesítések mennyire helyesen és nyomon követhetően történnek.\n\nAlapvető kézbesítési szabályok:\n- Kézbesítés a megfelelő személynek vagy a megfelelő helyre\n- Ügyfeleknek, háztartás tagjainak, szomszédoknak vagy recepciósoknak történő kézbesítés megfelelő végrehajtás esetén alacsony kockázatú\n- Mindig a megfelelő szkennelési/indok kódot használd, hogy az ügyfelek helyes értesítéseket kapjanak\n\nPostaszoba / postaláda kézbesítések:\n- Kövesd a szabványos munkafolyamatot\n- A csomagoknak teljes egészében a postaládában vagy a postanyílásban kell lenniük, és nem lóghatnak ki\n- A lehető legpontosabb szkennelést használd\n\nHelyes cím és geofence:\n- Kézbesítés a megfelelő geofence 25 méteres körzetén belül\n- Az alkalmazásban szereplő nevet és címet mindig egyeztesd a csomagcímkével és az épülettel\n- Ha a geokód helytelennek tűnik, jelentsd SDS-en keresztül\n\nFénykép kézbesítéskor (POD):\n- Mindig készíts tiszta fényképet, amikor erre felszólítanak\n- A csomagnak és a környezetnek jól láthatónak kell lennie\n- Különösen fontos felügyelet nélküli kézbesítések és az ügyfélbizalom szempontjából\n\nKézbesítési preferenciák betartása:\n- Kövesd az alkalmazásban megadott ügyfélutasításokat, amennyiben azok biztonságosak\n- Ha az utasítások nem biztonságosak, vedd fel a kapcsolatot az ügyféllel\n- Csak az alkalmazásban jóváhagyott biztonságos helyeket használd\n\nEgyidejű / csoportos megállók:\n- A „Mind kijelölése” funkciót csak akkor használd, ha több csomagot ugyanannak a személynek vagy ugyanarra a helyre kézbesítesz (pl. recepció)\n- A címzett nevét és aláírását pontosan rögzítsd',
+
+        'kpi_tip_dnr': 'Fontos figyelmeztetés:\n\nAz ismételten magas DSC DPMO értékek helytelen vagy kockázatos kézbesítésekre utalnak.\n\n- A gyakori eltéréseket az Amazon potenciális lopásként értelmezheti\n- Ez veszteségmegelőzési eljárást indíthat el\n- A legrosszabb esetben az együttműködés megszüntetéséhez vezethet\n\nA gondos szkennelések, a megfelelő fényképek és az összes kézbesítési szabály betartása megvéd téged és a csapatodat.',
+
+        'kpi_desc_lor': 'LoR (Útközben Elveszett)\n\nMinél alacsonyabb az érték, annál jobb.\n\nEz a mutató azt mutatja, hogy az út végén minden nem kézbesített csomag helyesen lett-e rögzítve.\n\nAz út végén:\n- Ellenőrizd a szkennerben, hány csomagot kell visszavinni\n- Győződj meg róla, hogy ez a szám pontosan megegyezik a járműben lévő csomagok számával',
+
+        'kpi_tip_lor': 'Fontos figyelmeztetés:\n\nEz a kategória a legnagyobb lopásgyanúval jár.\n\nA szkenner és a jármű készlete közötti eltérések súlyos hibának minősülhetnek, és belső vizsgálatokhoz vagy további következményekhez vezethetnek.',
+
+        'kpi_desc_pod': 'PoD (Kézbesítéskori Fénykép)\n\nMinél magasabb az érték, annál jobb.\n\nEz az oszlop azokat a csomagokat mutatja, amelyekről készült fénykép, de Érvénytelen vagy Nem biztonságos jelölést kaptak.\n\nA POD elutasításának gyakori okai:\n1. A csomagcímkén láthatók az ügyfél adatai (a csomagot meg kell fordítani)\n2. Elmosódott fénykép\n3. Személy látható a fényképen\n4. Nem látható csomag a fényképen\n5. Csomag a járműben\n6. Csomag kézben\n7. A csomag túl közel van a kamerához\n8. A fénykép túl sötét',
+
+        'kpi_tip_pod': 'Ez kell legyen a legegyszerűbb kategória\nCélérték: 100%\nJelentősen javítja az összpontszámot',
+
+        'kpi_desc_cc': 'CC (Ügyfélkapcsolat)\n\nMinél magasabb az érték, annál jobb.\n\nRendkívül fontos:\nMINDIG küldened kell egy „Nincs biztonságos hely” vagy „Cím nem található” üzenetet minden alkalommal, amikor nem tudsz kézbesíteni egy csomagot, mert:\n\n- az ügyfél nincs otthon vagy\n- a cím nem található',
+
+        'kpi_tip_cc': 'Minden forgatókönyvre létezik automatikus alapértelmezett üzenet az alkalmazásban.',
+
+        'kpi_desc_ce': 'CE (Ügyfél Eszkaláció)\n\nMinél alacsonyabb az érték, annál jobb.\nA legrosszabb kategória mind közül.\n\nAz ügyfelek akkor eszkalálnak, ha a kézbesítési utasításokat nem tartják be.\n\nA sofőr mindig felelős\nFellebbezések nagyon erős bizonyítékok nélkül szinte lehetetlenek\nA legerősebb hatással van a Scorecardodra\n\nHogyan kerüld el a CE-t\n\nA kézbesítési irányelvek ellen van, ha engedély nélkül nem biztonságos vagy felügyelet nélküli helyeken hagyod a csomagokat\n\nA Delivery Associates kötelesek:\n- Csengetni / kaputelefont használni vagy kopogni\n- Elegendő időt adni az ügyfélnek a válaszadásra\n\nHa az ügyfél nem érhető el, és nincs rögzítve biztonságos hely:\n- Az ügyfelet kétszer felhívni\n- Szöveges üzenetet küldeni\n- Driver Supporttal kapcsolatba lépni, ha nincs lehetőség kapcsolatra\n\nSzükség esetén:\n- A csomagot „Sikertelen kézbesítés – ügyfél nem elérhető” státusszal szkennelni\n- Az irányelveknek megfelelően újrapróbálni a kézbesítést',
+
+        'kpi_tip_ce': 'Ne hagyj csomagokat nem biztonságos vagy nem jóváhagyott helyeken\nMindig tartsd be a helyes szállítási és kézbesítési folyamatokat',
+
+        'kpi_desc_cdf': 'CDF DPMO (Ügyfél Kézbesítési Visszajelzés)\n\nMinél alacsonyabb az érték, annál jobb.\n\n1. szint (L1)\n- Az ügyfél a kézbesítést „Nagyszerű” (👍) vagy „Nem olyan jó” (👎) értékeléssel látja el\n\n2. szint (L2)\n- További visszajelzés arról, miért volt a tapasztalat jó vagy rossz',
+
+        'kpi_tip_cdf': 'A CDF kizárólag L1 szinten kerül kiszámításra',
 
       'month_jan': 'Január',
       'month_feb': 'Február',
@@ -1814,8 +1840,16 @@ class AppLocalizations {
       'select_language': 'Selectează limba',
       'notifications': 'Notificări',
       'no_notifications': 'Nu există notificări',
+      'nav_scorecard': 'Scorecard',
+      'nav_help': 'Ajutor',
+      'nav_rules': 'Reguli',
+      'nav_profile': 'Profil',
       'change_profile_photo': 'Schimbă poza de profil',
+      'profile_change_photo': 'Schimbă poza de profil',
       'logout': 'Deconectare',
+      'profile_logout': 'Deconectare',
+      'pin_change_with_old': 'Poți schimba PIN-ul după verificarea celui vechi.',
+      'pin_forgot_contact_admin': 'Ai uitat PIN-ul? Contactează administratorul.',
       'profile_photo_updated': 'Poza de profil a fost actualizată.',
       'failed_upload_profile_photo': 'Încărcarea pozei de profil a eșuat: {error}',
       'could_not_read_image_bytes': 'Nu s-au putut citi datele imaginii din selectorul de fișiere.',
@@ -1929,42 +1963,40 @@ class AppLocalizations {
       'kpi_value': 'VALOARE',
       'kpi_pro_tip': 'SFAT',
 
-      'kpi_title_dcr': 'Rata de finalizare a livrărilor',
-      'kpi_title_dnr': 'Livrare nereușită (neprimit)',
-      'kpi_title_lor': 'Pierdere pe rută',
-      'kpi_title_pod': 'Dovadă de livrare',
-      'kpi_title_cc': 'Contact cu clientul',
-      'kpi_title_ce': 'Experiența clientului',
-      'kpi_title_cdf': 'Eșecuri de livrare către client',
+      'kpi_title_dcr': 'Rata de Succes a Livrării',
+        'kpi_title_dnr': 'Condițiile de Succes ale Livrării',
+        'kpi_title_lor': 'Pierdut pe Traseu',
+        'kpi_title_pod': 'Fotografie la Livrare',
+        'kpi_title_cc': 'Contact cu Clientul',
+        'kpi_title_ce': 'Escaladare de la Client',
+        'kpi_title_cdf': 'Feedback-ul Clientului privind Livrarea',
 
-      'kpi_desc_dcr':
-          'DCR măsoară câte opriri planificate au fost finalizate cu succes.',
-      'kpi_tip_dcr':
-          'Menține un ritm constant și evită ocolurile inutile.',
-      'kpi_desc_dnr':
-          'DNR numără livrările eșuate când pachetul nu a putut fi predat.',
-      'kpi_tip_dnr':
-          'Verifică adresele și folosește opțiunile de contact pentru a reduce eșecurile.',
-      'kpi_desc_lor':
-          'LoR urmărește pachetele pierdute sau deteriorate pe parcursul rutei.',
-      'kpi_tip_lor':
-          'Manipulează coletele cu grijă și organizează duba pentru a evita deteriorarea.',
-      'kpi_desc_pod':
-          'POD măsoară scanările corecte și confirmările de livrare.',
-      'kpi_tip_pod':
-          'Scanează întotdeauna la ușă și asigură locul corect de lăsare.',
-      'kpi_desc_cc':
-          'CC verifică dacă șoferul urmează pașii de interacțiune când este necesar.',
-      'kpi_tip_cc':
-          'Trimite mesaje sau sună clienții atunci când este necesar.',
-      'kpi_desc_ce':
-          'CE arată cât de mulțumiți sunt clienții de livrările tale.',
-      'kpi_tip_ce':
-          'Fii amabil, punctual și atent cu coletele.',
-      'kpi_desc_cdf':
-          'CDF urmărește probleme serioase de livrare.',
-      'kpi_tip_cdf':
-          'Analizează livrările eșuate și învață din tipare pentru a evita repetarea.',
+        'kpi_desc_dcr': 'Cu cât valoarea este mai mare, cu atât mai bine. Pentru a atinge o rată de succes de 100%, se recomandă efectuarea unei încercări de relivrare* după o livrare eșuată.',
+        'kpi_tip_dcr': 'Exemplu: Dacă într-o zi nu poți livra un colet din orice motiv și încerci din nou livrarea mai târziu în aceeași zi, valoarea DCR va fi mai mare și mai aproape de 100%, chiar dacă și a doua încercare de livrare este nereușită.',
+
+        'kpi_desc_dnr': 'DSC DPMO (Condițiile de Succes ale Livrării)\n(anterior DNR – Livrare Neprimita)\n\nCu cât valoarea este mai mică, cu atât mai bine.\n\nAcest indicator măsoară cât de corect și trasabil sunt efectuate livrările.\n\nReguli de bază ale livrării:\n- Livrare către persoana corectă sau locația corectă\n- Livrările către clienți, membri ai gospodăriei, vecini sau recepționeri sunt cu risc scăzut atunci când sunt efectuate corect\n- Folosește întotdeauna codul corect de scanare/motiv pentru ca clienții să primească notificări corecte\n\nLivrări în camera poștală / cutia poștală:\n- Respectă fluxul de lucru standard\n- Coletele trebuie să fie complet în interiorul cutiei poștale sau fantei poștale și nu trebuie să iasă în afară\n- Folosește cea mai precisă scanare disponibilă\n\nAdresă corectă & Geofence:\n- Livrare în interiorul a 25 de metri de geofence-ul corect\n- Compară întotdeauna numele și adresa din aplicație cu eticheta coletului și clădirea\n- Dacă geocodul pare incorect, raportează prin SDS\n\nFotografie la livrare (POD):\n- Fă întotdeauna o fotografie clară atunci când ți se solicită\n- Coletul și mediul înconjurător trebuie să fie clar vizibile\n- Deosebit de important pentru livrările nesupravegheate și pentru încrederea clientului\n\nRespectarea preferințelor de livrare:\n- Respectă instrucțiunile clientului din aplicație, dacă sunt sigure\n- Dacă instrucțiunile nu sunt sigure, contactează clientul\n- Folosește doar locațiile sigure aprobate din aplicație\n\nOpriri simultane / de grup:\n- Folosește „Selectează toate” doar atunci când mai multe colete sunt livrate aceleiași persoane sau în același loc (de ex. recepție)\n- Înregistrează corect numele destinatarului și semnătura',
+
+        'kpi_tip_dnr': 'Notificare importantă:\n\nValorile ridicate repetate la DSC DPMO indică livrări incorecte sau riscante.\n\n- Abaterile frecvente pot fi interpretate de Amazon ca posibil furt\n- Acest lucru poate declanșa un proces de prevenire a pierderilor\n- În cel mai rău caz, poate duce la încetarea colaborării\n\nScanările atente, fotografiile corecte și respectarea tuturor regulilor de livrare te protejează pe tine și echipa ta.',
+
+        'kpi_desc_lor': 'LoR (Pierdut pe Traseu)\n\nCu cât valoarea este mai mică, cu atât mai bine.\n\nAcest indicator arată dacă toate coletele nelivrate sunt înregistrate corect la finalul rutei.\n\nLa finalul rutei:\n- Verifică în scanner câte colete trebuie returnate\n- Asigură-te că acest număr corespunde exact cu coletele din vehicul',
+
+        'kpi_tip_lor': 'Notificare importantă:\n\nAceasta este categoria cu cel mai ridicat suspiciune de furt.\n\nNeconcordanțele dintre scanner și inventarul vehiculului pot fi considerate erori grave și pot duce la investigații interne sau la alte consecințe.',
+
+        'kpi_desc_pod': 'PoD (Fotografie la Livrare)\n\nCu cât valoarea este mai mare, cu atât mai bine.\n\nAceastă coloană arată coletele pentru care a fost făcută o fotografie, dar care au fost marcate ca Nevalide sau Nesigure.\n\nMotive frecvente pentru respingerea POD:\n1. Eticheta coletului cu datele clientului vizibilă (coletul trebuie întors)\n2. Fotografie neclară\n3. Persoană vizibilă în fotografie\n4. Niciun colet vizibil în fotografie\n5. Colet în vehicul\n6. Colet în mână\n7. Colet prea aproape de cameră\n8. Fotografie prea întunecată',
+
+        'kpi_tip_pod': 'Aceasta ar trebui să fie cea mai simplă categorie\nValoare țintă: 100%\nÎmbunătățește semnificativ scorul general',
+
+        'kpi_desc_cc': 'CC (Contact cu Clientul)\n\nCu cât valoarea este mai mare, cu atât mai bine.\n\nExtrem de important:\nTrebuie SĂ TRIMIȚI ÎNTOTDEAUNA un mesaj „Nicio locație sigură” sau „Adresa nu a fost găsită” de fiecare dată când nu poți livra un colet deoarece:\n\n- clientul nu este acasă sau\n- adresa nu poate fi găsită',
+
+        'kpi_tip_cc': 'Există un mesaj standard automat în aplicație pentru fiecare scenariu.',
+
+        'kpi_desc_ce': 'CE (Escaladare de la Client)\n\nCu cât valoarea este mai mică, cu atât mai bine.\nCea mai proastă categorie dintre toate.\n\nClienții escaladează atunci când instrucțiunile de livrare nu sunt respectate.\n\nȘoferul este întotdeauna responsabil\nContestațiile sunt aproape imposibile fără dovezi foarte puternice\nAre cel mai puternic impact asupra Scorecard-ului tău\n\nCum să eviți CE\n\nEste împotriva regulilor de livrare să lași colete în locații nesigure sau nesupravegheate fără aprobare\n\nDelivery Associates trebuie:\n- Să sune la sonerie / să folosească interfonul sau să bată la ușă\n- Să ofere clientului suficient timp pentru a răspunde\n\nDacă clientul nu poate fi contactat și nu este setată nicio locație sigură:\n- Să sune clientul de două ori\n- Să trimită un mesaj text\n- Să contacteze Driver Support dacă nu este posibil contactul\n\nDacă este necesar:\n- Să scaneze coletul ca „Livrare eșuată – client indisponibil”\n- Să reîncerce livrarea conform regulilor',
+
+        'kpi_tip_ce': 'Nu lăsa colete în locații nesigure sau neaprobate\nRespectă întotdeauna procesele corecte de expediere și livrare',
+
+        'kpi_desc_cdf': 'CDF DPMO (Feedback-ul Clientului privind Livrarea)\n\nCu cât valoarea este mai mică, cu atât mai bine.\n\nNivelul 1 (L1)\n- Clientul evaluează livrarea ca „Groaznic” (👍) sau „Nu atât de bine” (👎)\n\nNivelul 2 (L2)\n- Feedback suplimentar despre motivul pentru care experiența a fost bună sau rea',
+
+        'kpi_tip_cdf': 'CDF este calculat exclusiv la nivelul L1',
 
       'month_jan': 'Ianuarie',
       'month_feb': 'Februarie',
@@ -2209,8 +2241,16 @@ class AppLocalizations {
       'select_language': 'Odaberi jezik',
       'notifications': 'Obavijesti',
       'no_notifications': 'Nema obavijesti',
+      'nav_scorecard': 'Scorecard',
+      'nav_help': 'Pomoć',
+      'nav_rules': 'Pravila',
+      'nav_profile': 'Profil',
       'change_profile_photo': 'Promijeni profilnu sliku',
+      'profile_change_photo': 'Promijeni profilnu sliku',
       'logout': 'Odjava',
+      'profile_logout': 'Odjava',
+      'pin_change_with_old': 'PIN možeš promijeniti nakon provjere starog PIN-a.',
+      'pin_forgot_contact_admin': 'Zaboravili ste PIN? Kontaktirajte administratora.',
       'profile_photo_updated': 'Profilna slika je ažurirana.',
       'failed_upload_profile_photo': 'Neuspješno učitavanje profilne slike: {error}',
       'could_not_read_image_bytes': 'Nije moguće pročitati podatke slike iz birača datoteka.',
@@ -2324,42 +2364,40 @@ class AppLocalizations {
       'kpi_value': 'VRIJEDNOST',
       'kpi_pro_tip': 'SAVJET',
 
-      'kpi_title_dcr': 'Stopa dovršenih dostava',
-      'kpi_title_dnr': 'Dostava nije primljena',
-      'kpi_title_lor': 'Gubitak na ruti',
-      'kpi_title_pod': 'Dokaz dostave',
-      'kpi_title_cc': 'Kontakt s kupcem',
-      'kpi_title_ce': 'Iskustvo kupca',
-      'kpi_title_cdf': 'Neuspjele dostave kupcu',
+        'kpi_title_dcr': 'Stopa Uspješnosti Dostave',
+        'kpi_title_dnr': 'Uvjeti Uspješne Dostave',
+        'kpi_title_lor': 'Izgubljeno na Ruti',
+        'kpi_title_pod': 'Fotografija pri Dostavi',
+        'kpi_title_cc': 'Kontakt s Kupcem',
+        'kpi_title_ce': 'Eskalacija Kupca',
+        'kpi_title_cdf': 'Povratne Informacije Kupca o Dostavi',
 
-      'kpi_desc_dcr':
-          'DCR mjeri koliko je planiranih stajanja uspješno završeno.',
-      'kpi_tip_dcr':
-          'Održavaj stabilan tempo i izbjegavaj nepotrebna skretanja.',
-      'kpi_desc_dnr':
-          'DNR broji neuspjele dostave kada paket nije mogao biti predan.',
-      'kpi_tip_dnr':
-          'Provjeri adrese i koristi kontakt s kupcem kako bi smanjio neuspjele dostave.',
-      'kpi_desc_lor':
-          'LoR prati izgubljene ili oštećene pakete tijekom rute.',
-      'kpi_tip_lor':
-          'Pažljivo rukuj paketima i organiziraj kombi da se ne oštete.',
-      'kpi_desc_pod':
-          'POD mjeri ispravna skeniranja i potvrde dostave.',
-      'kpi_tip_pod':
-          'Uvijek skeniraj na vratima i odaberi ispravnu lokaciju ostavljanja.',
-      'kpi_desc_cc':
-          'CC provjerava prati li vozač korake komunikacije kada je potrebno.',
-      'kpi_tip_cc':
-          'Po potrebi pošalji poruku ili nazovi kupca.',
-      'kpi_desc_ce':
-          'CE pokazuje koliko su kupci zadovoljni tvojim dostavama.',
-      'kpi_tip_ce':
-          'Budi ljubazan, točan i pažljiv s paketima.',
-      'kpi_desc_cdf':
-          'CDF prati ozbiljne probleme s dostavom.',
-      'kpi_tip_cdf':
-          'Analiziraj neuspjele dostave i uči iz obrazaca kako bi izbjegao ponavljanje.',
+        'kpi_desc_dcr': 'Što je vrijednost viša, to je bolje. Kako bi se postigla stopa uspješnosti od 100 %, preporučuje se ponovni pokušaj dostave* nakon neuspjele dostave.',
+        'kpi_tip_dcr': 'Primjer: Ako tijekom dana iz bilo kojeg razloga ne možeš dostaviti paket i pokušaš dostavu ponovno kasnije istog dana, tvoja DCR vrijednost bit će viša i bliža 100 %, čak i ako drugi pokušaj dostave također ne uspije.',
+
+        'kpi_desc_dnr': 'DSC DPMO (Uvjeti Uspješne Dostave)\n(ranije DNR – Dostava Nije Zaprimljena)\n\nŠto je vrijednost niža, to je bolje.\n\nOva metrika mjeri koliko se ispravno i sljedivo provode dostave.\n\nOsnovna pravila dostave:\n- Dostava ispravnoj osobi ili na ispravnu lokaciju\n- Dostave kupcima, članovima kućanstva, susjedima ili recepcionarima su niskog rizika ako se pravilno provedu\n- Uvijek koristiti ispravan kod skeniranja/razloga kako bi kupci primili točne obavijesti\n\nDostave u poštansku sobu / poštanski sandučić:\n- Slijediti standardni tijek rada\n- Paketi moraju biti u potpunosti unutar poštanskog sandučića ili utora i ne smiju viriti\n- Koristiti najpreciznije dostupno skeniranje\n\nIspravna adresa i geofence:\n- Dostava unutar 25 metara ispravnog geofencea\n- Uvijek usporediti ime i adresu u aplikaciji s oznakom paketa i zgradom\n- Ako se geokod čini netočnim, prijaviti putem SDS-a\n\nFotografija pri dostavi (POD):\n- Uvijek napraviti jasnu fotografiju kada se to zatraži\n- Paket i okolina moraju biti jasno vidljivi\n- Posebno važno za nenadzirane dostave i povjerenje kupaca\n\nPoštivanje preferencija dostave:\n- Slijediti upute kupca u aplikaciji ako su sigurne\n- Ako upute nisu sigurne, kontaktirati kupca\n- Koristiti samo odobrene sigurne lokacije iz aplikacije\n\nIstovremene / grupne stanice:\n- Koristiti „Odaberi sve“ samo kada se više paketa dostavlja istoj osobi ili na isto mjesto (npr. recepcija)\n- Ispravno zabilježiti ime primatelja i potpis',
+
+        'kpi_tip_dnr': 'Važna napomena:\n\nPonavljano visoke vrijednosti DSC DPMO-a ukazuju na netočne ili rizične dostave.\n\n- Česta odstupanja Amazon može protumačiti kao moguću krađu\n- To može pokrenuti postupak sprječavanja gubitaka\n- U najgorem slučaju, to može dovesti do prekida suradnje\n\nPažljivo skeniranje, ispravne fotografije i poštivanje svih pravila dostave štite tebe i tvoj tim.',
+
+        'kpi_desc_lor': 'LoR (Izgubljeno na Ruti)\n\nŠto je vrijednost niža, to je bolje.\n\nOva metrika pokazuje jesu li svi nedostavljeni paketi ispravno evidentirani na kraju rute.\n\nNa kraju rute:\n- Provjeriti u skeneru koliko paketa treba vratiti\n- Osigurati da se taj broj točno podudara s paketima u vozilu',
+
+        'kpi_tip_lor': 'Važna napomena:\n\nOvo je kategorija s najvećom sumnjom na krađu.\n\nNeusklađenosti između skenera i inventara vozila mogu se smatrati ozbiljnim pogreškama i mogu dovesti do unutarnjih istraga ili drugih posljedica.',
+
+        'kpi_desc_pod': 'PoD (Fotografija pri Dostavi)\n\nŠto je vrijednost viša, to je bolje.\n\nOvaj stupac prikazuje pakete za koje je snimljena fotografija, ali su označeni kao Nevažeći ili Nesigurni.\n\nČesti razlozi za odbijanje POD-a:\n1. Oznaka paketa s podacima o kupcu vidljiva (paket se mora okrenuti)\n2. Mutna fotografija\n3. Osoba vidljiva na fotografiji\n4. Paket nije vidljiv na fotografiji\n5. Paket u vozilu\n6. Paket u ruci\n7. Paket preblizu kameri\n8. Fotografija je previše tamna',
+
+        'kpi_tip_pod': 'Ovo bi trebala biti najjednostavnija kategorija\nCiljana vrijednost: 100 %\nZnačajno poboljšava ukupni rezultat',
+
+        'kpi_desc_cc': 'CC (Kontakt s Kupcem)\n\nŠto je vrijednost viša, to je bolje.\n\nIzuzetno važno:\nMoraš UVIJEK poslati poruku „Nema sigurne lokacije“ ili „Adresa nije pronađena“ svaki put kada ne možeš dostaviti paket jer:\n\n- kupac nije kod kuće ili\n- adresa se ne može pronaći',
+
+        'kpi_tip_cc': 'Za svaki scenarij u aplikaciji postoji automatska standardna poruka.',
+
+        'kpi_desc_ce': 'CE (Eskalacija Kupca)\n\nŠto je vrijednost niža, to je bolje.\nNajgora kategorija od svih.\n\nKupci eskaliraju kada se ne poštuju upute za dostavu.\n\nVozač je uvijek odgovoran\nŽalbe su gotovo nemoguće bez vrlo jakih dokaza\nIma najjači utjecaj na tvoj Scorecard\n\nKako izbjeći CE\n\nProtivno je pravilima dostave ostavljati pakete na nesigurnim ili nenadziranim mjestima bez odobrenja\n\nDelivery Associates moraju:\n- Pozvoniti / koristiti portafon ili pokucati\n- Dati kupcu dovoljno vremena za odgovor\n\nAko kupca nije moguće kontaktirati i nije postavljena sigurna lokacija:\n- Nazvati kupca dva puta\n- Poslati tekstualnu poruku\n- Kontaktirati Driver Support ako kontakt nije moguć\n\nAko je potrebno:\n- Skenirati paket kao „Dostava neuspješna – kupac nedostupan“\n- Ponovno pokušati dostavu u skladu s pravilima',
+
+        'kpi_tip_ce': 'Ne ostavljati pakete na nesigurnim ili neodobrenim lokacijama\nUvijek poštivati ispravne procese slanja i dostave',
+
+        'kpi_desc_cdf': 'CDF DPMO (Povratne Informacije Kupca o Dostavi)\n\nŠto je vrijednost niža, to je bolje.\n\nRazina 1 (L1)\n- Kupac ocjenjuje dostavu kao „Odlično” (👍) ili „Ne baš dobro” (👎)\n\nRazina 2 (L2)\n- Dodatna povratna informacija o tome zašto je iskustvo bilo dobro ili loše',
+
+        'kpi_tip_cdf': 'CDF se izračunava isključivo na razini L1',
 
       'month_jan': 'Siječanj',
       'month_feb': 'Veljača',
@@ -2604,8 +2642,16 @@ class AppLocalizations {
       'select_language': 'اختر اللغة',
       'notifications': 'الإشعارات',
       'no_notifications': 'لا توجد إشعارات',
+      'nav_scorecard': 'Scorecard',
+      'nav_help': 'مساعدة',
+      'nav_rules': 'القواعد',
+      'nav_profile': 'الملف الشخصي',
       'change_profile_photo': 'تغيير صورة الملف الشخصي',
+      'profile_change_photo': 'تغيير صورة الملف الشخصي',
       'logout': 'تسجيل الخروج',
+      'profile_logout': 'تسجيل الخروج',
+      'pin_change_with_old': 'يمكنك تغيير الرقم السري بعد التحقق من الرقم السري القديم.',
+      'pin_forgot_contact_admin': 'نسيت الرقم السري؟ تواصل مع المسؤول.',
       'profile_photo_updated': 'تم تحديث صورة الملف الشخصي.',
       'failed_upload_profile_photo': 'فشل رفع صورة الملف الشخصي: {error}',
       'could_not_read_image_bytes': 'تعذر قراءة بيانات الصورة من محدد الملفات.',
@@ -2718,42 +2764,40 @@ class AppLocalizations {
       'kpi_value': 'القيمة',
       'kpi_pro_tip': 'نصيحة',
 
-      'kpi_title_dcr': 'معدل إكمال التسليم',
-      'kpi_title_dnr': 'لم يتم الاستلام',
-      'kpi_title_lor': 'فقدان على الطريق',
-      'kpi_title_pod': 'إثبات التسليم',
-      'kpi_title_cc': 'التواصل مع العميل',
-      'kpi_title_ce': 'تجربة العميل',
-      'kpi_title_cdf': 'إخفاقات تسليم العميل',
+        'kpi_title_dcr': 'معدل نجاح التسليم',
+        'kpi_title_dnr': 'شروط نجاح التسليم',
+        'kpi_title_lor': 'مفقود أثناء الطريق',
+        'kpi_title_pod': 'صورة عند التسليم',
+        'kpi_title_cc': 'التواصل مع العميل',
+        'kpi_title_ce': 'تصعيد من العميل',
+        'kpi_title_cdf': 'تقييم العميل لعملية التسليم',
 
-      'kpi_desc_dcr':
-          'يقيس DCR عدد نقاط التوقف المخطط لها التي تم إنجازها بنجاح.',
-      'kpi_tip_dcr':
-          'حافظ على وتيرة ثابتة وتجنب الالتفافات غير الضرورية.',
-      'kpi_desc_dnr':
-          'يحسب DNR حالات فشل التسليم عندما لا يمكن تسليم الطرد.',
-      'kpi_tip_dnr':
-          'تحقق من العناوين واستخدم خيارات التواصل مع العميل لتقليل الفشل.',
-      'kpi_desc_lor':
-          'يتتبع LoR الطرود المفقودة أو التالفة أثناء الطريق.',
-      'kpi_tip_lor':
-          'تعامل مع الطرود بحذر ونظّم السيارة لتجنب التلف.',
-      'kpi_desc_pod':
-          'يقيس POD عمليات المسح الصحيحة وتأكيدات التسليم.',
-      'kpi_tip_pod':
-          'امسح الطرد عند الباب وتأكد من اختيار موقع التسليم الصحيح.',
-      'kpi_desc_cc':
-          'يتحقق CC من اتباع خطوات التواصل عند الحاجة.',
-      'kpi_tip_cc':
-          'أرسل رسالة أو اتصل بالعملاء عند الضرورة لتجنب فشل التسليم.',
-      'kpi_desc_ce':
-          'يمثل CE مدى رضا العملاء عن عمليات التسليم.',
-      'kpi_tip_ce':
-          'كن ودوداً ودقيقاً وحذراً مع الطرود لتحسين تقييم العملاء.',
-      'kpi_desc_cdf':
-          'يتتبع CDF مشاكل التسليم الخطيرة.',
-      'kpi_tip_cdf':
-          'حلّل حالات الفشل وتعلّم من الأنماط لتجنب تكرار الأخطاء.',
+        'kpi_desc_dcr': 'كلما كانت القيمة أعلى، كان ذلك أفضل. للوصول إلى معدل نجاح 100٪، يُوصى بمحاولة إعادة التسليم* بعد فشل عملية التسليم.',
+        'kpi_tip_dcr': 'مثال: إذا لم تتمكن في يوم ما من تسليم طرد لأي سبب، وحاولت التسليم مرة أخرى لاحقًا في نفس اليوم، فستكون قيمة DCR أعلى وأقرب إلى 100٪، حتى لو كانت محاولة التسليم الثانية غير ناجحة أيضًا.',
+
+        'kpi_desc_dnr': 'DSC DPMO (شروط نجاح التسليم)\n(سابقًا DNR – لم يتم استلام التسليم)\n\nكلما كانت القيمة أقل، كان ذلك أفضل.\n\nيقيس هذا المؤشر مدى صحة وقابلية تتبع عمليات التسليم.\n\nقواعد التسليم الأساسية:\n- التسليم إلى الشخص الصحيح أو الموقع الصحيح\n- التسليم إلى العملاء أو أفراد الأسرة أو الجيران أو موظفي الاستقبال منخفض المخاطر عند تنفيذه بشكل صحيح\n- استخدم دائمًا رمز المسح/السبب الصحيح حتى يتلقى العملاء إشعارات صحيحة\n\nالتسليم إلى غرفة البريد / صندوق البريد:\n- اتباع سير العمل القياسي\n- يجب أن تكون الطرود بالكامل داخل صندوق البريد أو فتحة البريد وألا تبرز للخارج\n- استخدام أدق عملية مسح متاحة\n\nالعنوان الصحيح وGeofence:\n- التسليم ضمن 25 مترًا من geofence الصحيح\n- مطابقة الاسم والعنوان في التطبيق دائمًا مع ملصق الطرد والمبنى\n- إذا بدا الرمز الجغرافي غير صحيح، قم بالإبلاغ عبر SDS\n\nالصورة عند التسليم (POD):\n- التقاط صورة واضحة دائمًا عند الطلب\n- يجب أن يكون الطرد والمحيط واضحين\n- مهم بشكل خاص لعمليات التسليم غير المراقبة ولثقة العملاء\n\nالالتزام بتفضيلات التسليم:\n- اتباع تعليمات العميل في التطبيق إذا كانت آمنة\n- إذا كانت التعليمات غير آمنة، تواصل مع العميل\n- استخدام مواقع التسليم الآمنة المعتمدة فقط من التطبيق\n\nالتوقفات المتزامنة / الجماعية:\n- استخدم \"تحديد الكل\" فقط عندما يتم تسليم عدة طرود لنفس الشخص أو نفس الموقع (مثل مكتب الاستقبال)\n- تسجيل اسم المستلم والتوقيع بشكل صحيح',
+
+        'kpi_tip_dnr': 'تنبيه مهم:\n\nالقيم المرتفعة المتكررة في DSC DPMO تشير إلى عمليات تسليم غير صحيحة أو محفوفة بالمخاطر.\n\n- قد تفسر أمازون الانحرافات المتكررة على أنها سرقة محتملة\n- قد يؤدي ذلك إلى بدء إجراء منع الخسائر\n- في أسوأ الحالات، قد يؤدي ذلك إلى إنهاء التعاون\n\nالمسح الدقيق، والتقاط الصور الصحيحة، والالتزام بجميع قواعد التسليم يحميك ويحمي فريقك.',
+
+        'kpi_desc_lor': 'LoR (مفقود أثناء الطريق)\n\nكلما كانت القيمة أقل، كان ذلك أفضل.\n\nيوضح هذا المؤشر ما إذا تم تسجيل جميع الطرود غير المسلمة بشكل صحيح في نهاية المسار.\n\nفي نهاية المسار:\n- التحقق في الماسح الضوئي من عدد الطرود التي يجب إرجاعها\n- التأكد من أن هذا العدد يطابق تمامًا الطرود الموجودة في المركبة',
+
+        'kpi_tip_lor': 'تنبيه مهم:\n\nهذه هي الفئة ذات أعلى اشتباه بالسرقة.\n\nقد تُعتبر الفروقات بين الماسح الضوئي ومخزون المركبة أخطاء جسيمة وقد تؤدي إلى تحقيقات داخلية أو عواقب أخرى.',
+
+        'kpi_desc_pod': 'PoD (صورة عند التسليم)\n\nكلما كانت القيمة أعلى، كان ذلك أفضل.\n\nيعرض هذا العمود الطرود التي تم التقاط صورة لها ولكن تم تصنيفها على أنها غير صالحة أو غير آمنة.\n\nالأسباب الشائعة لرفض POD:\n1. ملصق الطرد مع بيانات العميل ظاهر (يجب قلب الطرد)\n2. صورة غير واضحة\n3. ظهور شخص في الصورة\n4. لا يظهر أي طرد في الصورة\n5. الطرد داخل المركبة\n6. الطرد في اليد\n7. الطرد قريب جدًا من الكاميرا\n8. الصورة مظلمة جدًا',
+
+        'kpi_tip_pod': 'يجب أن تكون هذه أسهل فئة\nالقيمة المستهدفة: 100٪\nتحسن النتيجة الإجمالية بشكل كبير',
+
+        'kpi_desc_cc': 'CC (التواصل مع العميل)\n\nكلما كانت القيمة أعلى، كان ذلك أفضل.\n\nمهم للغاية:\nيجب عليك دائمًا إرسال رسالة \"لا يوجد مكان آمن\" أو \"لم يتم العثور على العنوان\" في كل مرة لا تتمكن فيها من تسليم طرد لأن:\n\n- العميل غير موجود في المنزل أو\n- لا يمكن العثور على العنوان',
+
+        'kpi_tip_cc': 'توجد رسالة قياسية تلقائية في التطبيق لكل سيناريو.',
+
+        'kpi_desc_ce': 'CE (تصعيد من العميل)\n\nكلما كانت القيمة أقل، كان ذلك أفضل.\nأسوأ فئة على الإطلاق.\n\nيقوم العملاء بالتصعيد عندما لا يتم الالتزام بتعليمات التسليم.\n\nالسائق مسؤول دائمًا\nالاعتراضات شبه مستحيلة دون أدلة قوية جدًا\nله التأثير الأقوى على بطاقة الأداء الخاصة بك\n\nكيفية تجنب CE\n\nيُعد مخالفًا لإرشادات التسليم ترك الطرود في أماكن غير آمنة أو غير مراقبة دون موافقة\n\nيجب على Delivery Associates:\n- استخدام الجرس / جهاز الاتصال أو الطرق على الباب\n- منح العميل وقتًا كافيًا للرد\n\nإذا لم يكن من الممكن الوصول إلى العميل ولم يتم تحديد مكان آمن:\n- الاتصال بالعميل مرتين\n- إرسال رسالة نصية\n- التواصل مع Driver Support إذا لم يكن الاتصال ممكنًا\n\nإذا لزم الأمر:\n- مسح الطرد كـ \"فشل التسليم – العميل غير متاح\"\n- إعادة محاولة التسليم وفقًا للإرشادات',
+
+        'kpi_tip_ce': 'لا تترك الطرود في أماكن غير آمنة أو غير معتمدة\nالتزم دائمًا بعمليات الشحن والتسليم الصحيحة',
+
+        'kpi_desc_cdf': 'CDF DPMO (تقييم العميل لعملية التسليم)\n\nكلما كانت القيمة أقل، كان ذلك أفضل.\n\nالمستوى 1 (L1)\n- يقيم العميل عملية التسليم على أنها \"رائعة\" (👍) أو \"ليست جيدة\" (👎)\n\nالمستوى 2 (L2)\n- ملاحظات إضافية حول سبب كون التجربة جيدة أو سيئة',
+
+        'kpi_tip_cdf': 'يتم احتساب CDF حصريًا على مستوى L1',
 
       'month_jan': 'يناير',
       'month_feb': 'فبراير',

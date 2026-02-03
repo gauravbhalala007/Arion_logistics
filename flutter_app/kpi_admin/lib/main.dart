@@ -5,17 +5,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 import 'firebase_options.dart';
-import 'screens/drivers_hub_page.dart';
 import 'widgets/auth_gate.dart';
 import 'Screens/login_page.dart';
-import 'Screens/scorecard_overview.dart';
 import 'Screens/signup_page.dart';
 import 'Screens/verify_email_page.dart';
-import 'Screens/admin_approvals_page.dart';
 import 'Screens/driver_dashboard_page.dart';
 import 'screens/dsp_profile_page.dart';
-import 'screens/notifications_page.dart';
-import 'screens/admin_home_page.dart';
+import 'screens/admin_shell_page.dart';
+import 'widgets/app_side_menu.dart'; // for AppNav
 
 
 
@@ -93,15 +90,18 @@ class App extends StatelessWidget {
             '/login': (_) => const LoginPage(),
             '/signup': (_) => const SignupPage(),
             '/verify-email': (_) => const VerifyEmailPage(),
-            '/dashboard': (_) => const ScorecardOverviewPage(),
-            '/drivers': (_) => const DriversHubPage(),
-            '/coming-soon': (_) =>
-                const _PlaceholderPage(title: 'Coming Soon'),
-            '/admin-approvals': (_) => const AdminApprovalsPage(),
-            '/profile': (context) => const DspProfilePage(),
-            '/notifications': (context) => const NotificationsPage(),
-            '/home': (_) => const AdminHomePage(),
+            '/profile': (_) => const DspProfilePage(),
+
+            // ✅ all side-menu destinations go through the shell
+            '/home': (_) => const AdminShellPage(initialNav: AppNav.home),
+            '/dashboard': (_) => const AdminShellPage(initialNav: AppNav.dashboard),
+            '/drivers': (_) => const AdminShellPage(initialNav: AppNav.drivers),
+            '/notifications': (_) => const AdminShellPage(initialNav: AppNav.notifications),
+            '/admin-approvals': (_) => const AdminShellPage(initialNav: AppNav.adminApprovals),
+
+            '/coming-soon': (_) => const _PlaceholderPage(title: 'Coming Soon'),
           },
+
         );
       },
     );
