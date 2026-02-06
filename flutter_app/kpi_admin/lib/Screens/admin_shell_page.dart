@@ -7,9 +7,11 @@ import '../widgets/app_side_menu.dart';
 // your existing pages
 import 'admin_home_page.dart';
 import 'scorecard_overview.dart';
+import 'pod_quality_overview.dart';
 import 'drivers_hub_page.dart';
 import 'notifications_page.dart';
 import 'admin_approvals_page.dart';
+import 'admin_faq_page.dart';
 
 class AdminShellPage extends StatefulWidget {
   final AppNav initialNav;
@@ -50,8 +52,10 @@ class _AdminShellPageState extends State<AdminShellPage> {
         children: const [
           AdminHomePage(),
           ScorecardOverviewPage(),
+          PodQualityOverviewPage(),
           DriversHubPage(),
           NotificationsPage(),
+          AdminFaqPage(),
           AdminApprovalsPage(),
         ],
       ),
@@ -64,12 +68,16 @@ class _AdminShellPageState extends State<AdminShellPage> {
         return 0;
       case AppNav.dashboard:
         return 1;
-      case AppNav.drivers:
+      case AppNav.podQuality:
         return 2;
-      case AppNav.notifications:
+      case AppNav.drivers:
         return 3;
-      case AppNav.adminApprovals:
+      case AppNav.notifications:
         return 4;
+      case AppNav.faqs:
+        return 5;
+      case AppNav.adminApprovals:
+        return 6;
       default:
         return 0;
     }

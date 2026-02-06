@@ -1,0 +1,9 @@
+# Sensitive configs
+**/firebase_options.dart
+**/google-services.json
+**/GoogleService-Info.plist
+**/.env
+**/serviceAccount*.json
+
+# Build outputs that can embed compiled config
+firebase/build/

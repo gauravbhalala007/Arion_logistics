@@ -318,7 +318,7 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
         );
 
       case DriverView.faq:
-      return const DriverFaqPage();
+        return DriverFaqPage(dspUid: widget.dspUid);
 
       case DriverView.onboarding:
         final driverRef = FirebaseFirestore.instance
@@ -434,6 +434,27 @@ class _HeaderBar extends StatelessWidget {
         return 'assets/flags/sy.svg';
       default:
         return 'assets/flags/gb.svg'; // fallback
+    }
+  }
+
+  String _languageName(String code) {
+    switch (code) {
+      case 'de':
+        return 'Deutsch';
+      case 'en':
+        return 'English';
+      case 'sq':
+        return 'Shqip';
+      case 'hu':
+        return 'Magyar';
+      case 'ro':
+        return 'Română';
+      case 'hr':
+        return 'Hrvatski';
+      case 'ar':
+        return 'العربية';
+      default:
+        return code;
     }
   }
 
@@ -572,7 +593,7 @@ class _HeaderBar extends StatelessWidget {
                         children: [
                           Expanded(
                             child: Text(
-                              loc.t('sheet_select_language'),
+                              loc.t('select_language'),
                               textAlign: TextAlign.center,
                               style: const TextStyle(
                                 fontWeight: FontWeight.w800,
@@ -599,7 +620,7 @@ class _HeaderBar extends StatelessWidget {
                             leading:
                                 SvgPicture.asset(asset, width: 26, height: 20),
                             title: Text(
-                              languageLabel(code),
+                              _languageName(code),
                               style: const TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w600,

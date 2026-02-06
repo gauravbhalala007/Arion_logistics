@@ -1992,10 +1992,36 @@ class _DriverDocumentsCardState extends State<_DriverDocumentsCard> {
     final s = v.toString().trim();
     if (s.isEmpty) return null;
 
+    final slashMatch = RegExp(r'^(\d{1,2})\/(\d{1,2})\/(\d{4})$');
+    final match = slashMatch.firstMatch(s);
+    if (match != null) {
+      final d = int.tryParse(match.group(1)!);
+      final m = int.tryParse(match.group(2)!);
+      final y = int.tryParse(match.group(3)!);
+      if (d != null && m != null && y != null) {
+        return DateTime(y, m, d);
+      }
+    }
+
     final iso = DateTime.tryParse(s);
     if (iso != null) return DateTime(iso.year, iso.month, iso.day);
 
     return null;
+  }
+
+  DateTime _addMonthsClamped(DateTime date, int months) {
+    final totalMonths = (date.month - 1) + months;
+    final year = date.year + (totalMonths ~/ 12);
+    final month = (totalMonths % 12) + 1;
+    final lastDay = DateTime(year, month + 1, 0).day;
+    final day = date.day <= lastDay ? date.day : lastDay;
+    return DateTime(year, month, day);
+  }
+
+  DateTime? _probationEndFromStart(DateTime? start) {
+    if (start == null) return null;
+    final sixMonthsLater = _addMonthsClamped(start, 6);
+    return sixMonthsLater.subtract(const Duration(days: 1));
   }
 
   String _fmtShortDate(DateTime? dt) {
@@ -2314,6 +2340,27 @@ class _DriverDocumentsCardState extends State<_DriverDocumentsCard> {
                       contractTone: _PillTone.yellow, // keep your style, adjust if needed
                       rightPrefix: 'last day',
                       date: cEnd,
+                    ));
+                  }
+
+                  if (isSoon) contractSoonDrivers.add(driverName);
+                }
+
+                final workStart = _parseDate(onboarding['workStartDate']);
+                final probationEnd = _probationEndFromStart(workStart);
+                if (probationEnd != null) {
+                  final isExpired = probationEnd.isBefore(today);
+                  final isSoon = !isExpired &&
+                      (probationEnd.isBefore(soonLimit) ||
+                          probationEnd.isAtSameMomentAs(soonLimit));
+
+                  if (isExpired || isSoon) {
+                    contractRowsUi.add(_DocRowUi(
+                      name: driverName,
+                      contractPill: 'Probezeit',
+                      contractTone: _PillTone.blue,
+                      rightPrefix: isExpired ? 'ended' : 'ends',
+                      date: probationEnd,
                     ));
                   }
 

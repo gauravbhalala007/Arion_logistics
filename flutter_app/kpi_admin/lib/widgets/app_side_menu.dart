@@ -5,7 +5,16 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
 
-enum AppNav { home, dashboard, drivers, notifications, comingSoon, adminApprovals }
+enum AppNav {
+  home,
+  dashboard,
+  podQuality,
+  drivers,
+  notifications,
+  faqs,
+  comingSoon,
+  adminApprovals,
+}
 
 class AppSideMenu extends StatelessWidget {
   final double width;
@@ -75,6 +84,12 @@ class AppSideMenu extends StatelessWidget {
                 onTap: () => _handleNav(context, AppNav.dashboard, '/dashboard'),
               ),
               _MenuItem(
+                icon: Icons.photo_camera_outlined,
+                label: 'POD Quality',
+                active: active == AppNav.podQuality,
+                onTap: () => _handleNav(context, AppNav.podQuality, '/pod-quality'),
+              ),
+              _MenuItem(
                 icon: Icons.badge_outlined,
                 label: 'Drivers Hub',
                 active: active == AppNav.drivers,
@@ -85,6 +100,12 @@ class AppSideMenu extends StatelessWidget {
                 label: 'Notifications',
                 active: active == AppNav.notifications,
                 onTap: () => _handleNav(context, AppNav.notifications, '/notifications'),
+              ),
+              _MenuItem(
+                icon: Icons.help_outline,
+                label: 'FAQs',
+                active: active == AppNav.faqs,
+                onTap: () => _handleNav(context, AppNav.faqs, '/faqs'),
               ),
 
               // ---- Admin-only item (auto-detect from Firestore user role) ----

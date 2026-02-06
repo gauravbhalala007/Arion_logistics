@@ -27,6 +27,15 @@ final _pct2 = NumberFormat.decimalPattern('de')
 final _int = NumberFormat.decimalPattern('de');
 
 String _s(dynamic v) => (v == null) ? '' : v.toString();
+num _numOr0(dynamic v) {
+  if (v == null) return 0;
+  if (v is num) return v;
+  if (v is String) {
+    final s = v.trim().replaceAll('%', '');
+    return num.tryParse(s.replaceAll(',', '.')) ?? 0;
+  }
+  return 0;
+}
 
 /// ---------- Week date helpers (ISO week: Monday start) ----------
 DateTime _isoWeekStartUtc(int year, int week) {
@@ -37,6 +46,24 @@ DateTime _isoWeekStartUtc(int year, int week) {
 }
 
 String _dotted(DateTime d) => DateFormat('dd.MM.yyyy').format(d.toLocal());
+
+int _monthIndexFromWeek(int year, int week) {
+  final jan4 = DateTime.utc(year, 1, 4);
+  final week1Mon =
+      jan4.subtract(Duration(days: jan4.weekday - DateTime.monday));
+  final target = week1Mon.add(Duration(days: (week - 1) * 7));
+  return target.month;
+}
+
+String _monthNameFromIndex(int m) {
+  final date = DateTime(2024, m, 1);
+  return DateFormat('MMMM').format(date);
+}
+
+String _shortMonthName(int m) {
+  final date = DateTime(2024, m, 1);
+  return DateFormat('MMM').format(date);
+}
 
 /// ---------- Responsive helpers (match scorecard_week.dart) ----------
 double _scaleForWidth(double w) {
@@ -51,6 +78,8 @@ double _scaleForWidth(double w) {
 double _sp(double base, double w) => base * _scaleForWidth(w);
 double _pad(double base, double w) => base * _scaleForWidth(w);
 bool _isNarrow(BuildContext c) => MediaQuery.of(c).size.width < 1100;
+
+enum _PeriodFilter { week, month, year }
 
 /* ====================  Palette / styles  ==================== */
 class _UI {
@@ -98,6 +127,20 @@ class _ReportVM {
   });
 }
 
+const _kFantasticPlusColor = Color(0xFF00B287); // Fantastic Plus
+const _kFantasticColor = Color(0xFF0082AF); // Fantastic
+const _kGreatColor = Color(0xFFF7AA00); // Great
+const _kFairColor = Color(0xFFF47400); // Fair
+const _kPoorColor = Color(0xFFCE4121); // Poor
+
+Color _monthlyBucketColorFromScore(double s) {
+  if (s > 93) return _kFantasticPlusColor; // Fantastic Plus
+  if (s >= 85) return _kFantasticColor; // Fantastic
+  if (s >= 70) return _kGreatColor; // Great
+  if (s >= 50) return _kFairColor; // Fair
+  return _kPoorColor; // Poor
+}
+
 class ScorecardOverviewPage extends StatefulWidget {
   const ScorecardOverviewPage({super.key});
 
@@ -127,6 +170,21 @@ class ScorecardWeekShellPage extends StatelessWidget {
 class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
   bool _busyUpload = false; // PDFs (bottom-left)
   bool _busyCsv = false;    // CSVs (top-right)
+
+  _PeriodFilter _periodFilter = _PeriodFilter.month;
+  String? _selectedMonthKey;
+  int? _selectedYear;
+  String? _selectedStationCode;
+
+  late final Stream<Map<String, String>> _globalNamesStreamCached;
+  final Map<String, Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>>>
+      _scoresStreamCache = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _globalNamesStreamCached = _driversNameMapGlobal();
+  }
 
   Stream<List<_ReportVM>> _reportsStream() {
     final uid = FirebaseAuth.instance.currentUser!.uid;
@@ -158,6 +216,99 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
             }).toList());
   }
 
+  Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _scoresForReport(
+    DocumentReference<Map<String, dynamic>> reportRef,
+  ) {
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('scores')
+        .where('reportRef', isEqualTo: reportRef)
+        .snapshots()
+        .map((s) => s.docs);
+  }
+
+  Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _scoresForReports(
+    List<DocumentReference<Map<String, dynamic>>> reportRefs,
+  ) {
+    if (reportRefs.isEmpty) {
+      return Stream.value(<QueryDocumentSnapshot<Map<String, dynamic>>>[]);
+    }
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('scores')
+        .where('reportRef', whereIn: reportRefs)
+        .snapshots()
+        .map((s) => s.docs);
+  }
+
+  Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _scoresCached(
+    DocumentReference<Map<String, dynamic>> reportRef,
+  ) {
+    return _scoresStreamCache.putIfAbsent(
+      reportRef.path,
+      () => _scoresForReport(reportRef),
+    );
+  }
+
+  Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _scoresForReportsCached(
+    List<DocumentReference<Map<String, dynamic>>> reportRefs,
+  ) {
+    final refs = [...reportRefs]..sort((a, b) => a.path.compareTo(b.path));
+    final key = refs.map((r) => r.path).join('|');
+    return _scoresStreamCache.putIfAbsent(
+      key,
+      () => _scoresForReports(refs),
+    );
+  }
+
+  Stream<Map<String, String>> _driversNameMapGlobal() {
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('drivers')
+        .snapshots()
+        .map((snap) {
+      final m = <String, String>{};
+      for (final d in snap.docs) {
+        final data = d.data();
+        final id = _s(data['transporterId']);
+        final name = _s(data['driverName']);
+        if (id.isNotEmpty) m[id] = name;
+      }
+      return m;
+    });
+  }
+
+  String _statusCodeFromScore(double v) {
+    if (v >= 93) return 'FANTASTIC_PLUS';
+    if (v >= 85) return 'FANTASTIC';
+    if (v >= 70) return 'GREAT';
+    if (v >= 50) return 'FAIR';
+    return 'POOR';
+  }
+
+  Color _statusColorFromCode(String code) {
+    switch (code.trim().toUpperCase()) {
+      case 'FANTASTIC_PLUS':
+        return _kFantasticPlusColor;
+      case 'FANTASTIC':
+        return _kFantasticColor;
+      case 'GREAT':
+        return _kGreatColor;
+      case 'FAIR':
+        return _kFairColor;
+      case 'POOR':
+        return _kPoorColor;
+      default:
+        return _UI.greenDark;
+    }
+  }
+
   String _prettyStatus(String? raw) {
     switch (_s(raw).trim().toUpperCase()) {
       case 'FANTASTIC_PLUS':
@@ -173,6 +324,537 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
       default:
         return _s(raw);
     }
+  }
+
+  Widget _buildBestDriversContent({
+    required BuildContext context,
+    required List<int> years,
+    required Map<int, List<int>> monthsByYear,
+    required List<_ReportVM> reports,
+    required void Function(VoidCallback) setDialogState,
+    required double w,
+  }) {
+    if (reports.isEmpty) {
+      return const Text(
+        'No reports available.',
+        style: TextStyle(fontSize: 12, color: _UI.textSecondary),
+      );
+    }
+
+    final latest = reports.first;
+    final defaultMonthKey = () {
+      final m = _monthIndexFromWeek(latest.year, latest.week);
+      return '${latest.year}-${m.toString().padLeft(2, '0')}';
+    }();
+
+    final currentMonthKey = _selectedMonthKey ?? defaultMonthKey;
+    final activeYear = _selectedYear ?? (years.isNotEmpty ? years.first : latest.year);
+
+    final isYearView = _periodFilter == _PeriodFilter.year;
+    final isMonthView = !isYearView;
+
+    int? filterYear;
+    int? filterMonth;
+    if (isYearView) {
+      filterYear = activeYear;
+    } else {
+      final parts = currentMonthKey.split('-');
+      if (parts.length == 2) {
+        filterYear = int.tryParse(parts[0]);
+        filterMonth = int.tryParse(parts[1]);
+      }
+    }
+
+    final periodReports = <_ReportVM>[];
+    for (final r in reports) {
+      if (filterYear != null && r.year != filterYear) continue;
+      if (filterMonth != null) {
+        final m = _monthIndexFromWeek(r.year, r.week);
+        if (m != filterMonth) continue;
+      }
+      periodReports.add(r);
+    }
+
+    final stationByReportPath = <String, String>{};
+    for (final r in periodReports) {
+      stationByReportPath[r.ref.path] = _s(r.stationCode).toUpperCase();
+    }
+
+    final stationOptions = stationByReportPath.values
+        .where((s) => s.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort();
+
+    final hasValidStation = _selectedStationCode != null &&
+        stationOptions.contains(_selectedStationCode);
+    final stationLabel =
+        hasValidStation ? 'Station $_selectedStationCode' : 'All Stations';
+
+    final scoreStream = _scoresForReportsCached(
+      periodReports.map((e) => e.ref).toList(),
+    );
+
+    final pillLabel = isYearView
+        ? (filterYear ?? latest.year).toString()
+        : (filterMonth != null
+            ? _monthNameFromIndex(filterMonth).toUpperCase()
+            : _monthNameFromIndex(_monthIndexFromWeek(latest.year, latest.week))
+                .toUpperCase());
+
+    final subtitle = isYearView
+        ? (filterYear?.toString() ?? '')
+        : (filterMonth != null && filterYear != null
+            ? '${_monthNameFromIndex(filterMonth).toUpperCase()} $filterYear'
+            : null);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _BestDriversPeriodRow(
+          periodLabel: pillLabel,
+          stationLabel: stationLabel,
+          onPeriodTap: () => _showBestPeriodDialog(
+                context: context,
+                years: years,
+                monthsByYear: monthsByYear,
+                onChanged: () => setDialogState(() {}),
+              ),
+          onStationTap: () => _showStationFilterDialog(
+                context: context,
+                stations: stationOptions,
+                onChanged: () => setDialogState(() {}),
+              ),
+        ),
+        SizedBox(height: _pad(10, w)),
+        if (subtitle != null && subtitle.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              isMonthView ? 'Best drivers of the month' : 'Best drivers of the year',
+              style: TextStyle(
+                fontSize: _sp(12, w),
+                fontWeight: FontWeight.w700,
+                color: _UI.textSecondary,
+              ),
+            ),
+          ),
+        if (subtitle != null && subtitle.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: _sp(13, w),
+                fontWeight: FontWeight.w800,
+                color: _UI.textPrimary,
+              ),
+            ),
+          ),
+        StreamBuilder<Map<String, String>>(
+          stream: _globalNamesStreamCached,
+          builder: (context, namesSnap) {
+            final names = namesSnap.data ?? const <String, String>{};
+
+            return StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+              stream: scoreStream,
+              builder: (context, scoreSnap) {
+                if (scoreSnap.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
+                }
+
+                final docs = scoreSnap.data ?? [];
+                if (docs.isEmpty) {
+                  return const Text(
+                    'No drivers found for this period.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: _UI.textSecondary,
+                    ),
+                  );
+                }
+
+                final Map<String, Map<String, _DriverAgg>> stationAgg = {};
+                for (final d in docs) {
+                  final data = d.data();
+                  final tid = _s(data['transporterId']).trim();
+                  if (tid.isEmpty) continue;
+
+                  String station = '';
+                  final reportRef = data['reportRef'];
+                  if (reportRef is DocumentReference) {
+                    station = stationByReportPath[reportRef.path] ?? '';
+                  } else if (reportRef is String) {
+                    station = stationByReportPath[reportRef] ?? '';
+                  }
+                  station = station.isEmpty ? 'UNKNOWN' : station;
+
+                  final compRaw = data['comp'] ?? {};
+                  final comp = compRaw is Map<String, dynamic>
+                      ? compRaw
+                      : <String, dynamic>{};
+                  final score = _numOr0(comp['FinalScore']).toDouble();
+
+                  final aggMap = stationAgg.putIfAbsent(
+                    station,
+                    () => <String, _DriverAgg>{},
+                  );
+                  final agg = aggMap.putIfAbsent(tid, () => _DriverAgg());
+                  agg.sumScore += score;
+                  agg.count++;
+                }
+
+                final stationsSorted = stationAgg.keys.toList()..sort();
+                final activeStation = (hasValidStation &&
+                        stationAgg.containsKey(_selectedStationCode))
+                    ? _selectedStationCode
+                    : null;
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (final station in stationsSorted)
+                      if (activeStation == null || station == activeStation) ...[
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6, top: 8),
+                        child: Text(
+                          station == 'UNKNOWN' ? 'Station' : 'Station $station',
+                          style: TextStyle(
+                            fontSize: _sp(12, w),
+                            fontWeight: FontWeight.w800,
+                            color: _UI.textPrimary,
+                          ),
+                        ),
+                      ),
+                      _buildStationDriverList(
+                        stationAgg[station] ?? const <String, _DriverAgg>{},
+                        names,
+                      ),
+                    ],
+                  ],
+                );
+              },
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStationDriverList(
+    Map<String, _DriverAgg> aggMap,
+    Map<String, String> names,
+  ) {
+    final entries = <_DriverEntry>[];
+    aggMap.forEach((tid, agg) {
+      if (agg.count == 0) return;
+      entries.add(
+        _DriverEntry(
+          transporterId: tid,
+          avgScore: agg.sumScore / agg.count,
+        ),
+      );
+    });
+    entries.sort((a, b) => b.avgScore.compareTo(a.avgScore));
+
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: entries.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      itemBuilder: (context, i) {
+        final e = entries[i];
+        final name =
+            _s(names[e.transporterId]).isNotEmpty ? _s(names[e.transporterId]) : 'No name';
+        final bucket = _statusCodeFromScore(e.avgScore);
+        final statusText = _prettyStatus(bucket);
+        final statusColor = _statusColorFromCode(bucket);
+        return _BestDriverRow(
+          rank: i + 1,
+          score: e.avgScore,
+          name: name,
+          statusText: statusText,
+          statusColor: statusColor,
+          backgroundColor: _monthlyBucketColorFromScore(e.avgScore),
+        );
+      },
+    );
+  }
+
+  Future<void> _openBestDriversDialog({
+    required BuildContext context,
+    required Widget Function(BuildContext, void Function(VoidCallback)) builder,
+  }) async {
+    final media = MediaQuery.of(context).size;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return Dialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: 820,
+                  maxHeight: media.height * 0.85,
+                ),
+                child: Stack(
+                  children: [
+                    SingleChildScrollView(
+                      padding: const EdgeInsets.all(16),
+                      child: _Panel(
+                        title: 'Best Drivers',
+                        child: builder(ctx, setDialogState),
+                      ),
+                    ),
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: IconButton(
+                        icon: const Icon(Icons.close, size: 18),
+                        onPressed: () => Navigator.of(ctx).pop(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _showStationFilterDialog({
+    required BuildContext context,
+    required List<String> stations,
+    VoidCallback? onChanged,
+  }) async {
+    final items = [
+      'ALL',
+      ...stations.where((s) => s.isNotEmpty).toList(),
+    ];
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    const Text(
+                      'Select station',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 18),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final s in items)
+                      ChoiceChip(
+                        label: Text(
+                          s == 'ALL' ? 'All Stations' : s,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        selected: s == 'ALL'
+                            ? _selectedStationCode == null
+                            : _selectedStationCode == s,
+                        onSelected: (_) {
+                          setState(() {
+                            _selectedStationCode = s == 'ALL' ? null : s;
+                          });
+                          onChanged?.call();
+                          Navigator.of(ctx).pop();
+                        },
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showBestPeriodDialog({
+    required BuildContext context,
+    required List<int> years,
+    required Map<int, List<int>> monthsByYear,
+    VoidCallback? onChanged,
+  }) async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: IntrinsicHeight(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      const Text(
+                        'Select period',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 18),
+                        onPressed: () => Navigator.of(ctx).pop(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Best drivers of year',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final y in years)
+                        ChoiceChip(
+                          label: Text(
+                            y.toString(),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          selected: _periodFilter == _PeriodFilter.year &&
+                              _selectedYear == y,
+                          onSelected: (_) {
+                            setState(() {
+                              _periodFilter = _PeriodFilter.year;
+                              _selectedYear = y;
+                              _selectedMonthKey = null;
+                            });
+                            onChanged?.call();
+                            Navigator.of(ctx).pop();
+                          },
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Best drivers of month',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (final y in years) ...[
+                        if ((monthsByYear[y] ?? []).isNotEmpty) ...[
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              y.toString(),
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black54,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              for (final m in monthsByYear[y]!)
+                                ChoiceChip(
+                                  label: Text(
+                                    _shortMonthName(m),
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  selected: _periodFilter == _PeriodFilter.month &&
+                                      _selectedMonthKey ==
+                                          '$y-${m.toString().padLeft(2, '0')}',
+                                  onSelected: (_) {
+                                    setState(() {
+                                      _periodFilter = _PeriodFilter.month;
+                                      _selectedYear = y;
+                                      _selectedMonthKey =
+                                          '$y-${m.toString().padLeft(2, '0')}';
+                                    });
+                                    onChanged?.call();
+                                    Navigator.of(ctx).pop();
+                                  },
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                        ],
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _uploadWeeklyPdf() async {
@@ -574,6 +1256,22 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
 
                           final chart = list.take(12).toList().reversed.toList();
 
+                          final yearsAvailable = <int>{};
+                          final Map<int, Set<int>> monthsByYear = {};
+                          for (final r in list) {
+                            yearsAvailable.add(r.year);
+                            final m = _monthIndexFromWeek(r.year, r.week);
+                            monthsByYear.putIfAbsent(r.year, () => <int>{}).add(m);
+                          }
+
+                          final sortedYears =
+                              yearsAvailable.toList()..sort((a, b) => b.compareTo(a));
+                          final Map<int, List<int>> sortedMonthsByYear = {
+                            for (final y in sortedYears)
+                              y: (monthsByYear[y]?.toList() ?? [])
+                                ..sort((a, b) => a.compareTo(b))
+                          };
+
                           // ----- LEFT column content
                           final leftColumnContent = <Widget>[
                             _ResponsiveStatStrip(
@@ -676,11 +1374,53 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                             ),
                           ];
 
+                          final bestDriversButton = TextButton.icon(
+                            onPressed: () => _openBestDriversDialog(
+                              context: context,
+                              builder: (ctx, setDialogState) =>
+                                  _buildBestDriversContent(
+                                context: ctx,
+                                years: sortedYears,
+                                monthsByYear: sortedMonthsByYear,
+                                reports: list,
+                                setDialogState: setDialogState,
+                                w: w,
+                              ),
+                            ),
+                            style: TextButton.styleFrom(
+                              foregroundColor: _UI.greenDark,
+                              padding: EdgeInsets.symmetric(
+                                horizontal: _pad(10, w),
+                                vertical: _pad(6, w),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(999),
+                                side: const BorderSide(color: _UI.greenDark, width: 1.1),
+                              ),
+                            ),
+                            icon: Icon(Icons.emoji_events_outlined,
+                                size: _sp(14, w)),
+                            label: Text(
+                              'Best Drivers',
+                              style: TextStyle(
+                                fontSize: _sp(11, w),
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          );
+
                           // ----- RIGHT panel (summary list) with 3-dots delete menu
                           final rightPanel = _Panel(
                             title: 'Score Card Summary',
-                            trailing: Icon(Icons.more_horiz,
-                                color: _UI.textSecondary, size: _sp(20, w)),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                bestDriversButton,
+                                SizedBox(width: _pad(6, w)),
+                                Icon(Icons.more_horiz,
+                                    color: _UI.textSecondary, size: _sp(20, w)),
+                              ],
+                            ),
                             child: ListView.separated(
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
@@ -918,6 +1658,254 @@ class _Panel extends StatelessWidget {
           child,
         ],
       ),
+    );
+  }
+}
+
+class _DriverAgg {
+  double sumScore = 0;
+  int count = 0;
+}
+
+class _DriverEntry {
+  final String transporterId;
+  final double avgScore;
+
+  const _DriverEntry({
+    required this.transporterId,
+    required this.avgScore,
+  });
+}
+
+class _BestDriversPeriodRow extends StatelessWidget {
+  final String periodLabel;
+  final String? stationLabel;
+  final VoidCallback onPeriodTap;
+  final VoidCallback? onStationTap;
+
+  const _BestDriversPeriodRow({
+    required this.periodLabel,
+    this.stationLabel,
+    required this.onPeriodTap,
+    this.onStationTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const pillHeight = 38.0;
+
+    BoxDecoration _pillDec() {
+      return BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: _UI.greenDark, width: 1.2),
+      );
+    }
+
+    const pillTextStyle = TextStyle(
+      fontSize: 11,
+      letterSpacing: 0.6,
+      fontWeight: FontWeight.w700,
+      color: Colors.black87,
+    );
+
+    Widget _pill(String text, VoidCallback? onTap) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          height: pillHeight,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: _pillDec(),
+          child: Center(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                children: [
+                  Text(text.toUpperCase(), style: pillTextStyle),
+                  const SizedBox(width: 6),
+                  const Icon(
+                    Icons.keyboard_arrow_down,
+                    size: 16,
+                    color: Colors.black87,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (stationLabel == null || onStationTap == null) {
+      return _pill(periodLabel, onPeriodTap);
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isTight = constraints.maxWidth < 520;
+        final periodPill = _pill(periodLabel, onPeriodTap);
+        final stationPill = _pill(stationLabel!, onStationTap);
+
+        if (!isTight) {
+          return Row(
+            children: [
+              Expanded(child: periodPill),
+              const SizedBox(width: 8),
+              Expanded(child: stationPill),
+            ],
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            periodPill,
+            const SizedBox(height: 8),
+            stationPill,
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _BestDriverRow extends StatelessWidget {
+  final int rank;
+  final double score;
+  final String name;
+  final String statusText;
+  final Color statusColor;
+  final Color? backgroundColor;
+
+  const _BestDriverRow({
+    required this.rank,
+    required this.score,
+    required this.name,
+    required this.statusText,
+    required this.statusColor,
+    this.backgroundColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isColored = backgroundColor != null;
+    final textColor = isColored ? Colors.white : _UI.textPrimary;
+    final labelColor = isColored ? Colors.white70 : _UI.textSecondary;
+    final pillTextColor = isColored ? Colors.white : statusColor;
+    final pillBgColor =
+        isColored ? Colors.white.withOpacity(0.2) : statusColor.withOpacity(0.15);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      decoration: BoxDecoration(
+        color: backgroundColor ?? Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: backgroundColor ?? _UI.border,
+          width: 1.2,
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _bestCol(
+                  label: 'RANK',
+                  value: '#$rank',
+                  labelColor: labelColor,
+                  textColor: textColor,
+                ),
+              ),
+              _bestDivider(isColored),
+              Expanded(
+                child: _bestCol(
+                  label: 'SCORE',
+                  value: _pct2.format(score),
+                  labelColor: labelColor,
+                  textColor: textColor,
+                ),
+              ),
+              _bestDivider(isColored),
+              Expanded(
+                flex: 2,
+                child: _bestCol(
+                  label: 'NAME',
+                  value: name.isEmpty ? 'No name' : name,
+                  labelColor: labelColor,
+                  textColor: textColor,
+                ),
+              ),
+            ],
+          ),
+          if (statusText.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: pillBgColor,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  statusText.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: pillTextColor,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _bestDivider(bool isColored) {
+    return Container(
+      width: 1,
+      height: 28,
+      margin: const EdgeInsets.symmetric(horizontal: 8),
+      color: isColored ? Colors.white.withOpacity(0.5) : _UI.border,
+    );
+  }
+
+  Widget _bestCol({
+    required String label,
+    required String value,
+    required Color labelColor,
+    required Color textColor,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 9,
+            letterSpacing: 1.1,
+            color: labelColor,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+            color: textColor,
+          ),
+        ),
+      ],
     );
   }
 }

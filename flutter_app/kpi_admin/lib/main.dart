@@ -95,8 +95,10 @@ class App extends StatelessWidget {
             // ✅ all side-menu destinations go through the shell
             '/home': (_) => const AdminShellPage(initialNav: AppNav.home),
             '/dashboard': (_) => const AdminShellPage(initialNav: AppNav.dashboard),
+            '/pod-quality': (_) => const AdminShellPage(initialNav: AppNav.podQuality),
             '/drivers': (_) => const AdminShellPage(initialNav: AppNav.drivers),
             '/notifications': (_) => const AdminShellPage(initialNav: AppNav.notifications),
+            '/faqs': (_) => const AdminShellPage(initialNav: AppNav.faqs),
             '/admin-approvals': (_) => const AdminShellPage(initialNav: AppNav.adminApprovals),
 
             '/coming-soon': (_) => const _PlaceholderPage(title: 'Coming Soon'),

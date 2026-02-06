@@ -227,6 +227,13 @@ class _DriversHubPageState extends State<DriversHubPage> {
     return '$day/$month/$year';
   }
 
+  String _formatDate(DateTime date) {
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final year = date.year.toString().padLeft(4, '0');
+    return '$day/$month/$year';
+  }
+
   Widget _detailRowEditable({
     required DocumentReference<Map<String, dynamic>> driverRef,
     required String label,
@@ -291,6 +298,61 @@ class _DriversHubPageState extends State<DriversHubPage> {
                       await Clipboard.setData(
                         ClipboardData(text: displayText),
                       );
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('$label copied')),
+                      );
+                    },
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _detailRowReadOnly({
+    required String label,
+    required String value,
+  }) {
+    final hasText = value.trim().isNotEmpty;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 160,
+            child: SelectableText(
+              label,
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: SelectableText(
+                    hasText ? value : '—',
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                ),
+                if (hasText) ...[
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(Icons.copy, size: 16),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    tooltip: 'Copy $label',
+                    onPressed: () async {
+                      await Clipboard.setData(ClipboardData(text: value));
                       if (!mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text('$label copied')),
@@ -1567,6 +1629,24 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                             ),
                                           ),
                                           const SizedBox(height: 4),
+
+                                          _detailRowEditable(
+                                            driverRef: snap.data!.reference,
+                                            label: 'Work start date',
+                                            value: onboarding['workStartDate'],
+                                            fieldKey: 'workStartDate',
+                                            isDate: true,
+                                          ),
+
+                                          _detailRowReadOnly(
+                                            label: 'Probezeit end',
+                                            value: (() {
+                                              final start = _parseIsoDate(
+                                                  onboarding['workStartDate']?.toString());
+                                              final end = _probationEndFromStart(start);
+                                              return end == null ? '' : _formatDate(end);
+                                            })(),
+                                          ),
 
                                           // ✅ Contract expiry now visible
                                           _detailRowEditable(
@@ -3321,6 +3401,21 @@ DateTime? _parseIsoDate(String? value) {
   }
 }
 
+DateTime _addMonthsClamped(DateTime date, int months) {
+  final totalMonths = (date.month - 1) + months;
+  final year = date.year + (totalMonths ~/ 12);
+  final month = (totalMonths % 12) + 1;
+  final lastDay = DateTime(year, month + 1, 0).day;
+  final day = date.day <= lastDay ? date.day : lastDay;
+  return DateTime(year, month, day);
+}
+
+DateTime? _probationEndFromStart(DateTime? start) {
+  if (start == null) return null;
+  final sixMonthsLater = _addMonthsClamped(start, 6);
+  return sixMonthsLater.subtract(const Duration(days: 1));
+}
+
 /// Returns 'expired', 'soon', or null
 String? _expiryFlag(String? date1, String? date2) {
   final now = DateTime.now();
@@ -3360,6 +3455,8 @@ Widget _expiryChipFromOnboardingRaw(dynamic onboardingRaw) {
 
   final contractDate =
       _parseIsoDate(onboarding['contractExpiry']?.toString());
+  final probationEnd = _probationEndFromStart(
+      _parseIsoDate(onboarding['workStartDate']?.toString()));
 
   final workPermitDate =
       _parseIsoDate(onboarding['residencePermitExpiry']?.toString());
@@ -3368,7 +3465,11 @@ Widget _expiryChipFromOnboardingRaw(dynamic onboardingRaw) {
   final idDocDate =
       _parseIsoDate(onboarding['idDocExpiry']?.toString());
 
-  if (contractDate == null && workPermitDate == null && licenseDate == null && idDocDate == null) {
+  if (contractDate == null &&
+      workPermitDate == null &&
+      licenseDate == null &&
+      idDocDate == null &&
+      probationEnd == null) {
     return const SizedBox.shrink();
   }
 
@@ -3377,6 +3478,8 @@ Widget _expiryChipFromOnboardingRaw(dynamic onboardingRaw) {
 
   int expiredCount = 0;
   int soonCount = 0;
+  bool pExpired = false;
+  bool pSoon = false;
 
   void check(DateTime? d) {
     if (d == null) return;
@@ -3392,6 +3495,16 @@ Widget _expiryChipFromOnboardingRaw(dynamic onboardingRaw) {
   check(workPermitDate);
   check(licenseDate);
   check(idDocDate);
+  if (probationEnd != null) {
+    final diff = probationEnd.difference(today).inDays;
+    if (diff < 0) {
+      pExpired = true;
+      expiredCount++;
+    } else if (diff <= 30) {
+      pSoon = true;
+      soonCount++;
+    }
+  }
 
   if (expiredCount == 0 && soonCount == 0) return const SizedBox.shrink();
 
@@ -3400,11 +3513,17 @@ Widget _expiryChipFromOnboardingRaw(dynamic onboardingRaw) {
   late Color fg;
 
   if (expiredCount > 0) {
-    label = '$expiredCount document${expiredCount > 1 ? 's' : ''} expired';
+    final onlyProbation = pExpired && expiredCount == 1 && soonCount == 0;
+    label = onlyProbation
+        ? 'Probezeit expired'
+        : '$expiredCount document${expiredCount > 1 ? 's' : ''} expired';
     bg = const Color(0xFFFEE2E2);
     fg = const Color(0xFF991B1B);
   } else {
-    label = '$soonCount document${soonCount > 1 ? 's' : ''} expiring soon';
+    final onlyProbation = pSoon && soonCount == 1;
+    label = onlyProbation
+        ? 'Probezeit expiring soon'
+        : '$soonCount document${soonCount > 1 ? 's' : ''} expiring soon';
     // ✅ ORANGE for "soon"
     bg = const Color(0xFFFFEDD5);
     fg = const Color(0xFF9A3412);
@@ -3449,12 +3568,18 @@ Widget _expiryChipDetailedFromOnboardingRaw(dynamic onboardingRaw) {
 
   final contractDate =
       _parseIsoDate(onboarding['contractExpiry']?.toString());
+  final probationEnd = _probationEndFromStart(
+      _parseIsoDate(onboarding['workStartDate']?.toString()));
   final workPermitDate =
       _parseIsoDate(onboarding['residencePermitExpiry']?.toString());
   final licenseDate = _parseIsoDate(onboarding['licenseExpiry']?.toString());
   final idDocDate = _parseIsoDate(onboarding['idDocExpiry']?.toString());
 
-  if (contractDate == null && workPermitDate == null && licenseDate == null && idDocDate == null) {
+  if (contractDate == null &&
+      workPermitDate == null &&
+      licenseDate == null &&
+      idDocDate == null &&
+      probationEnd == null) {
     return const SizedBox.shrink();
   }
 
@@ -3465,6 +3590,7 @@ Widget _expiryChipDetailedFromOnboardingRaw(dynamic onboardingRaw) {
   bool wpExpired = false, wpSoon = false;
   bool licExpired = false, licSoon = false;
   bool idExpired = false, idSoon = false;
+  bool pExpired = false, pSoon = false;
 
   void check(DateTime? d, void Function() markExpired, void Function() markSoon) {
     if (d == null) return;
@@ -3480,6 +3606,7 @@ Widget _expiryChipDetailedFromOnboardingRaw(dynamic onboardingRaw) {
   check(workPermitDate, () => wpExpired = true, () => wpSoon = true);
   check(licenseDate, () => licExpired = true, () => licSoon = true);
   check(idDocDate, () => idExpired = true, () => idSoon = true);
+  check(probationEnd, () => pExpired = true, () => pSoon = true);
 
   final expiredDocs = <String>[];
   final soonDocs = <String>[];
@@ -3488,11 +3615,13 @@ Widget _expiryChipDetailedFromOnboardingRaw(dynamic onboardingRaw) {
   if (wpExpired) expiredDocs.add('Work permit');
   if (licExpired) expiredDocs.add('Driving licence');
   if (idExpired) expiredDocs.add('ID / Passport');
+  if (pExpired) expiredDocs.add('Probezeit');
 
   if (!cExpired && cSoon) soonDocs.add('Contract');
   if (!wpExpired && wpSoon) soonDocs.add('Work permit');
   if (!licExpired && licSoon) soonDocs.add('Driving licence');
   if (!idExpired && idSoon) soonDocs.add('ID / Passport');
+  if (!pExpired && pSoon) soonDocs.add('Probezeit');
 
   if (expiredDocs.isEmpty && soonDocs.isEmpty) return const SizedBox.shrink();
 
