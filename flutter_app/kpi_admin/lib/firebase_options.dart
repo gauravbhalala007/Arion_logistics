@@ -50,21 +50,21 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: "REPLACE_WITH_WEB_API_KEY",
-    authDomain: "REPLACE_WITH_AUTH_DOMAIN",
-    projectId: "REPLACE_WITH_PROJECT_ID",
-    storageBucket: "REPLACE_WITH_STORAGE_BUCKET",
-    messagingSenderId: "REPLACE_WITH_SENDER_ID",
-    appId: "REPLACE_WITH_WEB_APP_ID",
+    apiKey: "AIzaSyBOADpH-ncKO9Zlpr5PknM2cvE9x4vA8xc",
+  authDomain: "gaurav-arion-001-3d94a.firebaseapp.com",
+  projectId: "gaurav-arion-001-3d94a",
+  storageBucket: "gaurav-arion-001-3d94a.firebasestorage.app",
+  messagingSenderId: "835979174130",
+  appId: "1:835979174130:web:53e028fa890ddc33dff06b"
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'REPLACE_WITH_MACOS_API_KEY',
-    appId: 'REPLACE_WITH_MACOS_APP_ID',
-    messagingSenderId: 'REPLACE_WITH_SENDER_ID',
-    projectId: 'REPLACE_WITH_PROJECT_ID',
-    storageBucket: 'REPLACE_WITH_STORAGE_BUCKET',
-    iosBundleId: 'REPLACE_WITH_IOS_BUNDLE_ID',
+    apiKey: 'AIzaSyCpviyS7NfWWWad7QgmHCyu1zRzefszSs8',
+    appId: '1:467245134639:ios:d21ebb7fdc28694022a7da',
+    messagingSenderId: '467245134639',
+    projectId: 'gaurav-arion-001-3d94a',
+    storageBucket: 'gaurav-arion-001-3d94a.firebasestorage.app',
+    iosBundleId: 'com.example.kpiAdmin',
   );
 
 }

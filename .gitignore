@@ -1,0 +1,6 @@
+# Sensitive configs
+**/firebase_options.dart
+**/google-services.json
+**/GoogleService-Info.plist
+**/.env
+**/serviceAccount*.json
