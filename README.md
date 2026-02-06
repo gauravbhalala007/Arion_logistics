@@ -13,7 +13,7 @@ Admin and driver dashboard for DSP KPIs, with a PDF parsing service and Firebase
 - Flutter (latest stable) + Dart
 - Node.js 22 (for Firebase Functions)
 - Python 3.10+
-- Firebase project configured (see "Firebase config" below)
+- Firebase project configured (see `flutter_app/kpi_admin/lib/firebase_options.dart`)
 
 ## Getting started
 
@@ -39,19 +39,6 @@ cd firebase/functions
 npm install
 npm run build
 ```
-
-## Firebase config
-This repo ignores Firebase config files that contain API keys. Generate them locally with the FlutterFire CLI:
-```sh
-cd flutter_app/kpi_admin
-flutterfire configure
-```
-
-Expected files (generated locally):
-- `flutter_app/kpi_admin/lib/firebase_options.dart`
-- `flutter_app/kpi_admin/android/app/google-services.json`
-- `flutter_app/kpi_admin/ios/Runner/GoogleService-Info.plist`
-- `flutter_app/kpi_admin/macos/Runner/GoogleService-Info.plist`
 
 ## Notes
 - The parser service ingests DSP scorecard and POD quality PDFs and writes structured data for the app to consume.
