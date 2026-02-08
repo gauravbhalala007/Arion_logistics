@@ -49,8 +49,3 @@ npm run build
 
 - The parser service ingests DSP scorecard and POD quality PDFs and writes structured data for the app to consume.
 - Sample PDFs in the repo root can be used to validate parser behavior.
-
-
-Arber.Qose@gmail.com
-
-Pommersfelden2024!

@@ -20,8 +20,11 @@ import '../widgets/web_preview.dart'
 import '../widgets/notification_pin_dialogs.dart';
 
 
-// 🔹 Default password for all newly created / reset driver logins
-const String kDefaultDriverPassword = 'Pommersfelden2024!';
+// Keep this out of source control by passing --dart-define=DEFAULT_DRIVER_PASSWORD=...
+const String kDefaultDriverPassword = String.fromEnvironment(
+  'DEFAULT_DRIVER_PASSWORD',
+  defaultValue: 'CHANGE_ME_LOCALLY',
+);
 
 
 

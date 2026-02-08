@@ -1,6 +1,13 @@
-# Sensitive configs
+# Sensitive configs (keep local only)
 **/firebase_options.dart
 **/google-services.json
 **/GoogleService-Info.plist
 **/.env
+**/.env.*
+!**/.env.example
+!**/.env.template
 **/serviceAccount*.json
+
+# Build and local OS artifacts
+firebase/build/
+**/.DS_Store
