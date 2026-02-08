@@ -94,91 +94,142 @@ class _PodQualityWeekPageState extends State<PodQualityWeekPage> {
           return Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF111827),
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
+                child: Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x0F111827),
+                        blurRadius: 20,
+                        offset: Offset(0, 10),
                       ),
-                    ),
-                    if (station.isNotEmpty)
-                      Text(
-                        station,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF6B7280),
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: [
-                        _StatTile(
-                          label: 'Opportunities',
-                          value: _intStr(opportunities),
-                          tone: _TileTone.neutral,
-                        ),
-                        _StatTile(
-                          label: 'Success',
-                          value: _pctStr(successPct),
-                          tone: _TileTone.good,
-                        ),
-                        _StatTile(
-                          label: 'Rejects',
-                          value: _pctStr(rejectsPct),
-                          tone: _TileTone.warn,
-                        ),
-                      ],
-                    ),
-                    if (podRejects.isNotEmpty) ...[
-                      const SizedBox(height: 14),
-                      const Text(
-                        'Rejects breakdown',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF6B7280),
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
-                          _MiniStat(
-                            label: 'Blurry',
-                            value: _intStr(_num(podRejects['blurryPhotoCount'])),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  label,
+                                  style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF111827),
+                                  ),
+                                ),
+                                if (station.isNotEmpty)
+                                  Text(
+                                    station,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Color(0xFF6B7280),
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
-                          _MiniStat(
-                            label: 'Too Dark',
-                            value: _intStr(_num(podRejects['photoTooDarkCount'])),
-                          ),
-                          _MiniStat(
-                            label: 'No Package',
-                            value: _intStr(
-                                _num(podRejects['noPackageDetectedCount'])),
-                          ),
-                          _MiniStat(
-                            label: 'In Car',
-                            value:
-                                _intStr(_num(podRejects['packageInCarCount'])),
-                          ),
-                          _MiniStat(
-                            label: 'Too Close',
-                            value: _intStr(
-                                _num(podRejects['packageTooCloseCount'])),
+                          _SectionTag(
+                            label: 'POD Quality',
+                            icon: Icons.photo_camera_outlined,
                           ),
                         ],
                       ),
+                      const SizedBox(height: 16),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final useRow = constraints.maxWidth >= 540;
+                          final tiles = [
+                            _StatTile(
+                              label: 'Opportunities',
+                              value: _intStr(opportunities),
+                              tone: _TileTone.neutral,
+                            ),
+                            _StatTile(
+                              label: 'Success',
+                              value: _pctStr(successPct),
+                              tone: _TileTone.good,
+                            ),
+                            _StatTile(
+                              label: 'Rejects',
+                              value: _pctStr(rejectsPct),
+                              tone: _TileTone.warn,
+                            ),
+                          ];
+
+                          if (useRow) {
+                            return Row(
+                              children: [
+                                Expanded(child: tiles[0]),
+                                const SizedBox(width: 12),
+                                Expanded(child: tiles[1]),
+                                const SizedBox(width: 12),
+                                Expanded(child: tiles[2]),
+                              ],
+                            );
+                          }
+
+                          return Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            children: tiles,
+                          );
+                        },
+                      ),
+                      if (podRejects.isNotEmpty) ...[
+                        const SizedBox(height: 14),
+                        const Text(
+                          'Rejects breakdown',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF6B7280),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _MiniStat(
+                              label: 'Blurry',
+                              value:
+                                  _intStr(_num(podRejects['blurryPhotoCount'])),
+                            ),
+                            _MiniStat(
+                              label: 'Too Dark',
+                              value: _intStr(
+                                  _num(podRejects['photoTooDarkCount'])),
+                            ),
+                            _MiniStat(
+                              label: 'No Package',
+                              value: _intStr(
+                                  _num(podRejects['noPackageDetectedCount'])),
+                            ),
+                            _MiniStat(
+                              label: 'In Car',
+                              value:
+                                  _intStr(_num(podRejects['packageInCarCount'])),
+                            ),
+                            _MiniStat(
+                              label: 'Too Close',
+                              value: _intStr(
+                                  _num(podRejects['packageTooCloseCount'])),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
               Expanded(
@@ -197,133 +248,176 @@ class _PodQualityWeekPageState extends State<PodQualityWeekPage> {
                       return const Center(child: Text('No POD data for this week.'));
                     }
 
-                    return ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                      itemCount: rows.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
-                      itemBuilder: (context, i) {
-                        final data = rows[i].data();
-                        final pod =
-                            (data['podQuality'] as Map?)?.cast<String, dynamic>() ??
-                                const <String, dynamic>{};
-
-                        final transporterId =
-                            (data['transporterId'] ?? '').toString();
-                        final driverName =
-                            (data['driverName'] ?? '').toString().trim();
-                        final name =
-                            driverName.isNotEmpty ? driverName : '(No Name)';
-
-                        final opportunities = _num(pod['opportunities']) ?? 0;
-                        final success = _num(pod['success']) ?? 0;
-                        final bypass = _num(pod['bypass']) ?? 0;
-                        final rejects = _num(pod['rejects']) ?? 0;
-
-                        final successPct = opportunities > 0
-                            ? (success / opportunities) * 100.0
-                            : null;
-                        final rejectsPct = opportunities > 0
-                            ? (rejects / opportunities) * 100.0
-                            : null;
-
-                        return Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: const Color(0xFFE5E7EB)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                    return Column(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(24, 4, 24, 8),
+                          child: Row(
                             children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          name,
-                                          style: const TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w800,
-                                            color: Color(0xFF111827),
-                                          ),
-                                        ),
-                                        if (transporterId.isNotEmpty)
-                                          Text(
-                                            transporterId,
-                                            style: const TextStyle(
-                                              fontSize: 12,
-                                              color: Color(0xFF6B7280),
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                  _StatPill(
-                                    label: 'Success',
-                                    value: _pctStr(successPct),
-                                    tone: _TileTone.good,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  _StatPill(
-                                    label: 'Rejects',
-                                    value: _pctStr(rejectsPct),
-                                    tone: _TileTone.warn,
-                                  ),
-                                ],
+                              const Text(
+                                'Drivers',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF111827),
+                                ),
                               ),
-                              const SizedBox(height: 12),
-                              Wrap(
-                                spacing: 10,
-                                runSpacing: 10,
-                                children: [
-                                  _MiniStat(
-                                    label: 'Opp',
-                                    value: _intStr(opportunities),
-                                  ),
-                                  _MiniStat(
-                                    label: 'Success',
-                                    value: _intStr(success),
-                                  ),
-                                  _MiniStat(
-                                    label: 'Bypass',
-                                    value: _intStr(bypass),
-                                  ),
-                                  _MiniStat(
-                                    label: 'Rejects',
-                                    value: _intStr(rejects),
-                                  ),
-                                  _MiniStat(
-                                    label: 'Blurry',
-                                    value: _intStr(_num(pod['blurryPhoto'])),
-                                  ),
-                                  _MiniStat(
-                                    label: 'Too Dark',
-                                    value: _intStr(_num(pod['photoTooDark'])),
-                                  ),
-                                  _MiniStat(
-                                    label: 'No Package',
-                                    value:
-                                        _intStr(_num(pod['noPackageDetected'])),
-                                  ),
-                                  _MiniStat(
-                                    label: 'In Car',
-                                    value: _intStr(_num(pod['packageInCar'])),
-                                  ),
-                                  _MiniStat(
-                                    label: 'Too Close',
-                                    value:
-                                        _intStr(_num(pod['packageTooClose'])),
-                                  ),
-                                ],
-                              ),
+                              const SizedBox(width: 8),
+                              _SectionTag(label: '${rows.length} entries'),
                             ],
                           ),
-                        );
-                      },
+                        ),
+                        Expanded(
+                          child: ListView.separated(
+                            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                            itemCount: rows.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 12),
+                            itemBuilder: (context, i) {
+                              final data = rows[i].data();
+                              final pod =
+                                  (data['podQuality'] as Map?)
+                                          ?.cast<String, dynamic>() ??
+                                      const <String, dynamic>{};
+
+                              final transporterId =
+                                  (data['transporterId'] ?? '').toString();
+                              final driverName =
+                                  (data['driverName'] ?? '').toString().trim();
+                              final name =
+                                  driverName.isNotEmpty ? driverName : '(No Name)';
+
+                              final opportunities = _num(pod['opportunities']) ?? 0;
+                              final success = _num(pod['success']) ?? 0;
+                              final bypass = _num(pod['bypass']) ?? 0;
+                              final rejects = _num(pod['rejects']) ?? 0;
+
+                              final successPct = opportunities > 0
+                                  ? (success / opportunities) * 100.0
+                                  : null;
+                              final rejectsPct = opportunities > 0
+                                  ? (rejects / opportunities) * 100.0
+                                  : null;
+
+                              return Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border:
+                                      Border.all(color: const Color(0xFFE5E7EB)),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Color(0x0B111827),
+                                      blurRadius: 18,
+                                      offset: Offset(0, 8),
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        _AvatarBadge(text: name),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                name,
+                                                style: const TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: Color(0xFF111827),
+                                                ),
+                                              ),
+                                              if (transporterId.isNotEmpty)
+                                                Text(
+                                                  transporterId,
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    color: Color(0xFF6B7280),
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                        Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.end,
+                                          children: [
+                                            _StatPill(
+                                              label: 'Success',
+                                              value: _pctStr(successPct),
+                                              tone: _TileTone.good,
+                                            ),
+                                            const SizedBox(height: 6),
+                                            _StatPill(
+                                              label: 'Rejects',
+                                              value: _pctStr(rejectsPct),
+                                              tone: _TileTone.warn,
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Wrap(
+                                      spacing: 10,
+                                      runSpacing: 10,
+                                      children: [
+                                        _MiniStat(
+                                          label: 'Opp',
+                                          value: _intStr(opportunities),
+                                        ),
+                                        _MiniStat(
+                                          label: 'Success',
+                                          value: _intStr(success),
+                                        ),
+                                        _MiniStat(
+                                          label: 'Bypass',
+                                          value: _intStr(bypass),
+                                        ),
+                                        _MiniStat(
+                                          label: 'Rejects',
+                                          value: _intStr(rejects),
+                                        ),
+                                        _MiniStat(
+                                          label: 'Blurry',
+                                          value: _intStr(_num(pod['blurryPhoto'])),
+                                        ),
+                                        _MiniStat(
+                                          label: 'Too Dark',
+                                          value:
+                                              _intStr(_num(pod['photoTooDark'])),
+                                        ),
+                                        _MiniStat(
+                                          label: 'No Package',
+                                          value: _intStr(
+                                              _num(pod['noPackageDetected'])),
+                                        ),
+                                        _MiniStat(
+                                          label: 'In Car',
+                                          value: _intStr(_num(pod['packageInCar'])),
+                                        ),
+                                        _MiniStat(
+                                          label: 'Too Close',
+                                          value: _intStr(
+                                              _num(pod['packageTooClose'])),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
                     );
                   },
                 ),
@@ -475,7 +569,8 @@ class _MiniStat extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFFF3F4F6),
+        color: const Color(0xFFF8FAFC),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
@@ -484,7 +579,7 @@ class _MiniStat extends StatelessWidget {
           Text(
             label,
             style: const TextStyle(
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: FontWeight.w700,
               color: Color(0xFF6B7280),
             ),
@@ -493,12 +588,86 @@ class _MiniStat extends StatelessWidget {
           Text(
             value,
             style: const TextStyle(
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: FontWeight.w800,
               color: Color(0xFF111827),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SectionTag extends StatelessWidget {
+  final String label;
+  final IconData? icon;
+
+  const _SectionTag({required this.label, this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F4F6),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 14, color: const Color(0xFF6B7280)),
+            const SizedBox(width: 6),
+          ],
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF6B7280),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AvatarBadge extends StatelessWidget {
+  final String text;
+
+  const _AvatarBadge({required this.text});
+
+  String _initials(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty || trimmed == '(No Name)') return '?';
+    final parts = trimmed.split(RegExp(r'\\s+')).where((p) => p.isNotEmpty);
+    final letters = parts.map((p) => p[0]).toList();
+    if (letters.isEmpty) return '?';
+    if (letters.length == 1) return letters.first.toUpperCase();
+    return (letters[0] + letters[1]).toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final initials = _initials(text);
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F4F6),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        initials,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+          color: Color(0xFF374151),
+        ),
       ),
     );
   }

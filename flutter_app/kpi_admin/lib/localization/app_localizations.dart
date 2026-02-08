@@ -224,6 +224,17 @@ class AppLocalizations {
 
         'kpi_tip_pod': 'This should be the easiest category\nTarget value: 100%\nSignificantly improves the overall score',
 
+        'pod_quality_title': 'POD Quality',
+        'pod_quality_success': 'Success',
+        'pod_quality_rejects': 'Rejects',
+        'pod_quality_opp': 'Opportunities',
+        'pod_quality_bypass': 'Bypass',
+        'pod_quality_blurry': 'Blurry',
+        'pod_quality_too_dark': 'Too Dark',
+        'pod_quality_no_package': 'No Package',
+        'pod_quality_in_car': 'In Car',
+        'pod_quality_too_close': 'Too Close',
+
         'kpi_desc_cc': 'CC (Customer Contact)\n\nThe higher the value, the better.\n\nExtremely important:\nYou must ALWAYS send a “No safe location” or “Address not found” message every time you cannot deliver a package because:\n\n- the customer is not at home or\n- the address cannot be found',
 
         'kpi_tip_cc': 'There is an automatic standard message in the app for every scenario.',
@@ -627,6 +638,17 @@ class AppLocalizations {
       'kpi_desc_pod': 'PoD (Picture on Delivery)\n\nJe höher der Wert, desto besser.\n\nDiese Spalte zeigt Pakete, für die ein Foto aufgenommen wurde, die jedoch als Ungültig oder Unsicher markiert wurden.\n\nHäufige Gründe für POD-Ablehnung:\n1. Paketlabel mit Kundendaten sichtbar (Paket muss umgedreht werden)\n2. Unscharfes Foto\n3. Person auf dem Foto sichtbar\n4. Kein Paket auf dem Foto erkennbar\n5. Paket im Fahrzeug\n6. Paket in der Hand\n7. Paket zu nah an der Kamera\n8. Foto zu dunkel',
 
       'kpi_tip_pod': 'Dies sollte die einfachste Kategorie sein\nZielwert: 100 %\nVerbessert den Gesamt-Score erheblich',
+
+      'pod_quality_title': 'POD-Qualität',
+      'pod_quality_success': 'Erfolg',
+      'pod_quality_rejects': 'Ablehnungen',
+      'pod_quality_opp': 'Chancen',
+      'pod_quality_bypass': 'Übersprungen',
+      'pod_quality_blurry': 'Unscharf',
+      'pod_quality_too_dark': 'Zu dunkel',
+      'pod_quality_no_package': 'Kein Paket',
+      'pod_quality_in_car': 'Im Auto',
+      'pod_quality_too_close': 'Zu nah',
 
       'kpi_desc_cc': 'CC (Customer Contact)\n\nJe höher der Wert, desto besser.\n\nExtrem wichtig:\nDu musst IMMER eine „Kein sicherer Ablageort“- oder „Adresse nicht gefunden“-Nachricht senden, jedes Mal, wenn du ein Paket nicht zustellen kannst, weil:\n\n- der Kunde nicht zu Hause ist oder\n- die Adresse nicht gefunden werden kann',
 
@@ -1073,6 +1095,17 @@ class AppLocalizations {
         'kpi_desc_pod': 'PoD (Foto gjatë Dorëzimit)\n\nSa më e lartë vlera, aq më mirë.\n\nKjo kolonë tregon paketat për të cilat është bërë një foto, por që janë shënuar si të Pavlefshme ose të Pasigurta.\n\nArsyet e zakonshme për refuzimin e POD:\n1. Etiketa e paketës me të dhëna të klientit e dukshme (paketa duhet të kthehet)\n2. Foto e paqartë\n3. Person i dukshëm në foto\n4. Asnjë paketë e dukshme në foto\n5. Paketa brenda automjetit\n6. Paketa në dorë\n7. Paketa shumë afër kamerës\n8. Foto shumë e errët',
 
         'kpi_tip_pod': 'Kjo duhet të jetë kategoria më e thjeshtë\nVlera e synuar: 100%\nPërmirëson ndjeshëm rezultatin e përgjithshëm',
+
+        'pod_quality_title': 'Cilësia POD',
+        'pod_quality_success': 'Sukses',
+        'pod_quality_rejects': 'Refuzime',
+        'pod_quality_opp': 'Mundësi',
+        'pod_quality_bypass': 'Anashkalime',
+        'pod_quality_blurry': 'E paqartë',
+        'pod_quality_too_dark': 'Shumë e errët',
+        'pod_quality_no_package': 'Pa paketë',
+        'pod_quality_in_car': 'Në makinë',
+        'pod_quality_too_close': 'Shumë afër',
 
         'kpi_desc_cc': 'CC (Kontakt me Klientin)\n\nSa më e lartë vlera, aq më mirë.\n\nJashtëzakonisht e rëndësishme:\nDuhet GJITHMONË të dërgosh një mesazh “Nuk ka vend të sigurt” ose “Adresa nuk u gjet”, çdo herë që nuk mund të dorëzosh një paketë sepse:\n\n- klienti nuk është në shtëpi ose\n- adresa nuk mund të gjendet',
 
@@ -1521,6 +1554,17 @@ class AppLocalizations {
         'kpi_desc_pod': 'PoD (Kézbesítéskori Fénykép)\n\nMinél magasabb az érték, annál jobb.\n\nEz az oszlop azokat a csomagokat mutatja, amelyekről készült fénykép, de Érvénytelen vagy Nem biztonságos jelölést kaptak.\n\nA POD elutasításának gyakori okai:\n1. A csomagcímkén láthatók az ügyfél adatai (a csomagot meg kell fordítani)\n2. Elmosódott fénykép\n3. Személy látható a fényképen\n4. Nem látható csomag a fényképen\n5. Csomag a járműben\n6. Csomag kézben\n7. A csomag túl közel van a kamerához\n8. A fénykép túl sötét',
 
         'kpi_tip_pod': 'Ez kell legyen a legegyszerűbb kategória\nCélérték: 100%\nJelentősen javítja az összpontszámot',
+
+        'pod_quality_title': 'POD minőség',
+        'pod_quality_success': 'Siker',
+        'pod_quality_rejects': 'Elutasítások',
+        'pod_quality_opp': 'Lehetőségek',
+        'pod_quality_bypass': 'Átugrás',
+        'pod_quality_blurry': 'Elmosódott',
+        'pod_quality_too_dark': 'Túl sötét',
+        'pod_quality_no_package': 'Nincs csomag',
+        'pod_quality_in_car': 'Az autóban',
+        'pod_quality_too_close': 'Túl közel',
 
         'kpi_desc_cc': 'CC (Ügyfélkapcsolat)\n\nMinél magasabb az érték, annál jobb.\n\nRendkívül fontos:\nMINDIG küldened kell egy „Nincs biztonságos hely” vagy „Cím nem található” üzenetet minden alkalommal, amikor nem tudsz kézbesíteni egy csomagot, mert:\n\n- az ügyfél nincs otthon vagy\n- a cím nem található',
 
@@ -1986,6 +2030,17 @@ class AppLocalizations {
 
         'kpi_tip_pod': 'Aceasta ar trebui să fie cea mai simplă categorie\nValoare țintă: 100%\nÎmbunătățește semnificativ scorul general',
 
+        'pod_quality_title': 'Calitate POD',
+        'pod_quality_success': 'Succes',
+        'pod_quality_rejects': 'Respingeri',
+        'pod_quality_opp': 'Oportunități',
+        'pod_quality_bypass': 'Ocoliri',
+        'pod_quality_blurry': 'Neclar',
+        'pod_quality_too_dark': 'Prea întunecat',
+        'pod_quality_no_package': 'Fără colet',
+        'pod_quality_in_car': 'În mașină',
+        'pod_quality_too_close': 'Prea aproape',
+
         'kpi_desc_cc': 'CC (Contact cu Clientul)\n\nCu cât valoarea este mai mare, cu atât mai bine.\n\nExtrem de important:\nTrebuie SĂ TRIMIȚI ÎNTOTDEAUNA un mesaj „Nicio locație sigură” sau „Adresa nu a fost găsită” de fiecare dată când nu poți livra un colet deoarece:\n\n- clientul nu este acasă sau\n- adresa nu poate fi găsită',
 
         'kpi_tip_cc': 'Există un mesaj standard automat în aplicație pentru fiecare scenariu.',
@@ -2387,6 +2442,17 @@ class AppLocalizations {
 
         'kpi_tip_pod': 'Ovo bi trebala biti najjednostavnija kategorija\nCiljana vrijednost: 100 %\nZnačajno poboljšava ukupni rezultat',
 
+        'pod_quality_title': 'POD kvaliteta',
+        'pod_quality_success': 'Uspjeh',
+        'pod_quality_rejects': 'Odbijanja',
+        'pod_quality_opp': 'Prilike',
+        'pod_quality_bypass': 'Preskakanje',
+        'pod_quality_blurry': 'Zamućeno',
+        'pod_quality_too_dark': 'Previše tamno',
+        'pod_quality_no_package': 'Nema paketa',
+        'pod_quality_in_car': 'U vozilu',
+        'pod_quality_too_close': 'Preblizu',
+
         'kpi_desc_cc': 'CC (Kontakt s Kupcem)\n\nŠto je vrijednost viša, to je bolje.\n\nIzuzetno važno:\nMoraš UVIJEK poslati poruku „Nema sigurne lokacije“ ili „Adresa nije pronađena“ svaki put kada ne možeš dostaviti paket jer:\n\n- kupac nije kod kuće ili\n- adresa se ne može pronaći',
 
         'kpi_tip_cc': 'Za svaki scenarij u aplikaciji postoji automatska standardna poruka.',
@@ -2786,6 +2852,17 @@ class AppLocalizations {
         'kpi_desc_pod': 'PoD (صورة عند التسليم)\n\nكلما كانت القيمة أعلى، كان ذلك أفضل.\n\nيعرض هذا العمود الطرود التي تم التقاط صورة لها ولكن تم تصنيفها على أنها غير صالحة أو غير آمنة.\n\nالأسباب الشائعة لرفض POD:\n1. ملصق الطرد مع بيانات العميل ظاهر (يجب قلب الطرد)\n2. صورة غير واضحة\n3. ظهور شخص في الصورة\n4. لا يظهر أي طرد في الصورة\n5. الطرد داخل المركبة\n6. الطرد في اليد\n7. الطرد قريب جدًا من الكاميرا\n8. الصورة مظلمة جدًا',
 
         'kpi_tip_pod': 'يجب أن تكون هذه أسهل فئة\nالقيمة المستهدفة: 100٪\nتحسن النتيجة الإجمالية بشكل كبير',
+
+        'pod_quality_title': 'جودة POD',
+        'pod_quality_success': 'نجاح',
+        'pod_quality_rejects': 'رفض',
+        'pod_quality_opp': 'فرص',
+        'pod_quality_bypass': 'تجاوز',
+        'pod_quality_blurry': 'غير واضح',
+        'pod_quality_too_dark': 'داكن جدًا',
+        'pod_quality_no_package': 'بدون طرد',
+        'pod_quality_in_car': 'في السيارة',
+        'pod_quality_too_close': 'قريب جدًا',
 
         'kpi_desc_cc': 'CC (التواصل مع العميل)\n\nكلما كانت القيمة أعلى، كان ذلك أفضل.\n\nمهم للغاية:\nيجب عليك دائمًا إرسال رسالة \"لا يوجد مكان آمن\" أو \"لم يتم العثور على العنوان\" في كل مرة لا تتمكن فيها من تسليم طرد لأن:\n\n- العميل غير موجود في المنزل أو\n- لا يمكن العثور على العنوان',
 

@@ -241,11 +241,13 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                   child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                    stream: _driverNotifsCol()
-                        .where('status', isEqualTo: 'unread')
-                        .snapshots(),
+                    stream: _driverNotifsCol().snapshots(),
                     builder: (ctx, notifSnap) {
-                      final unreadCount = notifSnap.data?.docs.length ?? 0;
+                      final docs = notifSnap.data?.docs ?? const [];
+                      final unreadCount = docs
+                          .map(DriverNotification.fromDoc)
+                          .where((n) => n.requiresConfirmation && !n.confirmed)
+                          .length;
 
                       return _HeaderBar(
                         driverName: driverName,

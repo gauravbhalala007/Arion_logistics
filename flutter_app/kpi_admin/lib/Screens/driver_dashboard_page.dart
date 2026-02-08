@@ -902,6 +902,26 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
                             final ceValue = _numOr0(kpis['CE'] ?? kpis['CE %'] ?? kpis['CE_PCT']).toDouble();
                             final cdfValue = _numOr0(kpis['CDF'] ?? kpis['CDF DPMO']).toDouble();
 
+                            final podQualityRaw = myData['podQuality'];
+                            final podQualityMap = podQualityRaw is Map
+                                ? Map<String, dynamic>.from(podQualityRaw as Map)
+                                : <String, dynamic>{};
+
+                            final podQuality = podQualityMap.isNotEmpty
+                                ? _PodQualityStats(
+                                    opportunities: _numOr0(podQualityMap['opportunities']).toDouble(),
+                                    success: _numOr0(podQualityMap['success']).toDouble(),
+                                    bypass: _numOr0(podQualityMap['bypass']).toDouble(),
+                                    rejects: _numOr0(podQualityMap['rejects']).toDouble(),
+                                    blurry: _numOr0(podQualityMap['blurryPhoto']).toDouble(),
+                                    tooDark: _numOr0(podQualityMap['photoTooDark']).toDouble(),
+                                    noPackage:
+                                        _numOr0(podQualityMap['noPackageDetected']).toDouble(),
+                                    inCar: _numOr0(podQualityMap['packageInCar']).toDouble(),
+                                    tooClose: _numOr0(podQualityMap['packageTooClose']).toDouble(),
+                                  )
+                                : null;
+
                             final totalDrivers = docs.length;
 
                             return Column(
@@ -935,6 +955,7 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
                                   ceValue: ceValue,
                                   cdfScore: cdfScore,
                                   cdfValue: cdfValue,
+                                  podQuality: podQuality,
                                 ),
                               ],
                             );
@@ -2014,6 +2035,8 @@ class _MyScoreKpiList extends StatelessWidget {
   final double cdfScore;
   final double cdfValue;
 
+  final _PodQualityStats? podQuality;
+
   const _MyScoreKpiList({
     required this.totalScore,
     required this.delivered,
@@ -2034,6 +2057,7 @@ class _MyScoreKpiList extends StatelessWidget {
     required this.ceValue,
     required this.cdfScore,
     required this.cdfValue,
+    required this.podQuality,
   });
 
   Color _kpiColorFromScore(double s) {
@@ -2059,6 +2083,7 @@ class _MyScoreKpiList extends StatelessWidget {
           title: loc.t('kpi_title_dcr'),
           description: loc.t('kpi_desc_dcr'),
           proTip: loc.t('kpi_tip_dcr'),
+          podQuality: null,
         ),
         _ExpandableKpiTile(
           code: 'DSC DPMO',
@@ -2068,6 +2093,7 @@ class _MyScoreKpiList extends StatelessWidget {
           title: loc.t('kpi_title_dnr'),
           description: loc.t('kpi_desc_dnr'),
           proTip: loc.t('kpi_tip_dnr'),
+          podQuality: null,
         ),
         _ExpandableKpiTile(
           code: 'LoR',
@@ -2077,6 +2103,7 @@ class _MyScoreKpiList extends StatelessWidget {
           title: loc.t('kpi_title_lor'),
           description: loc.t('kpi_desc_lor'),
           proTip: loc.t('kpi_tip_lor'),
+          podQuality: null,
         ),
         _ExpandableKpiTile(
           code: 'POD',
@@ -2086,6 +2113,7 @@ class _MyScoreKpiList extends StatelessWidget {
           title: loc.t('kpi_title_pod'),
           description: loc.t('kpi_desc_pod'),
           proTip: loc.t('kpi_tip_pod'),
+          podQuality: podQuality,
         ),
         _ExpandableKpiTile(
           code: 'CC',
@@ -2095,6 +2123,7 @@ class _MyScoreKpiList extends StatelessWidget {
           title: loc.t('kpi_title_cc'),
           description: loc.t('kpi_desc_cc'),
           proTip: loc.t('kpi_tip_cc'),
+          podQuality: null,
         ),
         _ExpandableKpiTile(
           code: 'CE',
@@ -2104,6 +2133,7 @@ class _MyScoreKpiList extends StatelessWidget {
           title: loc.t('kpi_title_ce'),
           description: loc.t('kpi_desc_ce'),
           proTip: loc.t('kpi_tip_ce'),
+          podQuality: null,
         ),
         _ExpandableKpiTile(
           code: 'CDF',
@@ -2113,6 +2143,7 @@ class _MyScoreKpiList extends StatelessWidget {
           title: loc.t('kpi_title_cdf'),
           description: loc.t('kpi_desc_cdf'),
           proTip: loc.t('kpi_tip_cdf'),
+          podQuality: null,
         ),
         const SizedBox(height: 24),
       ],
@@ -2129,6 +2160,7 @@ class _ExpandableKpiTile extends StatefulWidget {
   final String title;
   final String description;
   final String proTip;
+  final _PodQualityStats? podQuality;
 
   const _ExpandableKpiTile({
     required this.code,
@@ -2138,6 +2170,7 @@ class _ExpandableKpiTile extends StatefulWidget {
     required this.title,
     required this.description,
     required this.proTip,
+    required this.podQuality,
   });
 
   @override
@@ -2266,61 +2299,291 @@ class _ExpandableKpiTileState extends State<_ExpandableKpiTile> {
                 color: Color(0xFFF7F7F7),
                 borderRadius: BorderRadius.vertical(bottom: Radius.circular(15)),
               ),
-              child: Row(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.title,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF374151),
-                          ),
+                  if (widget.podQuality != null) ...[
+                    _PodQualityInline(stats: widget.podQuality!),
+                    const SizedBox(height: 12),
+                  ],
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.title,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF374151),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              widget.description,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                height: 1.4,
+                                color: Color(0xFF6B7280),
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          widget.description,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            height: 1.4,
-                            color: Color(0xFF6B7280),
-                          ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              loc.t('kpi_pro_tip'),
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: _kPrimaryGreen,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              widget.proTip,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                height: 1.4,
+                                color: Color(0xFF374151),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          loc.t('kpi_pro_tip'),
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: _kPrimaryGreen,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          widget.proTip,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            height: 1.4,
-                            color: Color(0xFF374151),
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PodQualityStats {
+  final double opportunities;
+  final double success;
+  final double bypass;
+  final double rejects;
+  final double blurry;
+  final double tooDark;
+  final double noPackage;
+  final double inCar;
+  final double tooClose;
+
+  const _PodQualityStats({
+    required this.opportunities,
+    required this.success,
+    required this.bypass,
+    required this.rejects,
+    required this.blurry,
+    required this.tooDark,
+    required this.noPackage,
+    required this.inCar,
+    required this.tooClose,
+  });
+
+  double? get successPct =>
+      opportunities > 0 ? (success / opportunities) * 100.0 : null;
+
+  double? get rejectsPct =>
+      opportunities > 0 ? (rejects / opportunities) * 100.0 : null;
+}
+
+enum _PodTone { good, warn }
+
+class _PodQualityInline extends StatelessWidget {
+  final _PodQualityStats stats;
+
+  const _PodQualityInline({required this.stats});
+
+  String _fmtInt(double v) => v.toStringAsFixed(0).replaceAll('.', ',');
+
+  String _fmtPct(double? v) =>
+      v == null ? '—' : '${v.toStringAsFixed(2).replaceAll('.', ',')} %';
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  loc.t('pod_quality_title'),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.1,
+                    color: Color(0xFF4B5563),
+                  ),
+                ),
+              ),
+              _PodStatPill(
+                label: loc.t('pod_quality_success'),
+                value: _fmtPct(stats.successPct),
+                tone: _PodTone.good,
+              ),
+              const SizedBox(width: 8),
+              _PodStatPill(
+                label: loc.t('pod_quality_rejects'),
+                value: _fmtPct(stats.rejectsPct),
+                tone: _PodTone.warn,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _PodMiniStat(
+                label: loc.t('pod_quality_opp'),
+                value: _fmtInt(stats.opportunities),
+              ),
+              _PodMiniStat(
+                label: loc.t('pod_quality_success'),
+                value: _fmtInt(stats.success),
+              ),
+              _PodMiniStat(
+                label: loc.t('pod_quality_bypass'),
+                value: _fmtInt(stats.bypass),
+              ),
+              _PodMiniStat(
+                label: loc.t('pod_quality_rejects'),
+                value: _fmtInt(stats.rejects),
+              ),
+              _PodMiniStat(
+                label: loc.t('pod_quality_blurry'),
+                value: _fmtInt(stats.blurry),
+              ),
+              _PodMiniStat(
+                label: loc.t('pod_quality_too_dark'),
+                value: _fmtInt(stats.tooDark),
+              ),
+              _PodMiniStat(
+                label: loc.t('pod_quality_no_package'),
+                value: _fmtInt(stats.noPackage),
+              ),
+              _PodMiniStat(
+                label: loc.t('pod_quality_in_car'),
+                value: _fmtInt(stats.inCar),
+              ),
+              _PodMiniStat(
+                label: loc.t('pod_quality_too_close'),
+                value: _fmtInt(stats.tooClose),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PodStatPill extends StatelessWidget {
+  final String label;
+  final String value;
+  final _PodTone tone;
+
+  const _PodStatPill({
+    required this.label,
+    required this.value,
+    required this.tone,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final Color bg =
+        tone == _PodTone.good ? const Color(0xFFDCFCE7) : const Color(0xFFFFEDD5);
+    final Color fg =
+        tone == _PodTone.good ? const Color(0xFF15803D) : const Color(0xFF9A3412);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: fg,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: fg,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PodMiniStat extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _PodMiniStat({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF6B7280),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF111827),
+            ),
+          ),
         ],
       ),
     );

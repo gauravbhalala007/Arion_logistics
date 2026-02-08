@@ -83,7 +83,7 @@ class AppSideMenu extends StatelessWidget {
                 active: active == AppNav.dashboard,
                 onTap: () => _handleNav(context, AppNav.dashboard, '/dashboard'),
               ),
-              _MenuItem(
+              _SubMenuItem(
                 icon: Icons.photo_camera_outlined,
                 label: 'POD Quality',
                 active: active == AppNav.podQuality,
@@ -280,6 +280,61 @@ class _MenuItem extends StatelessWidget {
             ),
             if (active)
               const Icon(Icons.chevron_right, size: 18, color: Colors.white70),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SubMenuItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _SubMenuItem({
+    required this.icon,
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = active ? Colors.white.withOpacity(0.08) : Colors.transparent;
+    final fg = active ? Colors.white : Colors.white60;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        margin: const EdgeInsets.only(top: 0, bottom: 2),
+        padding: const EdgeInsets.fromLTRB(26, 6, 12, 6),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.subdirectory_arrow_right, color: fg, size: 14),
+            const SizedBox(width: 6),
+            Icon(icon, color: fg, size: 16),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: fg,
+                  fontSize: 13,
+                  fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ),
+            if (active)
+              const Icon(Icons.chevron_right, size: 16, color: Colors.white70),
           ],
         ),
       ),
