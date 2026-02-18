@@ -84,6 +84,50 @@ service cloud.firestore {
         allow read: if isDriverOf(userId) && isApproved(userId);
       }
 
+      // ---------- task sheet ----------
+      // users/{userId}/tasks/{taskId}
+      match /tasks/{taskId} {
+        // DSP/admin full access for own account
+        allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
+
+        // Driver can only see tasks assigned to their transporterId
+        allow read: if isDriverOf(userId)
+          && isApproved(userId)
+          && resource.data.assignedTransporterId == me().data.transporterId;
+
+        // Driver can only update limited status fields on their own assigned tasks
+        allow update: if isDriverOf(userId)
+          && isApproved(userId)
+          && resource.data.assignedTransporterId == me().data.transporterId
+          && request.resource.data.assignedTransporterId == resource.data.assignedTransporterId
+          && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+            'status',
+            'completedConfirmed',
+            'completedConfirmedAt',
+            'updatedAt',
+          ])
+          && request.resource.data.status in ['pending', 'in_progress', 'completed'];
+      }
+
+      // ---------- FAQs ----------
+      // users/{userId}/faqs/{faqId}
+      match /faqs/{faqId} {
+        // DSP/admin full access for own account
+        allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
+
+        // Drivers of this DSP can read FAQs
+        allow read: if isDriverOf(userId) && isApproved(userId);
+      }
+
+      // users/{userId}/faqs_localized/{faqId}
+      match /faqs_localized/{faqId} {
+        // DSP/admin full access for own account
+        allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
+
+        // Drivers of this DSP can read localized overrides
+        allow read: if isDriverOf(userId) && isApproved(userId);
+      }
+
       // ---------- driver master data ----------
       // users/{userId}/drivers/{driverId}   (driverId == TransporterID)
       match /drivers/{driverId} {
@@ -93,18 +137,12 @@ service cloud.firestore {
           // DSP can create notifications for drivers
           allow create: if isSelf(userId) && isApproved(userId);
 
-          // DSP can read/update/delete notifications (optional but useful for admin UI)
-          allow read, update, delete: if isSelf(userId) && isApproved(userId);
+          // ✅ DSP can READ driver notifications (needed for History popup)
+          allow read: if isSelf(userId) && isApproved(userId);
 
-          // Driver can read
-          allow read: if isDriverOf(userId)
+          // Driver can read + update (mark read / confirm)
+          allow read, update: if isDriverOf(userId)
             && me().data.transporterId == driverId;
-
-          // Driver can ONLY update read/confirm fields (no editing content)
-          allow update: if isDriverOf(userId)
-            && me().data.transporterId == driverId
-            && request.resource.data.diff(resource.data).changedKeys()
-                .hasOnly(['readAt', 'confirmedAt', 'updatedAt']);
         }
 
 

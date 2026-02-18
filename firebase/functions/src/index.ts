@@ -6,6 +6,7 @@
 
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
+import * as https from "node:https";
 
 import {initializeApp} from "firebase-admin/app";
 import {getFirestore, FieldValue} from "firebase-admin/firestore";
@@ -54,6 +55,13 @@ type DeleteDriverData = {
   transporterId?: string;
 };
 
+type TranslateFaqTextData = {
+  sourceLang?: string;
+  targetLangs?: unknown;
+  question?: string;
+  answer?: string;
+};
+
 /**
  * Returns true if the caller is authenticated.
  * @param {unknown} authCtx onCall request.auth
@@ -77,6 +85,93 @@ function requireAuthUid(authCtx: unknown): string {
     );
   }
   return authCtx.uid;
+}
+
+/**
+ * Very small helper for GET calls without adding dependencies.
+ * @param {string} url
+ * @return {Promise<string>}
+ */
+function getText(url: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, (res) => {
+      let body = "";
+      res.setEncoding("utf8");
+      res.on("data", (chunk) => {
+        body += chunk;
+      });
+      res.on("end", () => {
+        const code = res.statusCode ?? 500;
+        if (code >= 400) {
+          reject(new Error(`HTTP ${code}`));
+          return;
+        }
+        resolve(body);
+      });
+    });
+
+    req.on("error", reject);
+    req.setTimeout(8000, () => {
+      req.destroy(new Error("Request timeout"));
+    });
+  });
+}
+
+/**
+ * Parses translate.googleapis.com response.
+ * Expected shape starts with an array of translated text segments.
+ * @param {unknown} raw
+ * @return {string}
+ */
+function parseTranslatedSegments(raw: unknown): string {
+  if (!Array.isArray(raw) || raw.length === 0) return "";
+  const segmentsRoot = raw[0];
+  if (!Array.isArray(segmentsRoot)) return "";
+
+  const out: string[] = [];
+  for (const seg of segmentsRoot) {
+    if (!Array.isArray(seg) || seg.length === 0) continue;
+    const translated = seg[0];
+    if (typeof translated === "string" && translated.trim().length > 0) {
+      out.push(translated);
+    }
+  }
+  return out.join("");
+}
+
+/**
+ * Best-effort translation using public Google Translate endpoint.
+ * Returns empty string if input is empty or translation fails.
+ * @param {string} text
+ * @param {string} sourceLang
+ * @param {string} targetLang
+ * @return {Promise<string>}
+ */
+async function translateTextBestEffort(
+  text: string,
+  sourceLang: string,
+  targetLang: string,
+): Promise<string> {
+  const clean = text.trim();
+  if (!clean) return "";
+
+  try {
+    const query = encodeURIComponent(clean);
+    const url =
+      "https://translate.googleapis.com/translate_a/single" +
+      `?client=gtx&sl=${encodeURIComponent(sourceLang)}` +
+      `&tl=${encodeURIComponent(targetLang)}&dt=t&q=${query}`;
+    const responseText = await getText(url);
+    const parsed = JSON.parse(responseText) as unknown;
+    const translated = parseTranslatedSegments(parsed).trim();
+    return translated || clean;
+  } catch (err) {
+    logger.warn(
+      `translateTextBestEffort failed ${sourceLang}->${targetLang}`,
+      err,
+    );
+    return "";
+  }
 }
 
 /**
@@ -888,4 +983,68 @@ export const deleteDriverAccount = onCall(async (request) => {
   );
 
   return { ok: true, authDeleted, userDocDeleted };
+});
+
+/**
+ * Auto-translates FAQ question/answer from one source language to targets.
+ * Caller must be authenticated.
+ */
+export const translateFaqText = onCall(async (request) => {
+  requireAuthUid(request.auth);
+
+  const data = (request.data || {}) as TranslateFaqTextData;
+
+  const sourceLang = (data.sourceLang || "en").toString().trim().toLowerCase();
+  const question = (data.question || "").toString().trim();
+  const answer = (data.answer || "").toString().trim();
+
+  if (!/^[a-z]{2}$/.test(sourceLang)) {
+    throw new HttpsError("invalid-argument", "sourceLang must be 2 letters.");
+  }
+
+  if (!question && !answer) {
+    throw new HttpsError(
+      "invalid-argument",
+      "question or answer is required.",
+    );
+  }
+
+  const rawTargets = Array.isArray(data.targetLangs) ? data.targetLangs : [];
+  const targets = Array.from(
+    new Set(
+      rawTargets
+        .map((v) => (v ?? "").toString().trim().toLowerCase())
+        .filter((v) => /^[a-z]{2}$/.test(v) && v !== sourceLang),
+    ),
+  ).slice(0, 12);
+
+  if (targets.length === 0) {
+    throw new HttpsError(
+      "invalid-argument",
+      "At least one valid target language is required.",
+    );
+  }
+
+  const translations: Record<string, {question: string; answer: string}> = {};
+
+  await Promise.all(
+    targets.map(async (targetLang) => {
+      const qText = question ?
+        await translateTextBestEffort(question, sourceLang, targetLang) :
+        "";
+      const aText = answer ?
+        await translateTextBestEffort(answer, sourceLang, targetLang) :
+        "";
+
+      translations[targetLang] = {
+        question: qText,
+        answer: aText,
+      };
+    }),
+  );
+
+  return {
+    sourceLang,
+    translations,
+  };
 });
