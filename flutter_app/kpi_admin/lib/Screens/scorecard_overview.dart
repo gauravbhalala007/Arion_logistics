@@ -17,14 +17,12 @@ import 'scorecard_week.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/app_side_menu.dart';
-
+import '../localization/app_localizations.dart';
 
 /// Simple German-style number formatting
-final _pct = NumberFormat.decimalPattern('de');
 final _pct2 = NumberFormat.decimalPattern('de')
   ..minimumFractionDigits = 2
   ..maximumFractionDigits = 2;
-final _int = NumberFormat.decimalPattern('de');
 
 String _s(dynamic v) => (v == null) ? '' : v.toString();
 num _numOr0(dynamic v) {
@@ -40,8 +38,9 @@ num _numOr0(dynamic v) {
 /// ---------- Week date helpers (ISO week: Monday start) ----------
 DateTime _isoWeekStartUtc(int year, int week) {
   final jan4 = DateTime.utc(year, 1, 4);
-  final week1Mon =
-      jan4.subtract(Duration(days: jan4.weekday - DateTime.monday));
+  final week1Mon = jan4.subtract(
+    Duration(days: jan4.weekday - DateTime.monday),
+  );
   return week1Mon.add(Duration(days: (week - 1) * 7));
 }
 
@@ -49,8 +48,9 @@ String _dotted(DateTime d) => DateFormat('dd.MM.yyyy').format(d.toLocal());
 
 int _monthIndexFromWeek(int year, int week) {
   final jan4 = DateTime.utc(year, 1, 4);
-  final week1Mon =
-      jan4.subtract(Duration(days: jan4.weekday - DateTime.monday));
+  final week1Mon = jan4.subtract(
+    Duration(days: jan4.weekday - DateTime.monday),
+  );
   final target = week1Mon.add(Duration(days: (week - 1) * 7));
   return target.month;
 }
@@ -70,11 +70,12 @@ double _scaleForWidth(double w) {
   if (w >= 1440) return 1.0;
   if (w >= 1200) return 0.93 + (w - 1200) / 240 * (1.0 - 0.93);
   if (w >= 1000) return 0.86 + (w - 1000) / 200 * (0.93 - 0.86);
-  if (w >= 800)  return 0.78 + (w - 800)  / 200 * (0.86 - 0.78);
-  if (w >= 600)  return 0.70 + (w - 600)  / 200 * (0.78 - 0.70);
-  if (w >= 420)  return 0.62 + (w - 420)  / 180 * (0.70 - 0.62);
+  if (w >= 800) return 0.78 + (w - 800) / 200 * (0.86 - 0.78);
+  if (w >= 600) return 0.70 + (w - 600) / 200 * (0.78 - 0.70);
+  if (w >= 420) return 0.62 + (w - 420) / 180 * (0.70 - 0.62);
   return 0.60;
 }
+
 double _sp(double base, double w) => base * _scaleForWidth(w);
 double _pad(double base, double w) => base * _scaleForWidth(w);
 bool _isNarrow(BuildContext c) => MediaQuery.of(c).size.width < 1100;
@@ -155,21 +156,21 @@ class ScorecardWeekShellPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     return AppShell(
       menuWidth: 300,
-      sideMenu: const AppSideMenu(
-        width: 300,
-        active: AppNav.dashboard,
-      ),
+      sideMenu: const AppSideMenu(width: 300, active: AppNav.dashboard),
       body: ScorecardWeekPage(reportRef: reportRef),
-      title: const Text('SCORECARD WEEK'),
+      title: Text(
+        '${t.t('nav_scorecard').toUpperCase()} ${t.t('dash_week').toUpperCase()}',
+      ),
     );
   }
 }
 
 class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
   bool _busyUpload = false; // PDFs (bottom-left)
-  bool _busyCsv = false;    // CSVs (top-right)
+  bool _busyCsv = false; // CSVs (top-right)
 
   _PeriodFilter _periodFilter = _PeriodFilter.month;
   String? _selectedMonthKey;
@@ -178,7 +179,7 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
 
   late final Stream<Map<String, String>> _globalNamesStreamCached;
   final Map<String, Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>>>
-      _scoresStreamCache = {};
+  _scoresStreamCache = {};
 
   @override
   void initState() {
@@ -189,31 +190,34 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
   Stream<List<_ReportVM>> _reportsStream() {
     final uid = FirebaseAuth.instance.currentUser!.uid;
     return FirebaseFirestore.instance
-        .collection('users').doc(uid)
+        .collection('users')
+        .doc(uid)
         .collection('reports')
         .orderBy('year', descending: true)
         .orderBy('weekNumber', descending: true)
         .limit(52)
         .snapshots()
-        .map((snap) => snap.docs.map((d) {
-              final m = d.data();
-              final s = (m['summary'] as Map?)?.cast<String, dynamic>() ?? {};
-              final y = (m['year'] as num?)?.toInt() ?? 0;
-              final w = (m['weekNumber'] as num?)?.toInt() ?? 0;
-              return _ReportVM(
-                ref: d.reference,
-                year: y,
-                week: w,
-                label: (s['weekText'] ?? 'Week $w - $y').toString(),
-                overall: (s['overallScore'] as num?)?.toDouble(),
-                overallStatus: s['overallStatus'] as String?,
-                relNext: (s['reliabilityNextDay'] as num?)?.toDouble(),
-                relSame: (s['reliabilitySameDay'] as num?)?.toDouble(),
-                rankAtStation: (s['rankAtStation'] as num?)?.toInt(),
-                stationCount: (s['stationCount'] as num?)?.toInt(),
-                stationCode: s['stationCode'] as String?,
-              );
-            }).toList());
+        .map(
+          (snap) => snap.docs.map((d) {
+            final m = d.data();
+            final s = (m['summary'] as Map?)?.cast<String, dynamic>() ?? {};
+            final y = (m['year'] as num?)?.toInt() ?? 0;
+            final w = (m['weekNumber'] as num?)?.toInt() ?? 0;
+            return _ReportVM(
+              ref: d.reference,
+              year: y,
+              week: w,
+              label: (s['weekText'] ?? 'Week $w - $y').toString(),
+              overall: (s['overallScore'] as num?)?.toDouble(),
+              overallStatus: s['overallStatus'] as String?,
+              relNext: (s['reliabilityNextDay'] as num?)?.toDouble(),
+              relSame: (s['reliabilitySameDay'] as num?)?.toDouble(),
+              rankAtStation: (s['rankAtStation'] as num?)?.toInt(),
+              stationCount: (s['stationCount'] as num?)?.toInt(),
+              stationCode: s['stationCode'] as String?,
+            );
+          }).toList(),
+        );
   }
 
   Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _scoresForReport(
@@ -254,15 +258,13 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
     );
   }
 
-  Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _scoresForReportsCached(
+  Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>>
+  _scoresForReportsCached(
     List<DocumentReference<Map<String, dynamic>>> reportRefs,
   ) {
     final refs = [...reportRefs]..sort((a, b) => a.path.compareTo(b.path));
     final key = refs.map((r) => r.path).join('|');
-    return _scoresStreamCache.putIfAbsent(
-      key,
-      () => _scoresForReports(refs),
-    );
+    return _scoresStreamCache.putIfAbsent(key, () => _scoresForReports(refs));
   }
 
   Stream<Map<String, String>> _driversNameMapGlobal() {
@@ -273,15 +275,15 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
         .collection('drivers')
         .snapshots()
         .map((snap) {
-      final m = <String, String>{};
-      for (final d in snap.docs) {
-        final data = d.data();
-        final id = _s(data['transporterId']);
-        final name = _s(data['driverName']);
-        if (id.isNotEmpty) m[id] = name;
-      }
-      return m;
-    });
+          final m = <String, String>{};
+          for (final d in snap.docs) {
+            final data = d.data();
+            final id = _s(data['transporterId']);
+            final name = _s(data['driverName']);
+            if (id.isNotEmpty) m[id] = name;
+          }
+          return m;
+        });
   }
 
   String _statusCodeFromScore(double v) {
@@ -309,18 +311,18 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
     }
   }
 
-  String _prettyStatus(String? raw) {
+  String _prettyStatus(String? raw, AppLocalizations t) {
     switch (_s(raw).trim().toUpperCase()) {
       case 'FANTASTIC_PLUS':
-        return 'Fantastic Plus';
+        return t.t('bucket_fantastic_plus');
       case 'FANTASTIC':
-        return 'Fantastic';
+        return t.t('bucket_fantastic');
       case 'GREAT':
-        return 'Great';
+        return t.t('bucket_great');
       case 'FAIR':
-        return 'Fair';
+        return t.t('bucket_fair');
       case 'POOR':
-        return 'Poor';
+        return t.t('bucket_poor');
       default:
         return _s(raw);
     }
@@ -334,9 +336,10 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
     required void Function(VoidCallback) setDialogState,
     required double w,
   }) {
+    final t = AppLocalizations.of(context);
     if (reports.isEmpty) {
-      return const Text(
-        'No reports available.',
+      return Text(
+        t.t('scorecard_overview_no_reports_available'),
         style: TextStyle(fontSize: 12, color: _UI.textSecondary),
       );
     }
@@ -348,7 +351,8 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
     }();
 
     final currentMonthKey = _selectedMonthKey ?? defaultMonthKey;
-    final activeYear = _selectedYear ?? (years.isNotEmpty ? years.first : latest.year);
+    final activeYear =
+        _selectedYear ?? (years.isNotEmpty ? years.first : latest.year);
 
     final isYearView = _periodFilter == _PeriodFilter.year;
     final isMonthView = !isYearView;
@@ -380,16 +384,18 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
       stationByReportPath[r.ref.path] = _s(r.stationCode).toUpperCase();
     }
 
-    final stationOptions = stationByReportPath.values
-        .where((s) => s.isNotEmpty)
-        .toSet()
-        .toList()
-      ..sort();
+    final stationOptions =
+        stationByReportPath.values.where((s) => s.isNotEmpty).toSet().toList()
+          ..sort();
 
-    final hasValidStation = _selectedStationCode != null &&
+    final hasValidStation =
+        _selectedStationCode != null &&
         stationOptions.contains(_selectedStationCode);
-    final stationLabel =
-        hasValidStation ? 'Station $_selectedStationCode' : 'All Stations';
+    final stationLabel = hasValidStation
+        ? t.tf('scorecard_overview_station_code', {
+            'code': _selectedStationCode ?? '',
+          })
+        : t.t('scorecard_overview_all_stations');
 
     final scoreStream = _scoresForReportsCached(
       periodReports.map((e) => e.ref).toList(),
@@ -398,15 +404,16 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
     final pillLabel = isYearView
         ? (filterYear ?? latest.year).toString()
         : (filterMonth != null
-            ? _monthNameFromIndex(filterMonth).toUpperCase()
-            : _monthNameFromIndex(_monthIndexFromWeek(latest.year, latest.week))
-                .toUpperCase());
+              ? _monthNameFromIndex(filterMonth).toUpperCase()
+              : _monthNameFromIndex(
+                  _monthIndexFromWeek(latest.year, latest.week),
+                ).toUpperCase());
 
     final subtitle = isYearView
         ? (filterYear?.toString() ?? '')
         : (filterMonth != null && filterYear != null
-            ? '${_monthNameFromIndex(filterMonth).toUpperCase()} $filterYear'
-            : null);
+              ? '${_monthNameFromIndex(filterMonth).toUpperCase()} $filterYear'
+              : null);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -415,23 +422,25 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
           periodLabel: pillLabel,
           stationLabel: stationLabel,
           onPeriodTap: () => _showBestPeriodDialog(
-                context: context,
-                years: years,
-                monthsByYear: monthsByYear,
-                onChanged: () => setDialogState(() {}),
-              ),
+            context: context,
+            years: years,
+            monthsByYear: monthsByYear,
+            onChanged: () => setDialogState(() {}),
+          ),
           onStationTap: () => _showStationFilterDialog(
-                context: context,
-                stations: stationOptions,
-                onChanged: () => setDialogState(() {}),
-              ),
+            context: context,
+            stations: stationOptions,
+            onChanged: () => setDialogState(() {}),
+          ),
         ),
         SizedBox(height: _pad(10, w)),
         if (subtitle != null && subtitle.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(
-              isMonthView ? 'Best drivers of the month' : 'Best drivers of the year',
+              isMonthView
+                  ? t.t('scorecard_overview_best_drivers_month')
+                  : t.t('scorecard_overview_best_drivers_year'),
               style: TextStyle(
                 fontSize: _sp(12, w),
                 fontWeight: FontWeight.w700,
@@ -456,7 +465,9 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
           builder: (context, namesSnap) {
             final names = namesSnap.data ?? const <String, String>{};
 
-            return StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+            return StreamBuilder<
+              List<QueryDocumentSnapshot<Map<String, dynamic>>>
+            >(
               stream: scoreStream,
               builder: (context, scoreSnap) {
                 if (scoreSnap.connectionState == ConnectionState.waiting) {
@@ -470,12 +481,9 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
 
                 final docs = scoreSnap.data ?? [];
                 if (docs.isEmpty) {
-                  return const Text(
-                    'No drivers found for this period.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: _UI.textSecondary,
-                    ),
+                  return Text(
+                    t.t('scorecard_overview_no_drivers_period'),
+                    style: TextStyle(fontSize: 12, color: _UI.textSecondary),
                   );
                 }
 
@@ -510,7 +518,8 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                 }
 
                 final stationsSorted = stationAgg.keys.toList()..sort();
-                final activeStation = (hasValidStation &&
+                final activeStation =
+                    (hasValidStation &&
                         stationAgg.containsKey(_selectedStationCode))
                     ? _selectedStationCode
                     : null;
@@ -519,23 +528,29 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     for (final station in stationsSorted)
-                      if (activeStation == null || station == activeStation) ...[
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 6, top: 8),
-                        child: Text(
-                          station == 'UNKNOWN' ? 'Station' : 'Station $station',
-                          style: TextStyle(
-                            fontSize: _sp(12, w),
-                            fontWeight: FontWeight.w800,
-                            color: _UI.textPrimary,
+                      if (activeStation == null ||
+                          station == activeStation) ...[
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 6, top: 8),
+                          child: Text(
+                            station == 'UNKNOWN'
+                                ? t.t('scorecard_overview_station')
+                                : t.tf('scorecard_overview_station_code', {
+                                    'code': station,
+                                  }),
+                            style: TextStyle(
+                              fontSize: _sp(12, w),
+                              fontWeight: FontWeight.w800,
+                              color: _UI.textPrimary,
+                            ),
                           ),
                         ),
-                      ),
-                      _buildStationDriverList(
-                        stationAgg[station] ?? const <String, _DriverAgg>{},
-                        names,
-                      ),
-                    ],
+                        _buildStationDriverList(
+                          stationAgg[station] ?? const <String, _DriverAgg>{},
+                          names,
+                          t,
+                        ),
+                      ],
                   ],
                 );
               },
@@ -549,15 +564,13 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
   Widget _buildStationDriverList(
     Map<String, _DriverAgg> aggMap,
     Map<String, String> names,
+    AppLocalizations t,
   ) {
     final entries = <_DriverEntry>[];
     aggMap.forEach((tid, agg) {
       if (agg.count == 0) return;
       entries.add(
-        _DriverEntry(
-          transporterId: tid,
-          avgScore: agg.sumScore / agg.count,
-        ),
+        _DriverEntry(transporterId: tid, avgScore: agg.sumScore / agg.count),
       );
     });
     entries.sort((a, b) => b.avgScore.compareTo(a.avgScore));
@@ -569,10 +582,11 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
       separatorBuilder: (_, __) => const SizedBox(height: 10),
       itemBuilder: (context, i) {
         final e = entries[i];
-        final name =
-            _s(names[e.transporterId]).isNotEmpty ? _s(names[e.transporterId]) : 'No name';
+        final name = _s(names[e.transporterId]).isNotEmpty
+            ? _s(names[e.transporterId])
+            : t.t('dash_no_name');
         final bucket = _statusCodeFromScore(e.avgScore);
-        final statusText = _prettyStatus(bucket);
+        final statusText = _prettyStatus(bucket, t);
         final statusColor = _statusColorFromCode(bucket);
         return _BestDriverRow(
           rank: i + 1,
@@ -590,6 +604,7 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
     required BuildContext context,
     required Widget Function(BuildContext, void Function(VoidCallback)) builder,
   }) async {
+    final t = AppLocalizations.of(context);
     final media = MediaQuery.of(context).size;
     await showDialog<void>(
       context: context,
@@ -598,8 +613,13 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
         return StatefulBuilder(
           builder: (ctx, setDialogState) {
             return Dialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 20,
+              ),
               child: ConstrainedBox(
                 constraints: BoxConstraints(
                   maxWidth: 820,
@@ -610,7 +630,7 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                     SingleChildScrollView(
                       padding: const EdgeInsets.all(16),
                       child: _Panel(
-                        title: 'Best Drivers',
+                        title: t.t('scorecard_overview_best_drivers'),
                         child: builder(ctx, setDialogState),
                       ),
                     ),
@@ -637,18 +657,21 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
     required List<String> stations,
     VoidCallback? onChanged,
   }) async {
-    final items = [
-      'ALL',
-      ...stations.where((s) => s.isNotEmpty).toList(),
-    ];
+    final t = AppLocalizations.of(context);
+    final items = ['ALL', ...stations.where((s) => s.isNotEmpty).toList()];
 
     await showDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (ctx) {
         return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 24,
+          ),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
             decoration: BoxDecoration(
@@ -660,9 +683,12 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
               children: [
                 Row(
                   children: [
-                    const Text(
-                      'Select station',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                    Text(
+                      t.t('scorecard_overview_select_station'),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     const Spacer(),
                     IconButton(
@@ -679,7 +705,9 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                     for (final s in items)
                       ChoiceChip(
                         label: Text(
-                          s == 'ALL' ? 'All Stations' : s,
+                          s == 'ALL'
+                              ? t.t('scorecard_overview_all_stations')
+                              : s,
                           style: const TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
@@ -712,6 +740,7 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
     required Map<int, List<int>> monthsByYear,
     VoidCallback? onChanged,
   }) async {
+    final t = AppLocalizations.of(context);
     await showDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -720,7 +749,10 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(15),
           ),
-          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 24,
+          ),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
             decoration: BoxDecoration(
@@ -733,9 +765,12 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                 children: [
                   Row(
                     children: [
-                      const Text(
-                        'Select period',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                      Text(
+                        t.t('scorecard_overview_select_period'),
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                       const Spacer(),
                       IconButton(
@@ -748,7 +783,7 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      'Best drivers of year',
+                      t.t('scorecard_overview_best_drivers_year'),
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
@@ -770,7 +805,8 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          selected: _periodFilter == _PeriodFilter.year &&
+                          selected:
+                              _periodFilter == _PeriodFilter.year &&
                               _selectedYear == y,
                           onSelected: (_) {
                             setState(() {
@@ -788,7 +824,7 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      'Best drivers of month',
+                      t.t('scorecard_overview_best_drivers_month'),
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
@@ -827,7 +863,8 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
-                                  selected: _periodFilter == _PeriodFilter.month &&
+                                  selected:
+                                      _periodFilter == _PeriodFilter.month &&
                                       _selectedMonthKey ==
                                           '$y-${m.toString().padLeft(2, '0')}',
                                   onSelected: (_) {
@@ -858,6 +895,7 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
   }
 
   Future<void> _uploadWeeklyPdf() async {
+    final t = AppLocalizations.of(context);
     if (_busyUpload) return;
     setState(() => _busyUpload = true);
 
@@ -900,23 +938,29 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
         SnackBar(
           content: Text(
             successCount == 1
-                ? '1 scorecard parsed & saved. Dashboard updated.'
-                : '$successCount scorecards parsed & saved. Dashboard updated.',
+                ? t.t('scorecard_overview_upload_success_one')
+                : t.tf('scorecard_overview_upload_success_many', {
+                    'count': '$successCount',
+                  }),
           ),
         ),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Upload/parse failed: $e')),
+        SnackBar(
+          content: Text(
+            t.tf('scorecard_overview_upload_parse_failed', {'error': '$e'}),
+          ),
+        ),
       );
     } finally {
       if (mounted) setState(() => _busyUpload = false);
     }
   }
 
-
   Future<void> _uploadDriverCsv() async {
+    final t = AppLocalizations.of(context);
     if (_busyCsv) return;
     setState(() => _busyCsv = true);
     try {
@@ -931,7 +975,8 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
       }
       final f = picked.files.single;
       final Uint8List? bytes = f.bytes;
-      if (bytes == null) throw Exception('No file bytes');
+      if (bytes == null)
+        throw Exception(t.t('scorecard_overview_no_file_bytes'));
 
       // ✅ NEW: user-scoped update so ALL of this user’s reports/scores get names
       final uid = FirebaseAuth.instance.currentUser!.uid;
@@ -939,47 +984,46 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Driver names updated across all your reports.')),
+        SnackBar(content: Text(t.t('scorecard_overview_csv_updated'))),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('CSV import failed: $e')),
+        SnackBar(
+          content: Text(t.tf('scorecard_overview_csv_failed', {'error': '$e'})),
+        ),
       );
     } finally {
       if (mounted) setState(() => _busyCsv = false);
     }
   }
 
-
-  // ---- delete a single report doc (scores are NOT deleted) ----
+  // ---- delete a report doc and its linked score rows ----
   Future<void> _confirmAndDeleteReport(
     BuildContext context, {
     required DocumentReference<Map<String, dynamic>> reportRef,
     required String titleLabel,
   }) async {
+    final t = AppLocalizations.of(context);
     final w = MediaQuery.of(context).size.width;
 
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete report?'),
+        title: Text(t.t('scorecard_overview_delete_report_q')),
         content: Text(
-          'This will delete the report "$titleLabel" from Firestore.\n'
-          'Scores and other data will NOT be deleted.',
+          t.tf('scorecard_overview_delete_report_body', {'title': titleLabel}),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text(t.t('admin_home_cancel')),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red,
-            ),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.of(ctx).pop(true),
             child: Text(
-              'Delete',
+              t.t('admin_home_delete'),
               style: TextStyle(fontSize: _sp(13, w), color: Colors.white),
             ),
           ),
@@ -990,15 +1034,64 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
     if (ok != true) return;
 
     try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) throw Exception(t.t('admin_home_not_logged_in'));
+      final db = FirebaseFirestore.instance;
+      final scoresCol = db.collection('users').doc(uid).collection('scores');
+      final reportPath = reportRef.path;
+      final reportId = reportRef.id;
+
+      final scoreRefs = <String, DocumentReference<Map<String, dynamic>>>{};
+      Future<void> collect(Query<Map<String, dynamic>> q) async {
+        final snap = await q.get();
+        for (final d in snap.docs) {
+          scoreRefs[d.id] = d.reference;
+        }
+      }
+
+      await collect(scoresCol.where('reportRef', isEqualTo: reportRef));
+      await collect(scoresCol.where('reportPath', isEqualTo: reportPath));
+      await collect(scoresCol.where('reportId', isEqualTo: reportId));
+
+      if (scoreRefs.isNotEmpty) {
+        final refs = scoreRefs.values.toList(growable: false);
+        for (var i = 0; i < refs.length; i += 450) {
+          final batch = db.batch();
+          final end = i + 450 < refs.length ? i + 450 : refs.length;
+          for (var j = i; j < end; j++) {
+            batch.delete(refs[j]);
+          }
+          await batch.commit();
+        }
+      }
+
+      final driverNamesSnap = await reportRef.collection('driverNames').get();
+      if (driverNamesSnap.docs.isNotEmpty) {
+        for (var i = 0; i < driverNamesSnap.docs.length; i += 450) {
+          final batch = db.batch();
+          final end = i + 450 < driverNamesSnap.docs.length
+              ? i + 450
+              : driverNamesSnap.docs.length;
+          for (var j = i; j < end; j++) {
+            batch.delete(driverNamesSnap.docs[j].reference);
+          }
+          await batch.commit();
+        }
+      }
+
       await reportRef.delete();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Report deleted.')),
+        SnackBar(content: Text(t.t('scorecard_overview_deleted'))),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Delete failed: $e')),
+        SnackBar(
+          content: Text(
+            t.tf('scorecard_overview_delete_failed', {'error': '$e'}),
+          ),
+        ),
       );
     }
   }
@@ -1015,9 +1108,7 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
     final w = MediaQuery.of(context).size.width;
     final sc = _scaleForWidth(w);
     final narrow = _isNarrow(context);
-
-    // AppShell title & optional actions (kept minimal; page still shows its own CSV buttons)
-    final shellTitle = const Text('SCORE CARD DASHBOARD — Overview');
+    final t = AppLocalizations.of(context);
 
     final body = Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1042,7 +1133,7 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                               spacing: _pad(8, w),
                               children: [
                                 Text(
-                                  'SCORE CARD DASHBOARD',
+                                  t.t('scorecard_overview_title'),
                                   style: Theme.of(context)
                                       .textTheme
                                       .headlineSmall
@@ -1053,32 +1144,37 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                                         color: _UI.textPrimary,
                                       ),
                                 ),
-                                Text('— Overview',
-                                    style: TextStyle(
-                                      fontSize: _sp(13, w),
-                                      color: _UI.textSecondary,
-                                      fontWeight: FontWeight.w700,
-                                    )),
+                                Text(
+                                  t.t('scorecard_overview_overview_suffix'),
+                                  style: TextStyle(
+                                    fontSize: _sp(13, w),
+                                    color: _UI.textSecondary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
                           FilledButton.icon(
                             onPressed: _busyCsv ? null : _uploadDriverCsv,
                             style: FilledButton.styleFrom(
-                              backgroundColor:
-                                  _UI.textPrimary.withOpacity(.9),
+                              backgroundColor: _UI.textPrimary.withOpacity(.9),
                               shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(24 * sc)),
+                                borderRadius: BorderRadius.circular(24 * sc),
+                              ),
                               elevation: 0,
                               padding: EdgeInsets.symmetric(
-                                  horizontal: _pad(16, w),
-                                  vertical: _pad(12, w)),
+                                horizontal: _pad(16, w),
+                                vertical: _pad(12, w),
+                              ),
                             ),
                             icon: Icon(Icons.upload_file, size: _sp(18, w)),
                             label: Text(
-                                _busyCsv ? 'Uploading…' : 'Upload Driver CSV',
-                                style: TextStyle(fontSize: _sp(14, w))),
+                              _busyCsv
+                                  ? t.t('uploading')
+                                  : t.t('dash_upload_driver_csv'),
+                              style: TextStyle(fontSize: _sp(14, w)),
+                            ),
                           ),
                         ],
                       ),
@@ -1088,104 +1184,130 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                       child: StreamBuilder<List<_ReportVM>>(
                         stream: _reportsStream(),
                         builder: (context, snap) {
-                          if (snap.connectionState ==
-                              ConnectionState.waiting) {
+                          if (snap.connectionState == ConnectionState.waiting) {
                             return const Center(
-                                child: CircularProgressIndicator());
+                              child: CircularProgressIndicator(),
+                            );
                           }
                           if (snap.hasError) {
                             return Center(
-                                child: Text('Error: ${snap.error}'));
+                              child: Text(
+                                t.tf('admin_home_error_generic', {
+                                  'error': '${snap.error}',
+                                }),
+                              ),
+                            );
                           }
                           final list = snap.data ?? const <_ReportVM>[];
 
                           // ======== EMPTY STATE (upload panel + summary) ========
                           if (list.isEmpty) {
                             final uploadPanel = _Panel(
-                              title: 'UPLOAD SCORECARD PDF',
-                              trailing: Icon(Icons.more_horiz,
-                                  color: _UI.textSecondary,
-                                  size: _sp(20, w)),
-                              child: LayoutBuilder(builder: (context, c) {
-                                final iconSize =
-                                    w < 380 ? _sp(28, w) : _sp(34, w);
-                                final gap =
-                                    w < 380 ? _pad(6, w) : _pad(8, w);
-                                return Container(
-                                  constraints:
-                                      const BoxConstraints(minHeight: 120),
-                                  padding: EdgeInsets.symmetric(
-                                      vertical: _pad(12, w)),
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(
-                                    borderRadius:
-                                        BorderRadius.circular(16 * sc),
-                                    border: Border.all(color: _UI.border),
-                                    color: _UI.bg,
-                                  ),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.upload_rounded,
-                                          size: iconSize),
-                                      SizedBox(height: gap),
-                                      Text(
-                                        _busyUpload
-                                            ? 'Uploading…'
-                                            : 'Upload your Scorecard PDF',
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          fontSize: _sp(13, w),
-                                          color: _UI.textSecondary,
-                                          fontWeight: FontWeight.w600,
-                                        ),
+                              title: t.t('scorecard_overview_upload_pdf'),
+                              trailing: Icon(
+                                Icons.more_horiz,
+                                color: _UI.textSecondary,
+                                size: _sp(20, w),
+                              ),
+                              child: LayoutBuilder(
+                                builder: (context, c) {
+                                  final iconSize = w < 380
+                                      ? _sp(28, w)
+                                      : _sp(34, w);
+                                  final gap = w < 380 ? _pad(6, w) : _pad(8, w);
+                                  return Container(
+                                    constraints: const BoxConstraints(
+                                      minHeight: 120,
+                                    ),
+                                    padding: EdgeInsets.symmetric(
+                                      vertical: _pad(12, w),
+                                    ),
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(
+                                        16 * sc,
                                       ),
-                                      SizedBox(height: gap),
-                                      ConstrainedBox(
-                                        constraints: const BoxConstraints(
-                                            minWidth: 140),
-                                        child: FilledButton(
-                                          onPressed: _busyUpload
-                                              ? null
-                                              : _uploadWeeklyPdf,
-                                          style: FilledButton.styleFrom(
-                                            backgroundColor: _UI.greenDark,
-                                            elevation: 0,
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(
-                                                      20 * sc),
+                                      border: Border.all(color: _UI.border),
+                                      color: _UI.bg,
+                                    ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.upload_rounded,
+                                          size: iconSize,
+                                        ),
+                                        SizedBox(height: gap),
+                                        Text(
+                                          _busyUpload
+                                              ? t.t('uploading')
+                                              : t.t(
+                                                  'scorecard_overview_upload_prompt',
+                                                ),
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: _sp(13, w),
+                                            color: _UI.textSecondary,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        SizedBox(height: gap),
+                                        ConstrainedBox(
+                                          constraints: const BoxConstraints(
+                                            minWidth: 140,
+                                          ),
+                                          child: FilledButton(
+                                            onPressed: _busyUpload
+                                                ? null
+                                                : _uploadWeeklyPdf,
+                                            style: FilledButton.styleFrom(
+                                              backgroundColor: _UI.greenDark,
+                                              elevation: 0,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(
+                                                      20 * sc,
+                                                    ),
+                                              ),
+                                              padding: EdgeInsets.symmetric(
+                                                horizontal: _pad(16, w),
+                                                vertical: _pad(10, w),
+                                              ),
                                             ),
-                                            padding: EdgeInsets.symmetric(
-                                              horizontal: _pad(16, w),
-                                              vertical: _pad(10, w),
+                                            child: Text(
+                                              t.t(
+                                                'scorecard_overview_choose_file',
+                                              ),
+                                              style: TextStyle(
+                                                fontSize: _sp(14, w),
+                                              ),
                                             ),
                                           ),
-                                          child: Text('Choose file',
-                                              style: TextStyle(
-                                                  fontSize: _sp(14, w))),
                                         ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
                             );
 
                             final summaryRight = _Panel(
-                              title: 'Score Card Summary',
-                              trailing: Icon(Icons.more_horiz,
-                                  color: _UI.textSecondary,
-                                  size: _sp(20, w)),
+                              title: t.t('scorecard_overview_summary_title'),
+                              trailing: Icon(
+                                Icons.more_horiz,
+                                color: _UI.textSecondary,
+                                size: _sp(20, w),
+                              ),
                               child: Padding(
                                 padding: EdgeInsets.all(_pad(12, w)),
                                 child: Text(
-                                  'No reports yet. Upload your first Scorecard PDF to get started.',
+                                  t.t('scorecard_overview_no_reports_yet'),
                                   style: TextStyle(
-                                      color: _UI.textSecondary,
-                                      fontSize: _sp(13, w)),
+                                    color: _UI.textSecondary,
+                                    fontSize: _sp(13, w),
+                                  ),
                                 ),
                               ),
                             );
@@ -1203,9 +1325,9 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Expanded(
-                                      flex: 3,
-                                      child:
-                                          ListView(children: [uploadPanel])),
+                                    flex: 3,
+                                    child: ListView(children: [uploadPanel]),
+                                  ),
                                   SizedBox(width: _pad(16, w)),
                                   Expanded(flex: 2, child: summaryRight),
                                 ],
@@ -1224,13 +1346,17 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                           final ytd = byYear[currentYear] ?? [];
 
                           final ytdOverall = _avg(ytd.map((e) => e.overall));
-                          final ytdRel = _avg(ytd.map((e) => e.relNext ?? e.relSame));
+                          final ytdRel = _avg(
+                            ytd.map((e) => e.relNext ?? e.relSame),
+                          );
 
                           double? lastWeekOverallDelta, lastWeekRelDelta;
                           if (list.length >= 2) {
                             final prev = list[1];
-                            if (latest.overall != null && prev.overall != null) {
-                              lastWeekOverallDelta = latest.overall! - prev.overall!;
+                            if (latest.overall != null &&
+                                prev.overall != null) {
+                              lastWeekOverallDelta =
+                                  latest.overall! - prev.overall!;
                             }
                             final lRel = latest.relNext ?? latest.relSame;
                             final pRel = prev.relNext ?? prev.relSame;
@@ -1248,28 +1374,36 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                             if (pyOverall != null && cyOverall != null) {
                               yoyOverallDelta = cyOverall - pyOverall;
                             }
-                            final pyRel = _avg(py.map((e) => e.relNext ?? e.relSame));
+                            final pyRel = _avg(
+                              py.map((e) => e.relNext ?? e.relSame),
+                            );
                             if (ytdRel != null && pyRel != null) {
                               yoyRelDelta = ytdRel - pyRel;
                             }
                           }
 
-                          final chart = list.take(12).toList().reversed.toList();
+                          final chart = list
+                              .take(12)
+                              .toList()
+                              .reversed
+                              .toList();
 
                           final yearsAvailable = <int>{};
                           final Map<int, Set<int>> monthsByYear = {};
                           for (final r in list) {
                             yearsAvailable.add(r.year);
                             final m = _monthIndexFromWeek(r.year, r.week);
-                            monthsByYear.putIfAbsent(r.year, () => <int>{}).add(m);
+                            monthsByYear
+                                .putIfAbsent(r.year, () => <int>{})
+                                .add(m);
                           }
 
-                          final sortedYears =
-                              yearsAvailable.toList()..sort((a, b) => b.compareTo(a));
+                          final sortedYears = yearsAvailable.toList()
+                            ..sort((a, b) => b.compareTo(a));
                           final Map<int, List<int>> sortedMonthsByYear = {
                             for (final y in sortedYears)
                               y: (monthsByYear[y]?.toList() ?? [])
-                                ..sort((a, b) => a.compareTo(b))
+                                ..sort((a, b) => a.compareTo(b)),
                           };
 
                           // ----- LEFT column content
@@ -1287,90 +1421,110 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                             ),
                             SizedBox(height: _pad(16, w)),
                             _Panel(
-                              title: 'Score Card Overview',
+                              title: t.t('scorecard_overview_chart_title'),
                               child: _MiniBarChart(
                                 points: chart
-                                    .map((p) => _BarPoint(
-                                          label:
-                                              'W${p.week.toString().padLeft(2, '0')}',
-                                          value: p.overall ?? 0,
-                                          ref: p.ref,
-                                        ))
+                                    .map(
+                                      (p) => _BarPoint(
+                                        label:
+                                            'W${p.week.toString().padLeft(2, '0')}',
+                                        value: p.overall ?? 0,
+                                        ref: p.ref,
+                                      ),
+                                    )
                                     .toList(),
                               ),
                             ),
                             SizedBox(height: _pad(16, w)),
                             _Panel(
-                              title: 'UPLOAD SCORECARD PDF',
-                              trailing: Icon(Icons.more_horiz,
-                                  color: _UI.textSecondary,
-                                  size: _sp(20, w)),
-                              child: LayoutBuilder(builder: (context, c) {
-                                final iconSize =
-                                    w < 380 ? _sp(28, w) : _sp(34, w);
-                                final gap =
-                                    w < 380 ? _pad(6, w) : _pad(8, w);
-                                return Container(
-                                  constraints:
-                                      const BoxConstraints(minHeight: 120),
-                                  padding: EdgeInsets.symmetric(
-                                      vertical: _pad(12, w)),
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(
-                                    borderRadius:
-                                        BorderRadius.circular(16 * sc),
-                                    border: Border.all(color: _UI.border),
-                                    color: _UI.bg,
-                                  ),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.upload_rounded,
-                                          size: iconSize),
-                                      SizedBox(height: gap),
-                                      Text(
-                                        _busyUpload
-                                            ? 'Uploading…'
-                                            : 'Upload your Scorecard PDF',
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          fontSize: _sp(13, w),
-                                          color: _UI.textSecondary,
-                                          fontWeight: FontWeight.w600,
-                                        ),
+                              title: t.t('scorecard_overview_upload_pdf'),
+                              trailing: Icon(
+                                Icons.more_horiz,
+                                color: _UI.textSecondary,
+                                size: _sp(20, w),
+                              ),
+                              child: LayoutBuilder(
+                                builder: (context, c) {
+                                  final iconSize = w < 380
+                                      ? _sp(28, w)
+                                      : _sp(34, w);
+                                  final gap = w < 380 ? _pad(6, w) : _pad(8, w);
+                                  return Container(
+                                    constraints: const BoxConstraints(
+                                      minHeight: 120,
+                                    ),
+                                    padding: EdgeInsets.symmetric(
+                                      vertical: _pad(12, w),
+                                    ),
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(
+                                        16 * sc,
                                       ),
-                                      SizedBox(height: gap),
-                                      ConstrainedBox(
-                                        constraints: const BoxConstraints(
-                                            minWidth: 140),
-                                        child: FilledButton(
-                                          onPressed: _busyUpload
-                                              ? null
-                                              : _uploadWeeklyPdf,
-                                          style: FilledButton.styleFrom(
-                                            backgroundColor: _UI.greenDark,
-                                            elevation: 0,
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(
-                                                      20 * sc),
+                                      border: Border.all(color: _UI.border),
+                                      color: _UI.bg,
+                                    ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.upload_rounded,
+                                          size: iconSize,
+                                        ),
+                                        SizedBox(height: gap),
+                                        Text(
+                                          _busyUpload
+                                              ? t.t('uploading')
+                                              : t.t(
+                                                  'scorecard_overview_upload_prompt',
+                                                ),
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: _sp(13, w),
+                                            color: _UI.textSecondary,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        SizedBox(height: gap),
+                                        ConstrainedBox(
+                                          constraints: const BoxConstraints(
+                                            minWidth: 140,
+                                          ),
+                                          child: FilledButton(
+                                            onPressed: _busyUpload
+                                                ? null
+                                                : _uploadWeeklyPdf,
+                                            style: FilledButton.styleFrom(
+                                              backgroundColor: _UI.greenDark,
+                                              elevation: 0,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(
+                                                      20 * sc,
+                                                    ),
+                                              ),
+                                              padding: EdgeInsets.symmetric(
+                                                horizontal: _pad(16, w),
+                                                vertical: _pad(10, w),
+                                              ),
                                             ),
-                                            padding: EdgeInsets.symmetric(
-                                              horizontal: _pad(16, w),
-                                              vertical: _pad(10, w),
+                                            child: Text(
+                                              t.t(
+                                                'scorecard_overview_choose_file',
+                                              ),
+                                              style: TextStyle(
+                                                fontSize: _sp(14, w),
+                                              ),
                                             ),
                                           ),
-                                          child: Text('Choose file',
-                                              style: TextStyle(
-                                                  fontSize: _sp(14, w))),
                                         ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
                             ),
                           ];
 
@@ -1379,13 +1533,13 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                               context: context,
                               builder: (ctx, setDialogState) =>
                                   _buildBestDriversContent(
-                                context: ctx,
-                                years: sortedYears,
-                                monthsByYear: sortedMonthsByYear,
-                                reports: list,
-                                setDialogState: setDialogState,
-                                w: w,
-                              ),
+                                    context: ctx,
+                                    years: sortedYears,
+                                    monthsByYear: sortedMonthsByYear,
+                                    reports: list,
+                                    setDialogState: setDialogState,
+                                    w: w,
+                                  ),
                             ),
                             style: TextButton.styleFrom(
                               foregroundColor: _UI.greenDark,
@@ -1395,13 +1549,18 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                               ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(999),
-                                side: const BorderSide(color: _UI.greenDark, width: 1.1),
+                                side: const BorderSide(
+                                  color: _UI.greenDark,
+                                  width: 1.1,
+                                ),
                               ),
                             ),
-                            icon: Icon(Icons.emoji_events_outlined,
-                                size: _sp(14, w)),
+                            icon: Icon(
+                              Icons.emoji_events_outlined,
+                              size: _sp(14, w),
+                            ),
                             label: Text(
-                              'Best Drivers',
+                              t.t('scorecard_overview_best_drivers'),
                               style: TextStyle(
                                 fontSize: _sp(11, w),
                                 fontWeight: FontWeight.w700,
@@ -1411,14 +1570,17 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
 
                           // ----- RIGHT panel (summary list) with 3-dots delete menu
                           final rightPanel = _Panel(
-                            title: 'Score Card Summary',
+                            title: t.t('scorecard_overview_summary_title'),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 bestDriversButton,
                                 SizedBox(width: _pad(6, w)),
-                                Icon(Icons.more_horiz,
-                                    color: _UI.textSecondary, size: _sp(20, w)),
+                                Icon(
+                                  Icons.more_horiz,
+                                  color: _UI.textSecondary,
+                                  size: _sp(20, w),
+                                ),
                               ],
                             ),
                             child: ListView.separated(
@@ -1429,24 +1591,30 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                                   Divider(height: 1, color: _UI.border),
                               itemBuilder: (_, i) {
                                 final p = list[i];
-                                final badge =
-                                    (p.overall != null) ? _pct2.format(p.overall) : '—';
+                                final badge = (p.overall != null)
+                                    ? _pct2.format(p.overall)
+                                    : '—';
 
                                 final start = _isoWeekStartUtc(p.year, p.week);
                                 final end = start.add(const Duration(days: 6));
-                                final dateRange = '${_dotted(start)} – ${_dotted(end)}';
+                                final dateRange =
+                                    '${_dotted(start)} – ${_dotted(end)}';
 
                                 final rankLine =
-                                    (p.rankAtStation != null && p.stationCount != null)
-                                        ? 'Rank in Station: ${p.rankAtStation} of ${p.stationCount}'
-                                        : '${_s(p.stationCode)} • ${_prettyStatus(p.overallStatus)}';
+                                    (p.rankAtStation != null &&
+                                        p.stationCount != null)
+                                    ? '${t.t('dash_rank_in_station')}: ${t.tf('dash_rank_of_total', {'rank': '${p.rankAtStation}', 'total': '${p.stationCount}'})}'
+                                    : '${_s(p.stationCode)} • ${_prettyStatus(p.overallStatus, t)}';
 
-                                final rowTitle =
-                                    'Score Card ${p.label.split(" ").last} KW ${p.week}';
+                                final rowTitle = t.tf(
+                                  'scorecard_overview_row_title',
+                                  {'year': '${p.year}', 'week': '${p.week}'},
+                                );
 
                                 return ListTile(
-                                  contentPadding:
-                                      EdgeInsets.symmetric(vertical: _pad(8, w)),
+                                  contentPadding: EdgeInsets.symmetric(
+                                    vertical: _pad(8, w),
+                                  ),
                                   leading: CircleAvatar(
                                     backgroundColor: _UI.green.withOpacity(.2),
                                     radius: _pad(26, w),
@@ -1467,7 +1635,8 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                                     ),
                                   ),
                                   subtitle: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       SizedBox(height: _pad(2, w)),
                                       Text(
@@ -1490,7 +1659,7 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       PopupMenuButton<String>(
-                                        tooltip: 'More',
+                                        tooltip: t.t('scorecard_overview_more'),
                                         onSelected: (v) {
                                           if (v == 'delete') {
                                             _confirmAndDeleteReport(
@@ -1504,7 +1673,9 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                                           PopupMenuItem<String>(
                                             value: 'delete',
                                             child: Text(
-                                              'Delete report',
+                                              t.t(
+                                                'scorecard_overview_delete_report_menu',
+                                              ),
                                               style: TextStyle(
                                                 color: Colors.red,
                                                 fontWeight: FontWeight.w700,
@@ -1516,18 +1687,22 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                                         icon: const Icon(Icons.more_vert),
                                       ),
                                       SizedBox(width: _pad(4, w)),
-                                      Icon(Icons.chevron_right_rounded,
-                                          size: _sp(22, w)),
+                                      Icon(
+                                        Icons.chevron_right_rounded,
+                                        size: _sp(22, w),
+                                      ),
                                     ],
                                   ),
-                                onTap: () => Navigator.of(context).push(
-                                  PageRouteBuilder(
-                                    pageBuilder: (_, __, ___) =>
-                                        ScorecardWeekShellPage(reportRef: p.ref),
-                                    transitionDuration: Duration.zero,
-                                    reverseTransitionDuration: Duration.zero,
+                                  onTap: () => Navigator.of(context).push(
+                                    PageRouteBuilder(
+                                      pageBuilder: (_, __, ___) =>
+                                          ScorecardWeekShellPage(
+                                            reportRef: p.ref,
+                                          ),
+                                      transitionDuration: Duration.zero,
+                                      reverseTransitionDuration: Duration.zero,
+                                    ),
                                   ),
-                                ),
                                 );
                               },
                             ),
@@ -1552,11 +1727,7 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                                 SizedBox(width: _pad(16, w)),
                                 Expanded(
                                   flex: 2,
-                                  child: ListView(
-                                    children: [
-                                      rightPanel,
-                                    ],
-                                  ),
+                                  child: ListView(children: [rightPanel]),
                                 ),
                               ],
                             );
@@ -1575,52 +1746,52 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
 
     // Use shared AppShell + shared side menu
     return Stack(
-        children: [
-          Container(color: _UI.bg, child: body),
+      children: [
+        Container(color: _UI.bg, child: body),
 
-          if (_busyUpload) ...[
-            Positioned.fill(
-              child: Container(
-                color: Colors.black.withOpacity(0.08),
-                child: Center(
-                  child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.12),
-                          blurRadius: 20,
-                          offset: Offset(0, 10),
+        if (_busyUpload) ...[
+          Positioned.fill(
+            child: Container(
+              color: Colors.black.withOpacity(0.08),
+              child: Center(
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.12),
+                        blurRadius: 20,
+                        offset: Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(
+                        width: 26,
+                        height: 26,
+                        child: CircularProgressIndicator(strokeWidth: 3),
+                      ),
+                      const SizedBox(width: 16),
+                      Text(
+                        t.t('scorecard_overview_upload_processing'),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
                         ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const SizedBox(
-                          width: 26,
-                          height: 26,
-                          child: CircularProgressIndicator(strokeWidth: 3),
-                        ),
-                        const SizedBox(width: 16),
-                        const Text(
-                          'Uploading & processing scorecards…',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
-          ],
+          ),
         ],
-      );
+      ],
+    );
   }
 }
 
@@ -1647,9 +1818,13 @@ class _Panel extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text(title,
-                  style: TextStyle(
-                      fontSize: _sp(18, w), fontWeight: FontWeight.w800)),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: _sp(18, w),
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
               const Spacer(),
               if (trailing != null) trailing!,
             ],
@@ -1671,10 +1846,7 @@ class _DriverEntry {
   final String transporterId;
   final double avgScore;
 
-  const _DriverEntry({
-    required this.transporterId,
-    required this.avgScore,
-  });
+  const _DriverEntry({required this.transporterId, required this.avgScore});
 }
 
 class _BestDriversPeriodRow extends StatelessWidget {
@@ -1759,11 +1931,7 @@ class _BestDriversPeriodRow extends StatelessWidget {
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            periodPill,
-            const SizedBox(height: 8),
-            stationPill,
-          ],
+          children: [periodPill, const SizedBox(height: 8), stationPill],
         );
       },
     );
@@ -1789,22 +1957,21 @@ class _BestDriverRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     final isColored = backgroundColor != null;
     final textColor = isColored ? Colors.white : _UI.textPrimary;
     final labelColor = isColored ? Colors.white70 : _UI.textSecondary;
     final pillTextColor = isColored ? Colors.white : statusColor;
-    final pillBgColor =
-        isColored ? Colors.white.withOpacity(0.2) : statusColor.withOpacity(0.15);
+    final pillBgColor = isColored
+        ? Colors.white.withOpacity(0.2)
+        : statusColor.withOpacity(0.15);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       decoration: BoxDecoration(
         color: backgroundColor ?? Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: backgroundColor ?? _UI.border,
-          width: 1.2,
-        ),
+        border: Border.all(color: backgroundColor ?? _UI.border, width: 1.2),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1813,7 +1980,7 @@ class _BestDriverRow extends StatelessWidget {
             children: [
               Expanded(
                 child: _bestCol(
-                  label: 'RANK',
+                  label: t.t('dash_rank').toUpperCase(),
                   value: '#$rank',
                   labelColor: labelColor,
                   textColor: textColor,
@@ -1822,7 +1989,7 @@ class _BestDriverRow extends StatelessWidget {
               _bestDivider(isColored),
               Expanded(
                 child: _bestCol(
-                  label: 'SCORE',
+                  label: t.t('dash_score').toUpperCase(),
                   value: _pct2.format(score),
                   labelColor: labelColor,
                   textColor: textColor,
@@ -1832,8 +1999,8 @@ class _BestDriverRow extends StatelessWidget {
               Expanded(
                 flex: 2,
                 child: _bestCol(
-                  label: 'NAME',
-                  value: name.isEmpty ? 'No name' : name,
+                  label: t.t('dash_name').toUpperCase(),
+                  value: name.isEmpty ? t.t('dash_no_name') : name,
                   labelColor: labelColor,
                   textColor: textColor,
                 ),
@@ -1844,7 +2011,10 @@ class _BestDriverRow extends StatelessWidget {
             const SizedBox(height: 8),
             Center(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: pillBgColor,
                   borderRadius: BorderRadius.circular(999),
@@ -1921,7 +2091,7 @@ class _StatCard extends StatelessWidget {
     required this.subtitle,
     required this.value,
     this.delta,
-    this.deltaCaption = 'from last week',
+    this.deltaCaption = '',
   });
 
   @override
@@ -1993,7 +2163,8 @@ class _StatCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: _sp(13, w),
                       color: isUp ? _UI.greenDark : Colors.red,
-                      fontWeight: FontWeight.w700),
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   Text(
                     deltaCaption,
@@ -2037,140 +2208,160 @@ class _MiniBarChart extends StatelessWidget {
 
     return SizedBox(
       height: chartH,
-      child: LayoutBuilder(builder: (context, c) {
-        final targetSlots = (points.length * 2.2).clamp(10, 36).toDouble();
-        final barW = (c.maxWidth / targetSlots).clamp(8, 18).toDouble() * sc;
+      child: LayoutBuilder(
+        builder: (context, c) {
+          final targetSlots = (points.length * 2.2).clamp(10, 36).toDouble();
+          final barW = (c.maxWidth / targetSlots).clamp(8, 18).toDouble() * sc;
 
-        return Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: _UI.border),
-            borderRadius: BorderRadius.circular(16 * sc),
-          ),
-          padding: EdgeInsets.all(_pad(16, w)),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Y-axis labels
-              SizedBox(
-                width: _pad(36, w),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: const [100, 80, 60, 40, 20, 0]
-                      .map((v) => Text('$v',
-                          style: TextStyle(color: _UI.textSecondary)))
-                      .toList(),
+          return Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border.all(color: _UI.border),
+              borderRadius: BorderRadius.circular(16 * sc),
+            ),
+            padding: EdgeInsets.all(_pad(16, w)),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Y-axis labels
+                SizedBox(
+                  width: _pad(36, w),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: const [100, 80, 60, 40, 20, 0]
+                        .map(
+                          (v) => Text(
+                            '$v',
+                            style: TextStyle(color: _UI.textSecondary),
+                          ),
+                        )
+                        .toList(),
+                  ),
                 ),
-              ),
-              SizedBox(width: _pad(8, w)),
+                SizedBox(width: _pad(8, w)),
 
-              // Chart area
-              Expanded(
-                child: LayoutBuilder(builder: (context, area) {
-                  final usableH = area.maxHeight - xLabelAreaH;
+                // Chart area
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, area) {
+                      final usableH = area.maxHeight - xLabelAreaH;
 
-                  return Stack(
-                    children: [
-                      // Grid
-                      Positioned.fill(
-                        top: 0,
-                        bottom: xLabelAreaH,
-                        child: Column(
-                          children: List.generate(
-                            5,
-                            (_) => Expanded(
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  border: Border(
-                                    top: BorderSide(
-                                      color: _UI.border.withOpacity(0.8),
-                                      width: 1,
+                      return Stack(
+                        children: [
+                          // Grid
+                          Positioned.fill(
+                            top: 0,
+                            bottom: xLabelAreaH,
+                            child: Column(
+                              children: List.generate(
+                                5,
+                                (_) => Expanded(
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      border: Border(
+                                        top: BorderSide(
+                                          color: _UI.border.withOpacity(0.8),
+                                          width: 1,
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                      ),
-                      // Bottom baseline
-                      Positioned(
-                        left: 0,
-                        right: 0,
-                        bottom: xLabelAreaH - 1,
-                        child: Container(height: 1, color: _UI.border.withOpacity(0.8)),
-                      ),
-
-                      // Bars
-                      Positioned.fill(
-                        top: 0,
-                        bottom: xLabelAreaH,
-                        child: Align(
-                          alignment: Alignment.bottomCenter,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: points.map((p) {
-                              final v = p.value.clamp(0, axisMax);
-                              final h = (v / axisMax) * (usableH - _pad(8, w));
-                              return GestureDetector(
-                                onTap: () => Navigator.of(context).push(
-                                  PageRouteBuilder(
-                                    pageBuilder: (_, __, ___) =>
-                                        ScorecardWeekShellPage(reportRef: p.ref),
-                                    transitionDuration: Duration.zero,
-                                    reverseTransitionDuration: Duration.zero,
-                                  ),
-                                ),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 220),
-                                  curve: Curves.easeOutCubic,
-                                  height: h,
-                                  width: barW,
-                                  decoration: BoxDecoration(
-                                    color: _UI.green,
-                                    borderRadius: BorderRadius.circular(8 * sc),
-                                  ),
-                                ),
-                              );
-                            }).toList(),
+                          // Bottom baseline
+                          Positioned(
+                            left: 0,
+                            right: 0,
+                            bottom: xLabelAreaH - 1,
+                            child: Container(
+                              height: 1,
+                              color: _UI.border.withOpacity(0.8),
+                            ),
                           ),
-                        ),
-                      ),
 
-                      // X labels strip
-                      Positioned(
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        height: xLabelAreaH,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: points.map((p) {
-                            return SizedBox(
-                              width: barW * 2.2,
-                              child: Text(
-                                p.label,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: _sp(11, w),
-                                  color: _UI.textSecondary,
-                                ),
+                          // Bars
+                          Positioned.fill(
+                            top: 0,
+                            bottom: xLabelAreaH,
+                            child: Align(
+                              alignment: Alignment.bottomCenter,
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceEvenly,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: points.map((p) {
+                                  final v = p.value.clamp(0, axisMax);
+                                  final h =
+                                      (v / axisMax) * (usableH - _pad(8, w));
+                                  return GestureDetector(
+                                    onTap: () => Navigator.of(context).push(
+                                      PageRouteBuilder(
+                                        pageBuilder: (_, __, ___) =>
+                                            ScorecardWeekShellPage(
+                                              reportRef: p.ref,
+                                            ),
+                                        transitionDuration: Duration.zero,
+                                        reverseTransitionDuration:
+                                            Duration.zero,
+                                      ),
+                                    ),
+                                    child: AnimatedContainer(
+                                      duration: const Duration(
+                                        milliseconds: 220,
+                                      ),
+                                      curve: Curves.easeOutCubic,
+                                      height: h,
+                                      width: barW,
+                                      decoration: BoxDecoration(
+                                        color: _UI.green,
+                                        borderRadius: BorderRadius.circular(
+                                          8 * sc,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
                               ),
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                    ],
-                  );
-                }),
-              ),
-            ],
-          ),
-        );
-      }),
+                            ),
+                          ),
+
+                          // X labels strip
+                          Positioned(
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            height: xLabelAreaH,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: points.map((p) {
+                                return SizedBox(
+                                  width: barW * 2.2,
+                                  child: Text(
+                                    p.label,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: _sp(11, w),
+                                      color: _UI.textSecondary,
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -2205,6 +2396,7 @@ class _ResponsiveStatStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     final w = MediaQuery.of(context).size.width;
 
     if (w >= 1280) {
@@ -2213,38 +2405,40 @@ class _ResponsiveStatStrip extends StatelessWidget {
         children: [
           Expanded(
             child: _StatCard(
-              title: 'SCORECARD',
-              subtitle: 'LAST WEEK',
+              title: t.t('nav_scorecard'),
+              subtitle: t.t('admin_home_last_week').toUpperCase(),
               value: latestOverall,
+              deltaCaption: t.t('scorecard_overview_from_last_week'),
               delta: lastWeekOverallDelta,
             ),
           ),
           SizedBox(width: _pad(12, w)),
           Expanded(
             child: _StatCard(
-              title: 'SCORECARD',
-              subtitle: 'YEAR $yearLabel',
+              title: t.t('nav_scorecard'),
+              subtitle: '${t.t('admin_home_year_prefix')} $yearLabel',
               value: ytdOverall,
-              deltaCaption: 'from last year',
+              deltaCaption: t.t('scorecard_overview_from_last_year'),
               delta: yoyOverallDelta,
             ),
           ),
           SizedBox(width: _pad(12, w)),
           Expanded(
             child: _StatCard(
-              title: 'RELIABILITY SCORE',
-              subtitle: 'LAST WEEK',
+              title: t.t('scorecard_overview_reliability_score'),
+              subtitle: t.t('admin_home_last_week').toUpperCase(),
               value: latestRel,
+              deltaCaption: t.t('scorecard_overview_from_last_week'),
               delta: lastWeekRelDelta,
             ),
           ),
           SizedBox(width: _pad(12, w)),
           Expanded(
             child: _StatCard(
-              title: 'RELIABILITY SCORE',
-              subtitle: 'YEAR $yearLabel',
+              title: t.t('scorecard_overview_reliability_score'),
+              subtitle: '${t.t('admin_home_year_prefix')} $yearLabel',
               value: ytdRel,
-              deltaCaption: 'from last year',
+              deltaCaption: t.t('scorecard_overview_from_last_year'),
               delta: yoyRelDelta,
             ),
           ),
@@ -2258,19 +2452,20 @@ class _ResponsiveStatStrip extends StatelessWidget {
             children: [
               Expanded(
                 child: _StatCard(
-                  title: 'SCORECARD',
-                  subtitle: 'LAST WEEK',
+                  title: t.t('nav_scorecard'),
+                  subtitle: t.t('admin_home_last_week').toUpperCase(),
                   value: latestOverall,
+                  deltaCaption: t.t('scorecard_overview_from_last_week'),
                   delta: lastWeekOverallDelta,
                 ),
               ),
               SizedBox(width: _pad(12, w)),
               Expanded(
                 child: _StatCard(
-                  title: 'SCORECARD',
-                  subtitle: 'YEAR $yearLabel',
+                  title: t.t('nav_scorecard'),
+                  subtitle: '${t.t('admin_home_year_prefix')} $yearLabel',
                   value: ytdOverall,
-                  deltaCaption: 'from last year',
+                  deltaCaption: t.t('scorecard_overview_from_last_year'),
                   delta: yoyOverallDelta,
                 ),
               ),
@@ -2281,19 +2476,20 @@ class _ResponsiveStatStrip extends StatelessWidget {
             children: [
               Expanded(
                 child: _StatCard(
-                  title: 'RELIABILITY SCORE',
-                  subtitle: 'LAST WEEK',
+                  title: t.t('scorecard_overview_reliability_score'),
+                  subtitle: t.t('admin_home_last_week').toUpperCase(),
                   value: latestRel,
+                  deltaCaption: t.t('scorecard_overview_from_last_week'),
                   delta: lastWeekRelDelta,
                 ),
               ),
               SizedBox(width: _pad(12, w)),
               Expanded(
                 child: _StatCard(
-                  title: 'RELIABILITY SCORE',
-                  subtitle: 'YEAR $yearLabel',
+                  title: t.t('scorecard_overview_reliability_score'),
+                  subtitle: '${t.t('admin_home_year_prefix')} $yearLabel',
                   value: ytdRel,
-                  deltaCaption: 'from last year',
+                  deltaCaption: t.t('scorecard_overview_from_last_year'),
                   delta: yoyRelDelta,
                 ),
               ),
@@ -2306,32 +2502,34 @@ class _ResponsiveStatStrip extends StatelessWidget {
       return Column(
         children: [
           _StatCard(
-            title: 'SCORECARD',
-            subtitle: 'LAST WEEK',
+            title: t.t('nav_scorecard'),
+            subtitle: t.t('admin_home_last_week').toUpperCase(),
             value: latestOverall,
+            deltaCaption: t.t('scorecard_overview_from_last_week'),
             delta: lastWeekOverallDelta,
           ),
           SizedBox(height: _pad(12, w)),
           _StatCard(
-            title: 'SCORECARD',
-            subtitle: 'YEAR $yearLabel',
+            title: t.t('nav_scorecard'),
+            subtitle: '${t.t('admin_home_year_prefix')} $yearLabel',
             value: ytdOverall,
-            deltaCaption: 'from last year',
+            deltaCaption: t.t('scorecard_overview_from_last_year'),
             delta: yoyOverallDelta,
           ),
           SizedBox(height: _pad(12, w)),
           _StatCard(
-            title: 'RELIABILITY SCORE',
-            subtitle: 'LAST WEEK',
+            title: t.t('scorecard_overview_reliability_score'),
+            subtitle: t.t('admin_home_last_week').toUpperCase(),
             value: latestRel,
+            deltaCaption: t.t('scorecard_overview_from_last_week'),
             delta: lastWeekRelDelta,
           ),
           SizedBox(height: _pad(12, w)),
           _StatCard(
-            title: 'RELIABILITY SCORE',
-            subtitle: 'YEAR $yearLabel',
+            title: t.t('scorecard_overview_reliability_score'),
+            subtitle: '${t.t('admin_home_year_prefix')} $yearLabel',
             value: ytdRel,
-            deltaCaption: 'from last year',
+            deltaCaption: t.t('scorecard_overview_from_last_year'),
             delta: yoyRelDelta,
           ),
         ],

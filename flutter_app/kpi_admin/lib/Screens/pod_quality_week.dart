@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../localization/app_localizations.dart';
 
 final _pct = NumberFormat.decimalPattern('de');
 final _int = NumberFormat.decimalPattern('de');
@@ -65,6 +66,7 @@ class _PodQualityWeekPageState extends State<PodQualityWeekPage> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     return Material(
       color: const Color(0xFFF5F7F9),
       child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
@@ -83,9 +85,11 @@ class _PodQualityWeekPageState extends State<PodQualityWeekPage> {
           final podRejects =
               (podQuality['rejects'] as Map?)?.cast<String, dynamic>() ?? {};
 
-          final label = (summary['weekText'] ?? 'POD Quality').toString();
-          final station = (summary['stationCode'] ?? report['stationCode'] ?? '')
+          final label = (summary['weekText'] ?? t.t('pod_quality_title'))
               .toString();
+          final station =
+              (summary['stationCode'] ?? report['stationCode'] ?? '')
+                  .toString();
 
           final opportunities = _num(podSummary['opportunitiesCount']);
           final successPct = _num(podSummary['successPct']);
@@ -139,7 +143,7 @@ class _PodQualityWeekPageState extends State<PodQualityWeekPage> {
                             ),
                           ),
                           _SectionTag(
-                            label: 'POD Quality',
+                            label: t.t('pod_quality_title'),
                             icon: Icons.photo_camera_outlined,
                           ),
                         ],
@@ -150,17 +154,17 @@ class _PodQualityWeekPageState extends State<PodQualityWeekPage> {
                           final useRow = constraints.maxWidth >= 540;
                           final tiles = [
                             _StatTile(
-                              label: 'Opportunities',
+                              label: t.t('pod_quality_opp'),
                               value: _intStr(opportunities),
                               tone: _TileTone.neutral,
                             ),
                             _StatTile(
-                              label: 'Success',
+                              label: t.t('pod_quality_success'),
                               value: _pctStr(successPct),
                               tone: _TileTone.good,
                             ),
                             _StatTile(
-                              label: 'Rejects',
+                              label: t.t('pod_quality_rejects'),
                               value: _pctStr(rejectsPct),
                               tone: _TileTone.warn,
                             ),
@@ -187,8 +191,8 @@ class _PodQualityWeekPageState extends State<PodQualityWeekPage> {
                       ),
                       if (podRejects.isNotEmpty) ...[
                         const SizedBox(height: 14),
-                        const Text(
-                          'Rejects breakdown',
+                        Text(
+                          t.t('pod_quality_rejects_breakdown'),
                           style: TextStyle(
                             fontSize: 12,
                             color: Color(0xFF6B7280),
@@ -201,29 +205,34 @@ class _PodQualityWeekPageState extends State<PodQualityWeekPage> {
                           runSpacing: 8,
                           children: [
                             _MiniStat(
-                              label: 'Blurry',
-                              value:
-                                  _intStr(_num(podRejects['blurryPhotoCount'])),
-                            ),
-                            _MiniStat(
-                              label: 'Too Dark',
+                              label: t.t('pod_quality_blurry'),
                               value: _intStr(
-                                  _num(podRejects['photoTooDarkCount'])),
+                                _num(podRejects['blurryPhotoCount']),
+                              ),
                             ),
                             _MiniStat(
-                              label: 'No Package',
+                              label: t.t('pod_quality_too_dark'),
                               value: _intStr(
-                                  _num(podRejects['noPackageDetectedCount'])),
+                                _num(podRejects['photoTooDarkCount']),
+                              ),
                             ),
                             _MiniStat(
-                              label: 'In Car',
-                              value:
-                                  _intStr(_num(podRejects['packageInCarCount'])),
-                            ),
-                            _MiniStat(
-                              label: 'Too Close',
+                              label: t.t('pod_quality_no_package'),
                               value: _intStr(
-                                  _num(podRejects['packageTooCloseCount'])),
+                                _num(podRejects['noPackageDetectedCount']),
+                              ),
+                            ),
+                            _MiniStat(
+                              label: t.t('pod_quality_in_car'),
+                              value: _intStr(
+                                _num(podRejects['packageInCarCount']),
+                              ),
+                            ),
+                            _MiniStat(
+                              label: t.t('pod_quality_too_close'),
+                              value: _intStr(
+                                _num(podRejects['packageTooCloseCount']),
+                              ),
                             ),
                           ],
                         ),
@@ -233,194 +242,242 @@ class _PodQualityWeekPageState extends State<PodQualityWeekPage> {
                 ),
               ),
               Expanded(
-                child: StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
-                  stream: _scores(),
-                  builder: (context, scoreSnap) {
-                    if (scoreSnap.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    final docs = scoreSnap.data ?? const [];
-                    final rows = docs
-                        .where((d) => (d.data()['podQuality'] as Map?) != null)
-                        .toList();
+                child:
+                    StreamBuilder<
+                      List<QueryDocumentSnapshot<Map<String, dynamic>>>
+                    >(
+                      stream: _scores(),
+                      builder: (context, scoreSnap) {
+                        if (scoreSnap.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+                        final docs = scoreSnap.data ?? const [];
+                        final rows = docs
+                            .where(
+                              (d) => (d.data()['podQuality'] as Map?) != null,
+                            )
+                            .toList();
 
-                    if (rows.isEmpty) {
-                      return const Center(child: Text('No POD data for this week.'));
-                    }
+                        if (rows.isEmpty) {
+                          return Center(
+                            child: Text(t.t('pod_quality_no_data_week')),
+                          );
+                        }
 
-                    return Column(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(24, 4, 24, 8),
-                          child: Row(
-                            children: [
-                              const Text(
-                                'Drivers',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFF111827),
-                                ),
+                        return Column(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(24, 4, 24, 8),
+                              child: Row(
+                                children: [
+                                  Text(
+                                    t.t('pod_quality_drivers'),
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF111827),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _SectionTag(
+                                    label: t.tf('pod_quality_entries_count', {
+                                      'count': '${rows.length}',
+                                    }),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 8),
-                              _SectionTag(label: '${rows.length} entries'),
-                            ],
-                          ),
-                        ),
-                        Expanded(
-                          child: ListView.separated(
-                            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                            itemCount: rows.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(height: 12),
-                            itemBuilder: (context, i) {
-                              final data = rows[i].data();
-                              final pod =
-                                  (data['podQuality'] as Map?)
+                            ),
+                            Expanded(
+                              child: ListView.separated(
+                                padding: const EdgeInsets.fromLTRB(
+                                  24,
+                                  0,
+                                  24,
+                                  24,
+                                ),
+                                itemCount: rows.length,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(height: 12),
+                                itemBuilder: (context, i) {
+                                  final data = rows[i].data();
+                                  final pod =
+                                      (data['podQuality'] as Map?)
                                           ?.cast<String, dynamic>() ??
                                       const <String, dynamic>{};
 
-                              final transporterId =
-                                  (data['transporterId'] ?? '').toString();
-                              final driverName =
-                                  (data['driverName'] ?? '').toString().trim();
-                              final name =
-                                  driverName.isNotEmpty ? driverName : '(No Name)';
+                                  final transporterId =
+                                      (data['transporterId'] ?? '').toString();
+                                  final driverName = (data['driverName'] ?? '')
+                                      .toString()
+                                      .trim();
+                                  final name = driverName.isNotEmpty
+                                      ? driverName
+                                      : t.t('dash_no_name');
 
-                              final opportunities = _num(pod['opportunities']) ?? 0;
-                              final success = _num(pod['success']) ?? 0;
-                              final bypass = _num(pod['bypass']) ?? 0;
-                              final rejects = _num(pod['rejects']) ?? 0;
+                                  final opportunities =
+                                      _num(pod['opportunities']) ?? 0;
+                                  final success = _num(pod['success']) ?? 0;
+                                  final bypass = _num(pod['bypass']) ?? 0;
+                                  final rejects = _num(pod['rejects']) ?? 0;
 
-                              final successPct = opportunities > 0
-                                  ? (success / opportunities) * 100.0
-                                  : null;
-                              final rejectsPct = opportunities > 0
-                                  ? (rejects / opportunities) * 100.0
-                                  : null;
+                                  final successPct = opportunities > 0
+                                      ? (success / opportunities) * 100.0
+                                      : null;
+                                  final rejectsPct = opportunities > 0
+                                      ? (rejects / opportunities) * 100.0
+                                      : null;
 
-                              return Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(20),
-                                  border:
-                                      Border.all(color: const Color(0xFFE5E7EB)),
-                                  boxShadow: const [
-                                    BoxShadow(
-                                      color: Color(0x0B111827),
-                                      blurRadius: 18,
-                                      offset: Offset(0, 8),
-                                    ),
-                                  ],
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        _AvatarBadge(text: name),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                name,
-                                                style: const TextStyle(
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.w800,
-                                                  color: Color(0xFF111827),
-                                                ),
-                                              ),
-                                              if (transporterId.isNotEmpty)
-                                                Text(
-                                                  transporterId,
-                                                  style: const TextStyle(
-                                                    fontSize: 12,
-                                                    color: Color(0xFF6B7280),
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                            ],
-                                          ),
+                                  return Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: const Color(0xFFE5E7EB),
+                                      ),
+                                      boxShadow: const [
+                                        BoxShadow(
+                                          color: Color(0x0B111827),
+                                          blurRadius: 18,
+                                          offset: Offset(0, 8),
                                         ),
-                                        Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.end,
+                                      ],
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
                                           children: [
-                                            _StatPill(
-                                              label: 'Success',
-                                              value: _pctStr(successPct),
-                                              tone: _TileTone.good,
+                                            _AvatarBadge(
+                                              text: name,
+                                              noNameText: t.t('dash_no_name'),
                                             ),
-                                            const SizedBox(height: 6),
-                                            _StatPill(
-                                              label: 'Rejects',
-                                              value: _pctStr(rejectsPct),
-                                              tone: _TileTone.warn,
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    name,
+                                                    style: const TextStyle(
+                                                      fontSize: 16,
+                                                      fontWeight:
+                                                          FontWeight.w800,
+                                                      color: Color(0xFF111827),
+                                                    ),
+                                                  ),
+                                                  if (transporterId.isNotEmpty)
+                                                    Text(
+                                                      transporterId,
+                                                      style: const TextStyle(
+                                                        fontSize: 12,
+                                                        color: Color(
+                                                          0xFF6B7280,
+                                                        ),
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                ],
+                                              ),
+                                            ),
+                                            Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.end,
+                                              children: [
+                                                _StatPill(
+                                                  label: t.t(
+                                                    'pod_quality_success',
+                                                  ),
+                                                  value: _pctStr(successPct),
+                                                  tone: _TileTone.good,
+                                                ),
+                                                const SizedBox(height: 6),
+                                                _StatPill(
+                                                  label: t.t(
+                                                    'pod_quality_rejects',
+                                                  ),
+                                                  value: _pctStr(rejectsPct),
+                                                  tone: _TileTone.warn,
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Wrap(
+                                          spacing: 10,
+                                          runSpacing: 10,
+                                          children: [
+                                            _MiniStat(
+                                              label: t.t('pod_quality_opp'),
+                                              value: _intStr(opportunities),
+                                            ),
+                                            _MiniStat(
+                                              label: t.t('pod_quality_success'),
+                                              value: _intStr(success),
+                                            ),
+                                            _MiniStat(
+                                              label: t.t('pod_quality_bypass'),
+                                              value: _intStr(bypass),
+                                            ),
+                                            _MiniStat(
+                                              label: t.t('pod_quality_rejects'),
+                                              value: _intStr(rejects),
+                                            ),
+                                            _MiniStat(
+                                              label: t.t('pod_quality_blurry'),
+                                              value: _intStr(
+                                                _num(pod['blurryPhoto']),
+                                              ),
+                                            ),
+                                            _MiniStat(
+                                              label: t.t(
+                                                'pod_quality_too_dark',
+                                              ),
+                                              value: _intStr(
+                                                _num(pod['photoTooDark']),
+                                              ),
+                                            ),
+                                            _MiniStat(
+                                              label: t.t(
+                                                'pod_quality_no_package',
+                                              ),
+                                              value: _intStr(
+                                                _num(pod['noPackageDetected']),
+                                              ),
+                                            ),
+                                            _MiniStat(
+                                              label: t.t('pod_quality_in_car'),
+                                              value: _intStr(
+                                                _num(pod['packageInCar']),
+                                              ),
+                                            ),
+                                            _MiniStat(
+                                              label: t.t(
+                                                'pod_quality_too_close',
+                                              ),
+                                              value: _intStr(
+                                                _num(pod['packageTooClose']),
+                                              ),
                                             ),
                                           ],
                                         ),
                                       ],
                                     ),
-                                    const SizedBox(height: 12),
-                                    Wrap(
-                                      spacing: 10,
-                                      runSpacing: 10,
-                                      children: [
-                                        _MiniStat(
-                                          label: 'Opp',
-                                          value: _intStr(opportunities),
-                                        ),
-                                        _MiniStat(
-                                          label: 'Success',
-                                          value: _intStr(success),
-                                        ),
-                                        _MiniStat(
-                                          label: 'Bypass',
-                                          value: _intStr(bypass),
-                                        ),
-                                        _MiniStat(
-                                          label: 'Rejects',
-                                          value: _intStr(rejects),
-                                        ),
-                                        _MiniStat(
-                                          label: 'Blurry',
-                                          value: _intStr(_num(pod['blurryPhoto'])),
-                                        ),
-                                        _MiniStat(
-                                          label: 'Too Dark',
-                                          value:
-                                              _intStr(_num(pod['photoTooDark'])),
-                                        ),
-                                        _MiniStat(
-                                          label: 'No Package',
-                                          value: _intStr(
-                                              _num(pod['noPackageDetected'])),
-                                        ),
-                                        _MiniStat(
-                                          label: 'In Car',
-                                          value: _intStr(_num(pod['packageInCar'])),
-                                        ),
-                                        _MiniStat(
-                                          label: 'Too Close',
-                                          value: _intStr(
-                                              _num(pod['packageTooClose'])),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
               ),
             ],
           );
@@ -636,12 +693,13 @@ class _SectionTag extends StatelessWidget {
 
 class _AvatarBadge extends StatelessWidget {
   final String text;
+  final String noNameText;
 
-  const _AvatarBadge({required this.text});
+  const _AvatarBadge({required this.text, required this.noNameText});
 
   String _initials(String value) {
     final trimmed = value.trim();
-    if (trimmed.isEmpty || trimmed == '(No Name)') return '?';
+    if (trimmed.isEmpty || trimmed == noNameText) return '?';
     final parts = trimmed.split(RegExp(r'\\s+')).where((p) => p.isNotEmpty);
     final letters = parts.map((p) => p[0]).toList();
     if (letters.isEmpty) return '?';

@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
+import '../localization/app_localizations.dart';
+
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
 
@@ -17,25 +19,16 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   bool _publishing = false;
 
-  // Matches your UI dropdown labels
+  // Matches your UI dropdown type values
   final List<_NotifType> _types = const [
-    _NotifType('rule', 'New Rule'),
-    _NotifType('message', 'New Message'),
-    _NotifType('academy', 'DA Academy'),
-    _NotifType('rideAlong', 'Ride Along'),
+    _NotifType('rule', 'notifications_page_type_rule'),
+    _NotifType('message', 'notifications_page_type_message'),
+    _NotifType('academy', 'notifications_page_type_academy'),
+    _NotifType('rideAlong', 'notifications_page_type_ride_along'),
   ];
   late _NotifType _selectedType = _types.first;
 
   String? get _uid => FirebaseAuth.instance.currentUser?.uid;
-
-  DocumentReference<Map<String, dynamic>> _dspDoc() =>
-      FirebaseFirestore.instance.collection('users').doc(_uid);
-
-  CollectionReference<Map<String, dynamic>> _adminNotifsCol() =>
-      _dspDoc().collection('notifications');
-
-  CollectionReference<Map<String, dynamic>> _driversCol() =>
-      _dspDoc().collection('drivers');
 
   @override
   void dispose() {
@@ -48,9 +41,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
   // Publish (UI-first implementation)
   // ------------------------------------------------------------
   Future<void> _publish() async {
+    final l10n = AppLocalizations.of(context);
     if (_uid == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You must be logged in.')),
+        SnackBar(content: Text(l10n.t('notifications_page_must_be_logged_in'))),
       );
       return;
     }
@@ -60,7 +54,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
     if (title.isEmpty && body.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Title or message is required.')),
+        SnackBar(
+          content: Text(l10n.t('notifications_page_title_or_message_required')),
+        ),
       );
       return;
     }
@@ -87,12 +83,24 @@ class _NotificationsPageState extends State<NotificationsPage> {
       _bodyCtrl.clear();
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Published to $targetCount drivers.')),
+        SnackBar(
+          content: Text(
+            l10n.tf('notifications_page_published_to_drivers', {
+              'count': '$targetCount',
+            }),
+          ),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Publish failed: $e')),
+        SnackBar(
+          content: Text(
+            l10n.tf('notifications_page_publish_failed', {
+              'error': e.toString(),
+            }),
+          ),
+        ),
       );
     } finally {
       if (mounted) setState(() => _publishing = false);
@@ -106,7 +114,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
     required int confirmedCount,
     required int targetCount,
   }) async {
-
+    final l10n = AppLocalizations.of(context);
     // ✅ Load notification details (title/body) once for the popup header
     final notifDoc = await FirebaseFirestore.instance
         .collection('users')
@@ -115,10 +123,13 @@ class _NotificationsPageState extends State<NotificationsPage> {
         .doc(notificationId)
         .get();
 
-    final notifTitle = (notifDoc.data()?['title'] ?? 'Notification').toString();
+    final notifTitle =
+        (notifDoc.data()?['title'] ??
+                l10n.t('notifications_page_popup_notification_fallback'))
+            .toString();
     final notifBody = (notifDoc.data()?['body'] ?? '').toString();
-    
-    Future<List<String>> loadMissingDrivers() async {
+
+    Future<Map<String, dynamic>> loadMissingDrivers() async {
       final driversSnap = await FirebaseFirestore.instance
           .collection('users')
           .doc(dspUid)
@@ -130,7 +141,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
       for (final d in driversSnap.docs) {
         final driverData = d.data();
         final driverName =
-            (driverData['driverName'] ?? driverData['fullName'] ?? 'Driver')
+            (driverData['driverName'] ??
+                    driverData['fullName'] ??
+                    l10n.t('notifications_page_popup_driver_fallback'))
                 .toString();
 
         final notifSnap = await FirebaseFirestore.instance
@@ -149,129 +162,201 @@ class _NotificationsPageState extends State<NotificationsPage> {
         }
       }
 
-      return missing;
+      final total = driversSnap.docs.length;
+      return {
+        'missing': missing,
+        'total': total,
+        'confirmed': total - missing.length,
+      };
     }
+
+    final statsFuture = loadMissingDrivers();
 
     await showDialog(
       context: context,
       barrierDismissible: true,
       builder: (ctx) {
+        final size = MediaQuery.of(ctx).size;
+        final dialogMaxHeight = size.height * 0.88;
+        final dialogWidth = size.width < 560 ? size.width - 24 : 520.0;
+
         return Dialog(
           backgroundColor: Colors.transparent,
-          child: Container(
-            width: 520,
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 20,
+          ),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: dialogWidth,
+              maxHeight: dialogMaxHeight,
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ✅ Notification context (TITLE + BODY)
-                Text(
-                  notifTitle,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                if (notifBody.isNotEmpty) ...[
-                  const SizedBox(height: 6),
+            child: Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.max,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    notifBody,
+                    notifTitle,
                     style: const TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF4B5563),
-                      fontWeight: FontWeight.w500,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
-                ],
-
-                const SizedBox(height: 16),
-                const Divider(height: 1),
-                const SizedBox(height: 12),
-
-                // ✅ Existing section header
-                Row(
-                  children: [
-                    const Text(
-                      'NOT CONFIRMED BY:',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w900,
+                  if (notifBody.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: dialogMaxHeight * 0.28,
                       ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      'missing: ${(targetCount - confirmedCount) < 0 ? 0 : (targetCount - confirmedCount)}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFFE9741A),
+                      child: SingleChildScrollView(
+                        child: Text(
+                          notifBody,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF4B5563),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                       ),
                     ),
                   ],
-                ),
-                const SizedBox(height: 12),
-                const Divider(height: 1),
-                const SizedBox(height: 10),
 
-                // ✅ Your list stays unchanged
-                SizedBox(
-                  height: 420,
+                  const SizedBox(height: 16),
+                  const Divider(height: 1),
+                  const SizedBox(height: 12),
 
-                  child: FutureBuilder<List<String>>(
-                    future: loadMissingDrivers(),
-                    builder: (ctx, snap) {
-                      if (snap.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-
-                      if (snap.hasError) {
-                        return Center(child: Text('Error: ${snap.error}'));
-                      }
-
-                      final items = snap.data ?? [];
-                      if (items.isEmpty) {
-                        return const Center(
-                          child: Text(
-                            'All drivers have confirmed.',
-                            style: TextStyle(color: Colors.black54),
-                          ),
-                        );
-                      }
-
-                      return ListView.separated(
-                        itemCount: items.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1),
-                        itemBuilder: (_, i) {
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            child: Text(
-                              items[i],
+                  Row(
+                    children: [
+                      Text(
+                        l10n.t('notifications_page_not_confirmed_by'),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const Spacer(),
+                      FutureBuilder<Map<String, dynamic>>(
+                        future: statsFuture,
+                        builder: (_, statsSnap) {
+                          if (statsSnap.connectionState ==
+                                  ConnectionState.waiting &&
+                              !statsSnap.hasData) {
+                            return Text(
+                              l10n.t('notifications_page_missing_loading'),
                               style: const TextStyle(
                                 fontSize: 14,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFFE9741A),
                               ),
+                            );
+                          }
+                          if (statsSnap.hasError) {
+                            return Text(
+                              l10n.t('notifications_page_missing_unknown'),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFFE9741A),
+                              ),
+                            );
+                          }
+                          final total =
+                              (statsSnap.data?['total'] as num?)?.toInt() ?? 0;
+                          final confirmed =
+                              (statsSnap.data?['confirmed'] as num?)?.toInt() ??
+                              0;
+                          final missingRaw = total - confirmed;
+                          final missing = missingRaw < 0 ? 0 : missingRaw;
+                          return Text(
+                            l10n.tf('notifications_page_missing_count', {
+                              'count': '$missing',
+                            }),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFFE9741A),
                             ),
                           );
                         },
-                      );
-                    },
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 10),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () => Navigator.of(ctx).pop(),
-                    child: const Text('Close'),
+                  const SizedBox(height: 12),
+                  const Divider(height: 1),
+                  const SizedBox(height: 10),
+
+                  Expanded(
+                    child: FutureBuilder<Map<String, dynamic>>(
+                      future: statsFuture,
+                      builder: (ctx, snap) {
+                        if (snap.connectionState == ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+
+                        if (snap.hasError) {
+                          return Center(
+                            child: Text(
+                              l10n.tf('notifications_page_error_generic', {
+                                'error': '${snap.error}',
+                              }),
+                            ),
+                          );
+                        }
+
+                        final items =
+                            (snap.data?['missing'] as List<dynamic>? ??
+                                    const [])
+                                .map((e) => e.toString())
+                                .toList(growable: false);
+                        if (items.isEmpty) {
+                          return Center(
+                            child: Text(
+                              l10n.t(
+                                'notifications_page_all_drivers_confirmed',
+                              ),
+                              style: const TextStyle(color: Colors.black54),
+                            ),
+                          );
+                        }
+
+                        return ListView.separated(
+                          itemCount: items.length,
+                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          itemBuilder: (_, i) {
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              child: Text(
+                                items[i],
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: Text(l10n.t('notifications_page_close')),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -287,96 +372,102 @@ class _NotificationsPageState extends State<NotificationsPage> {
   // ------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Padding(
-        padding: const EdgeInsets.all(24),
-        child: LayoutBuilder(
-          builder: (ctx, constraints) {
-            final w = constraints.maxWidth;
-            final h = constraints.maxHeight;
+      padding: const EdgeInsets.all(24),
+      child: LayoutBuilder(
+        builder: (ctx, constraints) {
+          final w = constraints.maxWidth;
+          final h = constraints.maxHeight;
 
-            // Breakpoints (tune if needed)
-            final bool stack = w < 800;
+          // Breakpoints (tune if needed)
+          final bool stack = w < 800;
 
-            // Space taken by title row + spacing
-            const headerBlock = 22.0 + 16.0;
+          // Space taken by title row + spacing
+          const headerBlock = 22.0 + 16.0;
 
-            // Remaining height for main content area
-            final contentH = (h - headerBlock).clamp(520.0, 5000.0);
+          // Remaining height for main content area
+          final contentH = (h - headerBlock).clamp(520.0, 5000.0);
 
-            // Composer height shrinks when screen height shrinks
-            // Wide: it can use full height (since right card sits next to it)
-            // Stack: we split height between composer and history
-            final composerH = stack
-                ? (contentH * 0.56).clamp(360.0, 520.0)
-                : contentH;
+          // Composer height shrinks when screen height shrinks
+          // Wide: it can use full height (since right card sits next to it)
+          // Stack: we split height between composer and history
+          final composerH = stack
+              ? (contentH * 0.56).clamp(360.0, 520.0)
+              : contentH;
 
-            final historyH = stack
-                ? (contentH * 0.44).clamp(320.0, 560.0)
-                : contentH;
+          final historyH = stack
+              ? (contentH * 0.44).clamp(320.0, 560.0)
+              : contentH;
 
-            final left = _ComposerCard(
-              selectedType: _selectedType,
-              types: _types,
-              titleCtrl: _titleCtrl,
-              bodyCtrl: _bodyCtrl,
-              publishing: _publishing,
-              onTypeChanged: (t) => setState(() => _selectedType = t),
-              onPublish: _publishing ? null : _publish,
-            );
+          final left = _ComposerCard(
+            selectedType: _selectedType,
+            types: _types,
+            titleCtrl: _titleCtrl,
+            bodyCtrl: _bodyCtrl,
+            publishing: _publishing,
+            onTypeChanged: (t) => setState(() => _selectedType = t),
+            onPublish: _publishing ? null : _publish,
+          );
 
-            final right = _HistoryCard(
-              uid: _uid,
-              onOpenMissing: (notifId, confirmedCount, targetCount) {
-                final dspUid = _uid;
-                if (dspUid == null) return;
-                _openNotConfirmedPopup(
-                  context: context,
-                  dspUid: dspUid,
-                  notificationId: notifId,
-                  confirmedCount: confirmedCount,
-                  targetCount: targetCount,
-                );
-              },
-            );
+          final right = _HistoryCard(
+            uid: _uid,
+            onOpenMissing: (notifId, confirmedCount, targetCount) {
+              final dspUid = _uid;
+              if (dspUid == null) return;
+              _openNotConfirmedPopup(
+                context: context,
+                dspUid: dspUid,
+                notificationId: notifId,
+                confirmedCount: confirmedCount,
+                targetCount: targetCount,
+              );
+            },
+          );
 
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: const [
-                    Icon(Icons.notifications_none, size: 22),
-                    SizedBox(width: 10),
-                    Text(
-                      'Notifications',
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 10,
+                runSpacing: 6,
+                children: [
+                  const Icon(Icons.notifications_none, size: 22),
+                  Text(
+                    l10n.t('notifications_page_title'),
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
                     ),
-                  ],
-                ),
-                const SizedBox(height: 16),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
 
-                Expanded(
-                  child: stack
-                      ? ListView(
-                          // IMPORTANT: bounded heights so Expanded() inside cards works
-                          children: [
-                            SizedBox(height: composerH, child: left),
-                            const SizedBox(height: 16),
-                            SizedBox(height: historyH, child: right),
-                          ],
-                        )
-                      : Row(
-                          children: [
-                            Expanded(flex: 6, child: left),
-                            const SizedBox(width: 18),
-                            Expanded(flex: 4, child: right),
-                          ],
-                        ),
-                ),
-              ],
-            );
-          },
-        ),
-      );
+              Expanded(
+                child: stack
+                    ? ListView(
+                        // IMPORTANT: bounded heights so Expanded() inside cards works
+                        children: [
+                          SizedBox(height: composerH, child: left),
+                          const SizedBox(height: 16),
+                          SizedBox(height: historyH, child: right),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          Expanded(flex: 6, child: left),
+                          const SizedBox(width: 18),
+                          Expanded(flex: 4, child: right),
+                        ],
+                      ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 }
 
@@ -427,6 +518,7 @@ class _ComposerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -435,31 +527,21 @@ class _ComposerCard extends StatelessWidget {
         border: Border.all(color: const Color(0xFFE5E7EB)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
-          )
+          ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header row: "NEW CONTENT | Notifications" + dropdown
-          Row(
-            children: [
-              const Icon(Icons.notifications_none, color: Color(0xFF1D7F5A)),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Text(
-                  'NEW CONTENT | Notifications',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.3,
-                  ),
-                ),
-              ),
-              Container(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 640;
+              final dropdown = Container(
+                width: compact ? double.infinity : null,
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF6F7F9),
@@ -469,11 +551,15 @@ class _ComposerCard extends StatelessWidget {
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<_NotifType>(
                     value: selectedType,
+                    isExpanded: compact,
                     items: types
                         .map(
                           (t) => DropdownMenuItem<_NotifType>(
                             value: t,
-                            child: Text(t.label),
+                            child: Text(
+                              l10n.t(t.labelKey),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         )
                         .toList(),
@@ -482,15 +568,67 @@ class _ComposerCard extends StatelessWidget {
                     },
                   ),
                 ),
-              ),
-            ],
+              );
+
+              if (compact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.notifications_none,
+                          color: Color(0xFF1D7F5A),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            l10n.t('notifications_page_new_content'),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    dropdown,
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  const Icon(
+                    Icons.notifications_none,
+                    color: Color(0xFF1D7F5A),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      l10n.t('notifications_page_new_content'),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ),
+                  dropdown,
+                ],
+              );
+            },
           ),
           const SizedBox(height: 14),
 
           // Title
           TextField(
             controller: titleCtrl,
-            decoration: _pillField(hint: 'TITLE'),
+            decoration: _pillField(
+              hint: l10n.t('notifications_page_title_hint'),
+            ),
           ),
           const SizedBox(height: 12),
 
@@ -502,7 +640,9 @@ class _ComposerCard extends StatelessWidget {
               maxLines: null,
               minLines: null,
               textAlignVertical: TextAlignVertical.top,
-              decoration: _pillField(hint: 'RULE / MESSAGE'),
+              decoration: _pillField(
+                hint: l10n.t('notifications_page_rule_message_hint'),
+              ),
             ),
           ),
           const SizedBox(height: 14),
@@ -528,13 +668,14 @@ class _ComposerCard extends StatelessWidget {
                         height: 18,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
                         ),
                       )
-                    : const Text(
-                        'publish',
-                        style: TextStyle(
+                    : Text(
+                        l10n.t('notifications_page_publish'),
+                        style: const TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 15,
                           letterSpacing: 0.2,
@@ -554,16 +695,18 @@ class _ComposerCard extends StatelessWidget {
 // -----------------------------------------------------------------------------
 class _HistoryCard extends StatelessWidget {
   final String? uid;
-  final void Function(String notificationId, int confirmedCount, int targetCount)
-      onOpenMissing;
+  final void Function(
+    String notificationId,
+    int confirmedCount,
+    int targetCount,
+  )
+  onOpenMissing;
 
-  const _HistoryCard({
-    required this.uid,
-    required this.onOpenMissing,
-  });
+  const _HistoryCard({required this.uid, required this.onOpenMissing});
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final dspUid = uid;
     return Container(
       padding: const EdgeInsets.all(18),
@@ -573,22 +716,22 @@ class _HistoryCard extends StatelessWidget {
         border: Border.all(color: const Color(0xFFE5E7EB)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
-          )
+          ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            children: const [
-              Icon(Icons.history, color: Color(0xFF1D7F5A)),
-              SizedBox(width: 10),
+            children: [
+              const Icon(Icons.history, color: Color(0xFF1D7F5A)),
+              const SizedBox(width: 10),
               Text(
-                'History',
-                style: TextStyle(
+                l10n.t('notifications_page_history'),
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w900,
                 ),
@@ -598,72 +741,92 @@ class _HistoryCard extends StatelessWidget {
           const SizedBox(height: 12),
           Expanded(
             child: dspUid == null
-                ? const Center(child: Text('Not logged in'))
-                : StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                ? Center(
+                    child: Text(l10n.t('notifications_page_not_logged_in')),
+                  )
+                : StreamBuilder<int>(
                     stream: FirebaseFirestore.instance
                         .collection('users')
                         .doc(dspUid)
-                        .collection('notifications')
-                        .orderBy('createdAt', descending: true)
-                        .snapshots(),
-                    builder: (ctx, snap) {
-                      if (snap.connectionState == ConnectionState.waiting) {
-                        return const Center(
-                          child: CircularProgressIndicator(),
-                        );
-                      }
-                      if (snap.hasError) {
-                        return Center(
-                          child: Text('Error: ${snap.error}'),
-                        );
-                      }
+                        .collection('drivers')
+                        .snapshots()
+                        .map((s) => s.docs.length),
+                    builder: (ctx, driverSnap) {
+                      final currentDriverCount = driverSnap.data ?? 0;
+                      return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                        stream: FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(dspUid)
+                            .collection('notifications')
+                            .orderBy('createdAt', descending: true)
+                            .snapshots(),
+                        builder: (ctx, snap) {
+                          if (snap.connectionState == ConnectionState.waiting) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          }
+                          if (snap.hasError) {
+                            return Center(
+                              child: Text(
+                                l10n.tf('notifications_page_error_generic', {
+                                  'error': '${snap.error}',
+                                }),
+                              ),
+                            );
+                          }
 
-                      final docs = snap.data?.docs ?? [];
-                      if (docs.isEmpty) {
-                        return const Center(
-                          child: Text(
-                            'No notifications yet.',
-                            style: TextStyle(color: Colors.black54),
-                          ),
-                        );
-                      }
+                          final docs = snap.data?.docs ?? [];
+                          if (docs.isEmpty) {
+                            return Center(
+                              child: Text(
+                                l10n.t('notifications_page_no_notifications'),
+                                style: const TextStyle(color: Colors.black54),
+                              ),
+                            );
+                          }
 
-                      return ListView.separated(
-                        itemCount: docs.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (_, i) {
-                          final d = docs[i];
-                          final data = d.data();
-                          final title = (data['title'] ?? '').toString();
-                          final body = (data['body'] ?? '').toString();
-                          final type = (data['type'] ?? 'rule').toString();
-                          final confirmedCount =
-                              (data['confirmedCount'] as num?)?.toInt() ?? 0;
-                          final targetCount =
-                              (data['targetCount'] as num?)?.toInt() ?? 0;
+                          return ListView.separated(
+                            itemCount: docs.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 10),
+                            itemBuilder: (_, i) {
+                              final d = docs[i];
+                              final data = d.data();
+                              final title = (data['title'] ?? '').toString();
+                              final body = (data['body'] ?? '').toString();
+                              final type = (data['type'] ?? 'rule').toString();
+                              final confirmedCount =
+                                  (data['confirmedCount'] as num?)?.toInt() ??
+                                  0;
+                              final targetCount =
+                                  (data['targetCount'] as num?)?.toInt() ?? 0;
 
-                          final ts = data['createdAt'];
-                          final dt = ts is Timestamp ? ts.toDate() : null;
+                              final ts = data['createdAt'];
+                              final dt = ts is Timestamp ? ts.toDate() : null;
 
-                          return InkWell(
-                            borderRadius: BorderRadius.circular(16),
-                            onTap: () {
-                              onOpenMissing(
-                                d.id,
-                                confirmedCount,
-                                targetCount,
+                              return InkWell(
+                                borderRadius: BorderRadius.circular(16),
+                                onTap: () {
+                                  onOpenMissing(
+                                    d.id,
+                                    confirmedCount,
+                                    targetCount,
+                                  );
+                                },
+                                child: _HistoryTile(
+                                  dspUid: dspUid,
+                                  notificationId: d.id,
+                                  title: title,
+                                  body: body,
+                                  type: type,
+                                  dateTime: dt,
+                                  confirmedCount: confirmedCount,
+                                  targetCount: targetCount,
+                                  currentDriverCount: currentDriverCount,
+                                ),
                               );
                             },
-                            child: _HistoryTile(
-                              dspUid: dspUid,
-                              notificationId: d.id,
-                              title: title,
-                              body: body,
-                              type: type,
-                              dateTime: dt,
-                              confirmedCount: confirmedCount,
-                              targetCount: targetCount,
-                            ),
                           );
                         },
                       );
@@ -686,6 +849,7 @@ class _HistoryTile extends StatelessWidget {
   final DateTime? dateTime;
   final int confirmedCount;
   final int targetCount;
+  final int currentDriverCount;
 
   const _HistoryTile({
     required this.dspUid,
@@ -696,61 +860,214 @@ class _HistoryTile extends StatelessWidget {
     required this.dateTime,
     required this.confirmedCount,
     required this.targetCount,
+    required this.currentDriverCount,
   });
 
-  String _fmtDate(DateTime? dt) {
+  String _fmtDate(DateTime? dt, AppLocalizations l10n) {
     if (dt == null) return '';
     final dd = dt.day.toString().padLeft(2, '0');
     final mm = dt.month.toString().padLeft(2, '0');
     final yy = dt.year.toString();
     final hh = dt.hour.toString().padLeft(2, '0');
     final min = dt.minute.toString().padLeft(2, '0');
-    return '$dd.$mm.$yy | $hh:$min Uhr';
+    final suffix = l10n.t('notifications_page_time_suffix').trim();
+    if (suffix.isEmpty) return '$dd.$mm.$yy | $hh:$min';
+    return '$dd.$mm.$yy | $hh:$min $suffix';
   }
 
-  String _typeLabel(String t) {
+  String _typeLabel(String t, AppLocalizations l10n) {
     switch (t) {
       case 'message':
-        return 'NEW MESSAGE';
+        return l10n.t('notifications_page_type_message_badge');
       case 'academy':
-        return 'DA ACADEMY';
+        return l10n.t('notifications_page_type_academy_badge');
       case 'rideAlong':
-        return 'RIDE ALONG';
+        return l10n.t('notifications_page_type_ride_along_badge');
       case 'rule':
       default:
-        return 'NEW RULE';
+        return l10n.t('notifications_page_type_rule_badge');
     }
   }
 
   IconData _typeIcon(String t) {
-  switch (t) {
-    case 'message':
-      return Icons.chat_bubble_outline;
-    case 'academy':
-      return Icons.school_outlined;
-    case 'rideAlong':
-      return Icons.directions_car_filled_outlined;
-    case 'rule':
-    default:
-      return Icons.gavel;
+    switch (t) {
+      case 'message':
+        return Icons.chat_bubble_outline;
+      case 'academy':
+        return Icons.school_outlined;
+      case 'rideAlong':
+        return Icons.directions_car_filled_outlined;
+      case 'rule':
+      default:
+        return Icons.gavel;
+    }
   }
-}
 
+  Future<void> _editEverywhere(BuildContext context) async {
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final titleCtrl = TextEditingController(text: title);
+    final bodyCtrl = TextEditingController(text: body);
+
+    try {
+      final payload = await showDialog<Map<String, String>>(
+        context: context,
+        barrierDismissible: true,
+        builder: (ctx) {
+          return AlertDialog(
+            title: Text(l10n.t('notifications_page_edit_rule')),
+            content: SizedBox(
+              width: 520,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: titleCtrl,
+                    decoration: InputDecoration(
+                      labelText: l10n.t('notifications_page_field_title'),
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: bodyCtrl,
+                    minLines: 5,
+                    maxLines: 12,
+                    decoration: InputDecoration(
+                      labelText: l10n.t('notifications_page_field_body'),
+                      alignLabelWithHint: true,
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text(l10n.t('notifications_page_cancel')),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop({
+                    'title': titleCtrl.text.trim(),
+                    'body': bodyCtrl.text.trim(),
+                  });
+                },
+                child: Text(l10n.t('notifications_page_save')),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (payload == null) return;
+      final newTitle = (payload['title'] ?? '').trim();
+      final newBody = (payload['body'] ?? '').trim();
+      if (newTitle.isEmpty && newBody.isEmpty) {
+        messenger?.showSnackBar(
+          SnackBar(
+            content: Text(l10n.t('notifications_page_title_or_body_required')),
+          ),
+        );
+        return;
+      }
+
+      final db = FirebaseFirestore.instance;
+      final dspRef = db.collection('users').doc(dspUid);
+      final adminNotifRef = dspRef
+          .collection('notifications')
+          .doc(notificationId);
+
+      final adminSnap = await adminNotifRef.get();
+      if (!adminSnap.exists) {
+        throw Exception(l10n.t('notifications_page_notification_not_found'));
+      }
+
+      final adminData = adminSnap.data() ?? <String, dynamic>{};
+      final notifType = (adminData['type'] ?? type).toString();
+      final createdAt = adminData['createdAt'];
+      final now = FieldValue.serverTimestamp();
+
+      final driversSnap = await dspRef.collection('drivers').get();
+      final drivers = driversSnap.docs;
+
+      await adminNotifRef.set({
+        'title': newTitle,
+        'body': newBody,
+        'targetCount': drivers.length,
+        'confirmedCount': 0,
+        'requiresConfirmation': true,
+        'updatedAt': now,
+        'editedAt': now,
+      }, SetOptions(merge: true));
+
+      const chunkSize = 400;
+      for (int i = 0; i < drivers.length; i += chunkSize) {
+        final end = (i + chunkSize > drivers.length)
+            ? drivers.length
+            : (i + chunkSize);
+        final batch = db.batch();
+
+        for (final d in drivers.sublist(i, end)) {
+          final driverNotifRef = d.reference
+              .collection('notifications')
+              .doc(notificationId);
+
+          batch.set(driverNotifRef, {
+            'notificationId': notificationId,
+            'type': notifType,
+            'title': newTitle,
+            'body': newBody,
+            'status': 'unread',
+            'readAt': null,
+            'confirmedAt': null,
+            'requiresConfirmation': true,
+            'createdAt': createdAt ?? now,
+            'updatedAt': now,
+            'editedAt': now,
+          }, SetOptions(merge: true));
+        }
+
+        await batch.commit();
+      }
+
+      messenger?.showSnackBar(
+        SnackBar(
+          content: Text(
+            l10n.tf('notifications_page_rule_updated_for_drivers', {
+              'count': '${drivers.length}',
+            }),
+          ),
+        ),
+      );
+    } catch (e) {
+      messenger?.showSnackBar(
+        SnackBar(
+          content: Text(
+            l10n.tf('notifications_page_edit_failed', {'error': e.toString()}),
+          ),
+        ),
+      );
+    } finally {
+      titleCtrl.dispose();
+      bodyCtrl.dispose();
+    }
+  }
 
   Future<void> _deleteEverywhere(BuildContext context) async {
+    final l10n = AppLocalizations.of(context);
     final ok = await showDialog<bool>(
       context: context,
       barrierDismissible: true,
       builder: (ctx) {
         return AlertDialog(
-          title: const Text('Delete notification?'),
-          content: const Text(
-            'This will delete this notification for you and for all drivers.',
-          ),
+          title: Text(l10n.t('notifications_page_delete_question')),
+          content: Text(l10n.t('notifications_page_delete_body')),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Cancel'),
+              child: Text(l10n.t('notifications_page_cancel')),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -761,7 +1078,7 @@ class _HistoryTile extends StatelessWidget {
                 ),
               ),
               onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text('Delete'),
+              child: Text(l10n.t('notifications_page_delete')),
             ),
           ],
         );
@@ -774,25 +1091,121 @@ class _HistoryTile extends StatelessWidget {
       final callable = FirebaseFunctions.instance.httpsCallable(
         'deleteNotificationEverywhere',
       );
-      await callable.call({
-        'dspUid': dspUid,
-        'notificationId': notificationId,
-      });
+      await callable.call({'dspUid': dspUid, 'notificationId': notificationId});
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Notification deleted.')),
+        SnackBar(
+          content: Text(l10n.t('notifications_page_notification_deleted')),
+        ),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Delete failed: $e')),
+        SnackBar(
+          content: Text(
+            l10n.tf('notifications_page_delete_failed', {
+              'error': e.toString(),
+            }),
+          ),
+        ),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final ratio =
-        (targetCount <= 0) ? '0 / 0' : '$confirmedCount / $targetCount';
+    final l10n = AppLocalizations.of(context);
+    final total = currentDriverCount > 0 ? currentDriverCount : targetCount;
+    final safeTotal = total <= 0 ? 0 : total;
+    final safeConfirmed = safeTotal <= 0
+        ? 0
+        : (confirmedCount > safeTotal ? safeTotal : confirmedCount);
+    final ratio = '$safeConfirmed / $safeTotal';
+
+    final menuButton = Theme(
+      data: Theme.of(context).copyWith(
+        popupMenuTheme: PopupMenuThemeData(
+          color: const Color(0xFFF3F6F7),
+          elevation: 8,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: const BorderSide(color: Color(0xFFE5E7EB)),
+          ),
+        ),
+      ),
+      child: SizedBox(
+        width: 36,
+        height: 36,
+        child: Center(
+          child: PopupMenuButton<String>(
+            tooltip: l10n.t('notifications_page_options'),
+            splashRadius: 18,
+            offset: const Offset(0, 10),
+            onSelected: (v) {
+              if (v == 'edit') _editEverywhere(context);
+              if (v == 'delete') _deleteEverywhere(context);
+            },
+            itemBuilder: (_) => [
+              if (type == 'rule')
+                PopupMenuItem<String>(
+                  value: 'edit',
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.edit_outlined,
+                        size: 18,
+                        color: Color(0xFF1D7F5A),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        l10n.t('notifications_page_menu_edit_rule'),
+                        style: const TextStyle(
+                          color: Color(0xFF1D7F5A),
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              PopupMenuItem<String>(
+                value: 'delete',
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.delete_outline,
+                      size: 18,
+                      color: Color(0xFFE11D48),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      l10n.t('notifications_page_menu_delete'),
+                      style: const TextStyle(
+                        color: Color(0xFFE11D48),
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            icon: const Icon(
+              Icons.more_vert,
+              size: 18,
+              color: Color(0xFF6B7280),
+            ),
+          ),
+        ),
+      ),
+    );
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -801,11 +1214,11 @@ class _HistoryTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFE5E7EB)),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Left icon
-          Container(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 560;
+
+          final leading = Container(
             width: 48,
             height: 48,
             decoration: BoxDecoration(
@@ -813,63 +1226,58 @@ class _HistoryTile extends StatelessWidget {
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: const Color(0xFFE5E7EB)),
             ),
-            child: Icon(_typeIcon(type), color: Color(0xFF6B7280)),
-          ),
-          const SizedBox(width: 12),
+            child: Icon(_typeIcon(type), color: const Color(0xFF6B7280)),
+          );
 
-          // Middle content
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+          final textBlock = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${_typeLabel(type, l10n)} | ${title.isEmpty ? l10n.t('notifications_page_title_fallback') : title}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 12,
+                  letterSpacing: 0.2,
+                ),
+              ),
+              const SizedBox(height: 4),
+              if (_fmtDate(dateTime, l10n).isNotEmpty)
                 Text(
-                  '${_typeLabel(type)} | ${title.isEmpty ? 'TITLE' : title}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  _fmtDate(dateTime, l10n),
                   style: const TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 12,
-                    letterSpacing: 0.2,
+                    fontSize: 11,
+                    color: Color(0xFF9CA3AF),
                   ),
                 ),
-                const SizedBox(height: 4),
-                if (_fmtDate(dateTime).isNotEmpty)
-                  Text(
-                    _fmtDate(dateTime),
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFF9CA3AF),
-                    ),
-                  ),
-                const SizedBox(height: 6),
-                Text(
-                  body.isEmpty ? '—' : body,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF4B5563),
-                    height: 1.25,
-                  ),
+              const SizedBox(height: 6),
+              Text(
+                body.isEmpty ? '—' : body,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF4B5563),
+                  height: 1.25,
                 ),
-              ],
-            ),
-          ),
+              ),
+            ],
+          );
 
-          const SizedBox(width: 14),
-
-          // Right side: confirmed column + 3-dot menu
-          Row(
+          final meta = Row(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  const Text(
-                    'confirmed by',
-                    style: TextStyle(fontSize: 10, color: Color(0xFF9CA3AF)),
+                  Text(
+                    l10n.t('notifications_page_confirmed_by'),
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: Color(0xFF9CA3AF),
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -882,67 +1290,39 @@ class _HistoryTile extends StatelessWidget {
                 ],
               ),
               const SizedBox(width: 12),
-              Theme(
-                data: Theme.of(context).copyWith(
-                  popupMenuTheme: PopupMenuThemeData(
-                    color: const Color(0xFFF3F6F7),
-                    elevation: 8,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      side: const BorderSide(color: Color(0xFFE5E7EB)),
-                    ),
-                  ),
-                ),
-                child: SizedBox(
-                  width: 36,
-                  height: 36,
-                  child: Center(
-                    child: PopupMenuButton<String>(
-                      tooltip: 'Options',
-                      splashRadius: 18,
-                      offset: const Offset(0, 10),
-                      onSelected: (v) {
-                        if (v == 'delete') _deleteEverywhere(context);
-                      },
-                      itemBuilder: (_) => [
-                        PopupMenuItem<String>(
-                          value: 'delete',
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: const [
-                              Icon(
-                                Icons.delete_outline,
-                                size: 18,
-                                color: Color(0xFFE11D48),
-                              ),
-                              SizedBox(width: 10),
-                              Text(
-                                'Delete',
-                                style: TextStyle(
-                                  color: Color(0xFFE11D48),
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                      icon: const Icon(
-                        Icons.more_vert,
-                        size: 18,
-                        color: Color(0xFF6B7280),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+              menuButton,
             ],
-          ),
-        ],
+          );
+
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    leading,
+                    const SizedBox(width: 12),
+                    Expanded(child: textBlock),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(mainAxisAlignment: MainAxisAlignment.end, children: [meta]),
+              ],
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              leading,
+              const SizedBox(width: 12),
+              Expanded(child: textBlock),
+              const SizedBox(width: 14),
+              meta,
+            ],
+          );
+        },
       ),
     );
   }
@@ -953,8 +1333,8 @@ class _HistoryTile extends StatelessWidget {
 // -----------------------------------------------------------------------------
 class _NotifType {
   final String value; // stored in Firestore
-  final String label; // shown in dropdown
-  const _NotifType(this.value, this.label);
+  final String labelKey; // localization key shown in dropdown
+  const _NotifType(this.value, this.labelKey);
 
   @override
   bool operator ==(Object other) =>

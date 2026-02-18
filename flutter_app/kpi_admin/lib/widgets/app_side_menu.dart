@@ -10,10 +10,12 @@ enum AppNav {
   dashboard,
   podQuality,
   drivers,
+  tasks,
   notifications,
   faqs,
   comingSoon,
   adminApprovals,
+  profile,
 }
 
 class AppSideMenu extends StatelessWidget {
@@ -81,13 +83,15 @@ class AppSideMenu extends StatelessWidget {
                 icon: Icons.dashboard,
                 label: 'Score Card Dashboard',
                 active: active == AppNav.dashboard,
-                onTap: () => _handleNav(context, AppNav.dashboard, '/dashboard'),
+                onTap: () =>
+                    _handleNav(context, AppNav.dashboard, '/dashboard'),
               ),
               _SubMenuItem(
                 icon: Icons.photo_camera_outlined,
                 label: 'POD Quality',
                 active: active == AppNav.podQuality,
-                onTap: () => _handleNav(context, AppNav.podQuality, '/pod-quality'),
+                onTap: () =>
+                    _handleNav(context, AppNav.podQuality, '/pod-quality'),
               ),
               _MenuItem(
                 icon: Icons.badge_outlined,
@@ -96,10 +100,17 @@ class AppSideMenu extends StatelessWidget {
                 onTap: () => _handleNav(context, AppNav.drivers, '/drivers'),
               ),
               _MenuItem(
+                icon: Icons.task_alt_outlined,
+                label: 'Task Sheet',
+                active: active == AppNav.tasks,
+                onTap: () => _handleNav(context, AppNav.tasks, '/tasks'),
+              ),
+              _MenuItem(
                 icon: Icons.notifications_none,
                 label: 'Notifications',
                 active: active == AppNav.notifications,
-                onTap: () => _handleNav(context, AppNav.notifications, '/notifications'),
+                onTap: () =>
+                    _handleNav(context, AppNav.notifications, '/notifications'),
               ),
               _MenuItem(
                 icon: Icons.help_outline,
@@ -159,8 +170,7 @@ class AppSideMenu extends StatelessWidget {
 
                   return InkWell(
                     onTap: () {
-                      // keep route for profile
-                      Navigator.of(context).pushNamed('/profile');
+                      _handleNav(context, AppNav.profile, '/profile');
                     },
                     borderRadius: BorderRadius.circular(16),
                     child: Container(
@@ -178,7 +188,10 @@ class AppSideMenu extends StatelessWidget {
                                 backgroundColor: Colors.white24,
                                 backgroundImage: img,
                                 child: img == null
-                                    ? const Icon(Icons.person, color: Colors.white)
+                                    ? const Icon(
+                                        Icons.person,
+                                        color: Colors.white,
+                                      )
                                     : null,
                               ),
                               const SizedBox(width: 10),
@@ -188,7 +201,10 @@ class AppSideMenu extends StatelessWidget {
                                   email: email.toString(),
                                 ),
                               ),
-                              const Icon(Icons.chevron_right, color: Colors.white70),
+                              const Icon(
+                                Icons.chevron_right,
+                                color: Colors.white70,
+                              ),
                             ],
                           ),
                           const SizedBox(height: 12),
@@ -203,7 +219,10 @@ class AppSideMenu extends StatelessWidget {
                                   (route) => false,
                                 );
                               },
-                              icon: const Icon(Icons.logout, color: Colors.white70),
+                              icon: const Icon(
+                                Icons.logout,
+                                color: Colors.white70,
+                              ),
                               label: const Text(
                                 'Sign out',
                                 style: TextStyle(color: Colors.white70),
@@ -231,7 +250,10 @@ class AppSideMenu extends StatelessWidget {
       });
       return ctrl;
     }
-    return FirebaseFirestore.instance.collection('users').doc(u.uid).snapshots();
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(u.uid)
+        .snapshots();
   }
 }
 

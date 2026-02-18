@@ -1,6 +1,4 @@
 // RESPONSIVE + DESKTOP-STYLE DRIVER ROW — scorecard_week.dart
-import 'dart:typed_data';
-
 import '../services/driver_csv.dart';
 import 'package:file_picker/file_picker.dart';
 
@@ -8,14 +6,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-// for uploading CSV
-import 'package:file_picker/file_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart' as fb;
-import '../main.dart' show storage;
-
 // 🔸 Added: need current user id to read scores under users/{uid}/scores
 import 'package:firebase_auth/firebase_auth.dart';
-
+import '../localization/app_localizations.dart';
 
 final _pct = NumberFormat.decimalPattern('de');
 final _int = NumberFormat.decimalPattern('de');
@@ -25,12 +18,20 @@ String _s(dynamic v) => (v == null) ? '' : v.toString();
 
 String _pctStr(num? v) {
   if (v == null) return '';
-  try { return '${_pct.format(v)} %'; } catch (_) { return ''; }
+  try {
+    return '${_pct.format(v)} %';
+  } catch (_) {
+    return '';
+  }
 }
 
 String _intStr(num? v) {
   if (v == null) return '';
-  try { return _int.format(v); } catch (_) { return ''; }
+  try {
+    return _int.format(v);
+  } catch (_) {
+    return '';
+  }
 }
 
 double _numOr0(dynamic v) {
@@ -43,16 +44,31 @@ double _numOr0(dynamic v) {
   return 0;
 }
 
+Map<String, dynamic> _strMap(dynamic v) {
+  if (v is Map<String, dynamic>) return v;
+  if (v is Map) {
+    try {
+      return Map<String, dynamic>.from(v);
+    } catch (_) {
+      final out = <String, dynamic>{};
+      v.forEach((k, val) => out['$k'] = val);
+      return out;
+    }
+  }
+  return <String, dynamic>{};
+}
+
 // --------- responsive scale helpers ---------
 double _scaleForWidth(double w) {
   if (w >= 1440) return 1.0;
   if (w >= 1200) return 0.93 + (w - 1200) / 240 * (1.0 - 0.93);
   if (w >= 1000) return 0.86 + (w - 1000) / 200 * (0.93 - 0.86);
-  if (w >= 800)  return 0.78 + (w - 800)  / 200 * (0.86 - 0.78);
-  if (w >= 600)  return 0.70 + (w - 600)  / 200 * (0.78 - 0.70);
-  if (w >= 420)  return 0.62 + (w - 420)  / 180 * (0.70 - 0.62);
+  if (w >= 800) return 0.78 + (w - 800) / 200 * (0.86 - 0.78);
+  if (w >= 600) return 0.70 + (w - 600) / 200 * (0.78 - 0.70);
+  if (w >= 420) return 0.62 + (w - 420) / 180 * (0.70 - 0.62);
   return 0.60;
 }
+
 double _sp(double base, double w) => base * _scaleForWidth(w);
 double _pad(double base, double w) => base * _scaleForWidth(w);
 
@@ -63,10 +79,7 @@ int _kpiCols(double w) => w < 520 ? 2 : (w < 820 ? 3 : 4);
 // ============================================
 
 class ScorecardWeekPage extends StatefulWidget {
-  const ScorecardWeekPage({
-    super.key,
-    required this.reportRef,
-  });
+  const ScorecardWeekPage({super.key, required this.reportRef});
 
   final DocumentReference<Map<String, dynamic>> reportRef;
 
@@ -80,14 +93,23 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
 
   // UI controls (search + bucket filter)
   String _query = '';
-  String _bucket = 'ALL'; // ALL | FANTASTIC_PLUS | FANTASTIC | GREAT | FAIR | POOR
-  static const _bucketItems = <String>['ALL','FANTASTIC_PLUS','FANTASTIC','GREAT','FAIR','POOR'];
+  String _bucket =
+      'ALL'; // ALL | FANTASTIC_PLUS | FANTASTIC | GREAT | FAIR | POOR
+  static const _bucketItems = <String>[
+    'ALL',
+    'FANTASTIC_PLUS',
+    'FANTASTIC',
+    'GREAT',
+    'FAIR',
+    'POOR',
+  ];
 
   // 🔧 Updated: read from users/{uid}/scores instead of global 'scores'
   Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _scores() {
     final uid = FirebaseAuth.instance.currentUser!.uid;
     return FirebaseFirestore.instance
-        .collection('users').doc(uid)
+        .collection('users')
+        .doc(uid)
         .collection('scores')
         .where('reportRef', isEqualTo: widget.reportRef)
         .snapshots()
@@ -99,7 +121,7 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
     return widget.reportRef.collection('driverNames').snapshots().map((snap) {
       final m = <String, String>{};
       for (final d in snap.docs) {
-        final data = d.data() as Map<String, dynamic>;
+        final data = _strMap(d.data());
         final id = _s(data['transporterId'] ?? d.id);
         final name = _s(data['driverName']);
         if (id.isNotEmpty) m[id] = name;
@@ -110,7 +132,9 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
 
   /// Global fallback (/drivers)
   Stream<Map<String, String>> _driversNameMapGlobal() {
-    return FirebaseFirestore.instance.collection('drivers').snapshots().map((snap) {
+    return FirebaseFirestore.instance.collection('drivers').snapshots().map((
+      snap,
+    ) {
       final m = <String, String>{};
       for (final d in snap.docs) {
         final data = d.data();
@@ -129,11 +153,11 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
   }
 
   // ===== summary helpers =====
-  String _statusText(double v) {
-    if (v >= 85) return 'Fantastic';
-    if (v >= 70) return 'Great';
-    if (v >= 55) return 'Fair';
-    return 'Poor';
+  String _statusText(double v, AppLocalizations t) {
+    if (v >= 85) return t.t('bucket_fantastic');
+    if (v >= 70) return t.t('bucket_great');
+    if (v >= 55) return t.t('bucket_fair');
+    return t.t('bucket_poor');
   }
 
   Color _statusColor(double v) {
@@ -153,39 +177,47 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
           name,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: fontSize,
-          ),
+          style: TextStyle(fontWeight: FontWeight.w800, fontSize: fontSize),
         ),
       ),
     );
   }
 
   // ===== API bucket mapping (driver rows) =====
-  String _prettyBucket(String raw) {
+  String _prettyBucket(String raw, AppLocalizations t) {
     switch (_s(raw).trim().toUpperCase()) {
-      case 'FANTASTIC_PLUS': return 'Fantastic Plus';
-      case 'FANTASTIC':      return 'Fantastic';
-      case 'GREAT':          return 'Great';
-      case 'FAIR':           return 'Fair';
-      case 'POOR':           return 'Poor';
-      default:               return _s(raw);
+      case 'FANTASTIC_PLUS':
+        return t.t('bucket_fantastic_plus');
+      case 'FANTASTIC':
+        return t.t('bucket_fantastic');
+      case 'GREAT':
+        return t.t('bucket_great');
+      case 'FAIR':
+        return t.t('bucket_fair');
+      case 'POOR':
+        return t.t('bucket_poor');
+      default:
+        return _s(raw);
     }
   }
 
   Color _colorFromApiBucket(String apiBucket) {
     switch (_s(apiBucket).trim().toUpperCase()) {
       case 'FANTASTIC_PLUS':
-      case 'FANTASTIC': return const Color(0xFF16A34A);
-      case 'GREAT':     return const Color(0xFF22C55E);
-      case 'FAIR':      return const Color(0xFFF59E0B);
+      case 'FANTASTIC':
+        return const Color(0xFF16A34A);
+      case 'GREAT':
+        return const Color(0xFF22C55E);
+      case 'FAIR':
+        return const Color(0xFFF59E0B);
       case 'POOR':
-      default:          return const Color(0xFFEF4444);
+      default:
+        return const Color(0xFFEF4444);
     }
   }
 
   Future<void> _uploadDriverCsv() async {
+    final t = AppLocalizations.of(context);
     if (_busyUpload) return;
     setState(() => _busyUpload = true);
     try {
@@ -200,7 +232,8 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
       }
       final f = picked.files.single;
       final bytes = f.bytes;
-      if (bytes == null) throw Exception('No file bytes');
+      if (bytes == null)
+        throw Exception(t.t('scorecard_overview_no_file_bytes'));
 
       // ✅ NEW: user-scoped update so ALL of this user’s reports/scores get names
       final uid = FirebaseAuth.instance.currentUser!.uid;
@@ -208,18 +241,19 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Driver names updated across all your reports.')),
+        SnackBar(content: Text(t.t('scorecard_overview_csv_updated'))),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('CSV import failed: $e')),
+        SnackBar(
+          content: Text(t.tf('scorecard_overview_csv_failed', {'error': '$e'})),
+        ),
       );
     } finally {
       if (mounted) setState(() => _busyUpload = false);
     }
   }
-
 
   // Compute ISO week date range (Mon–Sun)
   String _isoWeekRange(int year, int week) {
@@ -235,33 +269,7 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
   @override
   Widget build(BuildContext context) {
     final w = MediaQuery.of(context).size.width;
-
-    // Title updates via stream (week number)
-    final shellTitle = StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: _reportStream,
-      builder: (context, snap) {
-        final Map<String, dynamic> report = snap.data?.data() ?? <String, dynamic>{};
-        final rawSummary = report['summary'];
-        final summary = rawSummary is Map
-            ? Map<String, dynamic>.from(rawSummary as Map)
-            : <String, dynamic>{};
-        final weekNumber = (summary['weekNumber'] as num?)?.toInt()
-            ?? (report['weekNumber'] as num?)?.toInt();
-        return Text(weekNumber != null ? 'SCORECARD WEEK $weekNumber' : 'SCORECARD WEEK');
-      },
-    );
-
-    final csvAction = Padding(
-      padding: EdgeInsets.only(right: _pad(8, w)),
-      child: FilledButton.icon(
-        onPressed: _busyUpload ? null : _uploadDriverCsv,
-        icon: const Icon(Icons.upload),
-        label: Text(
-          _busyUpload ? 'Uploading…' : 'Upload Driver CSV',
-          style: TextStyle(fontSize: _sp(14, w)),
-        ),
-      ),
-    );
+    final t = AppLocalizations.of(context);
 
     // Your original page body (unchanged)
     final pageBody = Padding(
@@ -274,31 +282,41 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
             StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
               stream: _reportStream,
               builder: (context, snap) {
-                final Map<String, dynamic> report = snap.data?.data() ?? <String, dynamic>{};
+                final Map<String, dynamic> report =
+                    snap.data?.data() ?? <String, dynamic>{};
                 final rawSummary = report['summary'];
                 final summary = rawSummary is Map
                     ? Map<String, dynamic>.from(rawSummary as Map)
                     : <String, dynamic>{};
 
-                final weekNumber = (summary['weekNumber'] as num?)?.toInt()
-                    ?? (report['weekNumber'] as num?)?.toInt();
-                final year = (summary['year'] as num?)?.toInt()
-                    ?? (report['year'] as num?)?.toInt();
+                final weekNumber =
+                    (summary['weekNumber'] as num?)?.toInt() ??
+                    (report['weekNumber'] as num?)?.toInt();
+                final year =
+                    (summary['year'] as num?)?.toInt() ??
+                    (report['year'] as num?)?.toInt();
                 final range = (weekNumber != null && year != null)
                     ? _isoWeekRange(year, weekNumber)
                     : '';
 
                 final title = Text(
-                  weekNumber != null ? 'SCORECARD WEEK $weekNumber' : 'SCORECARD WEEK',
+                  weekNumber != null
+                      ? t.tf('dash_scorecard_week', {'week': '$weekNumber'})
+                      : '${t.t('nav_scorecard').toUpperCase()} ${t.t('dash_week').toUpperCase()}',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontSize: _sp(26, w),
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.5),
+                    fontSize: _sp(26, w),
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
                 );
 
                 final dateLbl = Text(
                   _s(range),
-                  style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w600, fontSize: _sp(13, w)),
+                  style: TextStyle(
+                    color: Colors.black54,
+                    fontWeight: FontWeight.w600,
+                    fontSize: _sp(13, w),
+                  ),
                 );
 
                 final controls = Wrap(
@@ -307,20 +325,26 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
                   runSpacing: _pad(8, w),
                   children: [
                     ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: w < 600 ? w : 380 * _scaleForWidth(w)),
+                      constraints: BoxConstraints(
+                        maxWidth: w < 600 ? w : 380 * _scaleForWidth(w),
+                      ),
                       child: SizedBox(
-                        width: w < 600 ? double.infinity : 360 * _scaleForWidth(w),
+                        width: w < 600
+                            ? double.infinity
+                            : 360 * _scaleForWidth(w),
                         child: TextField(
                           style: TextStyle(fontSize: _sp(14, w)),
                           decoration: InputDecoration(
                             prefixIcon: const Icon(Icons.search),
-                            hintText: 'Search name or Transporter ID…',
+                            hintText: t.t('dash_search_name_or_id'),
                             isDense: true,
                             contentPadding: EdgeInsets.symmetric(
                               horizontal: _pad(12, w),
                               vertical: _pad(12, w),
                             ),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
                           onChanged: (s) => setState(() => _query = s.trim()),
                         ),
@@ -335,16 +359,37 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
-                          value: _bucketItems.contains(_bucket) ? _bucket : 'ALL',
-                          items: const [
-                            DropdownMenuItem(value: 'ALL', child: Text('All Status')),
-                            DropdownMenuItem(value: 'FANTASTIC_PLUS', child: Text('Fantastic Plus')),
-                            DropdownMenuItem(value: 'FANTASTIC', child: Text('Fantastic')),
-                            DropdownMenuItem(value: 'GREAT', child: Text('Great')),
-                            DropdownMenuItem(value: 'FAIR', child: Text('Fair')),
-                            DropdownMenuItem(value: 'POOR', child: Text('Poor')),
+                          value: _bucketItems.contains(_bucket)
+                              ? _bucket
+                              : 'ALL',
+                          items: [
+                            DropdownMenuItem(
+                              value: 'ALL',
+                              child: Text(t.t('dash_all_status')),
+                            ),
+                            DropdownMenuItem(
+                              value: 'FANTASTIC_PLUS',
+                              child: Text(t.t('bucket_fantastic_plus')),
+                            ),
+                            DropdownMenuItem(
+                              value: 'FANTASTIC',
+                              child: Text(t.t('bucket_fantastic')),
+                            ),
+                            DropdownMenuItem(
+                              value: 'GREAT',
+                              child: Text(t.t('bucket_great')),
+                            ),
+                            DropdownMenuItem(
+                              value: 'FAIR',
+                              child: Text(t.t('bucket_fair')),
+                            ),
+                            DropdownMenuItem(
+                              value: 'POOR',
+                              child: Text(t.t('bucket_poor')),
+                            ),
                           ],
-                          onChanged: (v) => setState(() => _bucket = v ?? 'ALL'),
+                          onChanged: (v) =>
+                              setState(() => _bucket = v ?? 'ALL'),
                         ),
                       ),
                     ),
@@ -352,7 +397,9 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
                       onPressed: _busyUpload ? null : _uploadDriverCsv,
                       icon: const Icon(Icons.upload),
                       label: Text(
-                        _busyUpload ? 'Uploading…' : 'Upload Driver CSV',
+                        _busyUpload
+                            ? t.t('uploading')
+                            : t.t('dash_upload_driver_csv'),
                         style: TextStyle(fontSize: _sp(14, w)),
                       ),
                     ),
@@ -363,8 +410,11 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      title, SizedBox(height: _pad(6, w)), dateLbl,
-                      SizedBox(height: _pad(12, w)), controls,
+                      title,
+                      SizedBox(height: _pad(6, w)),
+                      dateLbl,
+                      SizedBox(height: _pad(12, w)),
+                      controls,
                     ],
                   );
                 }
@@ -373,7 +423,11 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [title, SizedBox(height: _pad(6, w)), dateLbl],
+                        children: [
+                          title,
+                          SizedBox(height: _pad(6, w)),
+                          dateLbl,
+                        ],
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -389,7 +443,8 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
             StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
               stream: _reportStream,
               builder: (context, snap) {
-                final Map<String, dynamic> report = snap.data?.data() ?? <String, dynamic>{};
+                final Map<String, dynamic> report =
+                    snap.data?.data() ?? <String, dynamic>{};
                 final rawSummary = report['summary'];
                 final summary = rawSummary is Map
                     ? Map<String, dynamic>.from(rawSummary as Map)
@@ -397,22 +452,31 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
 
                 final overall = (summary['overallScore'] as num?)?.toDouble();
                 final overallStatus = _s(summary['overallStatus']);
-                final relNext = (summary['reliabilityNextDay'] as num?)?.toDouble();
-                final relGeneric = (summary['reliabilityScore'] as num?)?.toDouble();
+                final relNext = (summary['reliabilityNextDay'] as num?)
+                    ?.toDouble();
+                final relGeneric = (summary['reliabilityScore'] as num?)
+                    ?.toDouble();
                 final reliability = relNext ?? relGeneric;
 
-                final rankAtStation = (summary['rankAtStation'] as num?)?.toInt();
-                final stationCount  = (summary['stationCount']  as num?)?.toInt();
+                final rankAtStation = (summary['rankAtStation'] as num?)
+                    ?.toInt();
+                final stationCount = (summary['stationCount'] as num?)?.toInt();
                 final rankText = () {
                   if (rankAtStation == null) return '—';
-                  var s = '$rankAtStation';
-                  if (stationCount != null && stationCount > 0) s += ' of $stationCount';
-                  return s;
+                  if (stationCount != null && stationCount > 0) {
+                    return t.tf('dash_rank_of_total', {
+                      'rank': '$rankAtStation',
+                      'total': '$stationCount',
+                    });
+                  }
+                  return '$rankAtStation';
                 }();
 
-                final stationName = _s(summary['stationCode'] ?? report['stationCode']);
+                final stationName = _s(
+                  summary['stationCode'] ?? report['stationCode'],
+                );
 
-                final w  = MediaQuery.of(context).size.width;
+                final w = MediaQuery.of(context).size.width;
 
                 return Center(
                   child: ConstrainedBox(
@@ -433,7 +497,9 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
                       child: LayoutBuilder(
                         builder: (context, cns) {
                           final double maxW = cns.maxWidth;
-                          final int cols = maxW >= 1024 ? 3 : (maxW >= 680 ? 2 : 1);
+                          final int cols = maxW >= 1024
+                              ? 3
+                              : (maxW >= 680 ? 2 : 1);
                           final gap = _pad(16, w);
                           final childW = (maxW - gap * (cols - 1)) / cols;
 
@@ -447,9 +513,13 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
                                 width: childW,
                                 child: _InnerSummaryPanel(
                                   w: w,
-                                  title: 'TOTAL COMPANY SCORE',
-                                  big: overall == null ? '—' : '${_pct.format(overall)} %',
-                                  small: overall == null ? '' : _prettyBucket(overallStatus),
+                                  title: t.t('admin_home_company_score'),
+                                  big: overall == null
+                                      ? '—'
+                                      : '${_pct.format(overall)} %',
+                                  small: overall == null
+                                      ? ''
+                                      : _prettyBucket(overallStatus, t),
                                   accent: const Color(0xFF16A34A),
                                 ),
                               ),
@@ -457,7 +527,7 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
                                 width: childW,
                                 child: _InnerSummaryPanel(
                                   w: w,
-                                  title: 'RANK IN STATION',
+                                  title: t.t('dash_rank_in_station'),
                                   big: rankText,
                                   small: stationName,
                                   accent: Colors.black87,
@@ -467,9 +537,15 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
                                 width: childW,
                                 child: _InnerSummaryPanel(
                                   w: w,
-                                  title: 'RELIABILITY SCORE',
-                                  big: reliability == null ? '—' : '${_pct.format(reliability)} %',
-                                  small: reliability == null ? '' : _statusText(reliability),
+                                  title: t.t(
+                                    'scorecard_overview_reliability_score',
+                                  ),
+                                  big: reliability == null
+                                      ? '—'
+                                      : '${_pct.format(reliability)} %',
+                                  small: reliability == null
+                                      ? ''
+                                      : _statusText(reliability, t),
                                   accent: const Color(0xFF16A34A),
                                 ),
                               ),
@@ -489,33 +565,43 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
             StreamBuilder<Map<String, String>>(
               stream: _driverNamesForWeek(),
               builder: (context, weekNamesSnap) {
-                final weekNames = weekNamesSnap.data ?? const <String, String>{};
+                final weekNames =
+                    weekNamesSnap.data ?? const <String, String>{};
 
                 return StreamBuilder<Map<String, String>>(
                   stream: _driversNameMapGlobal(),
                   builder: (context, globalNamesSnap) {
-                    final globalNames = globalNamesSnap.data ?? const <String, String>{};
+                    final globalNames =
+                        globalNamesSnap.data ?? const <String, String>{};
 
                     final nameMap = <String, String>{}
                       ..addAll(globalNames)
                       ..addAll(weekNames);
 
                     return StreamBuilder<
-                        List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+                      List<QueryDocumentSnapshot<Map<String, dynamic>>>
+                    >(
                       stream: _scores(),
                       builder: (context, scoreSnap) {
-                        if (scoreSnap.connectionState == ConnectionState.waiting) {
-                          return const Center(child: CircularProgressIndicator());
+                        if (scoreSnap.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
                         }
                         var docs = scoreSnap.data ?? [];
                         if (docs.isEmpty) {
-                          return const Center(child: Text('No scores for this week.'));
+                          return Center(
+                            child: Text(t.t('dash_no_scores_period')),
+                          );
                         }
 
                         // Filter by bucket
                         if (_bucket != 'ALL') {
                           docs = docs.where((d) {
-                            final b = _s(d.data()['statusBucket']).toUpperCase();
+                            final b = _s(
+                              d.data()['statusBucket'],
+                            ).toUpperCase();
                             return b == _bucket;
                           }).toList();
                         }
@@ -524,40 +610,52 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
                         final q = _query.toLowerCase();
                         if (q.isNotEmpty) {
                           docs = docs.where((d) {
-                            final id = _s(d.data()['transporterId']).toLowerCase();
-                            final name = _s(nameMap[_s(d.data()['transporterId'])]).toLowerCase();
+                            final id = _s(
+                              d.data()['transporterId'],
+                            ).toLowerCase();
+                            final name = _s(
+                              nameMap[_s(d.data()['transporterId'])],
+                            ).toLowerCase();
                             return id.contains(q) || name.contains(q);
                           }).toList();
                         }
 
                         // Sort: rank if present else FinalScore desc
-                        final hasAnyRank = docs.any((d) => (d.data()['rank'] != null));
+                        final hasAnyRank = docs.any(
+                          (d) => (d.data()['rank'] != null),
+                        );
                         docs.sort((a, b) {
                           if (hasAnyRank) {
-                            final ra = (a.data()['rank'] as num?)?.toInt() ?? 999999;
-                            final rb = (b.data()['rank'] as num?)?.toInt() ?? 999999;
+                            final ra =
+                                (a.data()['rank'] as num?)?.toInt() ?? 999999;
+                            final rb =
+                                (b.data()['rank'] as num?)?.toInt() ?? 999999;
                             return ra.compareTo(rb);
                           }
-                          final ca = (a.data()['comp'] ?? {}) as Map<String, dynamic>;
-                          final cb = (b.data()['comp'] ?? {}) as Map<String, dynamic>;
+                          final ca = _strMap(a.data()['comp']);
+                          final cb = _strMap(b.data()['comp']);
                           final fa = _numOr0(ca['FinalScore']);
                           final fb = _numOr0(cb['FinalScore']);
                           return fb.compareTo(fa);
                         });
 
                         if (docs.isEmpty) {
-                          return const Center(child: Text('No drivers match this filter.'));
+                          return Center(
+                            child: Text(t.t('dash_no_drivers_match')),
+                          );
                         }
 
-                        final maxRowWidth =
-                            w >= 1400 ? 1200.0 : (w >= 1100 ? 1100.0 : w - _pad(18, w) * 2);
+                        final maxRowWidth = w >= 1400
+                            ? 1200.0
+                            : (w >= 1100 ? 1100.0 : w - _pad(18, w) * 2);
                         final useCompact = _isCompactRow(w);
 
                         return ListView.separated(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
                           itemCount: docs.length,
-                          separatorBuilder: (_, __) => SizedBox(height: _pad(12, w)),
+                          separatorBuilder: (_, __) =>
+                              SizedBox(height: _pad(12, w)),
                           itemBuilder: (context, i) {
                             try {
                               final data = docs[i].data();
@@ -571,34 +669,56 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
                                   ? Map<String, dynamic>.from(kpisRaw as Map)
                                   : <String, dynamic>{};
 
-                              final transporterId = _s(data['transporterId']).trim();
+                              final transporterId = _s(
+                                data['transporterId'],
+                              ).trim();
                               final name = _s(nameMap[transporterId]).isNotEmpty
                                   ? _s(nameMap[transporterId])
-                                  : '(No Name)';
+                                  : t.t('dash_no_name');
 
                               final score = _numOr0(comp['FinalScore']);
                               final dcr = _numOr0(comp['DCR_Score']);
                               final pod = _numOr0(comp['POD_Score']);
-                              final cc  = _numOr0(comp['CC_Score']);
-                              final ce  = _numOr0(comp['CE_Score'] ?? comp['CE']);
+                              final cc = _numOr0(comp['CC_Score']);
+                              final ce = _numOr0(
+                                comp['CE_Score'] ?? comp['CE'],
+                              );
 
-                              final delivered = _numOr0(kpis['Delivered'] ?? kpis['DELIVERED'] ?? kpis['delivered']);
-                              final dnr = _numOr0(kpis['DNR'] ?? kpis['DNR DPMO']);
-                              final lor = _numOr0(kpis['LoR'] ?? kpis['LoR DPMO']);
-                              final cdf = _numOr0(kpis['CDF'] ?? kpis['CDF DPMO']);
+                              final delivered = _numOr0(
+                                kpis['Delivered'] ??
+                                    kpis['DELIVERED'] ??
+                                    kpis['delivered'],
+                              );
+                              final dnr = _numOr0(
+                                kpis['DNR'] ?? kpis['DNR DPMO'],
+                              );
+                              final lor = _numOr0(
+                                kpis['LoR'] ?? kpis['LoR DPMO'],
+                              );
+                              final cdf = _numOr0(
+                                kpis['CDF'] ?? kpis['CDF DPMO'],
+                              );
 
                               final rank = (data['rank'] as num?)?.toInt();
                               final apiBucketRaw = _s(data['statusBucket']);
-                              final statusText = apiBucketRaw.isNotEmpty ? _prettyBucket(apiBucketRaw) : _statusText(score);
-                              final statusColor = apiBucketRaw.isNotEmpty ? _colorFromApiBucket(apiBucketRaw) : _statusColor(score);
+                              final statusText = apiBucketRaw.isNotEmpty
+                                  ? _prettyBucket(apiBucketRaw, t)
+                                  : _statusText(score, t);
+                              final statusColor = apiBucketRaw.isNotEmpty
+                                  ? _colorFromApiBucket(apiBucketRaw)
+                                  : _statusColor(score);
 
                               return Center(
                                 child: ConstrainedBox(
-                                  constraints: BoxConstraints(maxWidth: maxRowWidth),
+                                  constraints: BoxConstraints(
+                                    maxWidth: maxRowWidth,
+                                  ),
                                   child: Container(
                                     decoration: BoxDecoration(
                                       color: Colors.white,
-                                      borderRadius: BorderRadius.circular(28 * _scaleForWidth(w)),
+                                      borderRadius: BorderRadius.circular(
+                                        28 * _scaleForWidth(w),
+                                      ),
                                       boxShadow: [
                                         BoxShadow(
                                           color: Colors.black.withOpacity(0.06),
@@ -614,40 +734,75 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
                                     child: useCompact
                                         // ====== COMPACT ======
                                         ? Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             children: [
                                               Row(
                                                 children: [
                                                   Expanded(
                                                     child: Column(
-                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
                                                       children: [
-                                                        _fitNameText(_s(name), _sp(16, w)),
-                                                        SizedBox(height: _pad(2, w)),
+                                                        _fitNameText(
+                                                          _s(name),
+                                                          _sp(16, w),
+                                                        ),
+                                                        SizedBox(
+                                                          height: _pad(2, w),
+                                                        ),
                                                         Text(
                                                           _s(transporterId),
                                                           maxLines: 1,
-                                                          overflow: TextOverflow.ellipsis,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
                                                           style: TextStyle(
-                                                            color: Colors.black54,
-                                                            fontSize: _sp(12, w),
-                                                            fontWeight: FontWeight.w600,
+                                                            color:
+                                                                Colors.black54,
+                                                            fontSize: _sp(
+                                                              12,
+                                                              w,
+                                                            ),
+                                                            fontWeight:
+                                                                FontWeight.w600,
                                                           ),
                                                         ),
-                                                        SizedBox(height: _pad(6, w)),
+                                                        SizedBox(
+                                                          height: _pad(6, w),
+                                                        ),
                                                         Container(
-                                                          padding: EdgeInsets.symmetric(
-                                                              horizontal: _pad(10, w), vertical: _pad(6, w)),
+                                                          padding:
+                                                              EdgeInsets.symmetric(
+                                                                horizontal:
+                                                                    _pad(10, w),
+                                                                vertical: _pad(
+                                                                  6,
+                                                                  w,
+                                                                ),
+                                                              ),
                                                           decoration: BoxDecoration(
-                                                            color: statusColor.withOpacity(0.12),
-                                                            borderRadius: BorderRadius.circular(999),
+                                                            color: statusColor
+                                                                .withOpacity(
+                                                                  0.12,
+                                                                ),
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  999,
+                                                                ),
                                                           ),
                                                           child: Text(
                                                             _s(statusText),
                                                             style: TextStyle(
-                                                              fontSize: _sp(11, w),
-                                                              fontWeight: FontWeight.w800,
-                                                              color: statusColor,
+                                                              fontSize: _sp(
+                                                                11,
+                                                                w,
+                                                              ),
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w800,
+                                                              color:
+                                                                  statusColor,
                                                             ),
                                                           ),
                                                         ),
@@ -658,8 +813,20 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
                                                     spacing: _pad(10, w),
                                                     runSpacing: _pad(6, w),
                                                     children: [
-                                                      _ChipStat(title: 'RANK',  value: rank != null ? '#$rank' : '—', w: w),
-                                                      _ChipStat(title: 'TOTAL', value: _pctStr(score), w: w),
+                                                      _ChipStat(
+                                                        title: t.t('dash_rank'),
+                                                        value: rank != null
+                                                            ? '#$rank'
+                                                            : '—',
+                                                        w: w,
+                                                      ),
+                                                      _ChipStat(
+                                                        title: t.t(
+                                                          'dash_total_score',
+                                                        ),
+                                                        value: _pctStr(score),
+                                                        w: w,
+                                                      ),
                                                     ],
                                                   ),
                                                 ],
@@ -669,23 +836,77 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
                                               SizedBox(height: _pad(10, w)),
                                               LayoutBuilder(
                                                 builder: (context, cns) {
-                                                  final cols = _kpiCols(cns.maxWidth);
+                                                  final cols = _kpiCols(
+                                                    cns.maxWidth,
+                                                  );
                                                   final gap = _pad(12, w);
-                                                  final cellW = (cns.maxWidth - (cols - 1) * gap) / cols;
+                                                  final cellW =
+                                                      (cns.maxWidth -
+                                                          (cols - 1) * gap) /
+                                                      cols;
                                                   final cells = [
-                                                    _KpiCell(label: 'DELIVERED', value: _intStr(delivered.round()), w: w),
-                                                    _KpiCell(label: 'DCR',       value: _pctStr(dcr), w: w),
-                                                    _KpiCell(label: 'DNR DPMO',  value: _intStr(dnr.round()), w: w),
-                                                    _KpiCell(label: 'LoR DPMO',  value: _intStr(lor.round()), w: w),
-                                                    _KpiCell(label: 'POD',       value: _pctStr(pod), w: w),
-                                                    _KpiCell(label: 'CC',        value: _pctStr(cc), w: w),
-                                                    _KpiCell(label: 'CE',        value: _pctStr(ce), w: w),
-                                                    _KpiCell(label: 'CDF DPMO',  value: _intStr(cdf.round()), w: w),
+                                                    _KpiCell(
+                                                      label: t
+                                                          .t('dash_delivered')
+                                                          .toUpperCase(),
+                                                      value: _intStr(
+                                                        delivered.round(),
+                                                      ),
+                                                      w: w,
+                                                    ),
+                                                    _KpiCell(
+                                                      label: 'DCR',
+                                                      value: _pctStr(dcr),
+                                                      w: w,
+                                                    ),
+                                                    _KpiCell(
+                                                      label: 'DNR DPMO',
+                                                      value: _intStr(
+                                                        dnr.round(),
+                                                      ),
+                                                      w: w,
+                                                    ),
+                                                    _KpiCell(
+                                                      label: 'LoR DPMO',
+                                                      value: _intStr(
+                                                        lor.round(),
+                                                      ),
+                                                      w: w,
+                                                    ),
+                                                    _KpiCell(
+                                                      label: 'POD',
+                                                      value: _pctStr(pod),
+                                                      w: w,
+                                                    ),
+                                                    _KpiCell(
+                                                      label: 'CC',
+                                                      value: _pctStr(cc),
+                                                      w: w,
+                                                    ),
+                                                    _KpiCell(
+                                                      label: 'CE',
+                                                      value: _pctStr(ce),
+                                                      w: w,
+                                                    ),
+                                                    _KpiCell(
+                                                      label: 'CDF DPMO',
+                                                      value: _intStr(
+                                                        cdf.round(),
+                                                      ),
+                                                      w: w,
+                                                    ),
                                                   ];
                                                   return Wrap(
                                                     spacing: gap,
                                                     runSpacing: _pad(10, w),
-                                                    children: cells.map((c) => SizedBox(width: cellW, child: c)).toList(),
+                                                    children: cells
+                                                        .map(
+                                                          (c) => SizedBox(
+                                                            width: cellW,
+                                                            child: c,
+                                                          ),
+                                                        )
+                                                        .toList(),
                                                   );
                                                 },
                                               ),
@@ -701,28 +922,59 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
                                                     children: [
                                                       Expanded(
                                                         child: Column(
-                                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                                          mainAxisAlignment: MainAxisAlignment.center,
+                                                          crossAxisAlignment:
+                                                              CrossAxisAlignment
+                                                                  .start,
+                                                          mainAxisAlignment:
+                                                              MainAxisAlignment
+                                                                  .center,
                                                           children: [
-                                                            _fitNameText(_s(name), _sp(18, w)),
-                                                            SizedBox(height: _pad(2, w)),
+                                                            _fitNameText(
+                                                              _s(name),
+                                                              _sp(18, w),
+                                                            ),
+                                                            SizedBox(
+                                                              height: _pad(
+                                                                2,
+                                                                w,
+                                                              ),
+                                                            ),
                                                             Text(
                                                               _s(transporterId),
                                                               maxLines: 1,
-                                                              overflow: TextOverflow.ellipsis,
+                                                              overflow:
+                                                                  TextOverflow
+                                                                      .ellipsis,
                                                               style: TextStyle(
-                                                                color: Colors.black54,
-                                                                fontSize: _sp(13, w),
-                                                                fontWeight: FontWeight.w600,
+                                                                color: Colors
+                                                                    .black54,
+                                                                fontSize: _sp(
+                                                                  13,
+                                                                  w,
+                                                                ),
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w600,
                                                               ),
                                                             ),
-                                                            SizedBox(height: _pad(6, w)),
+                                                            SizedBox(
+                                                              height: _pad(
+                                                                6,
+                                                                w,
+                                                              ),
+                                                            ),
                                                             Text(
                                                               _s(statusText),
                                                               style: TextStyle(
-                                                                fontSize: _sp(13, w),
-                                                                fontWeight: FontWeight.w800,
-                                                                color: statusColor,
+                                                                fontSize: _sp(
+                                                                  13,
+                                                                  w,
+                                                                ),
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w800,
+                                                                color:
+                                                                    statusColor,
                                                               ),
                                                             ),
                                                           ],
@@ -731,36 +983,124 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
                                                     ],
                                                   ),
                                                 ),
-                                                VerticalDivider(width: _pad(22, w), thickness: 1, color: Colors.black12),
+                                                VerticalDivider(
+                                                  width: _pad(22, w),
+                                                  thickness: 1,
+                                                  color: Colors.black12,
+                                                ),
 
-                                                _MetricCol(title: 'RANK', value: rank != null ? '#$rank' : '—', w: w),
-                                                VerticalDivider(width: _pad(22, w), thickness: 1, color: Colors.black12),
+                                                _MetricCol(
+                                                  title: t.t('dash_rank'),
+                                                  value: rank != null
+                                                      ? '#$rank'
+                                                      : '—',
+                                                  w: w,
+                                                ),
+                                                VerticalDivider(
+                                                  width: _pad(22, w),
+                                                  thickness: 1,
+                                                  color: Colors.black12,
+                                                ),
 
-                                                _MetricCol(title: 'TOTAL', value: _intStr(score), w: w),
-                                                VerticalDivider(width: _pad(22, w), thickness: 1, color: Colors.black12),
+                                                _MetricCol(
+                                                  title: t.t(
+                                                    'dash_total_score',
+                                                  ),
+                                                  value: _intStr(score),
+                                                  w: w,
+                                                ),
+                                                VerticalDivider(
+                                                  width: _pad(22, w),
+                                                  thickness: 1,
+                                                  color: Colors.black12,
+                                                ),
 
-                                                _MetricCol(title: 'DELIVERED', value: _intStr(delivered.round()), w: w),
-                                                VerticalDivider(width: _pad(22, w), thickness: 1, color: Colors.black12),
+                                                _MetricCol(
+                                                  title: t
+                                                      .t('dash_delivered')
+                                                      .toUpperCase(),
+                                                  value: _intStr(
+                                                    delivered.round(),
+                                                  ),
+                                                  w: w,
+                                                ),
+                                                VerticalDivider(
+                                                  width: _pad(22, w),
+                                                  thickness: 1,
+                                                  color: Colors.black12,
+                                                ),
 
-                                                _MetricCol(title: 'DCR', value: _intStr(dcr), w: w),
-                                                VerticalDivider(width: _pad(22, w), thickness: 1, color: Colors.black12),
+                                                _MetricCol(
+                                                  title: 'DCR',
+                                                  value: _intStr(dcr),
+                                                  w: w,
+                                                ),
+                                                VerticalDivider(
+                                                  width: _pad(22, w),
+                                                  thickness: 1,
+                                                  color: Colors.black12,
+                                                ),
 
-                                                _MetricCol(title: 'DNR DPMO', value: _intStr(dnr.round()), w: w),
-                                                VerticalDivider(width: _pad(22, w), thickness: 1, color: Colors.black12),
+                                                _MetricCol(
+                                                  title: 'DNR DPMO',
+                                                  value: _intStr(dnr.round()),
+                                                  w: w,
+                                                ),
+                                                VerticalDivider(
+                                                  width: _pad(22, w),
+                                                  thickness: 1,
+                                                  color: Colors.black12,
+                                                ),
 
-                                                _MetricCol(title: 'LoR DPMO', value: _intStr(lor.round()), w: w),
-                                                VerticalDivider(width: _pad(22, w), thickness: 1, color: Colors.black12),
+                                                _MetricCol(
+                                                  title: 'LoR DPMO',
+                                                  value: _intStr(lor.round()),
+                                                  w: w,
+                                                ),
+                                                VerticalDivider(
+                                                  width: _pad(22, w),
+                                                  thickness: 1,
+                                                  color: Colors.black12,
+                                                ),
 
-                                                _MetricCol(title: 'POD', value: _intStr(pod), w: w),
-                                                VerticalDivider(width: _pad(22, w), thickness: 1, color: Colors.black12),
+                                                _MetricCol(
+                                                  title: 'POD',
+                                                  value: _intStr(pod),
+                                                  w: w,
+                                                ),
+                                                VerticalDivider(
+                                                  width: _pad(22, w),
+                                                  thickness: 1,
+                                                  color: Colors.black12,
+                                                ),
 
-                                                _MetricCol(title: 'CC', value: _intStr(cc), w: w),
-                                                VerticalDivider(width: _pad(22, w), thickness: 1, color: Colors.black12),
+                                                _MetricCol(
+                                                  title: 'CC',
+                                                  value: _intStr(cc),
+                                                  w: w,
+                                                ),
+                                                VerticalDivider(
+                                                  width: _pad(22, w),
+                                                  thickness: 1,
+                                                  color: Colors.black12,
+                                                ),
 
-                                                _MetricCol(title: 'CE', value: _intStr(ce), w: w),
-                                                VerticalDivider(width: _pad(22, w), thickness: 1, color: Colors.black12),
+                                                _MetricCol(
+                                                  title: 'CE',
+                                                  value: _intStr(ce),
+                                                  w: w,
+                                                ),
+                                                VerticalDivider(
+                                                  width: _pad(22, w),
+                                                  thickness: 1,
+                                                  color: Colors.black12,
+                                                ),
 
-                                                _MetricCol(title: 'CDF DPMO', value: _intStr(cdf.round()), w: w),
+                                                _MetricCol(
+                                                  title: 'CDF DPMO',
+                                                  value: _intStr(cdf.round()),
+                                                  w: w,
+                                                ),
                                               ],
                                             ),
                                           ),
@@ -784,10 +1124,7 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
       ),
     );
 
-    return Material(
-      color: const Color(0xFFF5F7F9),
-      child: pageBody,
-    );
+    return Material(color: const Color(0xFFF5F7F9), child: pageBody);
   }
 }
 
@@ -811,14 +1148,19 @@ class _SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final align = centered ? CrossAxisAlignment.center : CrossAxisAlignment.start;
+    final align = centered
+        ? CrossAxisAlignment.center
+        : CrossAxisAlignment.start;
     final textAlign = centered ? TextAlign.center : TextAlign.start;
 
     return Card(
       elevation: 0.5,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: _pad(22, w), vertical: _pad(22, w)),
+        padding: EdgeInsets.symmetric(
+          horizontal: _pad(22, w),
+          vertical: _pad(22, w),
+        ),
         child: Column(
           crossAxisAlignment: align,
           children: [
@@ -836,7 +1178,11 @@ class _SummaryCard extends StatelessWidget {
             Text(
               _s(big),
               textAlign: textAlign,
-              style: TextStyle(fontSize: _sp(30, w), fontWeight: FontWeight.w800, color: accent),
+              style: TextStyle(
+                fontSize: _sp(30, w),
+                fontWeight: FontWeight.w800,
+                color: accent,
+              ),
             ),
             SizedBox(height: _pad(6, w)),
             if (_s(small).isNotEmpty)
@@ -865,7 +1211,10 @@ class _ChipStat extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: _pad(14, w), vertical: _pad(10, w)),
+      padding: EdgeInsets.symmetric(
+        horizontal: _pad(14, w),
+        vertical: _pad(10, w),
+      ),
       decoration: BoxDecoration(
         color: const Color(0xFFF3F4F6),
         borderRadius: BorderRadius.circular(16),
@@ -873,13 +1222,15 @@ class _ChipStat extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(_s(title),
-              style: TextStyle(
-                fontSize: _sp(11, w),
-                letterSpacing: 0.6,
-                color: Colors.black54,
-                fontWeight: FontWeight.w700,
-              )),
+          Text(
+            _s(title),
+            style: TextStyle(
+              fontSize: _sp(11, w),
+              letterSpacing: 0.6,
+              color: Colors.black54,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           SizedBox(height: _pad(4, w)),
           Text(
             _s(value),
@@ -902,12 +1253,15 @@ class _KpiCell extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(_s(label),
-            style: TextStyle(
-                fontSize: _sp(12, w),
-                color: Colors.black54,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.4)),
+        Text(
+          _s(label),
+          style: TextStyle(
+            fontSize: _sp(12, w),
+            color: Colors.black54,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.4,
+          ),
+        ),
         SizedBox(height: _pad(4, w)),
         Text(
           _s(value),
@@ -946,10 +1300,7 @@ class _MetricCol extends StatelessWidget {
           Text(
             _s(value),
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: _sp(20, w),
-              fontWeight: FontWeight.w800,
-            ),
+            style: TextStyle(fontSize: _sp(20, w), fontWeight: FontWeight.w800),
           ),
         ],
       ),

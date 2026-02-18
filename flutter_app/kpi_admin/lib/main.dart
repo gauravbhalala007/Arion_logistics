@@ -10,11 +10,8 @@ import 'Screens/login_page.dart';
 import 'Screens/signup_page.dart';
 import 'Screens/verify_email_page.dart';
 import 'Screens/driver_dashboard_page.dart';
-import 'screens/dsp_profile_page.dart';
 import 'screens/admin_shell_page.dart';
 import 'widgets/app_side_menu.dart'; // for AppNav
-
-
 
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'localization/app_localizations.dart';
@@ -39,7 +36,8 @@ Future<void> main() async {
   print('🔧 projectId: ${Firebase.app().options.projectId}');
   // ignore: avoid_print
   print(
-      '🔧 storageBucket (from options): ${DefaultFirebaseOptions.currentPlatform.storageBucket}');
+    '🔧 storageBucket (from options): ${DefaultFirebaseOptions.currentPlatform.storageBucket}',
+  );
 
   final bucket = DefaultFirebaseOptions.currentPlatform.storageBucket!;
   storage = FirebaseStorage.instanceFor(bucket: 'gs://$bucket');
@@ -79,8 +77,9 @@ class App extends StatelessWidget {
           ],
           theme: ThemeData(
             useMaterial3: true,
-            colorScheme:
-                ColorScheme.fromSeed(seedColor: const Color(0xFF16A34A)),
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: const Color(0xFF16A34A),
+            ),
             fontFamily: 'SF Pro',
             scaffoldBackgroundColor: const Color(0xFFF6F7F5),
           ),
@@ -90,20 +89,24 @@ class App extends StatelessWidget {
             '/login': (_) => const LoginPage(),
             '/signup': (_) => const SignupPage(),
             '/verify-email': (_) => const VerifyEmailPage(),
-            '/profile': (_) => const DspProfilePage(),
+            '/profile': (_) => const AdminShellPage(initialNav: AppNav.profile),
 
             // ✅ all side-menu destinations go through the shell
             '/home': (_) => const AdminShellPage(initialNav: AppNav.home),
-            '/dashboard': (_) => const AdminShellPage(initialNav: AppNav.dashboard),
-            '/pod-quality': (_) => const AdminShellPage(initialNav: AppNav.podQuality),
+            '/dashboard': (_) =>
+                const AdminShellPage(initialNav: AppNav.dashboard),
+            '/pod-quality': (_) =>
+                const AdminShellPage(initialNav: AppNav.podQuality),
             '/drivers': (_) => const AdminShellPage(initialNav: AppNav.drivers),
-            '/notifications': (_) => const AdminShellPage(initialNav: AppNav.notifications),
+            '/tasks': (_) => const AdminShellPage(initialNav: AppNav.tasks),
+            '/notifications': (_) =>
+                const AdminShellPage(initialNav: AppNav.notifications),
             '/faqs': (_) => const AdminShellPage(initialNav: AppNav.faqs),
-            '/admin-approvals': (_) => const AdminShellPage(initialNav: AppNav.adminApprovals),
+            '/admin-approvals': (_) =>
+                const AdminShellPage(initialNav: AppNav.adminApprovals),
 
             '/coming-soon': (_) => const _PlaceholderPage(title: 'Coming Soon'),
           },
-
         );
       },
     );

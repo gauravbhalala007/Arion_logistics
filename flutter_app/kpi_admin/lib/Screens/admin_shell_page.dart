@@ -9,17 +9,16 @@ import 'admin_home_page.dart';
 import 'scorecard_overview.dart';
 import 'pod_quality_overview.dart';
 import 'drivers_hub_page.dart';
+import 'task_sheet_page.dart';
 import 'notifications_page.dart';
 import 'admin_approvals_page.dart';
 import 'admin_faq_page.dart';
+import 'dsp_profile_page.dart';
 
 class AdminShellPage extends StatefulWidget {
   final AppNav initialNav;
 
-  const AdminShellPage({
-    super.key,
-    this.initialNav = AppNav.home,
-  });
+  const AdminShellPage({super.key, this.initialNav = AppNav.home});
 
   @override
   State<AdminShellPage> createState() => _AdminShellPageState();
@@ -54,9 +53,11 @@ class _AdminShellPageState extends State<AdminShellPage> {
           ScorecardOverviewPage(),
           PodQualityOverviewPage(),
           DriversHubPage(),
+          TaskSheetPage(),
           NotificationsPage(),
           AdminFaqPage(),
           AdminApprovalsPage(),
+          DspProfilePage(),
         ],
       ),
     );
@@ -72,12 +73,16 @@ class _AdminShellPageState extends State<AdminShellPage> {
         return 2;
       case AppNav.drivers:
         return 3;
-      case AppNav.notifications:
+      case AppNav.tasks:
         return 4;
-      case AppNav.faqs:
+      case AppNav.notifications:
         return 5;
-      case AppNav.adminApprovals:
+      case AppNav.faqs:
         return 6;
+      case AppNav.adminApprovals:
+        return 7;
+      case AppNav.profile:
+        return 8;
       default:
         return 0;
     }

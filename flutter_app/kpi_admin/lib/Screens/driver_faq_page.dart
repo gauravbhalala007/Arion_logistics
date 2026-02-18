@@ -36,18 +36,18 @@ class _DriverFaqPageState extends State<DriverFaqPage> {
     final customFaqStream = widget.dspUid.isEmpty
         ? const Stream<QuerySnapshot<Map<String, dynamic>>>.empty()
         : FirebaseFirestore.instance
-            .collection('users')
-            .doc(widget.dspUid)
-            .collection('faqs')
-            .orderBy('order')
-            .snapshots();
+              .collection('users')
+              .doc(widget.dspUid)
+              .collection('faqs')
+              .orderBy('order')
+              .snapshots();
     final localizedOverrideStream = widget.dspUid.isEmpty
         ? const Stream<QuerySnapshot<Map<String, dynamic>>>.empty()
         : FirebaseFirestore.instance
-            .collection('users')
-            .doc(widget.dspUid)
-            .collection(_localizedFaqCollection)
-            .snapshots();
+              .collection('users')
+              .doc(widget.dspUid)
+              .collection(_localizedFaqCollection)
+              .snapshots();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF3F6F7),
@@ -78,23 +78,22 @@ class _DriverFaqPageState extends State<DriverFaqPage> {
               final docs = snap.data?.docs ?? [];
               final langCode = Localizations.localeOf(context).languageCode;
               final customItems = docs
-                  .map((d) => _FaqItem(
-                        question: _localizedFaqValue(
-                          d.data(),
-                          'question',
-                          langCode,
-                        ),
-                        answer: _localizedFaqValue(
-                          d.data(),
-                          'answer',
-                          langCode,
-                        ),
-                        insertAfterKey:
-                            (d.data()['insertAfterKey'] ?? _insertAtEnd)
-                                .toString(),
-                        order: (d.data()['order'] as num?)?.toInt() ??
-                            DateTime.now().millisecondsSinceEpoch,
-                      ))
+                  .map(
+                    (d) => _FaqItem(
+                      question: _localizedFaqValue(
+                        d.data(),
+                        'question',
+                        langCode,
+                      ),
+                      answer: _localizedFaqValue(d.data(), 'answer', langCode),
+                      insertAfterKey:
+                          (d.data()['insertAfterKey'] ?? _insertAtEnd)
+                              .toString(),
+                      order:
+                          (d.data()['order'] as num?)?.toInt() ??
+                          DateTime.now().millisecondsSinceEpoch,
+                    ),
+                  )
                   .toList();
 
               String resolveText(DriverFaqNode node, bool isQuestion) {
@@ -110,8 +109,10 @@ class _DriverFaqPageState extends State<DriverFaqPage> {
 
               final filteredCustom = _filterFaqItems(customItems, query);
 
-              final visibleNodes =
-                  _pruneHiddenNodes(DriverFaqKeys.items, overrides);
+              final visibleNodes = _pruneHiddenNodes(
+                DriverFaqKeys.items,
+                overrides,
+              );
 
               // Filter tree (keeps hierarchy, but prunes to matches)
               final filteredTree = _filterTree(
@@ -143,7 +144,8 @@ class _DriverFaqPageState extends State<DriverFaqPage> {
                 if (items == null || items.isEmpty) return;
                 usedInsertKeys.add(key);
                 combinedWidgets.addAll(
-                    items.map((item) => _FaqItemCard(item: item)));
+                  items.map((item) => _FaqItemCard(item: item)),
+                );
                 combinedWidgets.add(const SizedBox(height: 8));
               }
 
@@ -186,9 +188,7 @@ class _DriverFaqPageState extends State<DriverFaqPage> {
                     },
                   ),
                   const SizedBox(height: 12),
-
-                  if (!hasResults)
-                    _emptyCard(t.t('faq_empty')),
+                  if (!hasResults) _emptyCard(t.t('faq_empty')),
                   if (combinedWidgets.isNotEmpty) ...combinedWidgets,
                 ],
               );
@@ -222,11 +222,7 @@ class _DriverFaqPageState extends State<DriverFaqPage> {
         final selfMatch = matchesNode(n);
         if (selfMatch || prunedKids.isNotEmpty) {
           out.add(
-            DriverFaqNode(
-              qKey: n.qKey,
-              aKey: n.aKey,
-              children: prunedKids,
-            ),
+            DriverFaqNode(qKey: n.qKey, aKey: n.aKey, children: prunedKids),
           );
         }
       }

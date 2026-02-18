@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../localization/app_localizations.dart';
 import '../services/admin_approvals.dart';
 
 class AdminApprovalsPage extends StatelessWidget {
@@ -8,6 +9,7 @@ class AdminApprovalsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     return Container(
       color: const Color(0xFFF6F7F5),
       child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -22,7 +24,9 @@ class AdminApprovalsPage extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Text(
-                  'Error loading pending users:\n${snap.error}',
+                  t.tf('admin_approvals_error_loading', {
+                    'error': '${snap.error}',
+                  }),
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: Colors.red),
                 ),
@@ -45,14 +49,14 @@ class AdminApprovalsPage extends StatelessWidget {
           });
 
           if (docs.isEmpty) {
-            return const Center(child: Text('No pending users.'));
+            return Center(child: Text(t.t('admin_approvals_no_pending')));
           }
 
           return ListView.separated(
             padding: const EdgeInsets.all(16),
             itemCount: docs.length,
             separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (_, i) {
+            itemBuilder: (context, i) {
               final d = docs[i];
               final data = d.data();
               final name =
@@ -60,30 +64,62 @@ class AdminApprovalsPage extends StatelessWidget {
                       .trim();
               final email = (data['email'] ?? '').toString();
               final createdAt = (data['createdAt'] as Timestamp?)?.toDate();
+              final isNarrow = MediaQuery.of(context).size.width < 760;
 
               return Card(
-                child: ListTile(
-                  title: Text(
-                    name.isEmpty ? '(no name)' : name,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  subtitle: Text(
-                    '$email${createdAt != null ? ' • ${createdAt.toLocal()}' : ''}',
-                  ),
-                  trailing: Wrap(
-                    spacing: 8,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      OutlinedButton.icon(
-                        onPressed: () =>
-                            AdminApprovalsService.deleteUserDoc(d.id),
-                        icon: const Icon(Icons.delete_outline),
-                        label: const Text('Delete'),
+                      Text(
+                        name.isEmpty ? t.t('admin_approvals_no_name') : name,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
-                      FilledButton.icon(
-                        onPressed: () => AdminApprovalsService.approve(d.id),
-                        icon: const Icon(Icons.check_circle_outline),
-                        label: const Text('Approve'),
+                      const SizedBox(height: 4),
+                      Text(
+                        '$email${createdAt != null ? ' • ${createdAt.toLocal()}' : ''}',
                       ),
+                      const SizedBox(height: 10),
+                      if (isNarrow) ...[
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: () =>
+                                AdminApprovalsService.deleteUserDoc(d.id),
+                            icon: const Icon(Icons.delete_outline),
+                            label: Text(t.t('admin_approvals_delete')),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            onPressed: () =>
+                                AdminApprovalsService.approve(d.id),
+                            icon: const Icon(Icons.check_circle_outline),
+                            label: Text(t.t('admin_approvals_approve')),
+                          ),
+                        ),
+                      ] else
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: () =>
+                                  AdminApprovalsService.deleteUserDoc(d.id),
+                              icon: const Icon(Icons.delete_outline),
+                              label: Text(t.t('admin_approvals_delete')),
+                            ),
+                            const SizedBox(width: 8),
+                            FilledButton.icon(
+                              onPressed: () =>
+                                  AdminApprovalsService.approve(d.id),
+                              icon: const Icon(Icons.check_circle_outline),
+                              label: Text(t.t('admin_approvals_approve')),
+                            ),
+                          ],
+                        ),
                     ],
                   ),
                 ),

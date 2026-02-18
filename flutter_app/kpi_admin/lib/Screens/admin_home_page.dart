@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-
+import '../localization/app_localizations.dart';
 
 class AdminHomePage extends StatefulWidget {
   const AdminHomePage({super.key});
@@ -36,7 +36,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
     required int confirmedCount,
     required int targetCount,
   }) async {
-
+    final t = AppLocalizations.of(context);
     // ✅ Load notification details (title/body) once for the popup header
     final notifDoc = await FirebaseFirestore.instance
         .collection('users')
@@ -45,10 +45,12 @@ class _AdminHomePageState extends State<AdminHomePage> {
         .doc(notificationId)
         .get();
 
-    final notifTitle = (notifDoc.data()?['title'] ?? 'Notification').toString();
+    final notifTitle =
+        (notifDoc.data()?['title'] ?? t.t('admin_home_notification'))
+            .toString();
     final notifBody = (notifDoc.data()?['body'] ?? '').toString();
-    
-    Future<List<String>> loadMissingDrivers() async {
+
+    Future<Map<String, dynamic>> loadMissingDrivers() async {
       final driversSnap = await FirebaseFirestore.instance
           .collection('users')
           .doc(dspUid)
@@ -60,7 +62,9 @@ class _AdminHomePageState extends State<AdminHomePage> {
       for (final d in driversSnap.docs) {
         final driverData = d.data();
         final driverName =
-            (driverData['driverName'] ?? driverData['fullName'] ?? 'Driver')
+            (driverData['driverName'] ??
+                    driverData['fullName'] ??
+                    t.t('admin_home_driver_fallback'))
                 .toString();
 
         final notifSnap = await FirebaseFirestore.instance
@@ -79,129 +83,199 @@ class _AdminHomePageState extends State<AdminHomePage> {
         }
       }
 
-      return missing;
+      final total = driversSnap.docs.length;
+      return {
+        'missing': missing,
+        'total': total,
+        'confirmed': total - missing.length,
+      };
     }
+
+    final statsFuture = loadMissingDrivers();
 
     await showDialog(
       context: context,
       barrierDismissible: true,
       builder: (ctx) {
+        final size = MediaQuery.of(ctx).size;
+        final dialogMaxHeight = size.height * 0.88;
+        final dialogWidth = size.width < 560 ? size.width - 24 : 520.0;
+
         return Dialog(
           backgroundColor: Colors.transparent,
-          child: Container(
-            width: 520,
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 20,
+          ),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: dialogWidth,
+              maxHeight: dialogMaxHeight,
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ✅ Notification context (TITLE + BODY)
-                Text(
-                  notifTitle,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                if (notifBody.isNotEmpty) ...[
-                  const SizedBox(height: 6),
+            child: Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.max,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    notifBody,
+                    notifTitle,
                     style: const TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF4B5563),
-                      fontWeight: FontWeight.w500,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
-                ],
-
-                const SizedBox(height: 16),
-                const Divider(height: 1),
-                const SizedBox(height: 12),
-
-                // ✅ Existing section header
-                Row(
-                  children: [
-                    const Text(
-                      'NOT CONFIRMED BY:',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w900,
+                  if (notifBody.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: dialogMaxHeight * 0.28,
                       ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      'missing: ${(targetCount - confirmedCount) < 0 ? 0 : (targetCount - confirmedCount)}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFFE9741A),
+                      child: SingleChildScrollView(
+                        child: Text(
+                          notifBody,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF4B5563),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                       ),
                     ),
                   ],
-                ),
-                const SizedBox(height: 12),
-                const Divider(height: 1),
-                const SizedBox(height: 10),
 
-                // ✅ Your list stays unchanged
-                SizedBox(
-                  height: 420,
+                  const SizedBox(height: 16),
+                  const Divider(height: 1),
+                  const SizedBox(height: 12),
 
-                  child: FutureBuilder<List<String>>(
-                    future: loadMissingDrivers(),
-                    builder: (ctx, snap) {
-                      if (snap.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-
-                      if (snap.hasError) {
-                        return Center(child: Text('Error: ${snap.error}'));
-                      }
-
-                      final items = snap.data ?? [];
-                      if (items.isEmpty) {
-                        return const Center(
-                          child: Text(
-                            'All drivers have confirmed.',
-                            style: TextStyle(color: Colors.black54),
-                          ),
-                        );
-                      }
-
-                      return ListView.separated(
-                        itemCount: items.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1),
-                        itemBuilder: (_, i) {
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            child: Text(
-                              items[i],
-                              style: const TextStyle(
+                  Row(
+                    children: [
+                      Text(
+                        t.t('admin_home_not_confirmed_by'),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const Spacer(),
+                      FutureBuilder<Map<String, dynamic>>(
+                        future: statsFuture,
+                        builder: (_, statsSnap) {
+                          if (statsSnap.connectionState ==
+                                  ConnectionState.waiting &&
+                              !statsSnap.hasData) {
+                            return Text(
+                              t.t('admin_home_missing_loading'),
+                              style: TextStyle(
                                 fontSize: 14,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFFE9741A),
                               ),
+                            );
+                          }
+                          if (statsSnap.hasError) {
+                            return Text(
+                              t.t('admin_home_missing_unknown'),
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFFE9741A),
+                              ),
+                            );
+                          }
+                          final total =
+                              (statsSnap.data?['total'] as num?)?.toInt() ?? 0;
+                          final confirmed =
+                              (statsSnap.data?['confirmed'] as num?)?.toInt() ??
+                              0;
+                          final missingRaw = total - confirmed;
+                          final missing = missingRaw < 0 ? 0 : missingRaw;
+                          return Text(
+                            t.tf('admin_home_missing_count', {
+                              'count': '$missing',
+                            }),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFFE9741A),
                             ),
                           );
                         },
-                      );
-                    },
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 10),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () => Navigator.of(ctx).pop(),
-                    child: const Text('Close'),
+                  const SizedBox(height: 12),
+                  const Divider(height: 1),
+                  const SizedBox(height: 10),
+
+                  Expanded(
+                    child: FutureBuilder<Map<String, dynamic>>(
+                      future: statsFuture,
+                      builder: (ctx, snap) {
+                        if (snap.connectionState == ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+
+                        if (snap.hasError) {
+                          return Center(
+                            child: Text(
+                              t.tf('admin_home_error_generic', {
+                                'error': '${snap.error}',
+                              }),
+                            ),
+                          );
+                        }
+
+                        final items =
+                            (snap.data?['missing'] as List<dynamic>? ??
+                                    const [])
+                                .map((e) => e.toString())
+                                .toList(growable: false);
+                        if (items.isEmpty) {
+                          return Center(
+                            child: Text(
+                              t.t('admin_home_all_drivers_confirmed'),
+                              style: const TextStyle(color: Colors.black54),
+                            ),
+                          );
+                        }
+
+                        return ListView.separated(
+                          itemCount: items.length,
+                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          itemBuilder: (_, i) {
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              child: Text(
+                                items[i],
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: Text(t.t('admin_home_close')),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -263,7 +337,6 @@ class _AdminHomePageState extends State<AdminHomePage> {
         },
       ),
     );
-
   }
 }
 
@@ -275,8 +348,12 @@ class _DesktopLayout extends StatelessWidget {
   final double scale;
   final double gap;
   final String? dspUid;
-  final void Function(String notificationId, int confirmedCount, int targetCount)
-      onOpenMissing;
+  final void Function(
+    String notificationId,
+    int confirmedCount,
+    int targetCount,
+  )
+  onOpenMissing;
 
   const _DesktopLayout({
     required this.scale,
@@ -328,8 +405,12 @@ class _StackedLayout extends StatelessWidget {
   final double scale;
   final double gap;
   final String? dspUid;
-  final void Function(String notificationId, int confirmedCount, int targetCount)
-      onOpenMissing;
+  final void Function(
+    String notificationId,
+    int confirmedCount,
+    int targetCount,
+  )
+  onOpenMissing;
 
   const _StackedLayout({
     required this.scale,
@@ -340,17 +421,33 @@ class _StackedLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hScore = _r(320, scale);
-    final hFleet = _r(520, scale);
-    final hNotif = _r(520, scale);
-    final hDocs = _r(320, scale);
+    final screenW = MediaQuery.of(context).size.width;
+    final veryNarrow = screenW < 700;
+
+    // Keep notification/doc cards bounded; scorecard/fleet are adaptive on very narrow screens.
+    final hScore = 350.0;
+    final hFleet = 520.0;
+    final hNotif = veryNarrow ? 620.0 : 560.0;
+    final hDocs = veryNarrow ? 760.0 : 700.0;
 
     return SingleChildScrollView(
       child: Column(
         children: [
-          SizedBox(height: hScore, child: _ScorecardCard(scale: scale)),
+          if (veryNarrow)
+            _ScorecardCard(scale: scale)
+          else
+            SizedBox(
+              height: hScore,
+              child: _ScorecardCard(scale: scale),
+            ),
           SizedBox(height: gap),
-          SizedBox(height: hFleet, child: _FleetHubCard(scale: scale)),
+          if (veryNarrow)
+            _FleetHubCard(scale: scale, adaptiveHeight: true)
+          else
+            SizedBox(
+              height: hFleet,
+              child: _FleetHubCard(scale: scale),
+            ),
           SizedBox(height: gap),
           SizedBox(
             height: hNotif,
@@ -361,7 +458,10 @@ class _StackedLayout extends StatelessWidget {
             ),
           ),
           SizedBox(height: gap),
-          SizedBox(height: hDocs, child: _DriverDocumentsCard(scale: scale)),
+          SizedBox(
+            height: hDocs,
+            child: _DriverDocumentsCard(scale: scale),
+          ),
         ],
       ),
     );
@@ -376,10 +476,7 @@ class _AdminCard extends StatelessWidget {
   final Widget child;
   final double scale;
 
-  const _AdminCard({
-    required this.child,
-    required this.scale,
-  });
+  const _AdminCard({required this.child, required this.scale});
 
   @override
   Widget build(BuildContext context) {
@@ -397,7 +494,7 @@ class _AdminCard extends StatelessWidget {
             color: Colors.black.withOpacity(0.04),
             blurRadius: _r(10, scale),
             offset: Offset(0, _r(4, scale)),
-          )
+          ),
         ],
       ),
       child: child,
@@ -485,16 +582,27 @@ class _ScorecardCardState extends State<_ScorecardCard> {
     return mondayOfTarget.month;
   }
 
-  String _monthName(int m) {
-    const names = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+  String _monthName(AppLocalizations t, int m) {
+    const keys = [
+      'month_short_jan',
+      'month_short_feb',
+      'month_short_mar',
+      'month_short_apr',
+      'month_short_may',
+      'month_short_jun',
+      'month_short_jul',
+      'month_short_aug',
+      'month_short_sep',
+      'month_short_oct',
+      'month_short_nov',
+      'month_short_dec',
     ];
-    return names[(m.clamp(1, 12) - 1)];
+    return t.t(keys[(m.clamp(1, 12) - 1)]);
   }
 
   double _companyOverallFromReportDoc(
-      QueryDocumentSnapshot<Map<String, dynamic>> d) {
+    QueryDocumentSnapshot<Map<String, dynamic>> d,
+  ) {
     final data = d.data();
     final sRaw = data['summary'];
     final s = sRaw is Map
@@ -508,7 +616,8 @@ class _ScorecardCardState extends State<_ScorecardCard> {
 
   // Names (week-level driverNames overrides global drivers)
   Stream<Map<String, String>> _driverNamesForWeek(
-      DocumentReference<Map<String, dynamic>> reportRef) {
+    DocumentReference<Map<String, dynamic>> reportRef,
+  ) {
     return reportRef.collection('driverNames').snapshots().map((snap) {
       final m = <String, String>{};
       for (final d in snap.docs) {
@@ -531,16 +640,17 @@ class _ScorecardCardState extends State<_ScorecardCard> {
         .collection('drivers')
         .snapshots()
         .map((snap) {
-      final m = <String, String>{};
-      for (final d in snap.docs) {
-        final data = d.data();
-        final tid = (data['transporterId'] ?? '').toString().trim();
-        final name =
-            (data['driverName'] ?? data['fullName'] ?? '').toString().trim();
-        if (tid.isNotEmpty && name.isNotEmpty) m[tid] = name;
-      }
-      return m;
-    });
+          final m = <String, String>{};
+          for (final d in snap.docs) {
+            final data = d.data();
+            final tid = (data['transporterId'] ?? '').toString().trim();
+            final name = (data['driverName'] ?? data['fullName'] ?? '')
+                .toString()
+                .trim();
+            if (tid.isNotEmpty && name.isNotEmpty) m[tid] = name;
+          }
+          return m;
+        });
   }
 
   // Week: stream (live)
@@ -560,7 +670,8 @@ class _ScorecardCardState extends State<_ScorecardCard> {
   }
 
   // Month/Year: Future-based aggregation with whereIn chunking (10 max)
-  Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _scoresForReportRefs(
+  Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>>
+  _scoresForReportRefs(
     List<DocumentReference<Map<String, dynamic>>> reportRefs,
   ) async {
     final uid = _uid;
@@ -570,8 +681,10 @@ class _ScorecardCardState extends State<_ScorecardCard> {
     final allDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
 
     for (int i = 0; i < reportRefs.length; i += chunkSize) {
-      final chunk =
-          reportRefs.sublist(i, (i + chunkSize).clamp(0, reportRefs.length));
+      final chunk = reportRefs.sublist(
+        i,
+        (i + chunkSize).clamp(0, reportRefs.length),
+      );
 
       final snap = await FirebaseFirestore.instance
           .collection('users')
@@ -588,6 +701,7 @@ class _ScorecardCardState extends State<_ScorecardCard> {
   @override
   Widget build(BuildContext context) {
     final scale = widget.scale;
+    final t = AppLocalizations.of(context);
 
     return _AdminCard(
       scale: scale,
@@ -601,12 +715,12 @@ class _ScorecardCardState extends State<_ScorecardCard> {
             return _ScorecardShellLive(
               scale: scale,
               companyScore: '—',
-              dropdownItems: const ['Last Week'],
-              dropdownValue: 'Last Week',
+              dropdownItems: [t.t('admin_home_last_week')],
+              dropdownValue: t.t('admin_home_last_week'),
               onDropdownChanged: (_) {},
               best: const [],
               worst: const [],
-              footerText: 'Not logged in.',
+              footerText: t.t('admin_home_not_logged_in'),
             );
           }
 
@@ -614,12 +728,12 @@ class _ScorecardCardState extends State<_ScorecardCard> {
             return _ScorecardShellLive(
               scale: scale,
               companyScore: '—',
-              dropdownItems: const ['Last Week'],
-              dropdownValue: 'Last Week',
+              dropdownItems: [t.t('admin_home_last_week')],
+              dropdownValue: t.t('admin_home_last_week'),
               onDropdownChanged: (_) {},
               best: const [],
               worst: const [],
-              footerText: 'Loading reports…',
+              footerText: t.t('admin_home_loading_reports'),
             );
           }
 
@@ -627,32 +741,34 @@ class _ScorecardCardState extends State<_ScorecardCard> {
             return _ScorecardShellLive(
               scale: scale,
               companyScore: '—',
-              dropdownItems: const ['Last Week'],
-              dropdownValue: 'Last Week',
+              dropdownItems: [t.t('admin_home_last_week')],
+              dropdownValue: t.t('admin_home_last_week'),
               onDropdownChanged: (_) {},
               best: const [],
               worst: const [],
-              footerText: 'Error: ${reportSnap.error}',
+              footerText: t.tf('admin_home_error_generic', {
+                'error': '${reportSnap.error}',
+              }),
             );
           }
 
           // IMPORTANT: typed copy fixes Flutter Web _JsonQueryDocumentSnapshot issues
           final List<QueryDocumentSnapshot<Map<String, dynamic>>> reportDocs =
               List<QueryDocumentSnapshot<Map<String, dynamic>>>.from(
-            reportSnap.data?.docs ??
-                const <QueryDocumentSnapshot<Map<String, dynamic>>>[],
-          );
+                reportSnap.data?.docs ??
+                    const <QueryDocumentSnapshot<Map<String, dynamic>>>[],
+              );
 
           if (reportDocs.isEmpty) {
             return _ScorecardShellLive(
               scale: scale,
               companyScore: '—',
-              dropdownItems: const ['Last Week'],
-              dropdownValue: 'Last Week',
+              dropdownItems: [t.t('admin_home_last_week')],
+              dropdownValue: t.t('admin_home_last_week'),
               onDropdownChanged: (_) {},
               best: const [],
               worst: const [],
-              footerText: 'No reports uploaded yet.',
+              footerText: t.t('admin_home_no_reports_uploaded'),
             );
           }
 
@@ -676,19 +792,27 @@ class _ScorecardCardState extends State<_ScorecardCard> {
           final sortedYears = years.toList()..sort((a, b) => b.compareTo(a));
           final sortedMonthsByYear = <int, List<int>>{
             for (final y in sortedYears)
-              y: (monthsByYear[y]?.toList() ?? [])..sort((a, b) => a.compareTo(b))
+              y: (monthsByYear[y]?.toList() ?? [])
+                ..sort((a, b) => a.compareTo(b)),
           };
 
           // Dropdown entries
           final entries = <_DropdownEntry>[];
-          entries.add(const _DropdownEntry(key: 'W|__LAST__', label: 'Last Week'));
+          entries.add(
+            _DropdownEntry(
+              key: 'W|__LAST__',
+              label: t.t('admin_home_last_week'),
+            ),
+          );
 
           // Weeks
           for (final r in reportDocs) {
             final data = r.data();
             final w = _weekOfReport(data);
             final y = _yearOfReport(data);
-            final label = (w != null && y != null) ? 'KW $w | $y' : 'KW';
+            final label = (w != null && y != null)
+                ? '${t.t('admin_home_week_short')} $w | $y'
+                : t.t('admin_home_week_short');
             entries.add(_DropdownEntry(key: 'W|${r.id}', label: label));
           }
 
@@ -696,16 +820,24 @@ class _ScorecardCardState extends State<_ScorecardCard> {
           for (final y in sortedYears) {
             for (final m in (sortedMonthsByYear[y] ?? const <int>[])) {
               final mm = m.toString().padLeft(2, '0');
-              entries.add(_DropdownEntry(
-                key: 'M|$y-$mm',
-                label: 'MONTH: ${_monthName(m)} $y',
-              ));
+              entries.add(
+                _DropdownEntry(
+                  key: 'M|$y-$mm',
+                  label:
+                      '${t.t('admin_home_month_prefix')}: ${_monthName(t, m)} $y',
+                ),
+              );
             }
           }
 
           // Years
           for (final y in sortedYears) {
-            entries.add(_DropdownEntry(key: 'Y|$y', label: 'YEAR: $y'));
+            entries.add(
+              _DropdownEntry(
+                key: 'Y|$y',
+                label: '${t.t('admin_home_year_prefix')}: $y',
+              ),
+            );
           }
 
           // Ensure selection still valid
@@ -713,8 +845,7 @@ class _ScorecardCardState extends State<_ScorecardCard> {
             _selectedKey = 'W|__LAST__';
           }
 
-          final selected =
-              entries.firstWhere((e) => e.key == _selectedKey);
+          final selected = entries.firstWhere((e) => e.key == _selectedKey);
 
           // Resolve selected reportRefs + companyScore aggregation
           List<DocumentReference<Map<String, dynamic>>> reportRefs = [];
@@ -787,14 +918,17 @@ class _ScorecardCardState extends State<_ScorecardCard> {
             }
           }
 
-          final companyScore =
-              (companyCount > 0) ? (companySum / companyCount) : 0.0;
-          final companyScoreStr =
-              companyScore <= 0 ? '—' : _fmtScore(companyScore);
+          final companyScore = (companyCount > 0)
+              ? (companySum / companyCount)
+              : 0.0;
+          final companyScoreStr = companyScore <= 0
+              ? '—'
+              : _fmtScore(companyScore);
 
           final isWeekView = _selectedKey.startsWith('W|');
-          final weekRef =
-              isWeekView && reportRefs.isNotEmpty ? reportRefs.first : null;
+          final weekRef = isWeekView && reportRefs.isNotEmpty
+              ? reportRefs.first
+              : null;
 
           final weekNamesStream = (weekRef != null)
               ? _driverNamesForWeek(weekRef)
@@ -818,16 +952,21 @@ class _ScorecardCardState extends State<_ScorecardCard> {
                   // WEEK: live stream
                   if (isWeekView && reportRefs.isNotEmpty) {
                     return StreamBuilder<
-                        List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+                      List<QueryDocumentSnapshot<Map<String, dynamic>>>
+                    >(
                       stream: _scoresForReportRef(reportRefs.first),
                       builder: (ctx, scoreSnap) {
-                        final docs = scoreSnap.data ??
-                            const <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                        final docs =
+                            scoreSnap.data ??
+                            const <
+                              QueryDocumentSnapshot<Map<String, dynamic>>
+                            >[];
 
                         final bestWorst = _computeBestWorst(
                           docs,
                           nameMap,
                           scoreFromDoc: _scoreFromDoc,
+                          fallbackName: t.t('admin_home_name_fallback'),
                         );
 
                         return _ScorecardShellLive(
@@ -844,9 +983,10 @@ class _ScorecardCardState extends State<_ScorecardCard> {
                           },
                           best: bestWorst.best,
                           worst: bestWorst.worst,
-                          footerText: scoreSnap.connectionState ==
+                          footerText:
+                              scoreSnap.connectionState ==
                                   ConnectionState.waiting
-                              ? 'Loading scores…'
+                              ? t.t('admin_home_loading_scores')
                               : null,
                         );
                       },
@@ -855,10 +995,12 @@ class _ScorecardCardState extends State<_ScorecardCard> {
 
                   // MONTH/YEAR: Future aggregation (avg per driver)
                   return FutureBuilder<
-                      List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+                    List<QueryDocumentSnapshot<Map<String, dynamic>>>
+                  >(
                     future: _scoresForReportRefs(reportRefs),
                     builder: (ctx, scoreSnap) {
-                      final docs = scoreSnap.data ??
+                      final docs =
+                          scoreSnap.data ??
                           const <QueryDocumentSnapshot<Map<String, dynamic>>>[];
 
                       final bestWorst = _computeBestWorst(
@@ -866,6 +1008,7 @@ class _ScorecardCardState extends State<_ScorecardCard> {
                         nameMap,
                         scoreFromDoc: _scoreFromDoc,
                         aggregateAveragePerDriver: true,
+                        fallbackName: t.t('admin_home_name_fallback'),
                       );
 
                       return _ScorecardShellLive(
@@ -882,9 +1025,9 @@ class _ScorecardCardState extends State<_ScorecardCard> {
                         },
                         best: bestWorst.best,
                         worst: bestWorst.worst,
-                        footerText: scoreSnap.connectionState ==
-                                ConnectionState.waiting
-                            ? 'Loading scores…'
+                        footerText:
+                            scoreSnap.connectionState == ConnectionState.waiting
+                            ? t.t('admin_home_loading_scores')
                             : null,
                       );
                     },
@@ -931,6 +1074,7 @@ _BestWorstResult _computeBestWorst(
   Map<String, String> nameMap, {
   required double Function(Map<String, dynamic>) scoreFromDoc,
   bool aggregateAveragePerDriver = false,
+  String fallbackName = '—',
 }) {
   if (!aggregateAveragePerDriver) {
     final entries = <_ScoreEntry>[];
@@ -942,7 +1086,7 @@ _BestWorstResult _computeBestWorst(
 
       final name = (tid.isNotEmpty && (nameMap[tid] ?? '').trim().isNotEmpty)
           ? nameMap[tid]!.trim()
-          : (tid.isNotEmpty ? tid : 'Vorname Nachname');
+          : (tid.isNotEmpty ? tid : fallbackName);
 
       entries.add(_ScoreEntry(transporterId: tid, name: name, score: score));
     }
@@ -952,7 +1096,10 @@ _BestWorstResult _computeBestWorst(
     final worst = List<_ScoreEntry>.from(entries)
       ..sort((a, b) => a.score.compareTo(b.score)); // lowest = worst
 
-    return _BestWorstResult(best: best.take(5).toList(), worst: worst.take(5).toList());
+    return _BestWorstResult(
+      best: best.take(5).toList(),
+      worst: worst.take(5).toList(),
+    );
   }
 
   // Month/Year: average score per transporterId
@@ -975,8 +1122,9 @@ _BestWorstResult _computeBestWorst(
     if (c <= 0) return;
     final avg = s / c;
 
-    final name =
-        (nameMap[tid] ?? '').trim().isNotEmpty ? nameMap[tid]!.trim() : tid;
+    final name = (nameMap[tid] ?? '').trim().isNotEmpty
+        ? nameMap[tid]!.trim()
+        : tid;
 
     entries.add(_ScoreEntry(transporterId: tid, name: name, score: avg));
   });
@@ -986,7 +1134,10 @@ _BestWorstResult _computeBestWorst(
   final worst = List<_ScoreEntry>.from(entries)
     ..sort((a, b) => a.score.compareTo(b.score)); // lowest = worst
 
-  return _BestWorstResult(best: best.take(5).toList(), worst: worst.take(5).toList());
+  return _BestWorstResult(
+    best: best.take(5).toList(),
+    worst: worst.take(5).toList(),
+  );
 }
 
 // ---------- scorecard UI shell (same look, but live data) ----------
@@ -1017,65 +1168,134 @@ class _ScorecardShellLive extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final compactHeader = MediaQuery.of(context).size.width < 700;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Icon(Icons.assignment_outlined,
-                color: AdminHomePage._kGreen, size: _r(22, scale)),
-            SizedBox(width: _r(10, scale)),
-            Text(
-              'Scorecard',
-              style: TextStyle(
-                fontSize: _r(20, scale),
-                fontWeight: FontWeight.w900,
-                color: AdminHomePage._kText,
+        if (compactHeader)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.assignment_outlined,
+                    color: AdminHomePage._kGreen,
+                    size: _r(22, scale),
+                  ),
+                  SizedBox(width: _r(10, scale)),
+                  Text(
+                    t.t('admin_home_scorecard'),
+                    style: TextStyle(
+                      fontSize: _r(20, scale),
+                      fontWeight: FontWeight.w900,
+                      color: AdminHomePage._kText,
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const Spacer(),
-            Text(
-              'COMPANY SCORE',
-              style: TextStyle(
-                fontSize: _r(12, scale),
-                fontWeight: FontWeight.w900,
-                color: AdminHomePage._kText,
+              SizedBox(height: _r(10, scale)),
+              Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: _r(8, scale),
+                runSpacing: _r(8, scale),
+                children: [
+                  Text(
+                    t.t('admin_home_company_score'),
+                    style: TextStyle(
+                      fontSize: _r(12, scale),
+                      fontWeight: FontWeight.w900,
+                      color: AdminHomePage._kText,
+                    ),
+                  ),
+                  Text(
+                    companyScore,
+                    style: TextStyle(
+                      fontSize: _r(16, scale),
+                      fontWeight: FontWeight.w900,
+                      color: AdminHomePage._kGreen,
+                    ),
+                  ),
+                  Text(
+                    t.t('admin_home_of'),
+                    style: TextStyle(
+                      color: AdminHomePage._kMuted,
+                      fontSize: _r(12, scale),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  _PillPopupDropdown(
+                    scale: scale,
+                    items: dropdownItems,
+                    value: dropdownValue,
+                    onChanged: onDropdownChanged,
+                  ),
+                ],
               ),
-            ),
-            SizedBox(width: _r(8, scale)),
-            Text(
-              companyScore,
-              style: TextStyle(
-                fontSize: _r(16, scale),
-                fontWeight: FontWeight.w900,
+            ],
+          )
+        else
+          Row(
+            children: [
+              Icon(
+                Icons.assignment_outlined,
                 color: AdminHomePage._kGreen,
+                size: _r(22, scale),
               ),
-            ),
-            SizedBox(width: _r(8, scale)),
-            Text(
-              'of',
-              style: TextStyle(
-                color: AdminHomePage._kMuted,
-                fontSize: _r(12, scale),
-                fontWeight: FontWeight.w700,
+              SizedBox(width: _r(10, scale)),
+              Text(
+                t.t('admin_home_scorecard'),
+                style: TextStyle(
+                  fontSize: _r(20, scale),
+                  fontWeight: FontWeight.w900,
+                  color: AdminHomePage._kText,
+                ),
               ),
-            ),
-            SizedBox(width: _r(8, scale)),
-            _PillPopupDropdown(
-              scale: scale,
-              items: dropdownItems,
-              value: dropdownValue,
-              onChanged: onDropdownChanged,
-            ),
-          ],
-        ),
+              const Spacer(),
+              Text(
+                t.t('admin_home_company_score'),
+                style: TextStyle(
+                  fontSize: _r(12, scale),
+                  fontWeight: FontWeight.w900,
+                  color: AdminHomePage._kText,
+                ),
+              ),
+              SizedBox(width: _r(8, scale)),
+              Text(
+                companyScore,
+                style: TextStyle(
+                  fontSize: _r(16, scale),
+                  fontWeight: FontWeight.w900,
+                  color: AdminHomePage._kGreen,
+                ),
+              ),
+              SizedBox(width: _r(8, scale)),
+              Text(
+                t.t('admin_home_of'),
+                style: TextStyle(
+                  color: AdminHomePage._kMuted,
+                  fontSize: _r(12, scale),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              SizedBox(width: _r(8, scale)),
+              _PillPopupDropdown(
+                scale: scale,
+                items: dropdownItems,
+                value: dropdownValue,
+                onChanged: onDropdownChanged,
+              ),
+            ],
+          ),
         SizedBox(height: _r(14, scale)),
         Row(
           children: [
             Expanded(
               child: _MiniRankingLive(
                 scale: scale,
-                title: 'Best Driver',
+                title: t.t('admin_home_best_driver'),
                 positive: true,
                 items: best,
               ),
@@ -1084,7 +1304,7 @@ class _ScorecardShellLive extends StatelessWidget {
             Expanded(
               child: _MiniRankingLive(
                 scale: scale,
-                title: 'Worst Defender',
+                title: t.t('admin_home_worst_defender'),
                 positive: false,
                 items: worst,
               ),
@@ -1197,7 +1417,6 @@ class _MiniRankingLive extends StatelessWidget {
   }
 }
 
-
 // ---------------------------
 // NOTIFICATION HISTORY (BACKEND CONNECTED)
 // ---------------------------
@@ -1205,8 +1424,12 @@ class _MiniRankingLive extends StatelessWidget {
 class _NotificationHistoryCard extends StatefulWidget {
   final double scale;
   final String? dspUid;
-  final void Function(String notificationId, int confirmedCount, int targetCount)
-      onOpenMissing;
+  final void Function(
+    String notificationId,
+    int confirmedCount,
+    int targetCount,
+  )
+  onOpenMissing;
 
   const _NotificationHistoryCard({
     required this.scale,
@@ -1215,7 +1438,8 @@ class _NotificationHistoryCard extends StatefulWidget {
   });
 
   @override
-  State<_NotificationHistoryCard> createState() => _NotificationHistoryCardState();
+  State<_NotificationHistoryCard> createState() =>
+      _NotificationHistoryCardState();
 }
 
 class _NotificationHistoryCardState extends State<_NotificationHistoryCard> {
@@ -1238,6 +1462,7 @@ class _NotificationHistoryCardState extends State<_NotificationHistoryCard> {
     final scale = widget.scale;
     final dspUid = widget.dspUid;
     final onOpenMissing = widget.onOpenMissing;
+    final t = AppLocalizations.of(context);
 
     return _AdminCard(
       scale: scale,
@@ -1246,11 +1471,14 @@ class _NotificationHistoryCardState extends State<_NotificationHistoryCard> {
         children: [
           Row(
             children: [
-              Icon(Icons.notifications_none,
-                  color: AdminHomePage._kGreen, size: _r(22, scale)),
+              Icon(
+                Icons.notifications_none,
+                color: AdminHomePage._kGreen,
+                size: _r(22, scale),
+              ),
               SizedBox(width: _r(10, scale)),
               Text(
-                'Notification History',
+                t.t('admin_home_notification_history'),
                 style: TextStyle(
                   fontSize: _r(20, scale),
                   fontWeight: FontWeight.w900,
@@ -1264,76 +1492,103 @@ class _NotificationHistoryCardState extends State<_NotificationHistoryCard> {
           SizedBox(height: _r(12, scale)),
           Expanded(
             child: dspUid == null
-                ? const Center(child: Text('Not logged in'))
-                : StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                ? Center(child: Text(t.t('admin_home_not_logged_in')))
+                : StreamBuilder<int>(
                     stream: FirebaseFirestore.instance
                         .collection('users')
                         .doc(dspUid)
-                        .collection('notifications')
-                        .orderBy('createdAt', descending: true)
-                        .snapshots(),
-                    builder: (ctx, snap) {
-                      if (snap.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      if (snap.hasError) {
-                        return Center(child: Text('Error: ${snap.error}'));
-                      }
-
-                      final docs = snap.data?.docs ?? [];
-                      if (docs.isEmpty) {
-                        return const Center(
-                          child: Text(
-                            'No notifications yet.',
-                            style: TextStyle(color: Colors.black54),
-                          ),
-                        );
-                      }
-
-                      return Scrollbar(
-                        controller: _scrollCtrl,
-                        thumbVisibility: true,
-                        child: ListView.separated(
-                          controller: _scrollCtrl,
-                          primary: false,
-                          itemCount: docs.length,
-                          separatorBuilder: (_, __) =>
-                              SizedBox(height: _r(12, scale)),
-                          itemBuilder: (_, i) {
-                            final d = docs[i];
-                            final data = d.data();
-
-                            final title = (data['title'] ?? '').toString();
-                            final body = (data['body'] ?? '').toString();
-
-                            final confirmedCount =
-                                (data['confirmedCount'] as num?)?.toInt() ?? 0;
-                            final targetCount =
-                                (data['targetCount'] as num?)?.toInt() ?? 0;
-
-                            final ts = data['createdAt'];
-                            final dt = ts is Timestamp ? ts.toDate() : null;
-
-                            final type = (data['type'] ?? 'rule').toString();
-
-                            return InkWell(
-                              borderRadius: BorderRadius.circular(_r(16, scale)),
-                              onTap: () =>
-                                  onOpenMissing(d.id, confirmedCount, targetCount),
-                              child: _NotificationHistoryTileLive(
-                                scale: scale,
-                                dspUid: dspUid,
-                                notificationId: d.id,
-                                type: type,
-                                title: title,
-                                body: body,
-                                dateTime: dt,
-                                confirmedCount: confirmedCount,
-                                targetCount: targetCount,
+                        .collection('drivers')
+                        .snapshots()
+                        .map((s) => s.docs.length),
+                    builder: (ctx, driverSnap) {
+                      final currentDriverCount = driverSnap.data ?? 0;
+                      return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                        stream: FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(dspUid)
+                            .collection('notifications')
+                            .orderBy('createdAt', descending: true)
+                            .snapshots(),
+                        builder: (ctx, snap) {
+                          if (snap.connectionState == ConnectionState.waiting) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          }
+                          if (snap.hasError) {
+                            return Center(
+                              child: Text(
+                                t.tf('admin_home_error_generic', {
+                                  'error': '${snap.error}',
+                                }),
                               ),
                             );
-                          },
-                        ),
+                          }
+
+                          final docs = snap.data?.docs ?? [];
+                          if (docs.isEmpty) {
+                            return Center(
+                              child: Text(
+                                t.t('admin_home_no_notifications_yet'),
+                                style: const TextStyle(color: Colors.black54),
+                              ),
+                            );
+                          }
+
+                          return Scrollbar(
+                            controller: _scrollCtrl,
+                            thumbVisibility: true,
+                            child: ListView.separated(
+                              controller: _scrollCtrl,
+                              primary: false,
+                              itemCount: docs.length,
+                              separatorBuilder: (_, __) =>
+                                  SizedBox(height: _r(12, scale)),
+                              itemBuilder: (_, i) {
+                                final d = docs[i];
+                                final data = d.data();
+
+                                final title = (data['title'] ?? '').toString();
+                                final body = (data['body'] ?? '').toString();
+
+                                final confirmedCount =
+                                    (data['confirmedCount'] as num?)?.toInt() ??
+                                    0;
+                                final targetCount =
+                                    (data['targetCount'] as num?)?.toInt() ?? 0;
+
+                                final ts = data['createdAt'];
+                                final dt = ts is Timestamp ? ts.toDate() : null;
+
+                                final type = (data['type'] ?? 'rule')
+                                    .toString();
+
+                                return InkWell(
+                                  borderRadius: BorderRadius.circular(
+                                    _r(16, scale),
+                                  ),
+                                  onTap: () => onOpenMissing(
+                                    d.id,
+                                    confirmedCount,
+                                    targetCount,
+                                  ),
+                                  child: _NotificationHistoryTileLive(
+                                    scale: scale,
+                                    dspUid: dspUid,
+                                    notificationId: d.id,
+                                    type: type,
+                                    title: title,
+                                    body: body,
+                                    dateTime: dt,
+                                    confirmedCount: confirmedCount,
+                                    targetCount: targetCount,
+                                    currentDriverCount: currentDriverCount,
+                                  ),
+                                );
+                              },
+                            ),
+                          );
+                        },
                       );
                     },
                   ),
@@ -1343,7 +1598,6 @@ class _NotificationHistoryCardState extends State<_NotificationHistoryCard> {
     );
   }
 }
-
 
 class _NotificationHistoryTileLive extends StatelessWidget {
   final double scale;
@@ -1358,6 +1612,7 @@ class _NotificationHistoryTileLive extends StatelessWidget {
 
   final int confirmedCount;
   final int targetCount;
+  final int currentDriverCount;
 
   const _NotificationHistoryTileLive({
     required this.scale,
@@ -1369,29 +1624,35 @@ class _NotificationHistoryTileLive extends StatelessWidget {
     required this.dateTime,
     required this.confirmedCount,
     required this.targetCount,
+    required this.currentDriverCount,
   });
 
-  String _fmtDate(DateTime? dt) {
+  String _fmtDate(BuildContext context, DateTime? dt) {
     if (dt == null) return '';
+    final t = AppLocalizations.of(context);
     final dd = dt.day.toString().padLeft(2, '0');
     final mm = dt.month.toString().padLeft(2, '0');
     final yy = dt.year.toString();
     final hh = dt.hour.toString().padLeft(2, '0');
     final min = dt.minute.toString().padLeft(2, '0');
-    return '$dd.$mm.$yy | $hh:$min Uhr';
+    final suffix = t.t('admin_home_time_suffix').trim();
+    return suffix.isEmpty
+        ? '$dd.$mm.$yy | $hh:$min'
+        : '$dd.$mm.$yy | $hh:$min $suffix';
   }
 
-  String _typeLabel(String t) {
+  String _typeLabel(BuildContext context, String t) {
+    final loc = AppLocalizations.of(context);
     switch (t) {
       case 'message':
-        return 'NEW MESSAGE';
+        return loc.t('admin_home_notification_type_message');
       case 'academy':
-        return 'DA ACADEMY';
+        return loc.t('admin_home_notification_type_academy');
       case 'rideAlong':
-        return 'RIDE ALONG';
+        return loc.t('admin_home_notification_type_ride_along');
       case 'rule':
       default:
-        return 'NEW RULE';
+        return loc.t('admin_home_notification_type_rule');
     }
   }
 
@@ -1409,20 +1670,167 @@ class _NotificationHistoryTileLive extends StatelessWidget {
     }
   }
 
+  Future<void> _editEverywhere(BuildContext context) async {
+    final t = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final titleCtrl = TextEditingController(text: title);
+    final bodyCtrl = TextEditingController(text: body);
+
+    try {
+      final payload = await showDialog<Map<String, String>>(
+        context: context,
+        barrierDismissible: true,
+        builder: (ctx) {
+          return AlertDialog(
+            title: Text(t.t('admin_home_edit_rule')),
+            content: SizedBox(
+              width: 520,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: titleCtrl,
+                    decoration: InputDecoration(
+                      labelText: t.t('admin_home_title'),
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: bodyCtrl,
+                    minLines: 5,
+                    maxLines: 12,
+                    decoration: InputDecoration(
+                      labelText: t.t('admin_home_body'),
+                      alignLabelWithHint: true,
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text(t.t('admin_home_cancel')),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop({
+                    'title': titleCtrl.text.trim(),
+                    'body': bodyCtrl.text.trim(),
+                  });
+                },
+                child: Text(t.t('admin_home_save')),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (payload == null) return;
+      final newTitle = (payload['title'] ?? '').trim();
+      final newBody = (payload['body'] ?? '').trim();
+      if (newTitle.isEmpty && newBody.isEmpty) {
+        messenger?.showSnackBar(
+          SnackBar(content: Text(t.t('admin_home_title_or_body_required'))),
+        );
+        return;
+      }
+
+      final db = FirebaseFirestore.instance;
+      final dspRef = db.collection('users').doc(dspUid);
+      final adminNotifRef = dspRef
+          .collection('notifications')
+          .doc(notificationId);
+
+      final adminSnap = await adminNotifRef.get();
+      if (!adminSnap.exists) {
+        throw Exception(t.t('admin_home_notification_not_found'));
+      }
+
+      final adminData = adminSnap.data() ?? <String, dynamic>{};
+      final notifType = (adminData['type'] ?? type).toString();
+      final createdAt = adminData['createdAt'];
+      final now = FieldValue.serverTimestamp();
+
+      final driversSnap = await dspRef.collection('drivers').get();
+      final drivers = driversSnap.docs;
+
+      await adminNotifRef.set({
+        'title': newTitle,
+        'body': newBody,
+        'targetCount': drivers.length,
+        'confirmedCount': 0,
+        'requiresConfirmation': true,
+        'updatedAt': now,
+        'editedAt': now,
+      }, SetOptions(merge: true));
+
+      const chunkSize = 400;
+      for (int i = 0; i < drivers.length; i += chunkSize) {
+        final end = (i + chunkSize > drivers.length)
+            ? drivers.length
+            : (i + chunkSize);
+        final batch = db.batch();
+
+        for (final d in drivers.sublist(i, end)) {
+          final driverNotifRef = d.reference
+              .collection('notifications')
+              .doc(notificationId);
+
+          batch.set(driverNotifRef, {
+            'notificationId': notificationId,
+            'type': notifType,
+            'title': newTitle,
+            'body': newBody,
+            'status': 'unread',
+            'readAt': null,
+            'confirmedAt': null,
+            'requiresConfirmation': true,
+            'createdAt': createdAt ?? now,
+            'updatedAt': now,
+            'editedAt': now,
+          }, SetOptions(merge: true));
+        }
+
+        await batch.commit();
+      }
+
+      messenger?.showSnackBar(
+        SnackBar(
+          content: Text(
+            t.tf('admin_home_rule_updated_for_drivers', {
+              'count': '${drivers.length}',
+            }),
+          ),
+        ),
+      );
+    } catch (e) {
+      messenger?.showSnackBar(
+        SnackBar(
+          content: Text(t.tf('admin_home_edit_failed', {'error': '$e'})),
+        ),
+      );
+    } finally {
+      titleCtrl.dispose();
+      bodyCtrl.dispose();
+    }
+  }
+
   Future<void> _deleteEverywhere(BuildContext context) async {
+    final t = AppLocalizations.of(context);
     final ok = await showDialog<bool>(
       context: context,
       barrierDismissible: true,
       builder: (ctx) {
         return AlertDialog(
-          title: const Text('Delete notification?'),
-          content: const Text(
-            'This will delete this notification for you and for all drivers.',
-          ),
+          title: Text(t.t('admin_home_delete_notification_question')),
+          content: Text(t.t('admin_home_delete_notification_body')),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Cancel'),
+              child: Text(t.t('admin_home_cancel')),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -1433,7 +1841,7 @@ class _NotificationHistoryTileLive extends StatelessWidget {
                 ),
               ),
               onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text('Delete'),
+              child: Text(t.t('admin_home_delete')),
             ),
           ],
         );
@@ -1443,27 +1851,119 @@ class _NotificationHistoryTileLive extends StatelessWidget {
     if (ok != true) return;
 
     try {
-      final callable =
-          FirebaseFunctions.instance.httpsCallable('deleteNotificationEverywhere');
-      await callable.call({
-        'dspUid': dspUid,
-        'notificationId': notificationId,
-      });
+      final callable = FirebaseFunctions.instance.httpsCallable(
+        'deleteNotificationEverywhere',
+      );
+      await callable.call({'dspUid': dspUid, 'notificationId': notificationId});
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Notification deleted.')),
+        SnackBar(content: Text(t.t('admin_home_notification_deleted'))),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Delete failed: $e')),
+        SnackBar(
+          content: Text(t.tf('admin_home_delete_failed', {'error': '$e'})),
+        ),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final ratio =
-        (targetCount <= 0) ? '0 / 0' : '$confirmedCount / $targetCount';
+    final t = AppLocalizations.of(context);
+    final total = currentDriverCount > 0 ? currentDriverCount : targetCount;
+    final safeTotal = total <= 0 ? 0 : total;
+    final safeConfirmed = safeTotal <= 0
+        ? 0
+        : (confirmedCount > safeTotal ? safeTotal : confirmedCount);
+    final ratio = '$safeConfirmed / $safeTotal';
+    final compact = MediaQuery.of(context).size.width < 700;
+
+    final menuButton = Theme(
+      data: Theme.of(context).copyWith(
+        popupMenuTheme: PopupMenuThemeData(
+          color: const Color(0xFFF3F6F7),
+          elevation: 8,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(_r(14, scale)),
+            side: const BorderSide(color: Color(0xFFE5E7EB)),
+          ),
+        ),
+      ),
+      child: SizedBox(
+        width: _r(36, scale),
+        height: _r(36, scale),
+        child: Center(
+          child: PopupMenuButton<String>(
+            tooltip: t.t('admin_home_options'),
+            splashRadius: _r(18, scale),
+            offset: const Offset(0, 10),
+            onSelected: (v) {
+              if (v == 'edit') _editEverywhere(context);
+              if (v == 'delete') _deleteEverywhere(context);
+            },
+            itemBuilder: (_) => [
+              if (type == 'rule')
+                PopupMenuItem<String>(
+                  value: 'edit',
+                  padding: EdgeInsets.symmetric(
+                    horizontal: _r(12, scale),
+                    vertical: _r(10, scale),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.edit_outlined,
+                        size: _r(18, scale),
+                        color: AdminHomePage._kGreen,
+                      ),
+                      SizedBox(width: _r(10, scale)),
+                      Text(
+                        t.t('admin_home_edit_rule'),
+                        style: TextStyle(
+                          color: AdminHomePage._kGreen,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              PopupMenuItem<String>(
+                value: 'delete',
+                padding: EdgeInsets.symmetric(
+                  horizontal: _r(12, scale),
+                  vertical: _r(10, scale),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.delete_outline,
+                      size: _r(18, scale),
+                      color: const Color(0xFFE11D48),
+                    ),
+                    SizedBox(width: _r(10, scale)),
+                    Text(
+                      t.t('admin_home_delete'),
+                      style: TextStyle(
+                        color: Color(0xFFE11D48),
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            icon: Icon(
+              Icons.more_vert,
+              size: _r(18, scale),
+              color: const Color(0xFF6B7280),
+            ),
+          ),
+        ),
+      ),
+    );
 
     return Container(
       padding: EdgeInsets.all(_r(14, scale)),
@@ -1472,9 +1972,11 @@ class _NotificationHistoryTileLive extends StatelessWidget {
         borderRadius: BorderRadius.circular(_r(16, scale)),
         border: Border.all(color: const Color(0xFFE5E7EB)),
       ),
-      child: Row(
-        children: [
-          Container(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final tileCompact = compact || constraints.maxWidth < 560;
+
+          final leading = Container(
             width: _r(56, scale),
             height: _r(56, scale),
             decoration: BoxDecoration(
@@ -1487,133 +1989,98 @@ class _NotificationHistoryTileLive extends StatelessWidget {
               color: const Color(0xFF6B7280),
               size: _r(22, scale),
             ),
-          ),
-          SizedBox(width: _r(12, scale)),
+          );
 
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '${_typeLabel(type)} | ${title.isEmpty ? 'TITLE' : title}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: _r(12, scale),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: _r(8, scale)),
-                    Text(
-                      'confirmed by',
-                      style: TextStyle(
-                        fontSize: _r(10, scale),
-                        color: AdminHomePage._kMuted,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    SizedBox(width: _r(6, scale)),
-                    Text(
-                      ratio,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        color: AdminHomePage._kGreen,
-                        fontSize: _r(12, scale),
-                      ),
-                    ),
-                  ],
+          final textContent = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${_typeLabel(context, type)} | ${title.isEmpty ? t.t('admin_home_title_upper') : title}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: _r(12, scale),
                 ),
-                SizedBox(height: _r(4, scale)),
-                if (_fmtDate(dateTime).isNotEmpty)
-                  Text(
-                    _fmtDate(dateTime),
-                    style: TextStyle(
-                      fontSize: _r(11, scale),
-                      color: AdminHomePage._kMuted,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                SizedBox(height: _r(8, scale)),
+              ),
+              SizedBox(height: _r(4, scale)),
+              if (_fmtDate(context, dateTime).isNotEmpty)
                 Text(
-                  body.isEmpty ? '—' : body,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
+                  _fmtDate(context, dateTime),
                   style: TextStyle(
-                    fontSize: _r(12, scale),
-                    height: 1.25,
-                    color: AdminHomePage._kSubText,
+                    fontSize: _r(11, scale),
+                    color: AdminHomePage._kMuted,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-              ],
-            ),
-          ),
-
-          SizedBox(width: _r(10, scale)),
-
-          Theme(
-            data: Theme.of(context).copyWith(
-              popupMenuTheme: PopupMenuThemeData(
-                color: const Color(0xFFF3F6F7),
-                elevation: 8,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(_r(14, scale)),
-                  side: const BorderSide(color: Color(0xFFE5E7EB)),
+              SizedBox(height: _r(8, scale)),
+              Text(
+                body.isEmpty ? '—' : body,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: _r(12, scale),
+                  height: 1.25,
+                  color: AdminHomePage._kSubText,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-            ),
-            child: SizedBox(
-              width: _r(36, scale),
-              height: _r(36, scale),
-              child: Center(
-                child: PopupMenuButton<String>(
-                  tooltip: 'Options',
-                  splashRadius: _r(18, scale),
-                  offset: const Offset(0, 10),
-                  onSelected: (v) {
-                    if (v == 'delete') _deleteEverywhere(context);
-                  },
-                  itemBuilder: (_) => [
-                    PopupMenuItem<String>(
-                      value: 'delete',
-                      padding: EdgeInsets.symmetric(
-                        horizontal: _r(12, scale),
-                        vertical: _r(10, scale),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.delete_outline,
-                            size: _r(18, scale),
-                            color: const Color(0xFFE11D48),
-                          ),
-                          SizedBox(width: _r(10, scale)),
-                          const Text(
-                            'Delete',
-                            style: TextStyle(
-                              color: Color(0xFFE11D48),
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+            ],
+          );
+
+          final meta = Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                t.t('admin_home_confirmed_by'),
+                style: TextStyle(
+                  fontSize: _r(10, scale),
+                  color: AdminHomePage._kMuted,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              SizedBox(width: _r(6, scale)),
+              Text(
+                ratio,
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  color: AdminHomePage._kGreen,
+                  fontSize: _r(12, scale),
+                ),
+              ),
+              SizedBox(width: _r(10, scale)),
+              menuButton,
+            ],
+          );
+
+          if (tileCompact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    leading,
+                    SizedBox(width: _r(12, scale)),
+                    Expanded(child: textContent),
                   ],
-                  icon: Icon(
-                    Icons.more_vert,
-                    size: _r(18, scale),
-                    color: const Color(0xFF6B7280),
-                  ),
                 ),
-              ),
-            ),
-          ),
-        ],
+                SizedBox(height: _r(8, scale)),
+                Align(alignment: Alignment.centerRight, child: meta),
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              leading,
+              SizedBox(width: _r(12, scale)),
+              Expanded(child: textContent),
+              SizedBox(width: _r(10, scale)),
+              meta,
+            ],
+          );
+        },
       ),
     );
   }
@@ -1625,48 +2092,118 @@ class _NotificationHistoryTileLive extends StatelessWidget {
 
 class _FleetHubCard extends StatelessWidget {
   final double scale;
-  const _FleetHubCard({required this.scale});
+  final bool adaptiveHeight;
+  const _FleetHubCard({required this.scale, this.adaptiveHeight = false});
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final compact = MediaQuery.of(context).size.width < 780;
+
     return _AdminCard(
       scale: scale,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(Icons.directions_car_filled_outlined,
-                  color: AdminHomePage._kGreen, size: _r(22, scale)),
-              SizedBox(width: _r(10, scale)),
-              Text(
-                'Fleet Hub',
-                style: TextStyle(
-                  fontSize: _r(20, scale),
-                  fontWeight: FontWeight.w900,
-                  color: AdminHomePage._kText,
-                ),
-              ),
-              const Spacer(),
-              _FleetStats(scale: scale),
-            ],
-          ),
-          SizedBox(height: _r(14, scale)),
-          Expanded(
-            child: Row(
+          if (compact)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                    child:
-                        _FleetList(scale: scale, title: 'Service', tag: 'SERVICE')),
-                SizedBox(width: _r(16, scale)),
-                const VerticalDivider(width: 1),
-                SizedBox(width: _r(16, scale)),
-                Expanded(
-                    child:
-                        _FleetList(scale: scale, title: 'Accidents', tag: 'TDV')),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.directions_car_filled_outlined,
+                      color: AdminHomePage._kGreen,
+                      size: _r(22, scale),
+                    ),
+                    SizedBox(width: _r(10, scale)),
+                    Text(
+                      t.t('admin_home_fleet_hub'),
+                      style: TextStyle(
+                        fontSize: _r(20, scale),
+                        fontWeight: FontWeight.w900,
+                        color: AdminHomePage._kText,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: _r(8, scale)),
+                _FleetStats(scale: scale),
+              ],
+            )
+          else
+            Row(
+              children: [
+                Icon(
+                  Icons.directions_car_filled_outlined,
+                  color: AdminHomePage._kGreen,
+                  size: _r(22, scale),
+                ),
+                SizedBox(width: _r(10, scale)),
+                Text(
+                  t.t('admin_home_fleet_hub'),
+                  style: TextStyle(
+                    fontSize: _r(20, scale),
+                    fontWeight: FontWeight.w900,
+                    color: AdminHomePage._kText,
+                  ),
+                ),
+                const Spacer(),
+                _FleetStats(scale: scale),
               ],
             ),
-          ),
+          SizedBox(height: _r(14, scale)),
+          if (adaptiveHeight)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _FleetListCompact(
+                    scale: scale,
+                    title: t.t('admin_home_service'),
+                    tag: 'SERVICE',
+                  ),
+                ),
+                SizedBox(width: _r(compact ? 10 : 16, scale)),
+                Container(
+                  width: 1,
+                  margin: EdgeInsets.symmetric(vertical: _r(4, scale)),
+                  color: const Color(0xFFD9DED8),
+                ),
+                SizedBox(width: _r(compact ? 10 : 16, scale)),
+                Expanded(
+                  child: _FleetListCompact(
+                    scale: scale,
+                    title: t.t('admin_home_accidents'),
+                    tag: 'TDV',
+                  ),
+                ),
+              ],
+            )
+          else
+            Expanded(
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _FleetList(
+                      scale: scale,
+                      title: t.t('admin_home_service'),
+                      tag: 'SERVICE',
+                    ),
+                  ),
+                  SizedBox(width: _r(compact ? 10 : 16, scale)),
+                  const VerticalDivider(width: 1),
+                  SizedBox(width: _r(compact ? 10 : 16, scale)),
+                  Expanded(
+                    child: _FleetList(
+                      scale: scale,
+                      title: t.t('admin_home_accidents'),
+                      tag: 'TDV',
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -1679,22 +2216,29 @@ class _FleetStats extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final t = AppLocalizations.of(context);
+    return Wrap(
+      spacing: _r(14, scale),
+      runSpacing: _r(6, scale),
       children: [
         _MiniStat(
-            scale: scale, label: 'total', value: '57', color: AdminHomePage._kText),
-        SizedBox(width: _r(14, scale)),
+          scale: scale,
+          label: t.t('admin_home_total'),
+          value: '57',
+          color: AdminHomePage._kText,
+        ),
         _MiniStat(
-            scale: scale,
-            label: 'active',
-            value: '45',
-            color: AdminHomePage._kGreen),
-        SizedBox(width: _r(14, scale)),
+          scale: scale,
+          label: t.t('admin_home_active'),
+          value: '45',
+          color: AdminHomePage._kGreen,
+        ),
         _MiniStat(
-            scale: scale,
-            label: 'inactive',
-            value: '12',
-            color: AdminHomePage._kOrange),
+          scale: scale,
+          label: t.t('admin_home_inactive'),
+          value: '12',
+          color: AdminHomePage._kOrange,
+        ),
       ],
     );
   }
@@ -1812,6 +2356,77 @@ class _FleetList extends StatelessWidget {
   }
 }
 
+class _FleetListCompact extends StatelessWidget {
+  final double scale;
+  final String title;
+  final String tag;
+  const _FleetListCompact({
+    required this.scale,
+    required this.title,
+    required this.tag,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final items = List.generate(6, (i) => i);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: _r(13, scale),
+          ),
+        ),
+        SizedBox(height: _r(10, scale)),
+        ...items.map((i) {
+          return Padding(
+            padding: EdgeInsets.only(bottom: _r(10, scale)),
+            child: Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: _r(12, scale),
+                vertical: _r(10, scale),
+              ),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF6F7F9),
+                borderRadius: BorderRadius.circular(_r(12, scale)),
+                border: Border.all(color: const Color(0xFFEDEFF3)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'FÜ DE 319',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: _r(12, scale),
+                      ),
+                    ),
+                  ),
+                  _SmallTag(scale: scale, label: tag),
+                  SizedBox(width: _r(10, scale)),
+                  Text(
+                    '30.03.26',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      color: AdminHomePage._kOrange,
+                      fontSize: _r(12, scale),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ],
+    );
+  }
+}
+
 class _SmallTag extends StatelessWidget {
   final double scale;
   final String label;
@@ -1869,9 +2484,12 @@ class _DriverDocumentsCardState extends State<_DriverDocumentsCard> {
 
   // Onboarding expiry keys -> labels
   static const List<_ExpiryField> _expiryFields = [
-    _ExpiryField(key: 'idDocExpiry', label: 'ID Card'),
-    _ExpiryField(key: 'licenseExpiry', label: 'Driving License'),
-    _ExpiryField(key: 'residencePermitExpiry', label: 'Residence Permit'),
+    _ExpiryField(key: 'idDocExpiry', label: 'admin_home_doc_id_card'),
+    _ExpiryField(key: 'licenseExpiry', label: 'admin_home_doc_driving_license'),
+    _ExpiryField(
+      key: 'residencePermitExpiry',
+      label: 'admin_home_doc_residence_permit',
+    ),
   ];
 
   // Required onboarding fields for "Missing Documents / Data"
@@ -1885,8 +2503,14 @@ class _DriverDocumentsCardState extends State<_DriverDocumentsCard> {
     _RequiredField(key: 'country', label: 'Country'),
     _RequiredField(key: 'licenseNumber', label: 'License Number'),
     _RequiredField(key: 'taxId', label: 'Tax ID'),
-    _RequiredField(key: 'emergencyContactName', label: 'Emergency Contact Name'),
-    _RequiredField(key: 'emergencyContactPhone', label: 'Emergency Contact Phone'),
+    _RequiredField(
+      key: 'emergencyContactName',
+      label: 'Emergency Contact Name',
+    ),
+    _RequiredField(
+      key: 'emergencyContactPhone',
+      label: 'Emergency Contact Phone',
+    ),
   ];
 
   // Required docs in /documents (we accept either docId match OR "type" match)
@@ -1930,7 +2554,10 @@ class _DriverDocumentsCardState extends State<_DriverDocumentsCard> {
     return true;
   }
 
-  bool _hasDocId(List<QueryDocumentSnapshot<Map<String, dynamic>>> docs, String id) {
+  bool _hasDocId(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+    String id,
+  ) {
     final target = id.toLowerCase().trim();
     for (final d in docs) {
       if (d.id.toLowerCase().trim() == target) return true;
@@ -1938,7 +2565,9 @@ class _DriverDocumentsCardState extends State<_DriverDocumentsCard> {
     return false;
   }
 
-  List<String> _missingDriverDocs(List<QueryDocumentSnapshot<Map<String, dynamic>>> docs) {
+  List<String> _missingDriverDocs(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) {
     // hard-required
     const requiredSingles = <String>[
       'driver_license_front',
@@ -1966,9 +2595,6 @@ class _DriverDocumentsCardState extends State<_DriverDocumentsCard> {
 
     return missing;
   }
-
-
-
 
   Stream<QuerySnapshot<Map<String, dynamic>>> _driversStream() {
     final uid = _uid;
@@ -2045,18 +2671,18 @@ class _DriverDocumentsCardState extends State<_DriverDocumentsCard> {
 
   // Loads doc snapshots for all drivers
   Future<Map<String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>>
-      _loadDocumentsForDrivers(
+  _loadDocumentsForDrivers(
     List<QueryDocumentSnapshot<Map<String, dynamic>>> drivers,
   ) async {
     final uid = _uid;
     if (uid == null) return {};
 
-    final out =
-        <String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>{};
+    final out = <String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>{};
 
     final futures = drivers.map((d) async {
-      final transporterId =
-          (d.data()['transporterId'] ?? d.id).toString().trim();
+      final transporterId = (d.data()['transporterId'] ?? d.id)
+          .toString()
+          .trim();
       if (transporterId.isEmpty) return;
 
       final snap = await FirebaseFirestore.instance
@@ -2092,10 +2718,8 @@ class _DriverDocumentsCardState extends State<_DriverDocumentsCard> {
 
       final url = _extractUrl(data);
 
-      final matches = id == t ||
-          docType == t ||
-          docType.contains(t) ||
-          id.contains(t);
+      final matches =
+          id == t || docType == t || docType.contains(t) || id.contains(t);
 
       if (matches && url.isNotEmpty) return true;
     }
@@ -2114,7 +2738,8 @@ class _DriverDocumentsCardState extends State<_DriverDocumentsCard> {
           .toLowerCase()
           .trim();
 
-      final isContract = id == 'contract' ||
+      final isContract =
+          id == 'contract' ||
           docType == 'contract' ||
           docType.contains('contract');
 
@@ -2131,13 +2756,14 @@ class _DriverDocumentsCardState extends State<_DriverDocumentsCard> {
       }
 
       // 2) Contract subtype (adjust mapping to your schema if needed)
-      final raw = (data['contractType'] ??
-              data['subType'] ??
-              data['label'] ??
-              data['status'] ??
-              '')
-          .toString()
-          .trim();
+      final raw =
+          (data['contractType'] ??
+                  data['subType'] ??
+                  data['label'] ??
+                  data['status'] ??
+                  '')
+              .toString()
+              .trim();
 
       String pill = raw.isEmpty ? 'Contract' : raw;
       _PillTone tone = _PillTone.yellow;
@@ -2168,6 +2794,7 @@ class _DriverDocumentsCardState extends State<_DriverDocumentsCard> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     final scale = widget.scale;
 
     return _AdminCard(
@@ -2197,7 +2824,7 @@ class _DriverDocumentsCardState extends State<_DriverDocumentsCard> {
               missingNames: const [],
               contractSoonCount: 0,
               contractRows: const [],
-              footerText: 'Loading drivers…',
+              footerText: t.t('admin_home_loading_drivers'),
             );
           }
           if (snap.hasError) {
@@ -2209,14 +2836,17 @@ class _DriverDocumentsCardState extends State<_DriverDocumentsCard> {
               missingNames: const [],
               contractSoonCount: 0,
               contractRows: const [],
-              footerText: 'Error: ${snap.error}',
+              footerText: t.tf('admin_home_error_generic', {
+                'error': '${snap.error}',
+              }),
             );
           }
 
-          final drivers = List<QueryDocumentSnapshot<Map<String, dynamic>>>.from(
-            snap.data?.docs ??
-                const <QueryDocumentSnapshot<Map<String, dynamic>>>[],
-          );
+          final drivers =
+              List<QueryDocumentSnapshot<Map<String, dynamic>>>.from(
+                snap.data?.docs ??
+                    const <QueryDocumentSnapshot<Map<String, dynamic>>>[],
+              );
 
           if (drivers.isEmpty) {
             return _DriverDocsShellV2(
@@ -2227,12 +2857,13 @@ class _DriverDocumentsCardState extends State<_DriverDocumentsCard> {
               missingNames: const [],
               contractSoonCount: 0,
               contractRows: const [],
-              footerText: 'No drivers yet.',
+              footerText: t.t('admin_home_no_drivers_yet'),
             );
           }
 
           return FutureBuilder<
-              Map<String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>>(
+            Map<String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>
+          >(
             future: _loadDocumentsForDrivers(drivers),
             builder: (ctx, docsSnap) {
               final docsByTid = docsSnap.data ?? const {};
@@ -2261,8 +2892,9 @@ class _DriverDocumentsCardState extends State<_DriverDocumentsCard> {
               for (final d in drivers) {
                 final data = d.data();
 
-                final transporterId =
-                    (data['transporterId'] ?? d.id).toString().trim();
+                final transporterId = (data['transporterId'] ?? d.id)
+                    .toString()
+                    .trim();
                 final driverName =
                     (data['driverName'] ?? data['fullName'] ?? transporterId)
                         .toString()
@@ -2275,7 +2907,8 @@ class _DriverDocumentsCardState extends State<_DriverDocumentsCard> {
 
                 final hasOnboarding = onboarding.isNotEmpty;
 
-                final docs = docsByTid[transporterId] ??
+                final docs =
+                    docsByTid[transporterId] ??
                     const <QueryDocumentSnapshot<Map<String, dynamic>>>[];
 
                 // ---- Expiry scan from onboarding fields ----
@@ -2287,16 +2920,20 @@ class _DriverDocumentsCardState extends State<_DriverDocumentsCard> {
                     final day = DateTime(dt.year, dt.month, dt.day);
 
                     final isExpired = day.isBefore(today);
-                    final isSoon = !isExpired &&
+                    final isSoon =
+                        !isExpired &&
                         (day.isBefore(soonLimit) ||
                             day.isAtSameMomentAs(soonLimit));
 
                     if (isExpired || isSoon) {
                       expiredPillsByDriver.putIfAbsent(
-                          driverName, () => <String>[]);
+                        driverName,
+                        () => <String>[],
+                      );
 
-                      if (!expiredPillsByDriver[driverName]!.contains(f.label)) {
-                        expiredPillsByDriver[driverName]!.add(f.label);
+                      final label = t.t(f.label);
+                      if (!expiredPillsByDriver[driverName]!.contains(label)) {
+                        expiredPillsByDriver[driverName]!.add(label);
                       }
 
                       final cur = expiredDateByDriver[driverName];
@@ -2325,22 +2962,26 @@ class _DriverDocumentsCardState extends State<_DriverDocumentsCard> {
                   missingDrivers.add(driverName);
                 }
 
-
                 // ---- Contracts (✅ from onboarding.contractExpiry) ----
                 final cEnd = _parseDate(onboarding['contractExpiry']);
                 if (cEnd != null) {
                   final isExpired = cEnd.isBefore(today);
-                  final isSoon = !isExpired &&
-                      (cEnd.isBefore(soonLimit) || cEnd.isAtSameMomentAs(soonLimit));
+                  final isSoon =
+                      !isExpired &&
+                      (cEnd.isBefore(soonLimit) ||
+                          cEnd.isAtSameMomentAs(soonLimit));
 
                   if (isExpired || isSoon) {
-                    contractRowsUi.add(_DocRowUi(
-                      name: driverName,
-                      contractPill: 'Contract',
-                      contractTone: _PillTone.yellow, // keep your style, adjust if needed
-                      rightPrefix: 'last day',
-                      date: cEnd,
-                    ));
+                    contractRowsUi.add(
+                      _DocRowUi(
+                        name: driverName,
+                        contractPill: t.t('admin_home_contract'),
+                        contractTone: _PillTone
+                            .yellow, // keep your style, adjust if needed
+                        rightPrefix: t.t('admin_home_last_day'),
+                        date: cEnd,
+                      ),
+                    );
                   }
 
                   if (isSoon) contractSoonDrivers.add(driverName);
@@ -2350,41 +2991,53 @@ class _DriverDocumentsCardState extends State<_DriverDocumentsCard> {
                 final probationEnd = _probationEndFromStart(workStart);
                 if (probationEnd != null) {
                   final isExpired = probationEnd.isBefore(today);
-                  final isSoon = !isExpired &&
+                  final isSoon =
+                      !isExpired &&
                       (probationEnd.isBefore(soonLimit) ||
                           probationEnd.isAtSameMomentAs(soonLimit));
 
                   if (isExpired || isSoon) {
-                    contractRowsUi.add(_DocRowUi(
-                      name: driverName,
-                      contractPill: 'Probezeit',
-                      contractTone: _PillTone.blue,
-                      rightPrefix: isExpired ? 'ended' : 'ends',
-                      date: probationEnd,
-                    ));
+                    contractRowsUi.add(
+                      _DocRowUi(
+                        name: driverName,
+                        contractPill: t.t('admin_home_probation'),
+                        contractTone: _PillTone.blue,
+                        rightPrefix: isExpired
+                            ? t.t('admin_home_ended')
+                            : t.t('admin_home_ends'),
+                        date: probationEnd,
+                      ),
+                    );
                   }
 
                   if (isSoon) contractSoonDrivers.add(driverName);
                 }
-
               }
 
               // Build expired UI rows
               final expiredRowsUi = <_DocRowUi>[];
               expiredPillsByDriver.forEach((name, pills) {
-                expiredRowsUi.add(_DocRowUi(
-                  name: name,
-                  pills: pills,
-                  rightPrefix: 'expired by',
-                  date: expiredDateByDriver[name],
-                ));
+                expiredRowsUi.add(
+                  _DocRowUi(
+                    name: name,
+                    pills: pills,
+                    rightPrefix: t.t('admin_home_expired_by'),
+                    date: expiredDateByDriver[name],
+                  ),
+                );
               });
 
               // Sort: earliest date first
-              expiredRowsUi.sort((a, b) =>
-                  (a.date ?? DateTime(2100)).compareTo(b.date ?? DateTime(2100)));
-              contractRowsUi.sort((a, b) =>
-                  (a.date ?? DateTime(2100)).compareTo(b.date ?? DateTime(2100)));
+              expiredRowsUi.sort(
+                (a, b) => (a.date ?? DateTime(2100)).compareTo(
+                  b.date ?? DateTime(2100),
+                ),
+              );
+              contractRowsUi.sort(
+                (a, b) => (a.date ?? DateTime(2100)).compareTo(
+                  b.date ?? DateTime(2100),
+                ),
+              );
 
               // Missing names
               final missingNamesUi = missingDrivers.toList()..sort();
@@ -2393,16 +3046,22 @@ class _DriverDocumentsCardState extends State<_DriverDocumentsCard> {
                 scale: scale,
                 // COUNTS
                 expiredSoonCount: soonDrivers.length,
-                expiredRows: expiredRowsUi.take(4).toList(), // keep dashboard summary
+                expiredRows: expiredRowsUi
+                    .take(4)
+                    .toList(), // keep dashboard summary
 
                 missingCount: missingDrivers.length,
-                missingNames: missingNamesUi, // ✅ DO NOT LIMIT (scroll will show all)
+                missingNames:
+                    missingNamesUi, // ✅ DO NOT LIMIT (scroll will show all)
 
                 contractSoonCount: contractSoonDrivers.length,
-                contractRows: contractRowsUi.take(4).toList(), // keep dashboard summary
+                contractRows: contractRowsUi
+                    .take(4)
+                    .toList(), // keep dashboard summary
 
-                footerText: (docsSnap.connectionState == ConnectionState.waiting)
-                    ? 'Loading documents…'
+                footerText:
+                    (docsSnap.connectionState == ConnectionState.waiting)
+                    ? t.t('admin_home_loading_documents')
                     : null,
               );
             },
@@ -2444,16 +3103,24 @@ class _DriverDocsShellV2 extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final compact = MediaQuery.of(context).size.width < 900;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
+        Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: _r(10, scale),
+          runSpacing: _r(6, scale),
           children: [
-            Icon(Icons.folder_copy_outlined,
-                color: AdminHomePage._kGreen, size: _r(22, scale)),
-            SizedBox(width: _r(10, scale)),
+            Icon(
+              Icons.folder_copy_outlined,
+              color: AdminHomePage._kGreen,
+              size: _r(22, scale),
+            ),
             Text(
-              'Driver Documents',
+              t.t('admin_home_driver_documents'),
               style: TextStyle(
                 fontSize: _r(20, scale),
                 fontWeight: FontWeight.w900,
@@ -2464,46 +3131,90 @@ class _DriverDocsShellV2 extends StatelessWidget {
         ),
         SizedBox(height: _r(14, scale)),
         Expanded(
-          child: Row(
-            children: [
-              Expanded(
-                child: _DocSectionV2(
-                  scale: scale,
-                  title: 'Expired Documents',
-                  counterLabel: 'expired soon',
-                  counterValue: expiredSoonCount.toString(),
-                  variant: _DocSectionVariant.expired,
-                  rows: expiredRows,
+          child: compact
+              ? Column(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: _DocSectionV2(
+                        scale: scale,
+                        title: t.t('admin_home_expired_documents'),
+                        counterLabel: t.t('admin_home_expired_soon'),
+                        counterValue: expiredSoonCount.toString(),
+                        variant: _DocSectionVariant.expired,
+                        rows: expiredRows,
+                      ),
+                    ),
+                    SizedBox(height: _r(12, scale)),
+                    const Divider(height: 1),
+                    SizedBox(height: _r(12, scale)),
+                    Expanded(
+                      flex: 5,
+                      child: _DocSectionV2(
+                        scale: scale,
+                        title: t.t('admin_home_missing_documents_data'),
+                        counterLabel: t.t('admin_home_total_missing'),
+                        counterValue: missingCount.toString(),
+                        variant: _DocSectionVariant.missing,
+                        missingNames: missingNames,
+                      ),
+                    ),
+                    SizedBox(height: _r(12, scale)),
+                    const Divider(height: 1),
+                    SizedBox(height: _r(12, scale)),
+                    Expanded(
+                      flex: 3,
+                      child: _DocSectionV2(
+                        scale: scale,
+                        title: t.t('admin_home_driver_contracts'),
+                        counterLabel: t.t('admin_home_last_day_soon'),
+                        counterValue: contractSoonCount.toString(),
+                        variant: _DocSectionVariant.contract,
+                        rows: contractRows,
+                      ),
+                    ),
+                  ],
+                )
+              : Row(
+                  children: [
+                    Expanded(
+                      child: _DocSectionV2(
+                        scale: scale,
+                        title: t.t('admin_home_expired_documents'),
+                        counterLabel: t.t('admin_home_expired_soon'),
+                        counterValue: expiredSoonCount.toString(),
+                        variant: _DocSectionVariant.expired,
+                        rows: expiredRows,
+                      ),
+                    ),
+                    SizedBox(width: _r(16, scale)),
+                    const VerticalDivider(width: 1),
+                    SizedBox(width: _r(16, scale)),
+                    Expanded(
+                      child: _DocSectionV2(
+                        scale: scale,
+                        title: t.t('admin_home_missing_documents_data'),
+                        counterLabel: t.t('admin_home_total_missing'),
+                        counterValue: missingCount.toString(),
+                        variant: _DocSectionVariant.missing,
+                        missingNames: missingNames,
+                      ),
+                    ),
+                    SizedBox(width: _r(16, scale)),
+                    const VerticalDivider(width: 1),
+                    SizedBox(width: _r(16, scale)),
+                    Expanded(
+                      child: _DocSectionV2(
+                        scale: scale,
+                        title: t.t('admin_home_driver_contracts'),
+                        counterLabel: t.t('admin_home_last_day_soon'),
+                        counterValue: contractSoonCount.toString(),
+                        variant: _DocSectionVariant.contract,
+                        rows: contractRows,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              SizedBox(width: _r(16, scale)),
-              const VerticalDivider(width: 1),
-              SizedBox(width: _r(16, scale)),
-              Expanded(
-                child: _DocSectionV2(
-                  scale: scale,
-                  title: 'Missing Documents / Data',
-                  counterLabel: 'total missing',
-                  counterValue: missingCount.toString(),
-                  variant: _DocSectionVariant.missing,
-                  missingNames: missingNames,
-                ),
-              ),
-              SizedBox(width: _r(16, scale)),
-              const VerticalDivider(width: 1),
-              SizedBox(width: _r(16, scale)),
-              Expanded(
-                child: _DocSectionV2(
-                  scale: scale,
-                  title: 'Driver Contracts',
-                  counterLabel: 'last day soon',
-                  counterValue: contractSoonCount.toString(),
-                  variant: _DocSectionVariant.contract,
-                  rows: contractRows,
-                ),
-              ),
-            ],
-          ),
         ),
         if (footerText != null) ...[
           SizedBox(height: _r(10, scale)),
@@ -2526,6 +3237,7 @@ class _DriverDocsShellV2 extends StatelessWidget {
 // ===========================
 
 enum _DocSectionVariant { expired, missing, contract }
+
 enum _PillTone { orange, blue, yellow }
 
 class _DocSectionV2 extends StatefulWidget {
@@ -2572,42 +3284,82 @@ class _DocSectionV2State extends State<_DocSectionV2> {
   @override
   Widget build(BuildContext context) {
     final scale = widget.scale;
+    final compactHeader = MediaQuery.of(context).size.width < 700;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
+        if (compactHeader)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
                 widget.title,
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontWeight: FontWeight.w900,
                   fontSize: _r(13, scale),
                 ),
               ),
-            ),
-            Text(
-              '${widget.counterLabel}:',
-              style: TextStyle(
-                fontSize: _r(10, scale),
-                color: AdminHomePage._kMuted,
-                fontWeight: FontWeight.w700,
+              SizedBox(height: _r(4, scale)),
+              Wrap(
+                spacing: _r(6, scale),
+                runSpacing: _r(4, scale),
+                children: [
+                  Text(
+                    '${widget.counterLabel}:',
+                    style: TextStyle(
+                      fontSize: _r(10, scale),
+                      color: AdminHomePage._kMuted,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  Text(
+                    widget.counterValue,
+                    style: TextStyle(
+                      fontSize: _r(10, scale),
+                      fontWeight: FontWeight.w900,
+                      color: AdminHomePage._kOrange,
+                    ),
+                  ),
+                ],
               ),
-            ),
-            SizedBox(width: _r(6, scale)),
-            Text(
-              widget.counterValue,
-              style: TextStyle(
-                fontSize: _r(10, scale),
-                fontWeight: FontWeight.w900,
-                color: AdminHomePage._kOrange,
+            ],
+          )
+        else
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  widget.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: _r(13, scale),
+                  ),
+                ),
               ),
-            ),
-          ],
-        ),
+              Text(
+                '${widget.counterLabel}:',
+                style: TextStyle(
+                  fontSize: _r(10, scale),
+                  color: AdminHomePage._kMuted,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              SizedBox(width: _r(6, scale)),
+              Text(
+                widget.counterValue,
+                style: TextStyle(
+                  fontSize: _r(10, scale),
+                  fontWeight: FontWeight.w900,
+                  color: AdminHomePage._kOrange,
+                ),
+              ),
+            ],
+          ),
         SizedBox(height: _r(10, scale)),
         Expanded(child: _buildBody()),
       ],
@@ -2615,6 +3367,7 @@ class _DocSectionV2State extends State<_DocSectionV2> {
   }
 
   Widget _buildBody() {
+    final t = AppLocalizations.of(context);
     final scale = widget.scale;
 
     // -------- Missing ----------
@@ -2622,7 +3375,7 @@ class _DocSectionV2State extends State<_DocSectionV2> {
       if (widget.missingNames.isEmpty) {
         return Center(
           child: Text(
-            'No items',
+            t.t('admin_home_no_items'),
             style: TextStyle(
               color: AdminHomePage._kMuted,
               fontSize: _r(12, scale),
@@ -2640,10 +3393,8 @@ class _DocSectionV2State extends State<_DocSectionV2> {
           primary: false,
           itemCount: widget.missingNames.length,
           separatorBuilder: (_, __) => SizedBox(height: _r(12, scale)),
-          itemBuilder: (_, i) => _MissingNameTile(
-            scale: scale,
-            name: widget.missingNames[i],
-          ),
+          itemBuilder: (_, i) =>
+              _MissingNameTile(scale: scale, name: widget.missingNames[i]),
         ),
       );
     }
@@ -2652,7 +3403,7 @@ class _DocSectionV2State extends State<_DocSectionV2> {
     if (widget.rows.isEmpty) {
       return Center(
         child: Text(
-          'No items',
+          t.t('admin_home_no_items'),
           style: TextStyle(
             color: AdminHomePage._kMuted,
             fontSize: _r(12, scale),
@@ -2681,7 +3432,6 @@ class _DocSectionV2State extends State<_DocSectionV2> {
     );
   }
 }
-
 
 class _MissingNameTile extends StatelessWidget {
   final double scale;
@@ -2728,6 +3478,7 @@ class _ExpiredDocTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     final isEmpty = row.isPlaceholder;
 
     return Container_toggle(
@@ -2758,7 +3509,9 @@ class _ExpiredDocTile extends StatelessWidget {
                 if (!isEmpty) ...[
                   SizedBox(width: _r(12, scale)),
                   Text(
-                    row.rightPrefix.isEmpty ? 'expired by' : row.rightPrefix,
+                    row.rightPrefix.isEmpty
+                        ? t.t('admin_home_expired_by')
+                        : row.rightPrefix,
                     style: TextStyle(
                       fontSize: _r(10, scale),
                       fontWeight: FontWeight.w800,
@@ -2785,7 +3538,10 @@ class _ExpiredDocTile extends StatelessWidget {
                 spacing: _r(8, scale),
                 runSpacing: _r(8, scale),
                 children: row.pills
-                    .map((p) => _Pill(scale: scale, text: p, tone: _PillTone.orange))
+                    .map(
+                      (p) =>
+                          _Pill(scale: scale, text: p, tone: _PillTone.orange),
+                    )
                     .toList(),
               ),
             ],
@@ -2814,7 +3570,6 @@ class Container_toggle extends StatelessWidget {
   }
 }
 
-
 class _ContractDocTile extends StatelessWidget {
   final double scale;
   final _DocRowUi row;
@@ -2830,6 +3585,7 @@ class _ContractDocTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: _r(14, scale),
@@ -2839,64 +3595,122 @@ class _ContractDocTile extends StatelessWidget {
         color: const Color(0xFFF2F3F5),
         borderRadius: BorderRadius.circular(_r(14, scale)),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 3,
-            child: Text(
-              row.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: _r(12, scale),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 360;
+
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  row.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: _r(12, scale),
+                  ),
+                ),
+                SizedBox(height: _r(8, scale)),
+                Wrap(
+                  spacing: _r(8, scale),
+                  runSpacing: _r(8, scale),
+                  children: [
+                    if (row.contractPill.isNotEmpty)
+                      _Pill(
+                        scale: scale,
+                        text: row.contractPill,
+                        tone: row.contractTone,
+                      ),
+                    Text(
+                      row.rightPrefix.isEmpty
+                          ? t.t('admin_home_last_day')
+                          : row.rightPrefix,
+                      style: TextStyle(
+                        fontSize: _r(10, scale),
+                        fontWeight: FontWeight.w800,
+                        color: AdminHomePage._kText,
+                      ),
+                    ),
+                    Text(
+                      _fmt(row.date),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: _r(12, scale),
+                        color: AdminHomePage._kOrange,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: Text(
+                  row.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: _r(12, scale),
+                  ),
+                ),
               ),
-            ),
-          ),
-          SizedBox(width: _r(10, scale)),
-          Expanded(
-            flex: 2,
-            child: row.contractPill.isEmpty
-                ? const SizedBox.shrink()
-                : Align(
-                    alignment: Alignment.centerLeft,
-                    child: _Pill(
-                      scale: scale,
-                      text: row.contractPill,
-                      tone: row.contractTone,
-                    ),
-                  ),
-          ),
-          SizedBox(width: _r(10, scale)),
-          Expanded(
-            flex: 3,
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    row.rightPrefix.isEmpty ? 'last day' : row.rightPrefix,
-                    style: TextStyle(
-                      fontSize: _r(10, scale),
-                      fontWeight: FontWeight.w800,
-                      color: AdminHomePage._kText,
-                    ),
-                  ),
-                  SizedBox(width: _r(8, scale)),
-                  Text(
-                    _fmt(row.date),
-                    style: TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: _r(12, scale),
-                      color: AdminHomePage._kOrange,
-                    ),
-                  ),
-                ],
+              SizedBox(width: _r(10, scale)),
+              Expanded(
+                flex: 2,
+                child: row.contractPill.isEmpty
+                    ? const SizedBox.shrink()
+                    : Align(
+                        alignment: Alignment.centerLeft,
+                        child: _Pill(
+                          scale: scale,
+                          text: row.contractPill,
+                          tone: row.contractTone,
+                        ),
+                      ),
               ),
-            ),
-          ),
-        ],
+              SizedBox(width: _r(10, scale)),
+              Expanded(
+                flex: 3,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Wrap(
+                    alignment: WrapAlignment.end,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: _r(8, scale),
+                    runSpacing: _r(4, scale),
+                    children: [
+                      Text(
+                        row.rightPrefix.isEmpty
+                            ? t.t('admin_home_last_day')
+                            : row.rightPrefix,
+                        style: TextStyle(
+                          fontSize: _r(10, scale),
+                          fontWeight: FontWeight.w800,
+                          color: AdminHomePage._kText,
+                        ),
+                      ),
+                      Text(
+                        _fmt(row.date),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: _r(12, scale),
+                          color: AdminHomePage._kOrange,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -2974,9 +3788,7 @@ class _DocRowUi {
     required this.date,
     this.isPlaceholder = false,
   });
-
 }
-
 
 // ===========================
 // Helper Models
@@ -3010,7 +3822,6 @@ String _prettyDocType(String t) {
       return t;
   }
 }
-
 
 class _PillPopupDropdown extends StatelessWidget {
   final double scale;
@@ -3081,7 +3892,9 @@ class _PillPopupDropdown extends StatelessWidget {
                   padding: EdgeInsets.symmetric(horizontal: _r(10, scale)),
                   alignment: Alignment.centerLeft,
                   decoration: BoxDecoration(
-                    color: selected ? const Color(0xFFE5E7EB) : Colors.transparent,
+                    color: selected
+                        ? const Color(0xFFE5E7EB)
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(_r(10, scale)),
                   ),
                   child: Text(
@@ -3127,7 +3940,6 @@ class _PillPopupDropdown extends StatelessWidget {
     );
   }
 }
-
 
 // ---------------------------
 // Helpers

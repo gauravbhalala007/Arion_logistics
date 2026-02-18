@@ -35,6 +35,13 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
+    
+    	// ---------- admin notifications ----------
+      match /notifications/{notificationId} {
+        // Admin (DSP owner) can create + read notification history
+        allow read, write: if isSelf(userId) && isApproved(userId);
+      }
+      
       // Created by the user at signup (DSP/admin + also driver profiles)
       allow create: if isSelf(userId);
 
@@ -42,7 +49,7 @@ service cloud.firestore {
       allow read: if isSelf(userId) || isAdmin();
 
       // Only admins may update/delete user docs (for now)
-      allow update: if isAdmin();
+      allow update: if isAdmin() || isSelf(userId); 
       allow delete: if isAdmin();
 
       // ---------- reports (scorecards) ----------
@@ -77,9 +84,42 @@ service cloud.firestore {
         allow read: if isDriverOf(userId) && isApproved(userId);
       }
 
+      // ---------- FAQs ----------
+      // users/{userId}/faqs/{faqId}
+      match /faqs/{faqId} {
+        // DSP/admin full access for own account
+        allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
+
+        // Drivers of this DSP can read FAQs
+        allow read: if isDriverOf(userId) && isApproved(userId);
+      }
+
+      // users/{userId}/faqs_localized/{faqId}
+      match /faqs_localized/{faqId} {
+        // DSP/admin full access for own account
+        allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
+
+        // Drivers of this DSP can read localized overrides
+        allow read: if isDriverOf(userId) && isApproved(userId);
+      }
+
       // ---------- driver master data ----------
       // users/{userId}/drivers/{driverId}   (driverId == TransporterID)
       match /drivers/{driverId} {
+      
+      	// ---------- driver notifications ----------
+        match /notifications/{notificationId} {
+          // DSP can create notifications for drivers
+          allow create: if isSelf(userId) && isApproved(userId);
+
+          // ✅ DSP can READ driver notifications (needed for History popup)
+          allow read: if isSelf(userId) && isApproved(userId);
+
+          // Driver can read + update (mark read / confirm)
+          allow read, update: if isDriverOf(userId)
+            && me().data.transporterId == driverId;
+        }
+
 
         // DSP can fully manage its driver list
         allow read: if isSelf(userId) && isApproved(userId);
@@ -87,11 +127,14 @@ service cloud.firestore {
         allow update: if isSelf(userId) && isApproved(userId);
 
         // Driver can read + update ONLY his own driver doc
-        // requires users/{driverUid} to have:
-        //   dspUid: <dspUid>
-        //   transporterId: <TransporterID string>
         allow read, update: if isDriverOf(userId)
           && me().data.transporterId == driverId;
+
+        // ---------- driver documents subcollection ----------
+        match /documents/{docId} {
+          allow read, write: if isSelf(userId) && isApproved(userId)
+            || (isDriverOf(userId) && me().data.transporterId == driverId);
+        }
       }
     }
   }
