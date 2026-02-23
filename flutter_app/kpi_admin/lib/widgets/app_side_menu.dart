@@ -11,6 +11,10 @@ enum AppNav {
   podQuality,
   drivers,
   tasks,
+  shiftAbsence,
+  incidentReports,
+  academy,
+  dispatcherPill,
   notifications,
   faqs,
   comingSoon,
@@ -55,6 +59,96 @@ class AppSideMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     const dark = Color(0xFF0B1220);
 
+    final navItems = <Widget>[
+      _MenuItem(
+        icon: Icons.home_outlined,
+        label: 'Home',
+        active: active == AppNav.home,
+        onTap: () => _handleNav(context, AppNav.home, '/home'),
+      ),
+      _MenuItem(
+        icon: Icons.dashboard,
+        label: 'Score Card Dashboard',
+        active: active == AppNav.dashboard,
+        onTap: () => _handleNav(context, AppNav.dashboard, '/dashboard'),
+      ),
+      _SubMenuItem(
+        icon: Icons.photo_camera_outlined,
+        label: 'POD Quality',
+        active: active == AppNav.podQuality,
+        onTap: () => _handleNav(context, AppNav.podQuality, '/pod-quality'),
+      ),
+      _MenuItem(
+        icon: Icons.badge_outlined,
+        label: 'Drivers Hub',
+        active: active == AppNav.drivers,
+        onTap: () => _handleNav(context, AppNav.drivers, '/drivers'),
+      ),
+      _MenuItem(
+        icon: Icons.task_alt_outlined,
+        label: 'Task Sheet',
+        active: active == AppNav.tasks,
+        onTap: () => _handleNav(context, AppNav.tasks, '/tasks'),
+      ),
+      _MenuItem(
+        icon: Icons.schedule_rounded,
+        label: 'Shift & Absence',
+        active: active == AppNav.shiftAbsence,
+        onTap: () => _handleNav(context, AppNav.shiftAbsence, '/shift-absence'),
+      ),
+      _MenuItem(
+        icon: Icons.warning_amber_rounded,
+        label: 'Incident Reports',
+        active: active == AppNav.incidentReports,
+        onTap: () =>
+            _handleNav(context, AppNav.incidentReports, '/incident-reports'),
+      ),
+      _MenuItem(
+        icon: Icons.school_outlined,
+        label: 'DA Academy',
+        active: active == AppNav.academy,
+        onTap: () => _handleNav(context, AppNav.academy, '/academy'),
+      ),
+      _MenuItem(
+        icon: Icons.support_agent_rounded,
+        label: 'Dispatcher',
+        active: active == AppNav.dispatcherPill,
+        onTap: () =>
+            _handleNav(context, AppNav.dispatcherPill, '/dispatcher-pill'),
+      ),
+      _MenuItem(
+        icon: Icons.notifications_none,
+        label: 'Notifications',
+        active: active == AppNav.notifications,
+        onTap: () =>
+            _handleNav(context, AppNav.notifications, '/notifications'),
+      ),
+      _MenuItem(
+        icon: Icons.help_outline,
+        label: 'FAQs',
+        active: active == AppNav.faqs,
+        onTap: () => _handleNav(context, AppNav.faqs, '/faqs'),
+      ),
+
+      // ---- Admin-only item (auto-detect from Firestore user role) ----
+      StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: _userDocStream(),
+        builder: (context, snap) {
+          final role = (snap.data?.data()?['role'] ?? '').toString();
+          final isAdmin = role == 'admin';
+          if (!isAdmin) return const SizedBox.shrink();
+
+          return _MenuItem(
+            icon: Icons.verified_user_outlined,
+            label: 'User Approvals',
+            active: active == AppNav.adminApprovals,
+            onTap: () =>
+                _handleNav(context, AppNav.adminApprovals, '/admin-approvals'),
+          );
+        },
+      ),
+    ];
+
     return Container(
       width: width,
       color: dark,
@@ -72,75 +166,15 @@ class AppSideMenu extends StatelessWidget {
               ),
               const SizedBox(height: 18),
               const _ThinDivider(),
-
-              _MenuItem(
-                icon: Icons.home_outlined,
-                label: 'Home',
-                active: active == AppNav.home,
-                onTap: () => _handleNav(context, AppNav.home, '/home'),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: navItems,
+                  ),
+                ),
               ),
-              _MenuItem(
-                icon: Icons.dashboard,
-                label: 'Score Card Dashboard',
-                active: active == AppNav.dashboard,
-                onTap: () =>
-                    _handleNav(context, AppNav.dashboard, '/dashboard'),
-              ),
-              _SubMenuItem(
-                icon: Icons.photo_camera_outlined,
-                label: 'POD Quality',
-                active: active == AppNav.podQuality,
-                onTap: () =>
-                    _handleNav(context, AppNav.podQuality, '/pod-quality'),
-              ),
-              _MenuItem(
-                icon: Icons.badge_outlined,
-                label: 'Drivers Hub',
-                active: active == AppNav.drivers,
-                onTap: () => _handleNav(context, AppNav.drivers, '/drivers'),
-              ),
-              _MenuItem(
-                icon: Icons.task_alt_outlined,
-                label: 'Task Sheet',
-                active: active == AppNav.tasks,
-                onTap: () => _handleNav(context, AppNav.tasks, '/tasks'),
-              ),
-              _MenuItem(
-                icon: Icons.notifications_none,
-                label: 'Notifications',
-                active: active == AppNav.notifications,
-                onTap: () =>
-                    _handleNav(context, AppNav.notifications, '/notifications'),
-              ),
-              _MenuItem(
-                icon: Icons.help_outline,
-                label: 'FAQs',
-                active: active == AppNav.faqs,
-                onTap: () => _handleNav(context, AppNav.faqs, '/faqs'),
-              ),
-
-              // ---- Admin-only item (auto-detect from Firestore user role) ----
-              StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                stream: _userDocStream(),
-                builder: (context, snap) {
-                  final role = (snap.data?.data()?['role'] ?? '').toString();
-                  final isAdmin = role == 'admin';
-                  if (!isAdmin) return const SizedBox.shrink();
-
-                  return _MenuItem(
-                    icon: Icons.verified_user_outlined,
-                    label: 'User Approvals',
-                    active: active == AppNav.adminApprovals,
-                    onTap: () => _handleNav(
-                      context,
-                      AppNav.adminApprovals,
-                      '/admin-approvals',
-                    ),
-                  );
-                },
-              ),
-
-              const Spacer(),
               const _ThinDivider(),
               const SizedBox(height: 12),
 

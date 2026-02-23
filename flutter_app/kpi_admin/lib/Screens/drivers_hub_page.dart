@@ -610,6 +610,71 @@ class _DriversHubPageState extends State<DriversHubPage> {
   // Manual driver creation
   // ---------------------------------------------------------------------------
 
+  Future<int> _backfillMissingRuleNotificationsForDriver({
+    required String dspUid,
+    required DocumentReference<Map<String, dynamic>> driverRef,
+  }) async {
+    final db = FirebaseFirestore.instance;
+
+    final adminRulesSnap = await db
+        .collection('users')
+        .doc(dspUid)
+        .collection('notifications')
+        .where('type', isEqualTo: 'rule')
+        .get();
+
+    if (adminRulesSnap.docs.isEmpty) return 0;
+
+    final driverRulesSnap = await driverRef
+        .collection('notifications')
+        .where('type', isEqualTo: 'rule')
+        .get();
+    final existingRuleIds = driverRulesSnap.docs.map((d) => d.id).toSet();
+
+    final missing = adminRulesSnap.docs
+        .where((doc) => !existingRuleIds.contains(doc.id))
+        .toList(growable: false);
+
+    if (missing.isEmpty) return 0;
+
+    final now = FieldValue.serverTimestamp();
+    const chunkSize = 350;
+    for (var i = 0; i < missing.length; i += chunkSize) {
+      final end = (i + chunkSize > missing.length)
+          ? missing.length
+          : (i + chunkSize);
+      final batch = db.batch();
+
+      for (final adminDoc in missing.sublist(i, end)) {
+        final adminData = adminDoc.data();
+        final driverNotifRef = driverRef
+            .collection('notifications')
+            .doc(adminDoc.id);
+
+        batch.set(driverNotifRef, {
+          'notificationId': adminDoc.id,
+          'type': 'rule',
+          'title': (adminData['title'] ?? '').toString(),
+          'body': (adminData['body'] ?? '').toString(),
+          'status': 'unread',
+          'createdAt': adminData['createdAt'] ?? now,
+          'readAt': null,
+          'confirmedAt': null,
+          'requiresConfirmation': adminData['requiresConfirmation'] ?? true,
+          'updatedAt': now,
+        }, SetOptions(merge: true));
+
+        batch.set(adminDoc.reference, {
+          'targetCount': FieldValue.increment(1),
+        }, SetOptions(merge: true));
+      }
+
+      await batch.commit();
+    }
+
+    return missing.length;
+  }
+
   Future<void> _createDriverManually() async {
     final t = AppLocalizations.of(context);
     if (_uid == null) {
@@ -696,6 +761,11 @@ class _DriversHubPageState extends State<DriversHubPage> {
       'hasLogin': false,
       'active': true,
     }, SetOptions(merge: true));
+
+    await _backfillMissingRuleNotificationsForDriver(
+      dspUid: _uid!,
+      driverRef: doc,
+    );
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(t.tf('drivers_hub_driver_saved', {'name': name}))),
@@ -987,12 +1057,20 @@ class _DriversHubPageState extends State<DriversHubPage> {
     bool currentlyActive,
   ) async {
     final t = AppLocalizations.of(context);
+    if (_uid == null) return;
     final newActive = !currentlyActive;
 
     await driverDoc.reference.set({
       'active': newActive,
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+
+    if (newActive) {
+      await _backfillMissingRuleNotificationsForDriver(
+        dspUid: _uid!,
+        driverRef: driverDoc.reference,
+      );
+    }
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(

@@ -64,7 +64,8 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
   _ViewMode _viewMode = _ViewMode.company;
   _TimeFilter _timeFilter = _TimeFilter.week;
 
-  String _bucket = 'ALL'; // ALL | FANTASTIC_PLUS | FANTASTIC | GREAT | FAIR | POOR
+  String _bucket =
+      'ALL'; // ALL | FANTASTIC_PLUS | FANTASTIC | GREAT | FAIR | POOR
   String _query = '';
   int _selectedReportIndex = 0;
 
@@ -76,7 +77,8 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
 
   late final Stream<QuerySnapshot<Map<String, dynamic>>> _reportsStreamCached;
   late final Stream<Map<String, String>> _globalNamesStreamCached;
-  final Map<String, Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>>> _scoresStreamCache = {};
+  final Map<String, Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>>>
+  _scoresStreamCache = {};
   final Map<String, Stream<Map<String, String>>> _weekNamesStreamCache = {};
 
   // All reports for this DSP (sorted latest first)
@@ -145,15 +147,15 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
         .collection('drivers')
         .snapshots()
         .map((snap) {
-      final m = <String, String>{};
-      for (final d in snap.docs) {
-        final data = d.data();
-        final id = _s(data['transporterId']);
-        final name = _s(data['driverName']);
-        if (id.isNotEmpty) m[id] = name;
-      }
-      return m;
-    });
+          final m = <String, String>{};
+          for (final d in snap.docs) {
+            final data = d.data();
+            final id = _s(data['transporterId']);
+            final name = _s(data['driverName']);
+            if (id.isNotEmpty) m[id] = name;
+          }
+          return m;
+        });
   }
 
   @override
@@ -166,10 +168,14 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
   Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _scoresCached(
     DocumentReference<Map<String, dynamic>> reportRef,
   ) {
-    return _scoresStreamCache.putIfAbsent(reportRef.path, () => _scores(reportRef));
+    return _scoresStreamCache.putIfAbsent(
+      reportRef.path,
+      () => _scores(reportRef),
+    );
   }
 
-  Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _scoresForReportsCached(
+  Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>>
+  _scoresForReportsCached(
     List<DocumentReference<Map<String, dynamic>>> reportRefs,
   ) {
     final refs = [...reportRefs]..sort((a, b) => a.path.compareTo(b.path));
@@ -201,8 +207,21 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
     return const Color(0xFFEF4444);
   }
 
-  String _statusCodeFromScore(double v) {
-    if (v >= 93) return 'FANTASTIC_PLUS';
+  bool _isWeek10PolicyActive({int? year, int? weekNumber}) {
+    if (year == null) return false;
+    if (year > 2026) return true;
+    if (year < 2026) return false;
+    return (weekNumber ?? 0) >= 9;
+  }
+
+  double _fantasticPlusCutoff({int? year, int? weekNumber}) {
+    return _isWeek10PolicyActive(year: year, weekNumber: weekNumber) ? 88 : 93;
+  }
+
+  String _statusCodeFromScore(double v, {int? year, int? weekNumber}) {
+    if (v >= _fantasticPlusCutoff(year: year, weekNumber: weekNumber)) {
+      return 'FANTASTIC_PLUS';
+    }
     if (v >= 85) return 'FANTASTIC';
     if (v >= 70) return 'GREAT';
     if (v >= 50) return 'FAIR';
@@ -329,9 +348,7 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
 
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) {
-      return Center(
-        child: Text(loc.t('error_must_be_logged_in_driver')),
-      );
+      return Center(child: Text(loc.t('error_must_be_logged_in_driver')));
     }
 
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -371,20 +388,26 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
             ? Map<String, dynamic>.from(summaryRaw as Map)
             : <String, dynamic>{};
 
-        final weekNumber = (summary['weekNumber'] as num?)?.toInt() ??
+        final weekNumber =
+            (summary['weekNumber'] as num?)?.toInt() ??
             (reportData['weekNumber'] as num?)?.toInt();
         final year =
-            (summary['year'] as num?)?.toInt() ?? (reportData['year'] as num?)?.toInt();
+            (summary['year'] as num?)?.toInt() ??
+            (reportData['year'] as num?)?.toInt();
 
-        final weekLabel =
-            weekNumber != null ? '${loc.t('dash_week')} $weekNumber' : loc.t('dash_week');
+        final weekLabel = weekNumber != null
+            ? '${loc.t('dash_week')} $weekNumber'
+            : loc.t('dash_week');
 
         final defaultMonthLabel = (year != null && weekNumber != null)
             ? _monthFromWeek(context, year, weekNumber).toUpperCase()
             : loc.t('period_month').toUpperCase();
 
         final range = (weekNumber != null && year != null)
-            ? loc.tf('dash_week_range', {'week': '$weekNumber', 'year': '$year'})
+            ? loc.tf('dash_week_range', {
+                'week': '$weekNumber',
+                'year': '$year',
+              })
             : '';
 
         // ---- Build available years and months from all reports ----
@@ -397,8 +420,11 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
               ? Map<String, dynamic>.from(sRaw as Map)
               : <String, dynamic>{};
 
-          final wy = (s['year'] as num?)?.toInt() ?? (dData['year'] as num?)?.toInt();
-          final ww = (s['weekNumber'] as num?)?.toInt() ?? (dData['weekNumber'] as num?)?.toInt();
+          final wy =
+              (s['year'] as num?)?.toInt() ?? (dData['year'] as num?)?.toInt();
+          final ww =
+              (s['weekNumber'] as num?)?.toInt() ??
+              (dData['weekNumber'] as num?)?.toInt();
           if (wy == null || ww == null) continue;
 
           yearsAvailable.add(wy);
@@ -406,10 +432,12 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
           monthsByYear.putIfAbsent(wy, () => <int>{}).add(m);
         }
 
-        final sortedYears = yearsAvailable.toList()..sort((a, b) => b.compareTo(a));
+        final sortedYears = yearsAvailable.toList()
+          ..sort((a, b) => b.compareTo(a));
         final Map<int, List<int>> sortedMonthsByYear = {
           for (final y in sortedYears)
-            y: (monthsByYear[y]?.toList() ?? [])..sort((a, b) => a.compareTo(b))
+            y: (monthsByYear[y]?.toList() ?? [])
+              ..sort((a, b) => a.compareTo(b)),
         };
 
         // ---- Prepare current month/year selection defaults ----
@@ -425,11 +453,13 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
           _selectedYear = sortedYears.first;
         }
 
-        bool isMonthlyCompany = _viewMode == _ViewMode.company &&
+        bool isMonthlyCompany =
+            _viewMode == _ViewMode.company &&
             _timeFilter == _TimeFilter.month &&
             currentMonthKey != null;
 
-        bool isYearlyCompany = _viewMode == _ViewMode.company &&
+        bool isYearlyCompany =
+            _viewMode == _ViewMode.company &&
             _timeFilter == _TimeFilter.year &&
             _selectedYear != null;
 
@@ -464,8 +494,12 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
                 ? Map<String, dynamic>.from(sRaw as Map)
                 : <String, dynamic>{};
 
-            final wy = (s['year'] as num?)?.toInt() ?? (dData['year'] as num?)?.toInt();
-            final ww = (s['weekNumber'] as num?)?.toInt() ?? (dData['weekNumber'] as num?)?.toInt();
+            final wy =
+                (s['year'] as num?)?.toInt() ??
+                (dData['year'] as num?)?.toInt();
+            final ww =
+                (s['weekNumber'] as num?)?.toInt() ??
+                (dData['weekNumber'] as num?)?.toInt();
             if (wy == null || ww == null) continue;
 
             if (wy != filterYear) continue;
@@ -495,7 +529,9 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
 
         final rankAtStation = (summary['rankAtStation'] as num?)?.toInt();
         final stationCount = (summary['stationCount'] as num?)?.toInt();
-        final stationName = _s(summary['stationCode'] ?? reportData['stationCode']);
+        final stationName = _s(
+          summary['stationCode'] ?? reportData['stationCode'],
+        );
 
         String rankText = '—';
         if (rankAtStation != null) {
@@ -513,7 +549,8 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
 
         final reportRef = selectedReport.reference;
 
-        final scoreStream = (isMonthlyCompany || isYearlyCompany) && aggReportRefs.isNotEmpty
+        final scoreStream =
+            (isMonthlyCompany || isYearlyCompany) && aggReportRefs.isNotEmpty
             ? _scoresForReportsCached(aggReportRefs)
             : _scoresCached(reportRef);
 
@@ -532,7 +569,10 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
                   final y = int.tryParse(parts[0]);
                   final m = int.tryParse(parts[1]);
                   if (y != null && m != null) {
-                    monthPillLabel = _monthNameFromIndex(context, m).toUpperCase();
+                    monthPillLabel = _monthNameFromIndex(
+                      context,
+                      m,
+                    ).toUpperCase();
                     break;
                   }
                 }
@@ -540,7 +580,8 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
               monthPillLabel = loc.t('period_month').toUpperCase();
               break;
             case _TimeFilter.year:
-              monthPillLabel = (_selectedYear ?? year ?? DateTime.now().year).toString();
+              monthPillLabel = (_selectedYear ?? year ?? DateTime.now().year)
+                  .toString();
               break;
           }
         }
@@ -559,10 +600,16 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
           for (final doc in reportDocs) {
             final dData = doc.data();
             final sRaw = dData['summary'];
-            final s = sRaw is Map ? Map<String, dynamic>.from(sRaw as Map) : <String, dynamic>{};
+            final s = sRaw is Map
+                ? Map<String, dynamic>.from(sRaw as Map)
+                : <String, dynamic>{};
 
-            final wy = (s['year'] as num?)?.toInt() ?? (dData['year'] as num?)?.toInt();
-            final ww = (s['weekNumber'] as num?)?.toInt() ?? (dData['weekNumber'] as num?)?.toInt();
+            final wy =
+                (s['year'] as num?)?.toInt() ??
+                (dData['year'] as num?)?.toInt();
+            final ww =
+                (s['weekNumber'] as num?)?.toInt() ??
+                (dData['weekNumber'] as num?)?.toInt();
             if (wy == null || ww == null) continue;
             if (wy != filterYear) continue;
 
@@ -592,7 +639,9 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    loc.tf('dash_scorecard_week', {'week': (weekNumber ?? '').toString()}),
+                    loc.tf('dash_scorecard_week', {
+                      'week': (weekNumber ?? '').toString(),
+                    }),
                     style: const TextStyle(
                       fontSize: 12,
                       letterSpacing: 1.4,
@@ -623,16 +672,17 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
                 selectedYear: _selectedYear,
                 years: sortedYears,
                 monthsByYear: sortedMonthsByYear,
-                onTimeFilterChanged: (_TimeFilter newFilter, int? yearSel, String? monthKey) {
-                  setState(() {
-                    _timeFilter = newFilter;
-                    if (newFilter == _TimeFilter.month) {
-                      _selectedMonthKey = monthKey;
-                    } else if (newFilter == _TimeFilter.year) {
-                      _selectedYear = yearSel;
-                    }
-                  });
-                },
+                onTimeFilterChanged:
+                    (_TimeFilter newFilter, int? yearSel, String? monthKey) {
+                      setState(() {
+                        _timeFilter = newFilter;
+                        if (newFilter == _TimeFilter.month) {
+                          _selectedMonthKey = monthKey;
+                        } else if (newFilter == _TimeFilter.year) {
+                          _selectedYear = yearSel;
+                        }
+                      });
+                    },
                 monthLabel: monthPillLabel,
                 reports: reportDocs,
                 selectedIndex: _selectedReportIndex,
@@ -683,17 +733,23 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
                   return StreamBuilder<Map<String, String>>(
                     stream: _globalNamesStreamCached,
                     builder: (context, globalSnap) {
-                      final globalNames = globalSnap.data ?? const <String, String>{};
+                      final globalNames =
+                          globalSnap.data ?? const <String, String>{};
 
                       final nameMap = <String, String>{}
                         ..addAll(globalNames)
                         ..addAll(weekNames);
 
-                      return StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+                      return StreamBuilder<
+                        List<QueryDocumentSnapshot<Map<String, dynamic>>>
+                      >(
                         stream: scoreStream,
                         builder: (context, scoreSnap) {
-                          if (scoreSnap.connectionState == ConnectionState.waiting) {
-                            return const Center(child: CircularProgressIndicator());
+                          if (scoreSnap.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
                           }
 
                           var docs = scoreSnap.data ?? [];
@@ -703,25 +759,37 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
                             );
                           }
 
-                          final isMonthly = _viewMode == _ViewMode.company &&
+                          final isMonthly =
+                              _viewMode == _ViewMode.company &&
                               _timeFilter == _TimeFilter.month &&
                               currentMonthKey != null;
-                          final isYearly = _viewMode == _ViewMode.company &&
+                          final isYearly =
+                              _viewMode == _ViewMode.company &&
                               _timeFilter == _TimeFilter.year &&
                               _selectedYear != null;
 
                           if (_viewMode == _ViewMode.company) {
                             // COMPANY VIEW
                             if (!isMonthly && !isYearly) {
-                              final hasAnyRank = docs.any((d) => d.data()['rank'] != null);
+                              final hasAnyRank = docs.any(
+                                (d) => d.data()['rank'] != null,
+                              );
                               docs.sort((a, b) {
                                 if (hasAnyRank) {
-                                  final ra = (a.data()['rank'] as num?)?.toInt() ?? 999999;
-                                  final rb = (b.data()['rank'] as num?)?.toInt() ?? 999999;
+                                  final ra =
+                                      (a.data()['rank'] as num?)?.toInt() ??
+                                      999999;
+                                  final rb =
+                                      (b.data()['rank'] as num?)?.toInt() ??
+                                      999999;
                                   return ra.compareTo(rb);
                                 }
-                                final ca = (a.data()['comp'] ?? {}) as Map<String, dynamic>;
-                                final cb = (b.data()['comp'] ?? {}) as Map<String, dynamic>;
+                                final ca =
+                                    (a.data()['comp'] ?? {})
+                                        as Map<String, dynamic>;
+                                final cb =
+                                    (b.data()['comp'] ?? {})
+                                        as Map<String, dynamic>;
                                 final fa = _numOr0(ca['FinalScore']);
                                 final fb = _numOr0(cb['FinalScore']);
                                 return fb.compareTo(fa);
@@ -730,7 +798,9 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
                               // Filter by bucket (kept logic)
                               if (_bucket != 'ALL') {
                                 docs = docs.where((d) {
-                                  final b = _s(d.data()['statusBucket']).toUpperCase();
+                                  final b = _s(
+                                    d.data()['statusBucket'],
+                                  ).toUpperCase();
                                   return b == _bucket;
                                 }).toList();
                               }
@@ -739,39 +809,61 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
                               if (_query.isNotEmpty) {
                                 docs = docs.where((d) {
                                   final data = d.data();
-                                  final tid = _s(data['transporterId']).toLowerCase();
-                                  final name = _s(nameMap[_s(data['transporterId'])]).toLowerCase();
-                                  return tid.contains(_query) || name.contains(_query);
+                                  final tid = _s(
+                                    data['transporterId'],
+                                  ).toLowerCase();
+                                  final name = _s(
+                                    nameMap[_s(data['transporterId'])],
+                                  ).toLowerCase();
+                                  return tid.contains(_query) ||
+                                      name.contains(_query);
                                 }).toList();
                               }
 
                               if (docs.isEmpty) {
-                                return Center(child: Text(loc.t('dash_no_drivers_match')));
+                                return Center(
+                                  child: Text(loc.t('dash_no_drivers_match')),
+                                );
                               }
 
                               return ListView.separated(
                                 shrinkWrap: true,
                                 physics: const NeverScrollableScrollPhysics(),
                                 itemCount: docs.length,
-                                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(height: 10),
                                 itemBuilder: (context, i) {
                                   final data = docs[i].data();
                                   final compRaw = (data['comp'] ?? {});
-                                  final comp = compRaw is Map<String, dynamic> ? compRaw : <String, dynamic>{};
+                                  final comp = compRaw is Map<String, dynamic>
+                                      ? compRaw
+                                      : <String, dynamic>{};
 
                                   final tid = _s(data['transporterId']).trim();
                                   final name = _s(nameMap[tid]).isNotEmpty
                                       ? _s(nameMap[tid])
                                       : loc.t('dash_no_name');
 
-                                  final score = _numOr0(comp['FinalScore']).toDouble();
-                                  final rank = (data['rank'] as num?)?.toInt() ?? i + 1;
+                                  final score = _numOr0(
+                                    comp['FinalScore'],
+                                  ).toDouble();
+                                  final rank =
+                                      (data['rank'] as num?)?.toInt() ?? i + 1;
                                   final apiBucketRaw = _s(data['statusBucket']);
                                   final statusCode = apiBucketRaw.isNotEmpty
                                       ? apiBucketRaw
-                                      : _statusCodeFromScore(score);
-                                  final statusText = _prettyBucket(context, statusCode);
-                                  final statusColor = _colorFromApiBucket(statusCode);
+                                      : _statusCodeFromScore(
+                                          score,
+                                          year: year,
+                                          weekNumber: weekNumber,
+                                        );
+                                  final statusText = _prettyBucket(
+                                    context,
+                                    statusCode,
+                                  );
+                                  final statusColor = _colorFromApiBucket(
+                                    statusCode,
+                                  );
 
                                   return _LeaderboardRowCard(
                                     rank: rank,
@@ -792,10 +884,17 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
                                 if (tid.isEmpty) continue;
 
                                 final compRaw = (data['comp'] ?? {});
-                                final comp = compRaw is Map<String, dynamic> ? compRaw : <String, dynamic>{};
+                                final comp = compRaw is Map<String, dynamic>
+                                    ? compRaw
+                                    : <String, dynamic>{};
 
-                                final score = _numOr0(comp['FinalScore']).toDouble();
-                                final agg = aggMap.putIfAbsent(tid, () => _MonthlyAgg());
+                                final score = _numOr0(
+                                  comp['FinalScore'],
+                                ).toDouble();
+                                final agg = aggMap.putIfAbsent(
+                                  tid,
+                                  () => _MonthlyAgg(),
+                                );
                                 agg.sumScore += score;
                                 agg.count++;
                               }
@@ -804,36 +903,58 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
                               aggMap.forEach((tid, agg) {
                                 if (agg.count == 0) return;
                                 final avgScore = agg.sumScore / agg.count;
-                                entries.add(_MonthlyEntry(transporterId: tid, avgScore: avgScore));
+                                entries.add(
+                                  _MonthlyEntry(
+                                    transporterId: tid,
+                                    avgScore: avgScore,
+                                  ),
+                                );
                               });
 
                               if (_query.isNotEmpty) {
                                 entries = entries.where((e) {
-                                  final name = _s(nameMap[e.transporterId]).toLowerCase();
+                                  final name = _s(
+                                    nameMap[e.transporterId],
+                                  ).toLowerCase();
                                   final tid = e.transporterId.toLowerCase();
-                                  return tid.contains(_query) || name.contains(_query);
+                                  return tid.contains(_query) ||
+                                      name.contains(_query);
                                 }).toList();
                               }
 
-                              entries.sort((a, b) => b.avgScore.compareTo(a.avgScore));
+                              entries.sort(
+                                (a, b) => b.avgScore.compareTo(a.avgScore),
+                              );
 
                               if (entries.isEmpty) {
-                                return Center(child: Text(loc.t('dash_no_drivers_match')));
+                                return Center(
+                                  child: Text(loc.t('dash_no_drivers_match')),
+                                );
                               }
 
                               return ListView.separated(
                                 shrinkWrap: true,
                                 physics: const NeverScrollableScrollPhysics(),
                                 itemCount: entries.length,
-                                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(height: 10),
                                 itemBuilder: (context, i) {
                                   final e = entries[i];
-                                  final name = _s(nameMap[e.transporterId]).isNotEmpty
+                                  final name =
+                                      _s(nameMap[e.transporterId]).isNotEmpty
                                       ? _s(nameMap[e.transporterId])
                                       : loc.t('dash_no_name');
-                                  final statusCode = _statusCodeFromScore(e.avgScore);
-                                  final statusText = _prettyBucket(context, statusCode);
-                                  final statusColor = _colorFromApiBucket(statusCode);
+                                  final statusCode = _statusCodeFromScore(
+                                    e.avgScore,
+                                    year: filterYear,
+                                  );
+                                  final statusText = _prettyBucket(
+                                    context,
+                                    statusCode,
+                                  );
+                                  final statusColor = _colorFromApiBucket(
+                                    statusCode,
+                                  );
 
                                   return _LeaderboardRowCard(
                                     rank: i + 1,
@@ -841,18 +962,24 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
                                     name: name,
                                     statusText: statusText,
                                     statusColor: statusColor,
-                                    backgroundColor: _monthlyBucketColorFromScore(e.avgScore),
+                                    backgroundColor:
+                                        _monthlyBucketColorFromScore(
+                                          e.avgScore,
+                                        ),
                                   );
                                 },
                               );
                             }
                           } else {
                             // MY SCORE VIEW (weekly only)
-                            final myTid = widget.driverTransporterId.toUpperCase();
+                            final myTid = widget.driverTransporterId
+                                .toUpperCase();
 
                             QueryDocumentSnapshot<Map<String, dynamic>>? myDoc;
                             for (final d in docs) {
-                              final tid = _s(d.data()['transporterId']).toUpperCase();
+                              final tid = _s(
+                                d.data()['transporterId'],
+                              ).toUpperCase();
                               if (tid == myTid) {
                                 myDoc = d;
                                 break;
@@ -860,19 +987,29 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
                             }
 
                             if (myDoc == null) {
-                              return Center(child: Text(loc.t('dash_no_my_score_week')));
+                              return Center(
+                                child: Text(loc.t('dash_no_my_score_week')),
+                              );
                             }
 
                             final myData = myDoc.data();
                             final compRaw = (myData['comp'] ?? {});
                             final kpisRaw = (myData['kpis'] ?? {});
-                            final comp = compRaw is Map<String, dynamic> ? compRaw : <String, dynamic>{};
-                            final kpis = kpisRaw is Map<String, dynamic> ? kpisRaw : <String, dynamic>{};
+                            final comp = compRaw is Map<String, dynamic>
+                                ? compRaw
+                                : <String, dynamic>{};
+                            final kpis = kpisRaw is Map<String, dynamic>
+                                ? kpisRaw
+                                : <String, dynamic>{};
 
-                            final scoreTotal = _numOr0(comp['FinalScore']).toDouble();
+                            final scoreTotal = _numOr0(
+                              comp['FinalScore'],
+                            ).toDouble();
 
                             final delivered = _numOr0(
-                              kpis['Delivered'] ?? kpis['DELIVERED'] ?? kpis['delivered'],
+                              kpis['Delivered'] ??
+                                  kpis['DELIVERED'] ??
+                                  kpis['delivered'],
                             ).toInt();
 
                             final rankMy = (myData['rank'] as num?)?.toInt();
@@ -886,39 +1023,86 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
                                 ? _colorFromApiBucket(apiBucketRaw)
                                 : _statusColor(scoreTotal);
 
-                            final dcrScore = _numOr0(comp['DCR_Score']).toDouble();
-                            final dnrScore = _numOr0(comp['DNR_Score']).toDouble();
-                            final lorScore = _numOr0(comp['LoR_Score']).toDouble();
-                            final podScore = _numOr0(comp['POD_Score']).toDouble();
-                            final ccScore = _numOr0(comp['CC_Score']).toDouble();
-                            final ceScore = _numOr0(comp['CE_Score'] ?? comp['CE']).toDouble();
-                            final cdfScore = _numOr0(comp['CDF_Score']).toDouble();
+                            final dcrScore = _numOr0(
+                              comp['DCR_Score'],
+                            ).toDouble();
+                            final dnrScore = _numOr0(
+                              comp['DNR_Score'],
+                            ).toDouble();
+                            final lorScore = _numOr0(
+                              comp['LoR_Score'],
+                            ).toDouble();
+                            final podScore = _numOr0(
+                              comp['POD_Score'],
+                            ).toDouble();
+                            final ccScore = _numOr0(
+                              comp['CC_Score'],
+                            ).toDouble();
+                            final ceScore = _numOr0(
+                              comp['CE_Score'] ?? comp['CE'],
+                            ).toDouble();
+                            final cdfScore = _numOr0(
+                              comp['CDF_Score'],
+                            ).toDouble();
 
-                            final dcrValue = _numOr0(kpis['DCR'] ?? kpis['DCR %'] ?? kpis['DCR_PCT']).toDouble();
-                            final dnrValue = _numOr0(kpis['DNR'] ?? kpis['DNR DPMO']).toDouble();
-                            final lorValue = _numOr0(kpis['LoR'] ?? kpis['LoR DPMO']).toDouble();
-                            final podValue = _numOr0(kpis['POD'] ?? kpis['POD %'] ?? kpis['POD_PCT']).toDouble();
-                            final ccValue = _numOr0(kpis['CC'] ?? kpis['CC %'] ?? kpis['CC_PCT']).toDouble();
-                            final ceValue = _numOr0(kpis['CE'] ?? kpis['CE %'] ?? kpis['CE_PCT']).toDouble();
-                            final cdfValue = _numOr0(kpis['CDF'] ?? kpis['CDF DPMO']).toDouble();
+                            final dcrValue = _numOr0(
+                              kpis['DCR'] ?? kpis['DCR %'] ?? kpis['DCR_PCT'],
+                            ).toDouble();
+                            final dnrValue = _numOr0(
+                              kpis['DNR'] ?? kpis['DNR DPMO'],
+                            ).toDouble();
+                            final lorValue = _numOr0(
+                              kpis['LoR'] ?? kpis['LoR DPMO'],
+                            ).toDouble();
+                            final podValue = _numOr0(
+                              kpis['POD'] ?? kpis['POD %'] ?? kpis['POD_PCT'],
+                            ).toDouble();
+                            final ccValue = _numOr0(
+                              kpis['CC'] ?? kpis['CC %'] ?? kpis['CC_PCT'],
+                            ).toDouble();
+                            final ceValue = _numOr0(
+                              kpis['CE'] ?? kpis['CE %'] ?? kpis['CE_PCT'],
+                            ).toDouble();
+                            final cdfValue = _numOr0(
+                              kpis['CDF'] ?? kpis['CDF DPMO'],
+                            ).toDouble();
 
                             final podQualityRaw = myData['podQuality'];
                             final podQualityMap = podQualityRaw is Map
-                                ? Map<String, dynamic>.from(podQualityRaw as Map)
+                                ? Map<String, dynamic>.from(
+                                    podQualityRaw as Map,
+                                  )
                                 : <String, dynamic>{};
 
                             final podQuality = podQualityMap.isNotEmpty
                                 ? _PodQualityStats(
-                                    opportunities: _numOr0(podQualityMap['opportunities']).toDouble(),
-                                    success: _numOr0(podQualityMap['success']).toDouble(),
-                                    bypass: _numOr0(podQualityMap['bypass']).toDouble(),
-                                    rejects: _numOr0(podQualityMap['rejects']).toDouble(),
-                                    blurry: _numOr0(podQualityMap['blurryPhoto']).toDouble(),
-                                    tooDark: _numOr0(podQualityMap['photoTooDark']).toDouble(),
-                                    noPackage:
-                                        _numOr0(podQualityMap['noPackageDetected']).toDouble(),
-                                    inCar: _numOr0(podQualityMap['packageInCar']).toDouble(),
-                                    tooClose: _numOr0(podQualityMap['packageTooClose']).toDouble(),
+                                    opportunities: _numOr0(
+                                      podQualityMap['opportunities'],
+                                    ).toDouble(),
+                                    success: _numOr0(
+                                      podQualityMap['success'],
+                                    ).toDouble(),
+                                    bypass: _numOr0(
+                                      podQualityMap['bypass'],
+                                    ).toDouble(),
+                                    rejects: _numOr0(
+                                      podQualityMap['rejects'],
+                                    ).toDouble(),
+                                    blurry: _numOr0(
+                                      podQualityMap['blurryPhoto'],
+                                    ).toDouble(),
+                                    tooDark: _numOr0(
+                                      podQualityMap['photoTooDark'],
+                                    ).toDouble(),
+                                    noPackage: _numOr0(
+                                      podQualityMap['noPackageDetected'],
+                                    ).toDouble(),
+                                    inCar: _numOr0(
+                                      podQualityMap['packageInCar'],
+                                    ).toDouble(),
+                                    tooClose: _numOr0(
+                                      podQualityMap['packageTooClose'],
+                                    ).toDouble(),
                                   )
                                 : null;
 
@@ -987,7 +1171,8 @@ class _FilterPillRow extends StatelessWidget {
   final int? selectedYear;
   final List<int> years;
   final Map<int, List<int>> monthsByYear;
-  final void Function(_TimeFilter filter, int? year, String? monthKey) onTimeFilterChanged;
+  final void Function(_TimeFilter filter, int? year, String? monthKey)
+  onTimeFilterChanged;
 
   final String monthLabel;
   final List<QueryDocumentSnapshot<Map<String, dynamic>>> reports;
@@ -1013,21 +1198,31 @@ class _FilterPillRow extends StatelessWidget {
   int _weekOf(int i) {
     final d = reports[i].data();
     final summary = d['summary'];
-    final s = summary is Map ? Map<String, dynamic>.from(summary as Map) : <String, dynamic>{};
-    return (s['weekNumber'] as num?)?.toInt() ?? (d['weekNumber'] as num?)?.toInt() ?? 0;
+    final s = summary is Map
+        ? Map<String, dynamic>.from(summary as Map)
+        : <String, dynamic>{};
+    return (s['weekNumber'] as num?)?.toInt() ??
+        (d['weekNumber'] as num?)?.toInt() ??
+        0;
   }
 
   int _yearOf(int i) {
     final d = reports[i].data();
     final summary = d['summary'];
-    final s = summary is Map ? Map<String, dynamic>.from(summary as Map) : <String, dynamic>{};
-    return (s['year'] as num?)?.toInt() ?? (d['year'] as num?)?.toInt() ?? DateTime.now().year;
+    final s = summary is Map
+        ? Map<String, dynamic>.from(summary as Map)
+        : <String, dynamic>{};
+    return (s['year'] as num?)?.toInt() ??
+        (d['year'] as num?)?.toInt() ??
+        DateTime.now().year;
   }
 
   String _stationOf(int i) {
     final d = reports[i].data();
     final summary = d['summary'];
-    final s = summary is Map ? Map<String, dynamic>.from(summary as Map) : <String, dynamic>{};
+    final s = summary is Map
+        ? Map<String, dynamic>.from(summary as Map)
+        : <String, dynamic>{};
     return _s(s['stationCode'] ?? d['stationCode']).toUpperCase();
   }
 
@@ -1068,7 +1263,9 @@ class _FilterPillRow extends StatelessWidget {
 
     final scorePill = GestureDetector(
       onTap: () {
-        final next = viewMode == _ViewMode.company ? _ViewMode.myScore : _ViewMode.company;
+        final next = viewMode == _ViewMode.company
+            ? _ViewMode.myScore
+            : _ViewMode.company;
         onViewModeChanged(next);
       },
       behavior: HitTestBehavior.opaque,
@@ -1083,7 +1280,11 @@ class _FilterPillRow extends StatelessWidget {
               children: [
                 Text(scoreLabel.toUpperCase(), style: pillTextStyle),
                 const SizedBox(width: 6),
-                const Icon(Icons.keyboard_arrow_down, size: 16, color: Colors.black87),
+                const Icon(
+                  Icons.keyboard_arrow_down,
+                  size: 16,
+                  color: Colors.black87,
+                ),
               ],
             ),
           ),
@@ -1111,7 +1312,11 @@ class _FilterPillRow extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(width: 6),
-                const Icon(Icons.keyboard_arrow_down, size: 16, color: Colors.black87),
+                const Icon(
+                  Icons.keyboard_arrow_down,
+                  size: 16,
+                  color: Colors.black87,
+                ),
               ],
             ),
           ),
@@ -1176,11 +1381,7 @@ class _FilterPillRow extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Expanded(child: scorePill),
-              ],
-            ),
+            Row(children: [Expanded(child: scorePill)]),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -1206,7 +1407,10 @@ class _FilterPillRow extends StatelessWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(15),
           ),
-          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 24,
+          ),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
             decoration: BoxDecoration(
@@ -1221,7 +1425,10 @@ class _FilterPillRow extends StatelessWidget {
                     children: [
                       Text(
                         loc.t('dash_select_period'),
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                       const Spacer(),
                       IconButton(
@@ -1236,10 +1443,16 @@ class _FilterPillRow extends StatelessWidget {
                     alignment: Alignment.centerLeft,
                     child: TextButton(
                       style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 6,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(999),
-                          side: const BorderSide(color: _kPrimaryGreen, width: 1.1),
+                          side: const BorderSide(
+                            color: _kPrimaryGreen,
+                            width: 1.1,
+                          ),
                         ),
                       ),
                       onPressed: () {
@@ -1279,9 +1492,14 @@ class _FilterPillRow extends StatelessWidget {
                         ChoiceChip(
                           label: Text(
                             y.toString(),
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                          selected: timeFilter == _TimeFilter.year && selectedYear == y,
+                          selected:
+                              timeFilter == _TimeFilter.year &&
+                              selectedYear == y,
                           onSelected: (_) {
                             onTimeFilterChanged(_TimeFilter.year, y, null);
                             Navigator.of(ctx).pop();
@@ -1330,13 +1548,23 @@ class _FilterPillRow extends StatelessWidget {
                                 ChoiceChip(
                                   label: Text(
                                     _shortMonthName(context, m),
-                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
-                                  selected: timeFilter == _TimeFilter.month &&
-                                      selectedMonthKey == '$y-${m.toString().padLeft(2, '0')}',
+                                  selected:
+                                      timeFilter == _TimeFilter.month &&
+                                      selectedMonthKey ==
+                                          '$y-${m.toString().padLeft(2, '0')}',
                                   onSelected: (_) {
-                                    final key = '$y-${m.toString().padLeft(2, '0')}';
-                                    onTimeFilterChanged(_TimeFilter.month, y, key);
+                                    final key =
+                                        '$y-${m.toString().padLeft(2, '0')}';
+                                    onTimeFilterChanged(
+                                      _TimeFilter.month,
+                                      y,
+                                      key,
+                                    );
                                     Navigator.of(ctx).pop();
                                   },
                                 ),
@@ -1387,8 +1615,13 @@ class _FilterPillRow extends StatelessWidget {
             final list = byYear[activeYear] ?? const <int>[];
 
             return Dialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-              insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 22,
+                vertical: 24,
+              ),
               child: Container(
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
                 decoration: BoxDecoration(
@@ -1402,7 +1635,10 @@ class _FilterPillRow extends StatelessWidget {
                       children: [
                         Text(
                           loc.t('dash_select_period'),
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                         const Spacer(),
                         IconButton(
@@ -1457,7 +1693,10 @@ class _FilterPillRow extends StatelessWidget {
                       children: [
                         Text(
                           '${loc.t('dash_weekly_view')} • $activeYear',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                         const Spacer(),
                         Text(
@@ -1491,14 +1730,19 @@ class _FilterPillRow extends StatelessWidget {
                             },
                             borderRadius: BorderRadius.circular(12),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
                               decoration: BoxDecoration(
                                 color: isSelected
                                     ? _kPrimaryGreen.withOpacity(0.10)
                                     : const Color(0xFFF7F8F8),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: isSelected ? _kPrimaryGreen : Colors.black12,
+                                  color: isSelected
+                                      ? _kPrimaryGreen
+                                      : Colors.black12,
                                   width: isSelected ? 1.2 : 1.0,
                                 ),
                               ),
@@ -1516,9 +1760,17 @@ class _FilterPillRow extends StatelessWidget {
                                   ),
                                   const Spacer(),
                                   if (isSelected)
-                                    const Icon(Icons.check_circle, size: 18, color: _kPrimaryGreen)
+                                    const Icon(
+                                      Icons.check_circle,
+                                      size: 18,
+                                      color: _kPrimaryGreen,
+                                    )
                                   else
-                                    const Icon(Icons.chevron_right, size: 18, color: Color(0xFF9CA3AF)),
+                                    const Icon(
+                                      Icons.chevron_right,
+                                      size: 18,
+                                      color: Color(0xFF9CA3AF),
+                                    ),
                                 ],
                               ),
                             ),
@@ -1569,7 +1821,6 @@ class _FilterPillRow extends StatelessWidget {
   }
 }
 
-
 // ---------- Summary strip ----------
 
 class _SummaryStrip extends StatelessWidget {
@@ -1608,8 +1859,9 @@ class _SummaryStrip extends StatelessWidget {
     const valueColorDefault = Colors.white;
     final separatorColor = Colors.white.withOpacity(0.3);
 
-    final totalScoreStr =
-        totalScore == 0 ? '—' : totalScore.toStringAsFixed(2).replaceAll('.', ',');
+    final totalScoreStr = totalScore == 0
+        ? '—'
+        : totalScore.toStringAsFixed(2).replaceAll('.', ',');
 
     Widget _cell({
       required String label,
@@ -1650,14 +1902,8 @@ class _SummaryStrip extends StatelessWidget {
     }
 
     final cells = <Widget>[
-      _cell(
-        label: loc.t('dash_rank_in_station'),
-        value: rankText,
-      ),
-      _cell(
-        label: loc.t('dash_status'),
-        value: statusText.toUpperCase(),
-      ),
+      _cell(label: loc.t('dash_rank_in_station'), value: rankText),
+      _cell(label: loc.t('dash_status'), value: statusText.toUpperCase()),
     ];
 
     return Container(
@@ -1703,11 +1949,15 @@ class _MySummaryStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context);
 
-    final scoreStr =
-        totalScore == 0 ? '—' : totalScore.toStringAsFixed(2).replaceAll('.', ',');
+    final scoreStr = totalScore == 0
+        ? '—'
+        : totalScore.toStringAsFixed(2).replaceAll('.', ',');
     final deliveredStr = delivered > 0 ? delivered.toString() : '—';
     final rankStr = (rank > 0 && totalDrivers > 0)
-        ? loc.tf('dash_rank_of_total', {'rank': '$rank', 'total': '$totalDrivers'})
+        ? loc.tf('dash_rank_of_total', {
+            'rank': '$rank',
+            'total': '$totalDrivers',
+          })
         : '—';
 
     return Container(
@@ -1792,10 +2042,7 @@ class _BestPeriodHeader extends StatelessWidget {
   final String title;
   final String subtitle;
 
-  const _BestPeriodHeader({
-    required this.title,
-    required this.subtitle,
-  });
+  const _BestPeriodHeader({required this.title, required this.subtitle});
 
   @override
   Widget build(BuildContext context) {
@@ -1859,10 +2106,13 @@ class _LeaderboardRowCard extends StatelessWidget {
 
     final bool isColored = backgroundColor != null;
     final Color textColor = isColored ? Colors.white : const Color(0xFF4B5563);
-    final Color labelColor = isColored ? Colors.white70 : const Color(0xFF9CA3AF);
+    final Color labelColor = isColored
+        ? Colors.white70
+        : const Color(0xFF9CA3AF);
     final Color pillTextColor = isColored ? Colors.white : statusColor;
-    final Color pillBgColor =
-        isColored ? Colors.white.withOpacity(0.2) : statusColor.withOpacity(0.15);
+    final Color pillBgColor = isColored
+        ? Colors.white.withOpacity(0.2)
+        : statusColor.withOpacity(0.15);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 16),
@@ -1917,7 +2167,10 @@ class _LeaderboardRowCard extends StatelessWidget {
             const SizedBox(height: 8),
             Center(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: pillBgColor,
                   borderRadius: BorderRadius.circular(999),
@@ -1999,10 +2252,7 @@ class _MonthlyEntry {
   final String transporterId;
   final double avgScore;
 
-  _MonthlyEntry({
-    required this.transporterId,
-    required this.avgScore,
-  });
+  _MonthlyEntry({required this.transporterId, required this.avgScore});
 }
 
 // ---------- My Score KPI tiles ----------
@@ -2269,20 +2519,26 @@ class _ExpandableKpiTileState extends State<_ExpandableKpiTile> {
                   Expanded(
                     child: Row(
                       children: [
-                        Expanded(child: metricColumn(loc.t('kpi_score'), scoreStr)),
+                        Expanded(
+                          child: metricColumn(loc.t('kpi_score'), scoreStr),
+                        ),
                         Container(
                           width: 1,
                           height: 28,
                           margin: const EdgeInsets.symmetric(horizontal: 12),
                           color: const Color(0xFFE5E7EB),
                         ),
-                        Expanded(child: metricColumn(loc.t('kpi_value'), valueStr)),
+                        Expanded(
+                          child: metricColumn(loc.t('kpi_value'), valueStr),
+                        ),
                       ],
                     ),
                   ),
                   const SizedBox(width: 8),
                   Icon(
-                    _expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                    _expanded
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
                     color: const Color(0xFF6B7280),
                   ),
                 ],
@@ -2297,7 +2553,9 @@ class _ExpandableKpiTileState extends State<_ExpandableKpiTile> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: const BoxDecoration(
                 color: Color(0xFFF7F7F7),
-                borderRadius: BorderRadius.vertical(bottom: Radius.circular(15)),
+                borderRadius: BorderRadius.vertical(
+                  bottom: Radius.circular(15),
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -2513,10 +2771,12 @@ class _PodStatPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color bg =
-        tone == _PodTone.good ? const Color(0xFFDCFCE7) : const Color(0xFFFFEDD5);
-    final Color fg =
-        tone == _PodTone.good ? const Color(0xFF15803D) : const Color(0xFF9A3412);
+    final Color bg = tone == _PodTone.good
+        ? const Color(0xFFDCFCE7)
+        : const Color(0xFFFFEDD5);
+    final Color fg = tone == _PodTone.good
+        ? const Color(0xFF15803D)
+        : const Color(0xFF9A3412);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),

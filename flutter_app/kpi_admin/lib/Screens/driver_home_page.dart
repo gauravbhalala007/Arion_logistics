@@ -1,55 +1,82 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../localization/app_localizations.dart';
 
 const double _kTopCardHeight = 142;
 
 class DriverHomePage extends StatelessWidget {
+  final String dspUid;
   final int pendingTasksCount;
+  final int unconfirmedRulesCount;
   final VoidCallback onOpenScorecard;
   final VoidCallback onOpenAcademy;
   final VoidCallback onOpenTasks;
   final VoidCallback onOpenRules;
+  final VoidCallback onOpenShiftPlan;
+  final VoidCallback onOpenAbsence;
+  final VoidCallback onOpenIncidentReport;
   final VoidCallback onOpenComingSoon;
 
   const DriverHomePage({
     super.key,
+    required this.dspUid,
     required this.pendingTasksCount,
+    required this.unconfirmedRulesCount,
     required this.onOpenScorecard,
     required this.onOpenAcademy,
     required this.onOpenTasks,
     required this.onOpenRules,
+    required this.onOpenShiftPlan,
+    required this.onOpenAbsence,
+    required this.onOpenIncidentReport,
     required this.onOpenComingSoon,
   });
 
   @override
   Widget build(BuildContext context) {
     return _DriverHomePageBody(
+      dspUid: dspUid,
       pendingTasks: pendingTasksCount,
+      unconfirmedRules: unconfirmedRulesCount,
       onOpenScorecard: onOpenScorecard,
       onOpenAcademy: onOpenAcademy,
       onOpenTasks: onOpenTasks,
       onOpenRules: onOpenRules,
+      onOpenShiftPlan: onOpenShiftPlan,
+      onOpenAbsence: onOpenAbsence,
+      onOpenIncidentReport: onOpenIncidentReport,
       onOpenComingSoon: onOpenComingSoon,
     );
   }
 }
 
 class _DriverHomePageBody extends StatefulWidget {
+  final String dspUid;
   final int pendingTasks;
+  final int unconfirmedRules;
   final VoidCallback onOpenScorecard;
   final VoidCallback onOpenAcademy;
   final VoidCallback onOpenTasks;
   final VoidCallback onOpenRules;
+  final VoidCallback onOpenShiftPlan;
+  final VoidCallback onOpenAbsence;
+  final VoidCallback onOpenIncidentReport;
   final VoidCallback onOpenComingSoon;
 
   const _DriverHomePageBody({
+    required this.dspUid,
     required this.pendingTasks,
+    required this.unconfirmedRules,
     required this.onOpenScorecard,
     required this.onOpenAcademy,
     required this.onOpenTasks,
     required this.onOpenRules,
+    required this.onOpenShiftPlan,
+    required this.onOpenAbsence,
+    required this.onOpenIncidentReport,
     required this.onOpenComingSoon,
   });
 
@@ -58,7 +85,8 @@ class _DriverHomePageBody extends StatefulWidget {
 }
 
 class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
-  static const _dispatcherNames = ['ISRAFIL', 'HALIM', 'ANES'];
+  static const _settingsCollection = 'settings';
+  static const _dispatcherPillDoc = 'dispatcher_pill';
   int _selectedDispatcher = 0;
 
   @override
@@ -67,6 +95,14 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
     final now = DateTime.now();
     final dateLabel =
         '${now.day.toString().padLeft(2, '0')}.${now.month.toString().padLeft(2, '0')}.${(now.year % 100).toString().padLeft(2, '0')}';
+    final dispatcherDocStream = widget.dspUid.trim().isEmpty
+        ? null
+        : FirebaseFirestore.instance
+              .collection('users')
+              .doc(widget.dspUid)
+              .collection(_settingsCollection)
+              .doc(_dispatcherPillDoc)
+              .snapshots();
 
     final cards = <_HomeCardData>[
       _HomeCardData(
@@ -90,7 +126,7 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
         onTap: widget.onOpenTasks,
       ),
       _HomeCardData(
-        title: 'DA Academy',
+        title: t.t('driver_academy_title'),
         subtitle: t.t('driver_home_academy_subtitle'),
         icon: Icons.school_outlined,
         iconColor: const Color(0xFF3E82F7),
@@ -103,7 +139,9 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
         icon: Icons.gavel_outlined,
         iconColor: const Color(0xFF3E82F7),
         iconBackground: const Color(0xFFE9F1FE),
-        badgeText: widget.pendingTasks > 0 ? '${widget.pendingTasks}' : null,
+        badgeText: widget.unconfirmedRules > 0
+            ? '${widget.unconfirmedRules}'
+            : null,
         badgeColor: const Color(0xFFFF4B4B),
         onTap: widget.onOpenRules,
       ),
@@ -133,7 +171,7 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
         iconColor: const Color(0xFFFF7A18),
         iconBackground: const Color(0xFFFFF0E4),
         borderColor: const Color(0xFFFF8A1F),
-        onTap: widget.onOpenComingSoon,
+        onTap: widget.onOpenAbsence,
       ),
       _HomeCardData(
         title: t.t('driver_home_incident_title'),
@@ -142,7 +180,7 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
         iconColor: const Color(0xFFFF7A18),
         iconBackground: const Color(0xFFFFF0E4),
         borderColor: const Color(0xFFFF8A1F),
-        onTap: widget.onOpenComingSoon,
+        onTap: widget.onOpenIncidentReport,
       ),
     ];
 
@@ -154,12 +192,37 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
           Row(
             children: [
               Expanded(
-                child: _DispatcherCard(
-                  dateLabel: dateLabel,
-                  selectedIndex: _selectedDispatcher,
-                  dispatcherNames: _dispatcherNames,
-                  onSelect: (idx) {
-                    setState(() => _selectedDispatcher = idx);
+                child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                  stream: dispatcherDocStream,
+                  builder: (context, snap) {
+                    final dispatchers = _parseDispatchers(snap.data?.data());
+                    if (dispatchers.isEmpty) {
+                      return const SizedBox.shrink();
+                    }
+                    if (_selectedDispatcher >= dispatchers.length &&
+                        dispatchers.isNotEmpty) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (!mounted) return;
+                        setState(() => _selectedDispatcher = 0);
+                      });
+                    }
+
+                    final safeIndex = _selectedDispatcher.clamp(
+                      0,
+                      dispatchers.length - 1,
+                    );
+                    return _DispatcherCard(
+                      dateLabel: dateLabel,
+                      selectedIndex: safeIndex,
+                      dispatchers: dispatchers,
+                      onSelect: (idx) {
+                        setState(() => _selectedDispatcher = idx);
+                      },
+                      onCallTap: () =>
+                          _callNumber(dispatchers[safeIndex].phone),
+                      onWhatsAppTap: () =>
+                          _openWhatsApp(dispatchers[safeIndex]),
+                    );
                   },
                 ),
               ),
@@ -169,7 +232,7 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
                   title: t.t('driver_home_shift_plan_title'),
                   subtitle: t.t('driver_home_shift_plan_subtitle'),
                   icon: Icons.calendar_today_rounded,
-                  onTap: widget.onOpenComingSoon,
+                  onTap: widget.onOpenShiftPlan,
                 ),
               ),
             ],
@@ -197,25 +260,175 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
       ),
     );
   }
+
+  List<_DispatcherContact> _parseDispatchers(Map<String, dynamic>? data) {
+    final fallback = <_DispatcherContact>[
+      const _DispatcherContact(
+        name: 'ISRAFIL',
+        startTime: '06:00',
+        endTime: '13:00',
+      ),
+      const _DispatcherContact(
+        name: 'HALIM',
+        startTime: '13:00',
+        endTime: '20:00',
+      ),
+      const _DispatcherContact(
+        name: 'ANES',
+        startTime: '20:00',
+        endTime: '03:00',
+      ),
+    ];
+
+    final raw = data?['dispatchers'];
+    if (raw is! List) return fallback;
+
+    final out = <_DispatcherContact>[];
+    for (final row in raw) {
+      if (row is! Map) continue;
+      final map = row.cast<String, dynamic>();
+      if (map['isActive'] == false) continue;
+      final name = _firstNonEmpty([
+        _stringOf(map['name']),
+        _stringOf(map['label']),
+        _stringOf(map['title']),
+      ]);
+      if (name.isEmpty) continue;
+
+      out.add(
+        _DispatcherContact(
+          name: name,
+          startTime: _firstNonEmpty([
+            _stringOf(map['startTime']),
+            _stringOf(map['shiftStart']),
+          ]),
+          endTime: _firstNonEmpty([
+            _stringOf(map['endTime']),
+            _stringOf(map['shiftEnd']),
+          ]),
+          phone: _stringOf(map['phone']),
+          whatsapp: _firstNonEmpty([
+            _stringOf(map['whatsapp']),
+            _stringOf(map['whatsApp']),
+            _stringOf(map['wa']),
+          ]),
+          whatsappLink: _firstNonEmpty([
+            _stringOf(map['whatsappLink']),
+            _stringOf(map['whatsappUrl']),
+            _stringOf(map['waLink']),
+          ]),
+        ),
+      );
+    }
+
+    return out.isEmpty ? fallback : out;
+  }
+
+  Future<void> _callNumber(String rawNumber) async {
+    final number = rawNumber.trim();
+    if (number.isEmpty) {
+      _showSnack('No phone number configured for this dispatcher.');
+      return;
+    }
+    final uri = Uri(scheme: 'tel', path: number);
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!mounted) return;
+    if (!opened) {
+      _showSnack('Could not open dialer.');
+    }
+  }
+
+  Future<void> _openWhatsApp(_DispatcherContact contact) async {
+    final linkRaw = contact.whatsappLink.trim();
+    Uri? uri;
+
+    if (linkRaw.isNotEmpty) {
+      final parsed = Uri.tryParse(linkRaw);
+      if (parsed != null) {
+        if (parsed.hasScheme) {
+          uri = parsed;
+        } else {
+          uri = Uri.tryParse('https://$linkRaw');
+        }
+      }
+    }
+
+    if (uri == null) {
+      final rawNumber = contact.whatsappOrPhone;
+      final looksLikeLink =
+          rawNumber.contains('://') ||
+          rawNumber.startsWith('wa.me/') ||
+          rawNumber.startsWith('www.');
+      if (looksLikeLink) {
+        final parsed = Uri.tryParse(rawNumber);
+        if (parsed != null) {
+          uri = parsed.hasScheme ? parsed : Uri.tryParse('https://$rawNumber');
+        }
+      }
+    }
+
+    if (uri == null) {
+      final rawNumber = contact.whatsappOrPhone;
+      final number = rawNumber.replaceAll(RegExp(r'[^0-9]'), '');
+      if (number.isEmpty) {
+        _showSnack(
+          'No WhatsApp link or number configured for this dispatcher.',
+        );
+        return;
+      }
+      uri = Uri.parse('https://wa.me/$number');
+    }
+
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!mounted) return;
+    if (!opened) {
+      _showSnack('Could not open WhatsApp.');
+    }
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    messenger?.showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  static String _stringOf(dynamic value) => value?.toString().trim() ?? '';
+
+  static String _firstNonEmpty(List<String> values) {
+    for (final raw in values) {
+      final v = raw.trim();
+      if (v.isNotEmpty) return v;
+    }
+    return '';
+  }
 }
 
 class _DispatcherCard extends StatelessWidget {
   final String dateLabel;
   final int selectedIndex;
-  final List<String> dispatcherNames;
+  final List<_DispatcherContact> dispatchers;
   final ValueChanged<int> onSelect;
+  final VoidCallback onCallTap;
+  final VoidCallback onWhatsAppTap;
 
   const _DispatcherCard({
     required this.dateLabel,
     required this.selectedIndex,
-    required this.dispatcherNames,
+    required this.dispatchers,
     required this.onSelect,
+    required this.onCallTap,
+    required this.onWhatsAppTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    final selectedName = dispatcherNames[selectedIndex];
+    if (dispatchers.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final safeIndex = selectedIndex.clamp(0, dispatchers.length - 1);
+    final selected = dispatchers[safeIndex];
+    final selectedName = selected.name;
 
     return Container(
       height: _kTopCardHeight,
@@ -240,10 +453,10 @@ class _DispatcherCard extends StatelessWidget {
               borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
             ),
             child: Row(
-              children: List.generate(dispatcherNames.length, (i) {
-                final active = i == selectedIndex;
+              children: List.generate(dispatchers.length, (i) {
+                final active = i == safeIndex;
                 final isFirst = i == 0;
-                final isLast = i == dispatcherNames.length - 1;
+                final isLast = i == dispatchers.length - 1;
                 final itemRadius = BorderRadius.only(
                   topLeft: isFirst ? const Radius.circular(14) : Radius.zero,
                   topRight: isLast ? const Radius.circular(14) : Radius.zero,
@@ -261,7 +474,7 @@ class _DispatcherCard extends StatelessWidget {
                         borderRadius: active ? itemRadius : null,
                       ),
                       child: Text(
-                        dispatcherNames[i],
+                        dispatchers[i].name.toUpperCase(),
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 12,
@@ -298,7 +511,7 @@ class _DispatcherCard extends StatelessWidget {
                         Row(
                           children: [
                             Text(
-                              '${selectedName[0]}${selectedName.substring(1).toLowerCase()}',
+                              selectedName,
                               style: const TextStyle(
                                 fontSize: 30 / 2,
                                 fontWeight: FontWeight.w800,
@@ -317,8 +530,8 @@ class _DispatcherCard extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: 3),
-                        const Text(
-                          '6:00 - 13:00',
+                        Text(
+                          selected.timeRange,
                           style: TextStyle(
                             fontSize: 28 / 2,
                             fontWeight: FontWeight.w800,
@@ -338,12 +551,17 @@ class _DispatcherCard extends StatelessWidget {
                   ),
                   Column(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      _RoundActionIcon(icon: Icons.call, bg: Color(0xFF38B888)),
+                    children: [
+                      _RoundActionIcon(
+                        icon: Icons.call,
+                        bg: const Color(0xFF38B888),
+                        onTap: onCallTap,
+                      ),
                       SizedBox(height: 6),
                       _RoundActionIcon(
-                        icon: Icons.chat_bubble_outline_rounded,
-                        bg: Color(0xFF24C269),
+                        iconAsset: 'assets/icons/whatsapp.svg',
+                        bg: const Color(0xFF24C269),
+                        onTap: onWhatsAppTap,
                       ),
                     ],
                   ),
@@ -597,18 +815,77 @@ class _HomeFeatureCard extends StatelessWidget {
 }
 
 class _RoundActionIcon extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
+  final String? iconAsset;
   final Color bg;
+  final VoidCallback? onTap;
 
-  const _RoundActionIcon({required this.icon, required this.bg});
+  const _RoundActionIcon({
+    this.icon,
+    this.iconAsset,
+    required this.bg,
+    this.onTap,
+  }) : assert(icon != null || iconAsset != null);
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 36,
-      height: 36,
-      decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
-      child: Icon(icon, color: Colors.white, size: 18),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+          child: iconAsset != null
+              ? Center(
+                  child: SvgPicture.asset(
+                    iconAsset!,
+                    width: 18,
+                    height: 18,
+                    colorFilter: const ColorFilter.mode(
+                      Colors.white,
+                      BlendMode.srcIn,
+                    ),
+                  ),
+                )
+              : Icon(icon, color: Colors.white, size: 18),
+        ),
+      ),
     );
+  }
+}
+
+class _DispatcherContact {
+  final String name;
+  final String startTime;
+  final String endTime;
+  final String phone;
+  final String whatsapp;
+  final String whatsappLink;
+
+  const _DispatcherContact({
+    required this.name,
+    required this.startTime,
+    required this.endTime,
+    this.phone = '',
+    this.whatsapp = '',
+    this.whatsappLink = '',
+  });
+
+  String get timeRange {
+    final s = startTime.trim();
+    final e = endTime.trim();
+    if (s.isEmpty && e.isEmpty) return '--';
+    if (s.isEmpty) return e;
+    if (e.isEmpty) return s;
+    return '$s - $e';
+  }
+
+  String get whatsappOrPhone {
+    final wa = whatsapp.trim();
+    if (wa.isNotEmpty) return wa;
+    return phone;
   }
 }

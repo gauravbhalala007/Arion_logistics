@@ -34,6 +34,19 @@ service cloud.firestore {
       return isDriver() && me().data.dspUid == userId;
     }
 
+    // Fallback for legacy driver accounts that rely on custom claims.
+    function isDriverOfByToken(userId) {
+      return signedIn()
+        && request.auth.token.role == 'driver'
+        && request.auth.token.dspUid == userId;
+    }
+
+    function driverTransporterMatches(driverId) {
+      return (isDriver() && me().data.transporterId == driverId)
+        || (signedIn() && request.auth.token.role == 'driver'
+          && request.auth.token.transporterId == driverId);
+    }
+
     match /users/{userId} {
     
     	// ---------- admin notifications ----------
@@ -103,6 +116,61 @@ service cloud.firestore {
         allow read: if isDriverOf(userId) && isApproved(userId);
       }
 
+      // users/{userId}/settings/{settingId}
+      match /settings/{settingId} {
+        // DSP/admin full access for own account
+        allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
+
+        // Drivers of this DSP can read settings (e.g. dispatcher pill, resources)
+        allow read: if (isDriverOf(userId) || isDriverOfByToken(userId))
+          && isApproved(userId);
+      }
+
+      // ---------- DA Academy Tests ----------
+      // users/{userId}/academy_tests/{testId}
+      match /academy_tests/{testId} {
+        // DSP/admin full access for own account
+        allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
+
+        // Drivers of this DSP can read test metadata
+        allow read: if (isDriverOf(userId) || isDriverOfByToken(userId))
+          && isApproved(userId);
+
+        // users/{userId}/academy_tests/{testId}/questions/{questionId}
+        match /questions/{questionId} {
+          // DSP/admin full access for own account
+          allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
+
+          // Drivers of this DSP can read test questions
+          allow read: if (isDriverOf(userId) || isDriverOfByToken(userId))
+            && isApproved(userId);
+        }
+      }
+
+      // ---------- DA Academy Results ----------
+      // users/{userId}/academy_test_results/{testId}/drivers/{driverId}
+      match /academy_test_results/{testId} {
+        // DSP/admin can manage and read aggregate result trees
+        allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
+
+        match /drivers/{driverId} {
+          // DSP/admin full access for own account
+          allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
+
+          // Driver can read only own result doc
+          allow read: if (isDriverOf(userId) || isDriverOfByToken(userId))
+            && isApproved(userId)
+            && driverTransporterMatches(driverId);
+
+          // Driver can create/update only own result doc
+          allow create, update: if (isDriverOf(userId) || isDriverOfByToken(userId))
+            && isApproved(userId)
+            && driverTransporterMatches(driverId)
+            && request.resource.data.driverTransporterId == driverId
+            && request.resource.data.testId == testId;
+        }
+      }
+
       // ---------- driver master data ----------
       // users/{userId}/drivers/{driverId}   (driverId == TransporterID)
       match /drivers/{driverId} {
@@ -118,6 +186,25 @@ service cloud.firestore {
           // Driver can read + update (mark read / confirm)
           allow read, update: if isDriverOf(userId)
             && me().data.transporterId == driverId;
+        }
+
+        // ---------- driver academy tests ----------
+        // users/{userId}/drivers/{driverId}/academy_tests/{testId}
+        match /academy_tests/{testId} {
+          // DSP/admin can publish/sync academy tests to driver docs
+          allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
+
+          // Driver can read own assigned test doc
+          allow read: if (isDriverOf(userId) || isDriverOfByToken(userId))
+            && isApproved(userId)
+            && driverTransporterMatches(driverId);
+
+          // Driver can submit own test attempts
+          allow create, update: if (isDriverOf(userId) || isDriverOfByToken(userId))
+            && isApproved(userId)
+            && driverTransporterMatches(driverId)
+            && request.resource.data.driverTransporterId == driverId
+            && request.resource.data.testId == testId;
         }
 
 

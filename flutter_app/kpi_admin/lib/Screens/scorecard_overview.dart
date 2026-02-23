@@ -286,8 +286,21 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
         });
   }
 
-  String _statusCodeFromScore(double v) {
-    if (v >= 93) return 'FANTASTIC_PLUS';
+  bool _isWeek10PolicyActive({int? year, int? weekNumber}) {
+    if (year == null) return false;
+    if (year > 2026) return true;
+    if (year < 2026) return false;
+    return (weekNumber ?? 0) >= 9;
+  }
+
+  double _fantasticPlusCutoff({int? year, int? weekNumber}) {
+    return _isWeek10PolicyActive(year: year, weekNumber: weekNumber) ? 88 : 93;
+  }
+
+  String _statusCodeFromScore(double v, {int? year, int? weekNumber}) {
+    if (v >= _fantasticPlusCutoff(year: year, weekNumber: weekNumber)) {
+      return 'FANTASTIC_PLUS';
+    }
     if (v >= 85) return 'FANTASTIC';
     if (v >= 70) return 'GREAT';
     if (v >= 50) return 'FAIR';
@@ -383,6 +396,12 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
     for (final r in periodReports) {
       stationByReportPath[r.ref.path] = _s(r.stationCode).toUpperCase();
     }
+    final int? statusPolicyYear = periodReports.isNotEmpty
+        ? periodReports.first.year
+        : null;
+    final int? statusPolicyWeek = periodReports.isNotEmpty
+        ? periodReports.first.week
+        : null;
 
     final stationOptions =
         stationByReportPath.values.where((s) => s.isNotEmpty).toSet().toList()
@@ -549,6 +568,8 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                           stationAgg[station] ?? const <String, _DriverAgg>{},
                           names,
                           t,
+                          statusPolicyYear: statusPolicyYear,
+                          statusPolicyWeek: statusPolicyWeek,
                         ),
                       ],
                   ],
@@ -564,8 +585,10 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
   Widget _buildStationDriverList(
     Map<String, _DriverAgg> aggMap,
     Map<String, String> names,
-    AppLocalizations t,
-  ) {
+    AppLocalizations t, {
+    int? statusPolicyYear,
+    int? statusPolicyWeek,
+  }) {
     final entries = <_DriverEntry>[];
     aggMap.forEach((tid, agg) {
       if (agg.count == 0) return;
@@ -585,7 +608,11 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
         final name = _s(names[e.transporterId]).isNotEmpty
             ? _s(names[e.transporterId])
             : t.t('dash_no_name');
-        final bucket = _statusCodeFromScore(e.avgScore);
+        final bucket = _statusCodeFromScore(
+          e.avgScore,
+          year: statusPolicyYear,
+          weekNumber: statusPolicyWeek,
+        );
         final statusText = _prettyStatus(bucket, t);
         final statusColor = _statusColorFromCode(bucket);
         return _BestDriverRow(

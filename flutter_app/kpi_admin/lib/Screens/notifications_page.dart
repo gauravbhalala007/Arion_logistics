@@ -6,6 +6,42 @@ import 'package:cloud_functions/cloud_functions.dart';
 
 import '../localization/app_localizations.dart';
 
+bool _isDriverWorking(Map<String, dynamic> driverData) {
+  bool? parseBoolish(dynamic raw) {
+    if (raw is bool) return raw;
+    if (raw is num) return raw != 0;
+    if (raw is String) {
+      final v = raw.trim().toLowerCase();
+      if (v == 'false' || v == '0' || v == 'off' || v == 'inactive') {
+        return false;
+      }
+      if (v == 'true' || v == '1' || v == 'on' || v == 'active') {
+        return true;
+      }
+    }
+    return null;
+  }
+
+  final active = parseBoolish(driverData['active']);
+  final working = parseBoolish(driverData['working']);
+  final isWorking = parseBoolish(driverData['isWorking']);
+
+  if (active == false || working == false || isWorking == false) {
+    return false;
+  }
+
+  final status = (driverData['status'] ?? '').toString().trim().toLowerCase();
+  if (status == 'off' || status == 'inactive' || status == 'suspended') {
+    return false;
+  }
+
+  if (active == true || working == true || isWorking == true) {
+    return true;
+  }
+
+  return true; // Backward compatible default
+}
+
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
 
@@ -135,8 +171,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
           .doc(dspUid)
           .collection('drivers')
           .get();
-
       final missing = <String>[];
+      var total = 0;
 
       for (final d in driversSnap.docs) {
         final driverData = d.data();
@@ -155,6 +191,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
             .doc(notificationId)
             .get();
 
+        if (!notifSnap.exists) {
+          continue; // Not part of this notification target set
+        }
+
+        total += 1;
         final status = (notifSnap.data()?['status'] ?? 'unread').toString();
 
         if (status != 'confirmed') {
@@ -162,7 +203,6 @@ class _NotificationsPageState extends State<NotificationsPage> {
         }
       }
 
-      final total = driversSnap.docs.length;
       return {
         'missing': missing,
         'total': total,
@@ -750,9 +790,15 @@ class _HistoryCard extends StatelessWidget {
                         .doc(dspUid)
                         .collection('drivers')
                         .snapshots()
-                        .map((s) => s.docs.length),
+                        .map(
+                          (s) => s.docs
+                              .where((d) => _isDriverWorking(d.data()))
+                              .length,
+                        ),
                     builder: (ctx, driverSnap) {
-                      final currentDriverCount = driverSnap.data ?? 0;
+                      final currentDriverCount = driverSnap.hasData
+                          ? (driverSnap.data ?? 0)
+                          : -1;
                       return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                         stream: FirebaseFirestore.instance
                             .collection('users')
@@ -990,7 +1036,9 @@ class _HistoryTile extends StatelessWidget {
       final now = FieldValue.serverTimestamp();
 
       final driversSnap = await dspRef.collection('drivers').get();
-      final drivers = driversSnap.docs;
+      final drivers = driversSnap.docs
+          .where((d) => _isDriverWorking(d.data()))
+          .toList(growable: false);
 
       await adminNotifRef.set({
         'title': newTitle,
@@ -1114,7 +1162,7 @@ class _HistoryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final total = currentDriverCount > 0 ? currentDriverCount : targetCount;
+    final total = targetCount > 0 ? targetCount : currentDriverCount;
     final safeTotal = total <= 0 ? 0 : total;
     final safeConfirmed = safeTotal <= 0
         ? 0

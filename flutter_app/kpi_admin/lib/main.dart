@@ -99,6 +99,13 @@ class App extends StatelessWidget {
                 const AdminShellPage(initialNav: AppNav.podQuality),
             '/drivers': (_) => const AdminShellPage(initialNav: AppNav.drivers),
             '/tasks': (_) => const AdminShellPage(initialNav: AppNav.tasks),
+            '/shift-absence': (_) =>
+                const AdminShellPage(initialNav: AppNav.shiftAbsence),
+            '/incident-reports': (_) =>
+                const AdminShellPage(initialNav: AppNav.incidentReports),
+            '/academy': (_) => const AdminShellPage(initialNav: AppNav.academy),
+            '/dispatcher-pill': (_) =>
+                const AdminShellPage(initialNav: AppNav.dispatcherPill),
             '/notifications': (_) =>
                 const AdminShellPage(initialNav: AppNav.notifications),
             '/faqs': (_) => const AdminShellPage(initialNav: AppNav.faqs),

@@ -10,9 +10,12 @@ import 'scorecard_overview.dart';
 import 'pod_quality_overview.dart';
 import 'drivers_hub_page.dart';
 import 'task_sheet_page.dart';
+import 'admin_incident_reports_page.dart';
 import 'notifications_page.dart';
 import 'admin_approvals_page.dart';
 import 'admin_faq_page.dart';
+import 'admin_academy_page.dart';
+import 'admin_dispatcher_pill_page.dart';
 import 'dsp_profile_page.dart';
 
 class AdminShellPage extends StatefulWidget {
@@ -54,6 +57,10 @@ class _AdminShellPageState extends State<AdminShellPage> {
           PodQualityOverviewPage(),
           DriversHubPage(),
           TaskSheetPage(),
+          _AdminComingSoonPanel(title: 'Shift & Absence'),
+          AdminIncidentReportsPage(),
+          AdminAcademyPage(),
+          AdminDispatcherPillPage(),
           NotificationsPage(),
           AdminFaqPage(),
           AdminApprovalsPage(),
@@ -75,16 +82,57 @@ class _AdminShellPageState extends State<AdminShellPage> {
         return 3;
       case AppNav.tasks:
         return 4;
-      case AppNav.notifications:
+      case AppNav.shiftAbsence:
         return 5;
-      case AppNav.faqs:
+      case AppNav.incidentReports:
         return 6;
-      case AppNav.adminApprovals:
+      case AppNav.academy:
         return 7;
-      case AppNav.profile:
+      case AppNav.dispatcherPill:
         return 8;
+      case AppNav.notifications:
+        return 9;
+      case AppNav.faqs:
+        return 10;
+      case AppNav.adminApprovals:
+        return 11;
+      case AppNav.profile:
+        return 12;
       default:
         return 0;
     }
+  }
+}
+
+class _AdminComingSoonPanel extends StatelessWidget {
+  final String title;
+  const _AdminComingSoonPanel({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF111827),
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Coming Soon',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF6B7280),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

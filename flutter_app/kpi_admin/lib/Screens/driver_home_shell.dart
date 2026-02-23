@@ -19,6 +19,7 @@ import '../localization/app_localizations.dart';
 import '../models/driver_notification.dart';
 import 'driver_academy_page.dart';
 import 'driver_green_book_page.dart';
+import 'driver_green_book_test_page.dart';
 import 'driver_onboarding_page.dart';
 import 'driver_dashboard_page.dart' show DashboardTabBody;
 import 'driver_home_page.dart';
@@ -30,6 +31,7 @@ import 'driver_tasks_view.dart';
 import '../widgets/notification_pin_dialogs.dart';
 import 'driver_profile_page.dart';
 import 'driver_faq_page.dart';
+import 'driver_incident_report_page.dart';
 
 // same colors as in dashboard
 const _kBg = Color(0xFFF3F6F7);
@@ -53,6 +55,10 @@ enum DriverView {
   home,
   academy,
   greenBook,
+  greenBookTest,
+  shiftPlan,
+  absence,
+  incidentReport,
   comingSoon,
   dashboard,
   faq,
@@ -84,6 +90,7 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
   DriverView _view = DriverView.home;
   DriverNotification? _selectedNotification;
   int _unreadCount = 0;
+  int _unconfirmedRulesCount = 0;
   int _pendingTasksCount = 0;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _notifSub;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _tasksSub;
@@ -110,6 +117,10 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
   void initState() {
     super.initState();
     _startCountSubscriptions();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _ensurePinOnLogin();
+    });
   }
 
   @override
@@ -125,10 +136,19 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
       final unreadCount = notifications
           .where((n) => n.requiresConfirmation && !n.confirmed)
           .length;
+      final unconfirmedRulesCount = notifications
+          .where(
+            (n) =>
+                n.type == DriverNotificationType.rule &&
+                n.requiresConfirmation &&
+                !n.confirmed,
+          )
+          .length;
 
       if (!mounted) return;
       setState(() {
         _unreadCount = unreadCount;
+        _unconfirmedRulesCount = unconfirmedRulesCount;
       });
     }, onError: (_) {});
 
@@ -270,10 +290,6 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
       );
     }
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _ensurePinOnLogin();
-    });
-
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance
           .collection('users')
@@ -346,6 +362,7 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
               child: _DriverBottomNav(
                 index: _tabIndex,
                 pendingTasksCount: _pendingTasksCount,
+                unconfirmedRulesCount: _unconfirmedRulesCount,
                 onTap: (i) {
                   setState(() {
                     _tabIndex = i;
@@ -377,7 +394,9 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
     switch (_view) {
       case DriverView.home:
         return DriverHomePage(
+          dspUid: widget.dspUid,
           pendingTasksCount: _pendingTasksCount,
+          unconfirmedRulesCount: _unconfirmedRulesCount,
           onOpenScorecard: () {
             setState(() {
               _tabIndex = 1;
@@ -400,6 +419,24 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
             setState(() {
               _tabIndex = 4;
               _view = DriverView.rules;
+            });
+          },
+          onOpenShiftPlan: () {
+            setState(() {
+              _tabIndex = 0;
+              _view = DriverView.comingSoon;
+            });
+          },
+          onOpenAbsence: () {
+            setState(() {
+              _tabIndex = 0;
+              _view = DriverView.comingSoon;
+            });
+          },
+          onOpenIncidentReport: () {
+            setState(() {
+              _tabIndex = 0;
+              _view = DriverView.incidentReport;
             });
           },
           onOpenComingSoon: () {
@@ -456,7 +493,56 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
           onStartTest: () {
             setState(() {
               _tabIndex = 0;
-              _view = DriverView.comingSoon;
+              _view = DriverView.greenBookTest;
+            });
+          },
+        );
+
+      case DriverView.greenBookTest:
+        return DriverGreenBookTestPage(
+          dspUid: widget.dspUid,
+          driverTransporterId: widget.driverTransporterId,
+          testId: 'green_book',
+          onBack: () {
+            setState(() {
+              _tabIndex = 0;
+              _view = DriverView.greenBook;
+            });
+          },
+        );
+
+      case DriverView.shiftPlan:
+        return Center(
+          child: Text(
+            loc.t('coming_soon'),
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF6B7280),
+            ),
+          ),
+        );
+
+      case DriverView.absence:
+        return Center(
+          child: Text(
+            loc.t('coming_soon'),
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF6B7280),
+            ),
+          ),
+        );
+
+      case DriverView.incidentReport:
+        return DriverIncidentReportPage(
+          dspUid: widget.dspUid,
+          driverTransporterId: widget.driverTransporterId,
+          onBack: () {
+            setState(() {
+              _tabIndex = 0;
+              _view = DriverView.home;
             });
           },
         );
@@ -634,6 +720,34 @@ class _HeaderBar extends StatelessWidget {
       default:
         return code;
     }
+  }
+
+  String _headerGreeting(AppLocalizations loc) {
+    final hour = DateTime.now().hour;
+    if (hour >= 5 && hour < 12) return loc.t('header_good_morning');
+    if (hour >= 12 && hour < 18) return loc.t('header_good_afternoon');
+    return loc.t('header_good_evening');
+  }
+
+  Widget _greetingLabel(AppLocalizations loc) {
+    return StreamBuilder<DateTime>(
+      stream: Stream<DateTime>.periodic(
+        const Duration(minutes: 1),
+        (_) => DateTime.now(),
+      ),
+      initialData: DateTime.now(),
+      builder: (context, _) {
+        return Text(
+          _headerGreeting(loc),
+          style: const TextStyle(
+            fontSize: 12,
+            letterSpacing: 2.0,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF9FA4AF),
+          ),
+        );
+      },
+    );
   }
 
   // round white icon container (for flag + bell)
@@ -850,7 +964,10 @@ class _HeaderBar extends StatelessWidget {
     );
 
     if (selectedCode != null && selectedCode != currentCode) {
-      localeController.setLocale(Locale(selectedCode));
+      // Apply locale after the sheet fully closes to avoid web view churn.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        localeController.setLocale(Locale(selectedCode));
+      });
 
       // persist on user document
       final user = FirebaseAuth.instance.currentUser;
@@ -1024,15 +1141,7 @@ class _HeaderBar extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                loc.t('header_good_morning'),
-                style: const TextStyle(
-                  fontSize: 12,
-                  letterSpacing: 2.0,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF9FA4AF),
-                ),
-              ),
+              _greetingLabel(loc),
               const SizedBox(height: 2),
               Text(
                 driverName.toUpperCase(),
@@ -1078,11 +1187,13 @@ class _HeaderBar extends StatelessWidget {
 class _DriverBottomNav extends StatelessWidget {
   final int index;
   final int pendingTasksCount;
+  final int unconfirmedRulesCount;
   final ValueChanged<int> onTap;
 
   const _DriverBottomNav({
     required this.index,
     required this.pendingTasksCount,
+    required this.unconfirmedRulesCount,
     required this.onTap,
   });
 
@@ -1213,6 +1324,7 @@ class _DriverBottomNav extends StatelessWidget {
                   Icon(Icons.gavel_outlined, size: 28, color: color),
               label: loc.t('nav_rules'),
               i: 4,
+              badgeCount: unconfirmedRulesCount,
             ),
           ),
         ],

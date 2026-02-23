@@ -41,19 +41,12 @@ class DriverGreenBookPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final langCode = Localizations.localeOf(context).languageCode;
-    final resourcesStream = dspUid.isEmpty
-        ? const Stream<DocumentSnapshot<Map<String, dynamic>>>.empty()
-        : FirebaseFirestore.instance
-              .collection('users')
-              .doc(dspUid)
-              .collection(_settingsCollection)
-              .doc(_faqResourcesDoc)
-              .snapshots();
+    final resourcesFuture = _loadResources();
 
-    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: resourcesStream,
+    return FutureBuilder<Map<String, dynamic>>(
+      future: resourcesFuture,
       builder: (context, snap) {
-        final resources = snap.data?.data() ?? const <String, dynamic>{};
+        final resources = snap.data ?? const <String, dynamic>{};
         final videoUrl = _resolveGreenBookVideoUrl(resources, langCode);
 
         return SingleChildScrollView(
@@ -154,6 +147,27 @@ class DriverGreenBookPage extends StatelessWidget {
         );
       },
     );
+  }
+
+  Future<Map<String, dynamic>> _loadResources() async {
+    if (dspUid.trim().isEmpty) return const <String, dynamic>{};
+
+    final ref = FirebaseFirestore.instance
+        .collection('users')
+        .doc(dspUid)
+        .collection(_settingsCollection)
+        .doc(_faqResourcesDoc);
+    try {
+      final serverSnap = await ref.get(const GetOptions(source: Source.server));
+      return serverSnap.data() ?? const <String, dynamic>{};
+    } catch (_) {
+      try {
+        final cacheSnap = await ref.get();
+        return cacheSnap.data() ?? const <String, dynamic>{};
+      } catch (_) {
+        return const <String, dynamic>{};
+      }
+    }
   }
 
   String _resolveGreenBookVideoUrl(

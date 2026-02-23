@@ -3,14 +3,25 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../Screens/admin_home_page.dart';
 import '../Screens/login_page.dart';
-import '../Screens/scorecard_overview.dart';
 import '../Screens/admin_shell_page.dart';
 import '../widgets/app_side_menu.dart';
 
-import '../Screens/driver_home_shell.dart';  
+import '../Screens/driver_home_shell.dart';
 import '../localization/app_localizations.dart'; // 🔹 for localeController
+
+String _lastProfileLocaleSyncKey = '';
+
+String _normalizeSupportedLanguageCode(String raw) {
+  final trimmed = raw.trim().toLowerCase();
+  if (trimmed.isEmpty) return '';
+  final code = trimmed.split(RegExp(r'[-_]')).first;
+  if (code.isEmpty) return '';
+  final supported = AppLocalizations.supportedLocales
+      .map((l) => l.languageCode.toLowerCase())
+      .toSet();
+  return supported.contains(code) ? code : '';
+}
 
 /// Decides whether we show:
 ///  - Login page (no user)
@@ -30,6 +41,7 @@ class AuthGate extends StatelessWidget {
 
         final user = authSnap.data;
         if (user == null) {
+          _lastProfileLocaleSyncKey = '';
           return const LoginPage();
         }
 
@@ -50,17 +62,23 @@ class AuthGate extends StatelessWidget {
             // ---------- CASE A: we have a users/{uid} doc ----------
             if (doc != null && doc.exists && data != null) {
               // 🔑 Load persisted language for this user and update global locale
-              final langCode =
-                  (data['languageCode'] ?? data['language'] ?? '').toString().trim();
+              final langCode = _normalizeSupportedLanguageCode(
+                (data['languageCode'] ?? data['language'] ?? '')
+                    .toString()
+                    .trim(),
+              );
 
               if (langCode.isNotEmpty) {
-                // ⚠️ IMPORTANT: don't call setLocale directly during build.
-                // Schedule it for *after* this frame instead.
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (localeController.locale?.languageCode != langCode) {
-                    localeController.setLocale(Locale(langCode));
-                  }
-                });
+                final syncKey = '${user.uid}:$langCode';
+                if (_lastProfileLocaleSyncKey != syncKey &&
+                    localeController.locale?.languageCode != langCode) {
+                  _lastProfileLocaleSyncKey = syncKey;
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (localeController.locale?.languageCode != langCode) {
+                      localeController.setLocale(Locale(langCode));
+                    }
+                  });
+                }
               }
 
               final role = (data['role'] ?? '').toString().trim();
@@ -68,8 +86,7 @@ class AuthGate extends StatelessWidget {
               // ✅ DRIVER account stored in users/{uid}
               if (role == 'driver') {
                 final dspUid = (data['dspUid'] ?? '').toString();
-                final transporterId =
-                    (data['transporterId'] ?? '').toString();
+                final transporterId = (data['transporterId'] ?? '').toString();
 
                 if (dspUid.isNotEmpty && transporterId.isNotEmpty) {
                   return DriverHomeShell(
@@ -89,7 +106,6 @@ class AuthGate extends StatelessWidget {
                 return _AwaitApproval(email: user.email ?? '');
               }
               return AdminShellPage(initialNav: AppNav.home);
-
             }
 
             // ---------- CASE B: no users/{uid} doc ----------
@@ -178,7 +194,7 @@ class _NoProfileFound extends StatelessWidget {
               Text(
                 message ??
                     'Your login is active, but no driver/DSP profile could be found.\n'
-                    'Please contact your DSP or admin.',
+                        'Please contact your DSP or admin.',
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
@@ -201,9 +217,7 @@ class _CenterProgress extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(child: CircularProgressIndicator()),
-    );
+    return const Scaffold(body: Center(child: CircularProgressIndicator()));
   }
 }
 
