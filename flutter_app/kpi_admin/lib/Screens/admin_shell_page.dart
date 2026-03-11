@@ -38,6 +38,15 @@ class _AdminShellPageState extends State<AdminShellPage> {
 
     return AppShell(
       menuWidth: 300,
+      centerTitle: true,
+      appBarBackgroundColor: const Color(0xFF0B1220),
+      appBarForegroundColor: Colors.white,
+      appBarToolbarHeight: 72,
+      title: Image.asset(
+        'assets/Codriver_logo_dark.png',
+        height: 38,
+        fit: BoxFit.contain,
+      ),
       sideMenu: AppSideMenu(
         width: 300,
         active: _active,

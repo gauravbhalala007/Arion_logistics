@@ -144,15 +144,15 @@ class _AdminAcademyPageState extends State<AdminAcademyPage> {
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
-              if (scopeUid.isNotEmpty)
-                Text(
-                  'DSP scope: $scopeUid',
-                  style: const TextStyle(
-                    color: _kAcademyMuted,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+              // const SizedBox(height: 14),
+              // if (scopeUid.isNotEmpty)
+              //   Text(
+              //     'DSP scope: $scopeUid',
+              //     style: const TextStyle(
+              //       color: _kAcademyMuted,
+              //       fontWeight: FontWeight.w600,
+              //     ),
+              //   ),
               if (scopeUid.isNotEmpty) const SizedBox(height: 8),
               Wrap(
                 spacing: 12,

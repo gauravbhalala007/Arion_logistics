@@ -254,14 +254,14 @@ class _AdminDispatcherPillPageState extends State<AdminDispatcherPillPage> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            'DSP scope: $scopeUid',
-            style: const TextStyle(
-              color: Color(0xFF6B7280),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          // const SizedBox(height: 8),
+          // Text(
+          //   'DSP scope: $scopeUid',
+          //   style: const TextStyle(
+          //     color: Color(0xFF6B7280),
+          //     fontWeight: FontWeight.w600,
+          //   ),
+          // ),
           const SizedBox(height: 14),
           Wrap(
             spacing: 10,

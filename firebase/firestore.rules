@@ -34,6 +34,21 @@ service cloud.firestore {
       return isDriver() && me().data.dspUid == userId;
     }
 
+    // Fallback for legacy driver accounts that rely on custom claims.
+    function isDriverOfByToken(userId) {
+      return signedIn()
+        && request.auth.token.role == 'driver'
+        && request.auth.token.dspUid == userId;
+    }
+
+    function isDriverForUser(userId) {
+      return isDriverOf(userId) || isDriverOfByToken(userId);
+    }
+
+    function driverTransporterId() {
+      return isDriver() ? me().data.transporterId : request.auth.token.transporterId;
+    }
+
     match /users/{userId} {
     
     	// ---------- admin notifications ----------
@@ -60,7 +75,7 @@ service cloud.firestore {
         allow write: if isSelf(userId) && isApproved(userId);
 
         // Drivers of this DSP can READ reports (for dashboard)
-        allow read: if isDriverOf(userId) && isApproved(userId);
+        allow read: if isDriverForUser(userId) && isApproved(userId);
 
         // per-report driver name mappings
         match /driverNames/{nameId} {
@@ -69,7 +84,7 @@ service cloud.firestore {
           allow write: if isSelf(userId) && isApproved(userId);
 
           // drivers of this DSP can read for display
-          allow read: if isDriverOf(userId) && isApproved(userId);
+          allow read: if isDriverForUser(userId) && isApproved(userId);
         }
       }
 
@@ -81,7 +96,7 @@ service cloud.firestore {
         allow write: if isSelf(userId) && isApproved(userId);
 
         // drivers of this DSP can read all scores (for ranking view)
-        allow read: if isDriverOf(userId) && isApproved(userId);
+        allow read: if isDriverForUser(userId) && isApproved(userId);
       }
 
       // ---------- task sheet ----------
@@ -91,14 +106,14 @@ service cloud.firestore {
         allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
 
         // Driver can only see tasks assigned to their transporterId
-        allow read: if isDriverOf(userId)
+        allow read: if isDriverForUser(userId)
           && isApproved(userId)
-          && resource.data.assignedTransporterId == me().data.transporterId;
+          && resource.data.assignedTransporterId == driverTransporterId();
 
         // Driver can only update limited status fields on their own assigned tasks
-        allow update: if isDriverOf(userId)
+        allow update: if isDriverForUser(userId)
           && isApproved(userId)
-          && resource.data.assignedTransporterId == me().data.transporterId
+          && resource.data.assignedTransporterId == driverTransporterId()
           && request.resource.data.assignedTransporterId == resource.data.assignedTransporterId
           && request.resource.data.diff(resource.data).changedKeys().hasOnly([
             'status',
@@ -116,7 +131,7 @@ service cloud.firestore {
         allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
 
         // Drivers of this DSP can read FAQs
-        allow read: if isDriverOf(userId) && isApproved(userId);
+        allow read: if isDriverForUser(userId) && isApproved(userId);
       }
 
       // users/{userId}/faqs_localized/{faqId}
@@ -125,7 +140,106 @@ service cloud.firestore {
         allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
 
         // Drivers of this DSP can read localized overrides
-        allow read: if isDriverOf(userId) && isApproved(userId);
+        allow read: if isDriverForUser(userId) && isApproved(userId);
+      }
+
+      // users/{userId}/settings/{settingId}
+      match /settings/{settingId} {
+        // DSP/admin full access for own account
+        allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
+
+        // Drivers of this DSP can read settings (e.g. academy/faq resources)
+        allow read: if isDriverForUser(userId) && isApproved(userId);
+      }
+
+      // ---------- Shift Plans ----------
+      // users/{userId}/shift_plans/{shiftId}
+      match /shift_plans/{shiftId} {
+        // DSP/admin full access for own account
+        allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
+
+        // Driver can read only own assigned shifts
+        allow read: if isDriverForUser(userId)
+          && isApproved(userId)
+          && resource.data.driverTransporterId == driverTransporterId();
+      }
+
+      // ---------- Absence Requests ----------
+      // users/{userId}/absence_requests/{requestId}
+      match /absence_requests/{requestId} {
+        // DSP/admin full access for own account
+        allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
+
+        // Driver can create and read only own requests
+        allow create: if isDriverForUser(userId)
+          && isApproved(userId)
+          && request.resource.data.driverTransporterId == driverTransporterId()
+          && request.resource.data.status == 'pending';
+
+        allow read: if isDriverForUser(userId)
+          && isApproved(userId)
+          && resource.data.driverTransporterId == driverTransporterId();
+      }
+
+      // ---------- Incident Reports ----------
+      // users/{userId}/incident_reports/{reportId}
+      match /incident_reports/{reportId} {
+        // DSP/admin full access for own account
+        allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
+
+        // Driver can create and read only own incident reports
+        allow create: if isDriverForUser(userId)
+          && isApproved(userId)
+          && request.resource.data.driverTransporterId == driverTransporterId();
+
+        allow read: if isDriverForUser(userId)
+          && isApproved(userId)
+          && resource.data.driverTransporterId == driverTransporterId();
+      }
+
+      // ---------- DA Academy Tests ----------
+      // users/{userId}/academy_tests/{testId}
+      match /academy_tests/{testId} {
+        // DSP/admin full access for own account
+        allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
+
+        // Drivers of this DSP can read test metadata
+        allow read: if isDriverForUser(userId)
+          && isApproved(userId);
+
+        // users/{userId}/academy_tests/{testId}/questions/{questionId}
+        match /questions/{questionId} {
+          // DSP/admin full access for own account
+          allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
+
+          // Drivers of this DSP can read test questions
+          allow read: if isDriverForUser(userId)
+            && isApproved(userId);
+        }
+      }
+
+      // ---------- DA Academy Results ----------
+      // users/{userId}/academy_test_results/{testId}/drivers/{driverId}
+      match /academy_test_results/{testId} {
+        // DSP/admin can manage and read aggregate result trees
+        allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
+
+        match /drivers/{driverId} {
+          // DSP/admin full access for own account
+          allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
+
+          // Driver can read only own result doc
+          allow read: if isDriverForUser(userId)
+            && isApproved(userId)
+            && driverTransporterId() == driverId;
+
+          // Driver can create/update only own result doc
+          allow create, update: if isDriverForUser(userId)
+            && isApproved(userId)
+            && driverTransporterId() == driverId
+            && request.resource.data.driverTransporterId == driverId
+            && request.resource.data.testId == testId;
+        }
       }
 
       // ---------- driver master data ----------
@@ -141,8 +255,74 @@ service cloud.firestore {
           allow read: if isSelf(userId) && isApproved(userId);
 
           // Driver can read + update (mark read / confirm)
-          allow read, update: if isDriverOf(userId)
-            && me().data.transporterId == driverId;
+          allow read, update: if isDriverForUser(userId)
+            && driverTransporterId() == driverId;
+        }
+
+        // ---------- driver academy tests ----------
+        // users/{userId}/drivers/{driverId}/academy_tests/{testId}
+        match /academy_tests/{testId} {
+          // DSP/admin can publish/sync academy tests to driver docs
+          allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
+
+          // Driver can read own assigned test doc
+          allow read: if isDriverForUser(userId)
+            && isApproved(userId)
+            && driverTransporterId() == driverId;
+
+          // Driver can submit own test attempts
+          allow create, update: if isDriverForUser(userId)
+            && isApproved(userId)
+            && driverTransporterId() == driverId
+            && request.resource.data.driverTransporterId == driverId
+            && request.resource.data.testId == testId;
+        }
+
+        // ---------- driver shifts ----------
+        // users/{userId}/drivers/{driverId}/shifts/{shiftId}
+        match /shifts/{shiftId} {
+          // DSP/admin full access for own account
+          allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
+
+          // Driver can read own shifts
+          allow read: if isDriverForUser(userId)
+            && isApproved(userId)
+            && driverTransporterId() == driverId;
+        }
+
+        // ---------- driver absence requests ----------
+        // users/{userId}/drivers/{driverId}/absence_requests/{requestId}
+        match /absence_requests/{requestId} {
+          // DSP/admin full access for own account
+          allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
+
+          // Driver can create/read own requests
+          allow create: if isDriverForUser(userId)
+            && isApproved(userId)
+            && driverTransporterId() == driverId
+            && request.resource.data.driverTransporterId == driverId
+            && request.resource.data.status == 'pending';
+
+          allow read: if isDriverForUser(userId)
+            && isApproved(userId)
+            && driverTransporterId() == driverId;
+        }
+
+        // ---------- driver incident reports ----------
+        // users/{userId}/drivers/{driverId}/incident_reports/{reportId}
+        match /incident_reports/{reportId} {
+          // DSP/admin full access for own account
+          allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
+
+          // Driver can create/read/update only own incident report docs
+          allow read: if isDriverForUser(userId)
+            && isApproved(userId)
+            && driverTransporterId() == driverId;
+
+          allow create, update: if isDriverForUser(userId)
+            && isApproved(userId)
+            && driverTransporterId() == driverId
+            && request.resource.data.driverTransporterId == driverId;
         }
 
 
@@ -152,13 +332,13 @@ service cloud.firestore {
         allow update: if isSelf(userId) && isApproved(userId);
 
         // Driver can read + update ONLY his own driver doc
-        allow read, update: if isDriverOf(userId)
-          && me().data.transporterId == driverId;
+        allow read, update: if isDriverForUser(userId)
+          && driverTransporterId() == driverId;
 
         // ---------- driver documents subcollection ----------
         match /documents/{docId} {
           allow read, write: if isSelf(userId) && isApproved(userId)
-            || (isDriverOf(userId) && me().data.transporterId == driverId);
+            || (isDriverForUser(userId) && driverTransporterId() == driverId);
         }
       }
     }

@@ -7325,6 +7325,1483 @@ class AppLocalizations {
     },
   };
 
+  static final Map<String, String> _deliveryTrainingSharedValues = {
+    'delivery_training_module_title': 'MEU - Delivery Workflow',
+    'delivery_training_activity_subtitle':
+        'Main app flow, tabs, notes and quick actions',
+    'delivery_training_module_activity_2_title': 'Delivering to the Customer',
+    'delivery_training_module_activity_2_subtitle':
+        'Process and best-practice handling',
+    'delivery_training_module_activity_3_title': 'Delivering to a Safe Place',
+    'delivery_training_module_activity_3_subtitle': 'Safe drop location checks',
+    'delivery_training_module_activity_4_title': 'Delivering to a Mailbox',
+    'delivery_training_module_activity_4_subtitle':
+        'Mailbox constraints and rules',
+    'delivery_training_module_activity_5_title': 'Unable to Deliver',
+    'delivery_training_module_activity_5_subtitle':
+        'Issue handling and escalation',
+    'delivery_training_module_activity_6_title': 'Delivery Verification',
+    'delivery_training_module_activity_6_subtitle':
+        'Photo and verification proof flow',
+    'delivery_training_module_activity_7_title': 'Final Assessment',
+    'delivery_training_module_activity_7_subtitle':
+        'Knowledge check and completion',
+    'delivery_training_status_not_started': 'Not started',
+    'delivery_training_status_in_progress': 'In progress',
+    'delivery_training_status_completed': 'Completed',
+    'delivery_training_step_of_total': 'Step {current}/{total}',
+    'delivery_training_last_completed': 'Last completed: {date}',
+    'delivery_training_review': 'Review',
+    'delivery_training_restart_activity': 'Restart activity',
+    'delivery_training_resume': 'Resume',
+    'delivery_training_start_now': 'Start now',
+    'delivery_training_restart_tooltip': 'Restart',
+    'delivery_training_step_title': 'Step {current}',
+    'delivery_training_next': 'Next',
+    'delivery_training_finish': 'Finish training',
+    'delivery_training_done': 'Completed',
+    'delivery_training_screen_title_overview': 'Overview',
+    'delivery_training_screen_title_type_of_deliveries': 'Type of Deliveries',
+    'delivery_training_screen_title_door_to_door': 'Door to Door',
+    'delivery_training_screen_title_lockers': 'Lockers',
+    'delivery_training_screen_title_counters': 'Counters',
+    'delivery_training_screen_title_otr_supplies': 'Door to Door Deliveries',
+    'delivery_training_screen_title_otp_badge': 'Door to Door Deliveries',
+    'delivery_training_screen_title_weather_bags': 'Door to Door Deliveries',
+    'delivery_training_screen_title_ready_to_go': 'Door to Door Deliveries',
+    'delivery_training_screen_title_customer_arrival':
+        'Door to Door Deliveries',
+    'delivery_training_screen_title_customer_feedback':
+        'Door to Door Deliveries',
+    'delivery_training_screen_title_concessions': 'Concessions',
+    'delivery_training_screen_title_delivery_app_usage': 'Delivery App Usage',
+    'delivery_training_screen_title_delivery_app_overview':
+        'Delivery App Overview',
+    'delivery_training_screen_title_transportation_method':
+        'Transportation Method',
+    'delivery_training_screen_title_verify_identity': 'Verify Identity',
+    'delivery_training_screen_title_offline_maps': 'Offline Maps',
+    'delivery_training_screen_title_menu': 'Main Menu',
+    'delivery_training_screen_title_settings': 'Settings',
+    'delivery_training_screen_title_itinerary': 'Itinerary List',
+    'delivery_training_screen_title_itinerary_list_lower': 'Itinerary list',
+    'delivery_training_screen_title_itinerary_map_lower': 'Itinerary map',
+    'delivery_training_screen_title_map': 'Itinerary Map',
+    'delivery_training_screen_title_summary': 'Summary',
+    'delivery_training_screen_title_stop_details': 'Stop Details',
+    'delivery_training_welcome_title': 'Type of Deliveries',
+    'delivery_training_welcome_body':
+        'Learn the core workflow inside the delivery app.',
+    'delivery_training_launch_button': 'Click here to launch',
+    'delivery_training_step_launch':
+        'Launch the training and prepare the app for your route.',
+    'delivery_training_step_type_of_deliveries':
+        'Review the delivery types introduction and continue.',
+    'delivery_training_step_door_to_door':
+        'Door-to-door deliveries are made directly to the customer home.',
+    'delivery_training_step_lockers':
+        'Amazon Locker locations allow customers to pick up and return packages.',
+    'delivery_training_step_counters':
+        'Counters are staffed pickup points where store partners support package collection.',
+    'delivery_training_step_otr_supplies':
+        'Review OTR supplies and where to find the trolley before continuing.',
+    'delivery_training_step_otp_badge':
+        'If customers do not know the OTP, ask them to scan the QR code on the OTP badge.',
+    'delivery_training_step_otp_badge_visual':
+        'If customers do not know the OTP, ask them to scan the QR code on the OTP badge.',
+    'delivery_training_step_weather_bags':
+        'Cover packages with weather bags when exposed to the weather.',
+    'delivery_training_step_ready_to_go':
+        'You have all the delivery equipment and are ready to hit the road.',
+    'delivery_training_step_customer_arrival_contact':
+        'When parked at the delivery address, use the app to call or text the customer and notify your arrival.',
+    'delivery_training_step_customer_feedback':
+        'When the delivery is completed, customers receive a survey to evaluate their experience.',
+    'delivery_training_step_concessions':
+        'If delivery experience is negative, customers can request a refund or concession.',
+    'delivery_training_step_delivery_app_usage':
+        'During this training, we will learn to avoid concessions by using the Delivery App correctly.',
+    'delivery_training_step_delivery_app_overview':
+        'The Delivery App is the main tool for making deliveries. Never uninstall it unless your DSP asks.',
+    'delivery_training_step_transportation_method':
+        'On the first screen, select how you will be delivering the packages.',
+    'delivery_training_step_verify_identity':
+        'The app may request a selfie to verify identity. Follow instructions safely.',
+    'delivery_training_step_delivery_app_overview_maps':
+        'If connection is weak, download maps before starting the route.',
+    'delivery_training_step_offline_maps_prompt':
+        'Open Main Menu to download offline maps.',
+    'delivery_training_step_settings_prompt': 'From Main Menu, tap Settings.',
+    'delivery_training_step_offline_maps_settings_prompt':
+        'Tap on Offline Maps.',
+    'delivery_training_step_offline_maps_download_prompt':
+        'Review offline maps download options before continuing.',
+    'delivery_training_step_offline_maps_downloaded_prompt':
+        'Review downloaded maps and how to delete them.',
+    'delivery_training_step_offline_maps_connectivity_prompt':
+        'Download maps for your DS to keep delivering with poor connectivity.',
+    'delivery_training_door_to_door_title': 'Door to Door',
+    'delivery_training_door_to_door_body':
+        'Deliver packages directly to the Customer\'s home.',
+    'delivery_training_lockers_title': 'Lockers',
+    'delivery_training_lockers_body':
+        'Amazon Locker locations allow Customers to easily pick up and return packages.',
+    'delivery_training_counters_title': 'Counters',
+    'delivery_training_counters_body':
+        'Staffed locations where partners offer space in their store as a pickup point for Customers.',
+    'delivery_training_otr_header': 'DOOR TO DOOR DELIVERIES',
+    'delivery_training_otr_body_1':
+        'Before jumping to the processes to follow in the Delivery App while delivering packages door to door, let\'s take a look at the delivery equipment available for you in the On The Road (OTR) Supplies Trolley of the DS.',
+    'delivery_training_otr_body_2':
+        'The trolley is usually located close to the Loadout Area. Then we will familiarize with the main features of the Delivery App.',
+    'delivery_training_otp_badge_body':
+        'If customers don\'t know the One-Time Password (OTP) to complete the delivery, ask them to scan the QR code on the OTP badge.',
+    'delivery_training_otp_badge_help_body':
+        'They will be directed to the official help page with details on how to recover the OTP.',
+    'delivery_training_weather_bags_body':
+        'Cover packages with weather bags when exposed to the weather.',
+    'delivery_training_ready_to_go_body':
+        'You have all the delivery equipment and are ready to hit the road.',
+    'delivery_training_ready_to_go_footer': 'Let\'s go!',
+    'delivery_training_customer_arrival_body':
+        'When parked at the delivery address, the Delivery App enables you to call or text the Customer to notify them of your arrival.',
+    'delivery_training_customer_feedback_body':
+        'When the delivery is completed, Customers receive a survey to evaluate their experience.',
+    'delivery_training_concessions_title': 'Concessions',
+    'delivery_training_concessions_body':
+        'If the delivery experience was negative, customers can ask for a refund or concession.',
+    'delivery_training_delivery_app_usage_title': 'Delivery App Usage',
+    'delivery_training_delivery_app_usage_body':
+        'During this training, we will learn to avoid concessions by using the Delivery App correctly.',
+    'delivery_training_delivery_app_overview_header': 'DELIVERY APP OVERVIEW',
+    'delivery_training_delivery_app_overview_body':
+        'The Delivery App is the main tool for making deliveries.\n\nUnless your DSP tells you to, never uninstall it from your device.\n\nLet\'s take a look to the main features of the Delivery App!',
+    'delivery_training_delivery_app_overview_maps_body':
+        'Sometimes, the device might not have a good connection when delivering packages. This can make it hard to see where to go or which package to deliver next.\n\nTo fix this, download maps before starting the route, so you always know where to go.\n\nLet\'s take a look!',
+    'delivery_training_offline_maps_prompt_title': 'Overview',
+    'delivery_training_offline_maps_prompt_body':
+        'You can download offline maps from the Main Menu, on the top-left corner.\n\nTap on it!',
+    'delivery_training_settings_prompt_current_stop': 'Current stop',
+    'delivery_training_settings_prompt_feedback': 'Feedback',
+    'delivery_training_settings_prompt_settings': 'Settings',
+    'delivery_training_settings_prompt_breaks': 'Breaks',
+    'delivery_training_settings_prompt_driver_support': 'Driver Support',
+    'delivery_training_settings_prompt_emergency_help': 'Emergency Help',
+    'delivery_training_settings_prompt_body':
+        'From the Main Menu, tap on “Settings”.\n\nTap on it!',
+    'delivery_training_offline_maps_settings_header': 'SETTINGS',
+    'delivery_training_offline_maps_settings_personal': 'Personal Information',
+    'delivery_training_offline_maps_settings_phone': 'Phone Number',
+    'delivery_training_offline_maps_settings_legal': 'View Legal Information',
+    'delivery_training_offline_maps_settings_offline': 'Offline Maps',
+    'delivery_training_offline_maps_settings_version': 'Version Info',
+    'delivery_training_offline_maps_settings_device': 'Device Identifier',
+    'delivery_training_offline_maps_settings_sign_out': 'SIGN OUT',
+    'delivery_training_offline_maps_settings_prompt_body':
+        'Tap on “Offline Maps”.',
+    'delivery_training_offline_maps_settings_prompt_prefix': 'Tap on “',
+    'delivery_training_offline_maps_settings_prompt_target': 'Offline Maps',
+    'delivery_training_offline_maps_settings_prompt_suffix': '”.',
+    'delivery_training_offline_maps_download_header': 'OFFLINE MAPS',
+    'delivery_training_offline_maps_download_settings': 'Download settings',
+    'delivery_training_offline_maps_allow_title':
+        'Allow downloads over cell network',
+    'delivery_training_offline_maps_allow_body':
+        'If Wi-Fi isn\'t available, your maps will use your cell data to download updates.',
+    'delivery_training_offline_maps_downloaded_title': 'Downloaded maps',
+    'delivery_training_offline_maps_downloaded_item': 'MDC-HTB',
+    'delivery_training_offline_maps_download_prompt_body':
+        'By default, downloading offline maps requires WiFi, but you can switch to "Download over cellular network" to use your cellular connection instead.',
+    'delivery_training_offline_maps_downloaded_code': 'DL01',
+    'delivery_training_offline_maps_downloaded_size': '134.6 MB',
+    'delivery_training_offline_maps_other_maps': 'Other maps',
+    'delivery_training_offline_maps_downloaded_prompt_body':
+        'Here you can find maps already downloaded. To delete a map, tap the bin icon.',
+    'delivery_training_offline_maps_other_code_1': 'DLO4',
+    'delivery_training_offline_maps_other_size_1': '162.7 MB',
+    'delivery_training_offline_maps_other_code_2': 'DPU3',
+    'delivery_training_offline_maps_other_size_2': '112.4 MB',
+    'delivery_training_offline_maps_other_code_3': 'DGV2',
+    'delivery_training_offline_maps_other_size_3': '105.9 MB',
+    'delivery_training_offline_maps_connectivity_prompt_body':
+        'Download maps for the DS you operate in. This ensures you can deliver packages even with poor connectivity.',
+    'delivery_training_overview_intro_prompt_body':
+        'In the Overview screen you\'ll find information that you\'ll need to deliver and troubleshoot packages.\n\nLet’s take a look!',
+    'delivery_training_overview_tabs_prompt':
+        'The buttons at the top help you to keep the itinerary at your fingertips.',
+    'delivery_training_overview_itinerary_tap_prompt':
+        'Let’s start exploring the Itinerary List screen.\n\nTap on it!',
+    'delivery_training_itinerary_overview_prompt':
+        'From the Itinerary List you access the list of delivery locations for the assigned route.',
+    'delivery_training_itinerary_delivery_type_prompt':
+        'You can also check the delivery type.',
+    'delivery_training_itinerary_map_tap_prompt':
+        'Let’s move on and explore the Itinerary Map screen.\n\nTap on it!',
+    'delivery_training_itinerary_map_locations_prompt':
+        'Here you see the delivery locations in the map.',
+    'delivery_training_itinerary_summary_tap_prompt':
+        'Let\'s finish by exploring the Summary screen.\n\nTap on it!',
+    'delivery_training_itinerary_summary_overview_prompt':
+        'Here you find information about the remaining packages to be delivered.',
+    'delivery_training_itinerary_prompt_current_stop': 'Current stop',
+    'delivery_training_itinerary_prompt_by_end_day': 'By the end of the day',
+    'delivery_training_itinerary_prompt_access': '1-Click Access',
+    'delivery_training_itinerary_prompt_otp_delivery': 'OTP Delivery',
+    'delivery_training_itinerary_prompt_resume_stop1':
+        'Resume delivery - Stop 1',
+    'delivery_training_summary_work_remaining': 'Work remaining',
+    'delivery_training_summary_stops_count': '5 stops',
+    'delivery_training_summary_locations_count': '8 locations',
+    'delivery_training_summary_packages_count': '9 packages',
+    'delivery_training_summary_stops_header': 'Stops',
+    'delivery_training_transportation_method_header': 'TRANSPORTATION METHOD',
+    'delivery_training_transportation_method_question':
+        'What transportation method do you prefer?',
+    'delivery_training_transportation_method_walk': 'Walk',
+    'delivery_training_transportation_method_drive': 'Drive',
+    'delivery_training_transportation_method_bike': 'Bike',
+    'delivery_training_transportation_method_motorcycle': 'Motorcycle',
+    'delivery_training_transportation_method_card_title':
+        'Transportation method',
+    'delivery_training_transportation_method_card_body':
+        'On the first screen, select how you\'ll be delivering the packages.',
+    'delivery_training_verify_identity_header': 'VERIFY IDENTITY',
+    'delivery_training_verify_identity_card_body':
+        'The Delivery App might ask you to take a selfie to verify your identity. Follow the Delivery App instructions while taking a selfie.',
+    'delivery_training_verify_identity_instructions_title': 'Instructions',
+    'delivery_training_verify_identity_instructions_body':
+        'To continue delivering, please help us verify your identity by taking a selfie. Do not take a selfie while driving. This photo won\'t be shown to customers.',
+    'delivery_training_verify_identity_tips_title': 'Tips',
+    'delivery_training_verify_identity_tip_1': 'Do not wear sunglasses',
+    'delivery_training_verify_identity_tip_2': 'Face the camera directly',
+    'delivery_training_verify_identity_tip_3': 'Avoid light sources behind you',
+    'delivery_training_verify_identity_tip_4': 'Use good lighting on your face',
+    'delivery_training_verify_identity_tip_5':
+        'Have only your face in the picture',
+    'delivery_training_verify_identity_tip_6':
+        'Please remove hats that cover your face',
+    'delivery_training_verify_identity_take_photo': 'Take photo',
+    'delivery_training_step_country_selection':
+        'Select the country flow that matches your delivery station.',
+    'delivery_training_step_open_itinerary_tab':
+        'Open Itinerary to see your assigned stops in execution order.',
+    'delivery_training_step_itinerary_overview':
+        'Review addresses and time windows before starting delivery.',
+    'delivery_training_step_itinerary_locations_prompt':
+        'From itinerary list, review all delivery locations assigned to your route.',
+    'delivery_training_step_itinerary_delivery_type_prompt':
+        'Check delivery type badges in the itinerary list.',
+    'delivery_training_step_itinerary_map_tap_prompt':
+        'Move on to the Itinerary Map screen from the top tabs.',
+    'delivery_training_step_itinerary_map_locations_prompt':
+        'Review delivery locations on the Itinerary Map screen.',
+    'delivery_training_step_itinerary_summary_tap_prompt':
+        'Move to Summary from the top tabs.',
+    'delivery_training_step_itinerary_summary_overview_prompt':
+        'Review remaining package information in Summary.',
+    'delivery_training_step_open_stop':
+        'Open a stop card to access stop-level actions.',
+    'delivery_training_step_customer_notes':
+        'Always follow customer notes when the requested location is safe.',
+    'delivery_training_step_delivery_access':
+        'Use access information and key instructions when available.',
+    'delivery_training_step_external_navigation':
+        'Open external navigation if additional routing help is needed.',
+    'delivery_training_step_open_map_tab':
+        'Switch to Map view for route context and nearby stop planning.',
+    'delivery_training_step_map_guidance':
+        'Use the map to confirm stop position before approaching.',
+    'delivery_training_step_open_summary_tab':
+        'Open Summary to track remaining work during the route.',
+    'delivery_training_step_summary_guidance':
+        'Monitor stops, locations, and package progress in Summary.',
+    'delivery_training_step_open_menu':
+        'Open the main menu for support and app-level options.',
+    'delivery_training_step_open_settings':
+        'Open Settings to manage app configuration.',
+    'delivery_training_step_offline_maps':
+        'Check Offline Maps before leaving station to avoid navigation gaps.',
+    'delivery_training_step_help_menu':
+        'Use Help whenever you need in-app guidance.',
+    'delivery_training_step_otp_support':
+        'If customer does not know OTP, ask them to scan the QR on their OTP badge.',
+    'delivery_training_step_identity_verification':
+        'Identity checks may require a selfie. Follow app instructions safely.',
+    'delivery_training_step_feedback_quality':
+        'Delivery quality affects customer feedback and score.',
+    'delivery_training_step_completion':
+        'You are ready for door-to-door deliveries. Continue with confidence.',
+  };
+
+  static final Map<String, Map<String, String>>
+  _deliveryTrainingLocalizedValues = {
+    'en': _deliveryTrainingSharedValues,
+    'de': {
+      ..._deliveryTrainingSharedValues,
+      'delivery_training_activity_subtitle':
+          'Hauptablauf der App, Tabs, Hinweise und Schnellaktionen',
+      'delivery_training_status_not_started': 'Nicht gestartet',
+      'delivery_training_status_in_progress': 'In Bearbeitung',
+      'delivery_training_status_completed': 'Abgeschlossen',
+      'delivery_training_last_completed': 'Zuletzt abgeschlossen: {date}',
+      'delivery_training_review': 'Ansehen',
+      'delivery_training_restart_activity': 'Training neu starten',
+      'delivery_training_resume': 'Fortsetzen',
+      'delivery_training_start_now': 'Jetzt starten',
+      'delivery_training_restart_tooltip': 'Neu starten',
+      'delivery_training_next': 'Weiter',
+      'delivery_training_finish': 'Training beenden',
+      'delivery_training_done': 'Abgeschlossen',
+      'delivery_training_welcome_body':
+          'Lerne den Kernablauf in der Delivery App.',
+      'delivery_training_launch_button': 'Hier tippen zum Starten',
+      'delivery_training_step_launch':
+          'Starte das Training und bereite die App fuer deine Route vor.',
+      'delivery_training_step_type_of_deliveries':
+          'Prufe die Einfuhrung zu Lieferarten und fahre fort.',
+      'delivery_training_step_door_to_door':
+          'Tür-zu-Tür-Lieferungen erfolgen direkt zum Kundenhaus.',
+      'delivery_training_door_to_door_title': 'Tür zu Tür',
+      'delivery_training_door_to_door_body':
+          'Liefere Pakete direkt zum Zuhause des Kunden.',
+      'delivery_training_step_completion':
+          'Du bist bereit fuer Tür-zu-Tür-Lieferungen.',
+    },
+    'sq': {
+      ..._deliveryTrainingSharedValues,
+      'delivery_training_status_not_started': 'Nuk ka filluar',
+      'delivery_training_status_in_progress': 'Ne progres',
+      'delivery_training_status_completed': 'Perfunduar',
+      'delivery_training_last_completed': 'Perfunduar se fundmi: {date}',
+      'delivery_training_review': 'Rishiko',
+      'delivery_training_restart_activity': 'Rinis aktivitetin',
+      'delivery_training_resume': 'Vazhdo',
+      'delivery_training_start_now': 'Fillo tani',
+      'delivery_training_restart_tooltip': 'Rinis',
+      'delivery_training_next': 'Tjetra',
+      'delivery_training_finish': 'Perfundo trajnimin',
+      'delivery_training_done': 'Perfunduar',
+      'delivery_training_welcome_body':
+          'Meso rrjedhen kryesore te aplikacionit te dorezimit.',
+      'delivery_training_launch_button': 'Kliko ketu per ta nisur',
+      'delivery_training_step_type_of_deliveries':
+          'Shiko hyrjen e llojeve te dorezimit dhe vazhdo.',
+      'delivery_training_step_door_to_door':
+          'Dorezimet dere me dere behen direkt ne shtepine e klientit.',
+      'delivery_training_door_to_door_title': 'Dere me Dere',
+      'delivery_training_door_to_door_body':
+          'Dorezo pakot direkt ne shtepine e Klientit.',
+    },
+    'hu': {
+      ..._deliveryTrainingSharedValues,
+      'delivery_training_status_not_started': 'Nincs elkezdve',
+      'delivery_training_status_in_progress': 'Folyamatban',
+      'delivery_training_status_completed': 'Befejezve',
+      'delivery_training_last_completed': 'Utolso teljesites: {date}',
+      'delivery_training_review': 'Attekintes',
+      'delivery_training_restart_activity': 'Trening ujrainditasa',
+      'delivery_training_resume': 'Folytatas',
+      'delivery_training_start_now': 'Inditas most',
+      'delivery_training_restart_tooltip': 'Ujrainditas',
+      'delivery_training_next': 'Kovetkezo',
+      'delivery_training_finish': 'Trening befejezese',
+      'delivery_training_done': 'Befejezve',
+      'delivery_training_welcome_body':
+          'Ismerd meg a delivery app fo munkafolyamatait.',
+      'delivery_training_launch_button': 'Kattints ide az inditashoz',
+      'delivery_training_step_type_of_deliveries':
+          'Tekintsd at a kezbesitesi tipusok bevezeteset, majd folytasd.',
+      'delivery_training_step_door_to_door':
+          'Az ajtotol ajtoig kezbesites kozvetlenul az ugyfel otthonaba tortenik.',
+      'delivery_training_door_to_door_title': 'Ajtotol Ajtoig',
+      'delivery_training_door_to_door_body':
+          'A csomagokat kozvetlenul az Ugyfel otthonaba kezbesitsd.',
+    },
+    'ro': {
+      ..._deliveryTrainingSharedValues,
+      'delivery_training_status_not_started': 'Neinceput',
+      'delivery_training_status_in_progress': 'In progres',
+      'delivery_training_status_completed': 'Finalizat',
+      'delivery_training_last_completed': 'Ultima finalizare: {date}',
+      'delivery_training_review': 'Revizuire',
+      'delivery_training_restart_activity': 'Reporneste activitatea',
+      'delivery_training_resume': 'Continua',
+      'delivery_training_start_now': 'Incepe acum',
+      'delivery_training_restart_tooltip': 'Reporneste',
+      'delivery_training_next': 'Urmatorul',
+      'delivery_training_finish': 'Finalizeaza trainingul',
+      'delivery_training_done': 'Finalizat',
+      'delivery_training_welcome_body':
+          'Invata fluxul principal din aplicatia de livrare.',
+      'delivery_training_launch_button': 'Apasa aici pentru pornire',
+      'delivery_training_step_type_of_deliveries':
+          'Revizuieste introducerea tipurilor de livrare si continua.',
+      'delivery_training_step_door_to_door':
+          'Livrarile door-to-door se fac direct la domiciliul clientului.',
+      'delivery_training_door_to_door_title': 'Door to Door',
+      'delivery_training_door_to_door_body':
+          'Livreaza pachetele direct la domiciliul Clientului.',
+    },
+    'hr': {
+      ..._deliveryTrainingSharedValues,
+      'delivery_training_status_not_started': 'Nije zapoceto',
+      'delivery_training_status_in_progress': 'U tijeku',
+      'delivery_training_status_completed': 'Zavrseno',
+      'delivery_training_last_completed': 'Zadnje zavrseno: {date}',
+      'delivery_training_review': 'Pregled',
+      'delivery_training_restart_activity': 'Ponovno pokreni aktivnost',
+      'delivery_training_resume': 'Nastavi',
+      'delivery_training_start_now': 'Pokreni sada',
+      'delivery_training_restart_tooltip': 'Ponovno pokreni',
+      'delivery_training_next': 'Dalje',
+      'delivery_training_finish': 'Zavrsi trening',
+      'delivery_training_done': 'Zavrseno',
+      'delivery_training_welcome_body':
+          'Nauci glavni tijek rada u aplikaciji za dostavu.',
+      'delivery_training_launch_button': 'Klikni ovdje za pokretanje',
+      'delivery_training_step_type_of_deliveries':
+          'Pregledaj uvod o vrstama dostave i nastavi.',
+      'delivery_training_step_door_to_door':
+          'Dostava od vrata do vrata ide izravno na adresu kupca.',
+      'delivery_training_door_to_door_title': 'Od Vrata do Vrata',
+      'delivery_training_door_to_door_body':
+          'Dostavi pakete izravno na adresu Kupca.',
+    },
+    'ar': {
+      ..._deliveryTrainingSharedValues,
+      'delivery_training_status_not_started': 'لم يبدأ',
+      'delivery_training_status_in_progress': 'قيد التنفيذ',
+      'delivery_training_status_completed': 'مكتمل',
+      'delivery_training_last_completed': 'آخر إكمال: {date}',
+      'delivery_training_review': 'مراجعة',
+      'delivery_training_restart_activity': 'إعادة بدء النشاط',
+      'delivery_training_resume': 'متابعة',
+      'delivery_training_start_now': 'ابدأ الآن',
+      'delivery_training_restart_tooltip': 'إعادة البدء',
+      'delivery_training_next': 'التالي',
+      'delivery_training_finish': 'إنهاء التدريب',
+      'delivery_training_done': 'مكتمل',
+      'delivery_training_welcome_title': 'أنواع التسليم',
+      'delivery_training_welcome_body':
+          'تعرّف على سير العمل الأساسي داخل تطبيق التسليم.',
+      'delivery_training_launch_button': 'اضغط هنا للبدء',
+      'delivery_training_step_type_of_deliveries':
+          'راجع مقدمة أنواع التسليم ثم تابع.',
+      'delivery_training_step_door_to_door':
+          'تسليم الباب إلى الباب يتم مباشرة إلى منزل العميل.',
+      'delivery_training_door_to_door_title': 'الباب إلى الباب',
+      'delivery_training_door_to_door_body':
+          'سلّم الطرود مباشرة إلى منزل العميل.',
+    },
+    'tr': {
+      ..._deliveryTrainingSharedValues,
+      'delivery_training_status_not_started': 'Baslamadi',
+      'delivery_training_status_in_progress': 'Devam ediyor',
+      'delivery_training_status_completed': 'Tamamlandi',
+      'delivery_training_last_completed': 'Son tamamlama: {date}',
+      'delivery_training_review': 'Gozden gecir',
+      'delivery_training_restart_activity': 'Etkinligi yeniden baslat',
+      'delivery_training_resume': 'Devam et',
+      'delivery_training_start_now': 'Simdi basla',
+      'delivery_training_restart_tooltip': 'Yeniden baslat',
+      'delivery_training_next': 'Ileri',
+      'delivery_training_finish': 'Egitimi bitir',
+      'delivery_training_done': 'Tamamlandi',
+      'delivery_training_welcome_body':
+          'Teslimat uygulamasindaki temel is akislarini ogren.',
+      'delivery_training_launch_button': 'Baslatmak icin buraya dokun',
+      'delivery_training_step_type_of_deliveries':
+          'Teslimat turleri girisini inceleyin ve devam edin.',
+      'delivery_training_step_door_to_door':
+          'Kapiya teslimatlar dogrudan musteri evine yapilir.',
+      'delivery_training_door_to_door_title': 'Door to Door',
+      'delivery_training_door_to_door_body':
+          'Paketleri dogrudan Musterinin evine teslim edin.',
+    },
+    'ru': {
+      ..._deliveryTrainingSharedValues,
+      'delivery_training_status_not_started': 'Не начато',
+      'delivery_training_status_in_progress': 'В процессе',
+      'delivery_training_status_completed': 'Завершено',
+      'delivery_training_last_completed': 'Последнее завершение: {date}',
+      'delivery_training_review': 'Просмотр',
+      'delivery_training_restart_activity': 'Перезапустить активность',
+      'delivery_training_resume': 'Продолжить',
+      'delivery_training_start_now': 'Начать сейчас',
+      'delivery_training_restart_tooltip': 'Перезапуск',
+      'delivery_training_next': 'Далее',
+      'delivery_training_finish': 'Завершить обучение',
+      'delivery_training_done': 'Завершено',
+      'delivery_training_welcome_title': 'Типы доставок',
+      'delivery_training_welcome_body':
+          'Изучите основной рабочий процесс в приложении доставки.',
+      'delivery_training_launch_button': 'Нажмите здесь для запуска',
+      'delivery_training_step_type_of_deliveries':
+          'Ознакомьтесь с вводной частью по типам доставок и продолжайте.',
+      'delivery_training_step_door_to_door':
+          'Доставка door-to-door выполняется прямо к дому клиента.',
+      'delivery_training_door_to_door_title': 'Door to Door',
+      'delivery_training_door_to_door_body':
+          'Доставляйте посылки прямо к дому Клиента.',
+    },
+  };
+
+  // Overrides for Delivery Training strings that are still in English in
+  // non-English locale maps.
+  static final Map<String, Map<String, String>>
+  _deliveryTrainingLocalizedOverrides = {
+    'de': {
+      'delivery_training_module_title': 'MEU - Lieferablauf',
+      'delivery_training_step_of_total': 'Schritt {current}/{total}',
+      'delivery_training_welcome_title': 'Lieferarten',
+      'delivery_training_lockers_title': 'Locker',
+      'delivery_training_counters_title': 'Schalter',
+      'delivery_training_otr_header': 'TUeR-ZU-TUeR-LIEFERUNGEN',
+      'delivery_training_concessions_title': 'Kulanzfaelle',
+      'delivery_training_delivery_app_usage_title':
+          'Nutzung der Delivery App',
+      'delivery_training_delivery_app_overview_header':
+          'UEBERSICHT DELIVERY APP',
+      'delivery_training_transportation_method_header': 'TRANSPORTMETHODE',
+      'delivery_training_transportation_method_question':
+          'Welche Transportmethode bevorzugst du?',
+      'delivery_training_transportation_method_walk': 'Zu Fuss',
+      'delivery_training_transportation_method_bike': 'Fahrrad',
+      'delivery_training_verify_identity_header': 'IDENTITAET BESTAETIGEN',
+      'delivery_training_verify_identity_tips_title': 'Tipps',
+      'delivery_training_verify_identity_take_photo': 'Foto aufnehmen',
+      'delivery_training_offline_maps_prompt_title': 'Uebersicht',
+      'delivery_training_settings_prompt_current_stop': 'Aktueller Stopp',
+      'delivery_training_settings_prompt_feedback': 'Rueckmeldung',
+      'delivery_training_settings_prompt_settings': 'Einstellungen',
+      'delivery_training_settings_prompt_breaks': 'Pausen',
+      'delivery_training_settings_prompt_driver_support': 'Fahrer-Support',
+      'delivery_training_settings_prompt_emergency_help': 'Notfallhilfe',
+      'delivery_training_offline_maps_settings_header': 'EINSTELLUNGEN',
+      'delivery_training_offline_maps_settings_personal':
+          'Persoenliche Informationen',
+      'delivery_training_offline_maps_settings_phone': 'Telefonnummer',
+      'delivery_training_offline_maps_settings_legal':
+          'Rechtliche Informationen anzeigen',
+      'delivery_training_offline_maps_settings_offline': 'Offline-Karten',
+      'delivery_training_offline_maps_settings_version': 'Versionsinfo',
+      'delivery_training_offline_maps_settings_device': 'Geraete-ID',
+      'delivery_training_offline_maps_settings_sign_out': 'ABMELDEN',
+      'delivery_training_offline_maps_download_header': 'OFFLINE-KARTEN',
+      'delivery_training_offline_maps_download_settings':
+          'Download-Einstellungen',
+      'delivery_training_offline_maps_downloaded_title':
+          'Heruntergeladene Karten',
+      'delivery_training_offline_maps_other_maps': 'Weitere Karten',
+      'delivery_training_screen_title_overview': 'Uebersicht',
+      'delivery_training_screen_title_itinerary': 'Itinerarliste',
+      'delivery_training_screen_title_itinerary_list_lower': 'Itinerarliste',
+      'delivery_training_itinerary_prompt_access': '1-Klick-Zugriff',
+      'delivery_training_screen_title_map': 'Itinerarkarte',
+      'delivery_training_screen_title_itinerary_map_lower': 'Itinerarkarte',
+      'delivery_training_screen_title_summary': 'Zusammenfassung',
+      'delivery_training_summary_work_remaining': 'Verbleibende Arbeit',
+      'delivery_training_summary_stops_count': '5 Stopps',
+      'delivery_training_summary_locations_count': '8 Orte',
+      'delivery_training_summary_packages_count': '9 Pakete',
+      'delivery_training_summary_stops_header': 'Stopps',
+      'delivery_training_screen_title_type_of_deliveries': 'Lieferarten',
+      'delivery_training_screen_title_door_to_door': 'Tür zu Tür',
+      'delivery_training_screen_title_lockers': 'Locker',
+      'delivery_training_screen_title_counters': 'Schalter',
+      'delivery_training_screen_title_otr_supplies':
+          'Tür-zu-Tür-Lieferungen',
+      'delivery_training_screen_title_otp_badge':
+          'Tür-zu-Tür-Lieferungen',
+      'delivery_training_screen_title_weather_bags':
+          'Tür-zu-Tür-Lieferungen',
+      'delivery_training_screen_title_ready_to_go':
+          'Tür-zu-Tür-Lieferungen',
+      'delivery_training_screen_title_customer_arrival':
+          'Tür-zu-Tür-Lieferungen',
+      'delivery_training_screen_title_customer_feedback':
+          'Tür-zu-Tür-Lieferungen',
+      'delivery_training_screen_title_concessions': 'Kulanzfaelle',
+      'delivery_training_screen_title_delivery_app_usage':
+          'Nutzung der Delivery App',
+      'delivery_training_screen_title_delivery_app_overview':
+          'Uebersicht Delivery App',
+      'delivery_training_screen_title_transportation_method':
+          'Transportmethode',
+      'delivery_training_screen_title_verify_identity':
+          'Identitaet bestaetigen',
+      'delivery_training_screen_title_menu': 'Hauptmenue',
+      'delivery_training_screen_title_settings': 'Einstellungen',
+      'delivery_training_screen_title_offline_maps': 'Offline-Karten',
+      'delivery_training_screen_title_stop_details': 'Stopp-Details',
+      'delivery_training_lockers_body':
+          'Amazon-Locker-Standorte ermoeglichen Kunden eine einfache Abholung und Rueckgabe von Paketen.',
+      'delivery_training_counters_body':
+          'Besetzte Standorte, an denen Partnerflaeche als Abholpunkt angeboten wird.',
+      'delivery_training_otr_body_1':
+          'Bevor wir die Prozesse in der Delivery App fuer Tür-zu-Tür-Lieferungen ansehen, schauen wir auf die Ausruestung im OTR-Supplies-Trolley der DS.',
+      'delivery_training_otr_body_2':
+          'Der Trolley steht meist nahe der Loadout Area. Danach sehen wir uns die Hauptfunktionen der Delivery App an.',
+      'delivery_training_otp_badge_body':
+          'Wenn Kunden das One-Time Password (OTP) nicht kennen, bitte den QR-Code auf dem OTP-Badge scannen lassen.',
+      'delivery_training_otp_badge_help_body':
+          'Danach gelangen sie zur offiziellen Hilfeseite mit Schritten zur OTP-Wiederherstellung.',
+      'delivery_training_weather_bags_body':
+          'Decke Pakete mit Wetterschutzbeuteln ab, wenn sie Wetter ausgesetzt sind.',
+      'delivery_training_ready_to_go_body':
+          'Du hast die komplette Ausruestung und bist bereit fuer die Tour.',
+      'delivery_training_ready_to_go_footer': 'Los gehts!',
+      'delivery_training_customer_arrival_body':
+          'Wenn du an der Lieferadresse geparkt hast, kannst du den Kunden in der Delivery App anrufen oder schreiben und die Ankunft melden.',
+      'delivery_training_customer_feedback_body':
+          'Nach der Zustellung erhalten Kunden eine Umfrage zur Bewertung ihrer Erfahrung.',
+      'delivery_training_concessions_body':
+          'Wenn die Zustellerfahrung negativ war, koennen Kunden Erstattung oder Kulanz anfragen.',
+      'delivery_training_delivery_app_usage_body':
+          'In diesem Training lernst du, wie du Kulanzfaelle durch korrekte Nutzung der Delivery App vermeidest.',
+      'delivery_training_delivery_app_overview_body':
+          'Die Delivery App ist das wichtigste Werkzeug fuer Zustellungen.\n\nWenn dein DSP es nicht verlangt, deinstalliere sie nie vom Geraet.\n\nSchauen wir uns die Hauptfunktionen der Delivery App an!',
+      'delivery_training_offline_maps_prompt_body':
+          'Du kannst Offline-Karten im Hauptmenue oben links herunterladen.\n\nTippe darauf!',
+      'delivery_training_settings_prompt_body':
+          'Tippe im Hauptmenue auf Einstellungen.\n\nTippe darauf!',
+      'delivery_training_offline_maps_allow_body':
+          'Wenn kein WLAN verfuegbar ist, werden Kartenupdates ueber mobile Daten geladen.',
+      'delivery_training_offline_maps_downloaded_item': 'MDC-HTB Karte',
+      'delivery_training_overview_intro_prompt_body':
+          'Im Uebersichtsbildschirm findest du Infos fuer Zustellung und Problemloesung.\n\nSchauen wir rein!',
+    },
+    'sq': {
+      'delivery_training_module_title': 'MEU - Rrjedha e dorezimit',
+      'delivery_training_step_of_total': 'Hapi {current}/{total}',
+      'delivery_training_welcome_title': 'Llojet e dorezimit',
+      'delivery_training_lockers_title': 'Locker',
+      'delivery_training_counters_title': 'Pika sporteli',
+      'delivery_training_otr_header': 'DOREZIME DERE ME DERE',
+      'delivery_training_concessions_title': 'Koncesione',
+      'delivery_training_delivery_app_usage_title':
+          'Perdorimi i Delivery App',
+      'delivery_training_delivery_app_overview_header':
+          'PAMJE E PERGJITHSHME E DELIVERY APP',
+      'delivery_training_transportation_method_header':
+          'MENYRA E TRANSPORTIT',
+      'delivery_training_transportation_method_question':
+          'Cilen menyre transporti preferon?',
+      'delivery_training_transportation_method_walk': 'Ne kembe',
+      'delivery_training_transportation_method_bike': 'Biçiklete',
+      'delivery_training_verify_identity_header': 'VERIFIKO IDENTITETIN',
+      'delivery_training_verify_identity_tips_title': 'Keshilla',
+      'delivery_training_verify_identity_take_photo': 'Bej foto',
+      'delivery_training_offline_maps_prompt_title': 'Permbledhje',
+      'delivery_training_settings_prompt_current_stop': 'Ndalimi aktual',
+      'delivery_training_settings_prompt_feedback': 'Reagime',
+      'delivery_training_settings_prompt_settings': 'Cilesimet',
+      'delivery_training_settings_prompt_breaks': 'Pushime',
+      'delivery_training_settings_prompt_driver_support':
+          'Mbeshtejtje per shoferin',
+      'delivery_training_settings_prompt_emergency_help': 'Ndihme emergjente',
+      'delivery_training_offline_maps_settings_header': 'CILESIMET',
+      'delivery_training_offline_maps_settings_personal':
+          'Te dhena personale',
+      'delivery_training_offline_maps_settings_phone': 'Numri i telefonit',
+      'delivery_training_offline_maps_settings_legal':
+          'Shiko informacionin ligjor',
+      'delivery_training_offline_maps_settings_offline': 'Harta offline',
+      'delivery_training_offline_maps_settings_version':
+          'Informacion i versionit',
+      'delivery_training_offline_maps_settings_device': 'Identifikues pajisjeje',
+      'delivery_training_offline_maps_settings_sign_out': 'DIL',
+      'delivery_training_offline_maps_download_header': 'HARTA OFFLINE',
+      'delivery_training_offline_maps_download_settings':
+          'Cilesimet e shkarkimit',
+      'delivery_training_offline_maps_downloaded_title': 'Hartat e shkarkuara',
+      'delivery_training_offline_maps_other_maps': 'Harta te tjera',
+      'delivery_training_screen_title_overview': 'Permbledhje',
+      'delivery_training_screen_title_itinerary': 'Lista e itinerarit',
+      'delivery_training_screen_title_itinerary_list_lower':
+          'Lista e itinerarit',
+      'delivery_training_itinerary_prompt_access': 'Qasje me 1 klik',
+      'delivery_training_screen_title_map': 'Harta e itinerarit',
+      'delivery_training_screen_title_itinerary_map_lower':
+          'Harta e itinerarit',
+      'delivery_training_screen_title_summary': 'Permbledhje',
+      'delivery_training_summary_work_remaining': 'Pune e mbetur',
+      'delivery_training_summary_stops_count': '5 ndalesa',
+      'delivery_training_summary_locations_count': '8 lokacione',
+      'delivery_training_summary_packages_count': '9 pako',
+      'delivery_training_summary_stops_header': 'Ndalesa',
+      'delivery_training_screen_title_type_of_deliveries':
+          'Llojet e dorezimit',
+      'delivery_training_screen_title_door_to_door': 'Dere me dere',
+      'delivery_training_screen_title_lockers': 'Locker',
+      'delivery_training_screen_title_counters': 'Pika sporteli',
+      'delivery_training_screen_title_otr_supplies': 'Dorezime dere me dere',
+      'delivery_training_screen_title_otp_badge': 'Dorezime dere me dere',
+      'delivery_training_screen_title_weather_bags': 'Dorezime dere me dere',
+      'delivery_training_screen_title_ready_to_go': 'Dorezime dere me dere',
+      'delivery_training_screen_title_customer_arrival':
+          'Dorezime dere me dere',
+      'delivery_training_screen_title_customer_feedback':
+          'Dorezime dere me dere',
+      'delivery_training_screen_title_concessions': 'Koncesione',
+      'delivery_training_screen_title_delivery_app_usage':
+          'Perdorimi i Delivery App',
+      'delivery_training_screen_title_delivery_app_overview':
+          'Pamje e Delivery App',
+      'delivery_training_screen_title_transportation_method':
+          'Menyra e transportit',
+      'delivery_training_screen_title_verify_identity':
+          'Verifiko identitetin',
+      'delivery_training_screen_title_menu': 'Menuja kryesore',
+      'delivery_training_screen_title_settings': 'Cilesimet',
+      'delivery_training_screen_title_offline_maps': 'Harta offline',
+      'delivery_training_screen_title_stop_details': 'Detajet e ndalese',
+      'delivery_training_lockers_body':
+          'Lokacionet Amazon Locker i lejojne klientet te marrin dhe te kthejne pakot lehtesisht.',
+      'delivery_training_counters_body':
+          'Lokacione me staf ku partneret ofrojne hapesire ne dyqan si pike marrjeje.',
+      'delivery_training_otr_body_1':
+          'Para proceseve ne Delivery App per dorezimet dere me dere, shikojme pajisjet ne OTR Supplies Trolley te DS.',
+      'delivery_training_otr_body_2':
+          'Trollei zakonisht eshte afer zonës se ngarkimit. Me pas shohim funksionet kryesore te Delivery App.',
+      'delivery_training_otp_badge_body':
+          'Nese klientet nuk e dine OTP-ne, kerkoju te skanojne kodin QR ne OTP badge.',
+      'delivery_training_otp_badge_help_body':
+          'Ata do te drejtohen ne faqen zyrtare te ndihmes per rikuperimin e OTP.',
+      'delivery_training_weather_bags_body':
+          'Mbuloni pakot me qese moti kur jane te ekspozuara ndaj kushteve te motit.',
+      'delivery_training_ready_to_go_body':
+          'Keni te gjitha pajisjet e dorezimit dhe jeni gati per rruge.',
+      'delivery_training_ready_to_go_footer': 'Le te nisim!',
+      'delivery_training_customer_arrival_body':
+          'Kur parkoni ne adrese, Delivery App ju lejon te telefononi ose te dergoni mesazh klientit per ardhjen.',
+      'delivery_training_customer_feedback_body':
+          'Kur dorezimi perfundon, klientet marrin nje ankete per te vleresuar eksperiencen.',
+      'delivery_training_concessions_body':
+          'Nese eksperienca e dorezimit ishte negative, klientet mund te kerkojne rimbursim ose koncesion.',
+      'delivery_training_delivery_app_usage_body':
+          'Ne kete trajnim mesojme si te shmangim koncesionet duke perdorur sakte Delivery App.',
+      'delivery_training_delivery_app_overview_body':
+          'Delivery App eshte mjeti kryesor per dorezime.\n\nNese DSP nuk ju kerkon, mos e cinstaloni nga pajisja.\n\nLe te shohim funksionet kryesore!',
+      'delivery_training_offline_maps_prompt_body':
+          'Mund te shkarkoni harta offline nga menuja kryesore ne cepin e siperm majtas.\n\nPreke!',
+      'delivery_training_settings_prompt_body':
+          'Nga menuja kryesore, prekni Cilesimet.\n\nPreke!',
+      'delivery_training_offline_maps_allow_body':
+          'Nese Wi-Fi nuk eshte i disponueshem, hartat do te perditesohen me internet celular.',
+      'delivery_training_offline_maps_downloaded_item': 'MDC-HTB harte',
+      'delivery_training_overview_intro_prompt_body':
+          'Ne ekranin e permbledhjes gjeni informacion per dorezimin dhe zgjidhjen e problemeve.\n\nLe te shohim!',
+    },
+    'hu': {
+      'delivery_training_module_title': 'MEU - Kezbesitesi munkafolyamat',
+      'delivery_training_step_of_total': 'Lepes {current}/{total}',
+      'delivery_training_welcome_title': 'Kezbesitesi tipusok',
+      'delivery_training_lockers_title': 'Lockerek',
+      'delivery_training_counters_title': 'Atveteli pontok',
+      'delivery_training_otr_header': 'AJTOTOL AJTOIG KEZBESITES',
+      'delivery_training_concessions_title': 'Kompenzaciok',
+      'delivery_training_delivery_app_usage_title': 'Delivery App hasznalata',
+      'delivery_training_delivery_app_overview_header':
+          'DELIVERY APP ATTEKINTES',
+      'delivery_training_transportation_method_header': 'SZALLITASI MOD',
+      'delivery_training_transportation_method_question':
+          'Melyik szallitasi modot preferalod?',
+      'delivery_training_transportation_method_walk': 'Gyalog',
+      'delivery_training_transportation_method_bike': 'Kerekpar',
+      'delivery_training_verify_identity_header': 'SZEMELYAZONOSSAG ELLENORZESE',
+      'delivery_training_verify_identity_tips_title': 'Tippek',
+      'delivery_training_verify_identity_take_photo': 'Foto keszitese',
+      'delivery_training_offline_maps_prompt_title': 'Attekintes',
+      'delivery_training_settings_prompt_current_stop': 'Aktualis stop',
+      'delivery_training_settings_prompt_feedback': 'Visszajelzes',
+      'delivery_training_settings_prompt_settings': 'Beallitasok',
+      'delivery_training_settings_prompt_breaks': 'Szünetek',
+      'delivery_training_settings_prompt_driver_support':
+          'Sofor tamogatas',
+      'delivery_training_settings_prompt_emergency_help': 'Surgossegi segitseg',
+      'delivery_training_offline_maps_settings_header': 'BEALLITASOK',
+      'delivery_training_offline_maps_settings_personal': 'Szemelyes adatok',
+      'delivery_training_offline_maps_settings_phone': 'Telefonszam',
+      'delivery_training_offline_maps_settings_legal':
+          'Jogi informaciok megtekintese',
+      'delivery_training_offline_maps_settings_offline': 'Offline terkep',
+      'delivery_training_offline_maps_settings_version':
+          'Verzioinformacio',
+      'delivery_training_offline_maps_settings_device': 'Eszkozonosito',
+      'delivery_training_offline_maps_settings_sign_out': 'KIJELENTKEZES',
+      'delivery_training_offline_maps_download_header': 'OFFLINE TERKEPEK',
+      'delivery_training_offline_maps_download_settings':
+          'Letoltesi beallitasok',
+      'delivery_training_offline_maps_downloaded_title': 'Letoltott terkep',
+      'delivery_training_offline_maps_other_maps': 'Tovabbi terkepek',
+      'delivery_training_screen_title_overview': 'Attekintes',
+      'delivery_training_screen_title_itinerary': 'Itinerary lista',
+      'delivery_training_screen_title_itinerary_list_lower': 'Itinerary lista',
+      'delivery_training_itinerary_prompt_access': '1-kattintas hozzaferes',
+      'delivery_training_screen_title_map': 'Itinerary terkep',
+      'delivery_training_screen_title_itinerary_map_lower': 'Itinerary terkep',
+      'delivery_training_screen_title_summary': 'Osszegzes',
+      'delivery_training_summary_work_remaining': 'Hatrallevo munka',
+      'delivery_training_summary_stops_count': '5 stop',
+      'delivery_training_summary_locations_count': '8 helyszin',
+      'delivery_training_summary_packages_count': '9 csomag',
+      'delivery_training_summary_stops_header': 'Stopok',
+      'delivery_training_screen_title_type_of_deliveries':
+          'Kezbesitesi tipusok',
+      'delivery_training_screen_title_door_to_door': 'Ajtotol ajtoig',
+      'delivery_training_screen_title_lockers': 'Lockerek',
+      'delivery_training_screen_title_counters': 'Atveteli pontok',
+      'delivery_training_screen_title_otr_supplies': 'Ajtotol ajtoig kezbesites',
+      'delivery_training_screen_title_otp_badge': 'Ajtotol ajtoig kezbesites',
+      'delivery_training_screen_title_weather_bags':
+          'Ajtotol ajtoig kezbesites',
+      'delivery_training_screen_title_ready_to_go':
+          'Ajtotol ajtoig kezbesites',
+      'delivery_training_screen_title_customer_arrival':
+          'Ajtotol ajtoig kezbesites',
+      'delivery_training_screen_title_customer_feedback':
+          'Ajtotol ajtoig kezbesites',
+      'delivery_training_screen_title_concessions': 'Kompenzaciok',
+      'delivery_training_screen_title_delivery_app_usage':
+          'Delivery App hasznalata',
+      'delivery_training_screen_title_delivery_app_overview':
+          'Delivery App attekintes',
+      'delivery_training_screen_title_transportation_method': 'Szallitasi mod',
+      'delivery_training_screen_title_verify_identity':
+          'Szemelyazonossag ellenorzese',
+      'delivery_training_screen_title_menu': 'Fo menu',
+      'delivery_training_screen_title_settings': 'Beallitasok',
+      'delivery_training_screen_title_offline_maps': 'Offline terkep',
+      'delivery_training_screen_title_stop_details': 'Stop reszletei',
+      'delivery_training_lockers_body':
+          'Az Amazon Locker helyek lehetove teszik a csomagok konnyu atvetelet es visszaadasat.',
+      'delivery_training_counters_body':
+          'Szemelyzettel mukodo helyek, ahol a partnerek atveteli pontot biztositanak.',
+      'delivery_training_otr_body_1':
+          'Mielott a Delivery App folyamatait atneznenk, nezzuk meg a DS OTR Supplies trolijaban elerheto felszereleseket.',
+      'delivery_training_otr_body_2':
+          'A troli altalaban a Loadout Area kozeleben van. Ezutan atnezzuk a Delivery App fo funkcioit.',
+      'delivery_training_otp_badge_body':
+          'Ha az ugyfel nem ismeri az OTP-t, kerd meg, hogy olvassa be az OTP badge QR-kodjat.',
+      'delivery_training_otp_badge_help_body':
+          'Ezutan a hivatalos segitsegoldalra jut, ahol visszaallithato az OTP.',
+      'delivery_training_weather_bags_body':
+          'Takard le a csomagokat idojarasi tasakokkal, ha ki vannak teve az idojarasnak.',
+      'delivery_training_ready_to_go_body':
+          'Minden szukseges felszereles nalad van, indulhatsz az utra.',
+      'delivery_training_ready_to_go_footer': 'Induljunk!',
+      'delivery_training_customer_arrival_body':
+          'A cimre erve a Delivery App segitsegevel hivhatod vagy uzenetet kuldhetsz az ugyfelnek az erkezesrol.',
+      'delivery_training_customer_feedback_body':
+          'A kezbesites utan az ugyfel kerdoivet kap az elmeny ertekelesere.',
+      'delivery_training_concessions_body':
+          'Ha a kezbesitesi elmeny negativ, az ugyfel visszateritest vagy kompenzaciot kerhet.',
+      'delivery_training_delivery_app_usage_body':
+          'Ebben a treningben megtanuljuk, hogyan keruljuk el a kompenzaciokat a Delivery App helyes hasznalataval.',
+      'delivery_training_delivery_app_overview_body':
+          'A Delivery App a kezbesites fo eszkoze.\n\nHa a DSP nem keri, soha ne tavolitsd el az eszkozrol.\n\nNezzuk at a Delivery App fo funkcioit!',
+      'delivery_training_offline_maps_prompt_body':
+          'Offline terkepet a fo menubol, bal felul tudsz letolteni.\n\nErintsd meg!',
+      'delivery_training_settings_prompt_body':
+          'A fo menubol nyisd meg a Beallitasok pontot.\n\nErintsd meg!',
+      'delivery_training_offline_maps_allow_body':
+          'Ha nincs Wi-Fi, a terkepfrissitesek mobiladatot hasznalnak.',
+      'delivery_training_offline_maps_downloaded_item': 'MDC-HTB terkep',
+      'delivery_training_overview_intro_prompt_body':
+          'Az attekintes kepernyon a kezbesiteshez es hibakezeleshez szukseges informaciokat talalsz.\n\nNezzuk meg!',
+    },
+    'ro': {
+      'delivery_training_module_title': 'MEU - Fluxul de livrare',
+      'delivery_training_step_of_total': 'Pasul {current}/{total}',
+      'delivery_training_welcome_title': 'Tipuri de livrare',
+      'delivery_training_door_to_door_title': 'Usa la usa',
+      'delivery_training_lockers_title': 'Lockere',
+      'delivery_training_counters_title': 'Puncte ghiseu',
+      'delivery_training_otr_header': 'LIVRARI USA LA USA',
+      'delivery_training_concessions_title': 'Concesii',
+      'delivery_training_delivery_app_usage_title':
+          'Utilizarea Delivery App',
+      'delivery_training_delivery_app_overview_header':
+          'PREZENTARE DELIVERY APP',
+      'delivery_training_transportation_method_header': 'METODA DE TRANSPORT',
+      'delivery_training_transportation_method_question':
+          'Ce metoda de transport preferi?',
+      'delivery_training_transportation_method_walk': 'Pe jos',
+      'delivery_training_transportation_method_bike': 'Bicicleta',
+      'delivery_training_verify_identity_header': 'VERIFICA IDENTITATEA',
+      'delivery_training_verify_identity_tips_title': 'Sfaturi',
+      'delivery_training_verify_identity_take_photo': 'Fa o poza',
+      'delivery_training_offline_maps_prompt_title': 'Prezentare',
+      'delivery_training_settings_prompt_current_stop': 'Oprirea curenta',
+      'delivery_training_settings_prompt_feedback': 'Feedback clienti',
+      'delivery_training_settings_prompt_settings': 'Setari',
+      'delivery_training_settings_prompt_breaks': 'Pauze',
+      'delivery_training_settings_prompt_driver_support': 'Suport sofer',
+      'delivery_training_settings_prompt_emergency_help': 'Ajutor de urgenta',
+      'delivery_training_offline_maps_settings_header': 'SETARI',
+      'delivery_training_offline_maps_settings_personal':
+          'Informatii personale',
+      'delivery_training_offline_maps_settings_phone': 'Numar de telefon',
+      'delivery_training_offline_maps_settings_legal':
+          'Vezi informatii legale',
+      'delivery_training_offline_maps_settings_offline': 'Harti offline',
+      'delivery_training_offline_maps_settings_version': 'Informatii versiune',
+      'delivery_training_offline_maps_settings_device':
+          'Identificator dispozitiv',
+      'delivery_training_offline_maps_settings_sign_out': 'DECONECTARE',
+      'delivery_training_offline_maps_download_header': 'HARTI OFFLINE',
+      'delivery_training_offline_maps_download_settings':
+          'Setari descarcare',
+      'delivery_training_offline_maps_downloaded_title': 'Harti descarcate',
+      'delivery_training_offline_maps_other_maps': 'Alte harti',
+      'delivery_training_screen_title_overview': 'Prezentare',
+      'delivery_training_screen_title_itinerary': 'Lista itinerar',
+      'delivery_training_screen_title_itinerary_list_lower': 'Lista itinerar',
+      'delivery_training_itinerary_prompt_access': 'Acces cu 1 click',
+      'delivery_training_screen_title_map': 'Harta itinerar',
+      'delivery_training_screen_title_itinerary_map_lower': 'Harta itinerar',
+      'delivery_training_screen_title_summary': 'Sumar',
+      'delivery_training_summary_work_remaining': 'Munca ramasa',
+      'delivery_training_summary_stops_count': '5 opriri',
+      'delivery_training_summary_locations_count': '8 locatii',
+      'delivery_training_summary_packages_count': '9 colete',
+      'delivery_training_summary_stops_header': 'Opriri',
+      'delivery_training_screen_title_type_of_deliveries':
+          'Tipuri de livrare',
+      'delivery_training_screen_title_door_to_door': 'Usa la usa',
+      'delivery_training_screen_title_lockers': 'Lockere',
+      'delivery_training_screen_title_counters': 'Puncte ghiseu',
+      'delivery_training_screen_title_otr_supplies': 'Livrari usa la usa',
+      'delivery_training_screen_title_otp_badge': 'Livrari usa la usa',
+      'delivery_training_screen_title_weather_bags': 'Livrari usa la usa',
+      'delivery_training_screen_title_ready_to_go': 'Livrari usa la usa',
+      'delivery_training_screen_title_customer_arrival': 'Livrari usa la usa',
+      'delivery_training_screen_title_customer_feedback':
+          'Livrari usa la usa',
+      'delivery_training_screen_title_concessions': 'Concesii',
+      'delivery_training_screen_title_delivery_app_usage':
+          'Utilizarea Delivery App',
+      'delivery_training_screen_title_delivery_app_overview':
+          'Prezentare Delivery App',
+      'delivery_training_screen_title_transportation_method':
+          'Metoda de transport',
+      'delivery_training_screen_title_verify_identity':
+          'Verifica identitatea',
+      'delivery_training_screen_title_menu': 'Meniu principal',
+      'delivery_training_screen_title_settings': 'Setari',
+      'delivery_training_screen_title_offline_maps': 'Harti offline',
+      'delivery_training_screen_title_stop_details': 'Detalii oprire',
+      'delivery_training_lockers_body':
+          'Locatiile Amazon Locker permit clientilor sa ridice si sa returneze usor coletele.',
+      'delivery_training_counters_body':
+          'Locatii cu personal unde partenerii ofera spatiu in magazin ca punct de ridicare.',
+      'delivery_training_otr_body_1':
+          'Inainte de procesele din Delivery App pentru livrari usa la usa, vedem echipamentele din OTR Supplies Trolley al DS.',
+      'delivery_training_otr_body_2':
+          'Caruciorul este de obicei aproape de zona Loadout. Apoi vedem functiile principale ale Delivery App.',
+      'delivery_training_otp_badge_body':
+          'Daca clientii nu stiu OTP-ul, roaga-i sa scaneze codul QR de pe OTP badge.',
+      'delivery_training_otp_badge_help_body':
+          'Vor fi directionati catre pagina oficiala de ajutor pentru recuperarea OTP.',
+      'delivery_training_weather_bags_body':
+          'Acopera coletele cu pungi de protectie cand sunt expuse la vreme.',
+      'delivery_training_ready_to_go_body':
+          'Ai tot echipamentul de livrare si esti gata de drum.',
+      'delivery_training_ready_to_go_footer': 'Sa mergem!',
+      'delivery_training_customer_arrival_body':
+          'Cand ai ajuns la adresa, Delivery App iti permite sa suni sau sa trimiti mesaj clientului pentru a anunta sosirea.',
+      'delivery_training_customer_feedback_body':
+          'Cand livrarea este finalizata, clientii primesc un sondaj pentru evaluarea experientei.',
+      'delivery_training_concessions_body':
+          'Daca experienta de livrare a fost negativa, clientii pot cere rambursare sau concesie.',
+      'delivery_training_delivery_app_usage_body':
+          'In acest training invatam sa evitam concesiile folosind corect Delivery App.',
+      'delivery_training_delivery_app_overview_body':
+          'Delivery App este instrumentul principal pentru livrari.\n\nDaca DSP nu iti cere, nu il dezinstala niciodata de pe dispozitiv.\n\nHai sa vedem functiile principale!',
+      'delivery_training_offline_maps_prompt_body':
+          'Poti descarca harti offline din meniul principal, in coltul stanga sus.\n\nApasa pe el!',
+      'delivery_training_settings_prompt_body':
+          'Din meniul principal, apasa pe Setari.\n\nApasa pe el!',
+      'delivery_training_offline_maps_allow_body':
+          'Daca Wi-Fi nu este disponibil, hartile vor folosi datele mobile pentru actualizari.',
+      'delivery_training_offline_maps_downloaded_item': 'MDC-HTB harta',
+      'delivery_training_overview_intro_prompt_body':
+          'In ecranul de prezentare gasesti informatii necesare pentru livrare si rezolvarea problemelor.\n\nHai sa vedem!',
+    },
+    'hr': {
+      'delivery_training_module_title': 'MEU - Tijek dostave',
+      'delivery_training_step_of_total': 'Korak {current}/{total}',
+      'delivery_training_welcome_title': 'Vrste dostave',
+      'delivery_training_lockers_title': 'Lockeri',
+      'delivery_training_counters_title': 'Pultovi',
+      'delivery_training_otr_header': 'DOSTAVE OD VRATA DO VRATA',
+      'delivery_training_concessions_title': 'Koncesije',
+      'delivery_training_delivery_app_usage_title':
+          'Koristenje Delivery App',
+      'delivery_training_delivery_app_overview_header':
+          'PREGLED DELIVERY APP',
+      'delivery_training_transportation_method_header': 'NACIN PRIJEVOZA',
+      'delivery_training_transportation_method_question':
+          'Koji nacin prijevoza preferiras?',
+      'delivery_training_transportation_method_walk': 'Pjeske',
+      'delivery_training_transportation_method_bike': 'Bicikl',
+      'delivery_training_verify_identity_header': 'POTVRDI IDENTITET',
+      'delivery_training_verify_identity_tips_title': 'Savjeti',
+      'delivery_training_verify_identity_take_photo': 'Snimi fotografiju',
+      'delivery_training_offline_maps_prompt_title': 'Pregled',
+      'delivery_training_settings_prompt_current_stop': 'Trenutno stajaliste',
+      'delivery_training_settings_prompt_feedback': 'Povratna informacija',
+      'delivery_training_settings_prompt_settings': 'Postavke',
+      'delivery_training_settings_prompt_breaks': 'Pauze',
+      'delivery_training_settings_prompt_driver_support': 'Podrska vozacu',
+      'delivery_training_settings_prompt_emergency_help': 'Hitna pomoc',
+      'delivery_training_offline_maps_settings_header': 'POSTAVKE',
+      'delivery_training_offline_maps_settings_personal':
+          'Osobni podaci',
+      'delivery_training_offline_maps_settings_phone': 'Broj telefona',
+      'delivery_training_offline_maps_settings_legal':
+          'Pregled pravnih informacija',
+      'delivery_training_offline_maps_settings_offline': 'Offline karte',
+      'delivery_training_offline_maps_settings_version': 'Informacije o verziji',
+      'delivery_training_offline_maps_settings_device':
+          'Identifikator uredaja',
+      'delivery_training_offline_maps_settings_sign_out': 'ODJAVA',
+      'delivery_training_offline_maps_download_header': 'OFFLINE KARTE',
+      'delivery_training_offline_maps_download_settings':
+          'Postavke preuzimanja',
+      'delivery_training_offline_maps_downloaded_title': 'Preuzete karte',
+      'delivery_training_offline_maps_other_maps': 'Ostale karte',
+      'delivery_training_screen_title_overview': 'Pregled',
+      'delivery_training_screen_title_itinerary': 'Popis itinerara',
+      'delivery_training_screen_title_itinerary_list_lower': 'Popis itinerara',
+      'delivery_training_itinerary_prompt_access': 'Pristup jednim klikom',
+      'delivery_training_screen_title_map': 'Karta itinerara',
+      'delivery_training_screen_title_itinerary_map_lower': 'Karta itinerara',
+      'delivery_training_screen_title_summary': 'Sažetak',
+      'delivery_training_summary_work_remaining': 'Preostali posao',
+      'delivery_training_summary_stops_count': '5 stajalista',
+      'delivery_training_summary_locations_count': '8 lokacija',
+      'delivery_training_summary_packages_count': '9 paketa',
+      'delivery_training_summary_stops_header': 'Stajalista',
+      'delivery_training_screen_title_type_of_deliveries': 'Vrste dostave',
+      'delivery_training_screen_title_door_to_door': 'Od vrata do vrata',
+      'delivery_training_screen_title_lockers': 'Lockeri',
+      'delivery_training_screen_title_counters': 'Pultovi',
+      'delivery_training_screen_title_otr_supplies':
+          'Dostave od vrata do vrata',
+      'delivery_training_screen_title_otp_badge':
+          'Dostave od vrata do vrata',
+      'delivery_training_screen_title_weather_bags':
+          'Dostave od vrata do vrata',
+      'delivery_training_screen_title_ready_to_go':
+          'Dostave od vrata do vrata',
+      'delivery_training_screen_title_customer_arrival':
+          'Dostave od vrata do vrata',
+      'delivery_training_screen_title_customer_feedback':
+          'Dostave od vrata do vrata',
+      'delivery_training_screen_title_concessions': 'Koncesije',
+      'delivery_training_screen_title_delivery_app_usage':
+          'Koristenje Delivery App',
+      'delivery_training_screen_title_delivery_app_overview':
+          'Pregled Delivery App',
+      'delivery_training_screen_title_transportation_method':
+          'Nacin prijevoza',
+      'delivery_training_screen_title_verify_identity': 'Potvrdi identitet',
+      'delivery_training_screen_title_menu': 'Glavni izbornik',
+      'delivery_training_screen_title_settings': 'Postavke',
+      'delivery_training_screen_title_offline_maps': 'Offline karte',
+      'delivery_training_screen_title_stop_details': 'Detalji stajalista',
+      'delivery_training_lockers_body':
+          'Amazon Locker lokacije omogucuju kupcima jednostavno preuzimanje i vracanje paketa.',
+      'delivery_training_counters_body':
+          'Lokacije s osobljem gdje partneri nude prostor kao mjesto preuzimanja.',
+      'delivery_training_otr_body_1':
+          'Prije procesa u Delivery App za dostavu od vrata do vrata, pogledajmo opremu u OTR Supplies Trolley-u DS-a.',
+      'delivery_training_otr_body_2':
+          'Kolica su obicno blizu Loadout Area. Zatim prolazimo glavne funkcije Delivery App.',
+      'delivery_training_otp_badge_body':
+          'Ako kupci ne znaju OTP, zamolite ih da skeniraju QR kod na OTP badge-u.',
+      'delivery_training_otp_badge_help_body':
+          'Bit ce preusmjereni na sluzbenu stranicu pomoci za oporavak OTP-a.',
+      'delivery_training_weather_bags_body':
+          'Pokrijte pakete vremenskim vrecama kada su izlozeni vremenskim uvjetima.',
+      'delivery_training_ready_to_go_body':
+          'Imate svu opremu za dostavu i spremni ste za put.',
+      'delivery_training_ready_to_go_footer': 'Krenimo!',
+      'delivery_training_customer_arrival_body':
+          'Kad parkirate na adresi dostave, Delivery App omogucuje poziv ili poruku kupcu za najavu dolaska.',
+      'delivery_training_customer_feedback_body':
+          'Nakon zavrsene dostave kupci dobivaju anketu za ocjenu iskustva.',
+      'delivery_training_concessions_body':
+          'Ako je iskustvo dostave bilo negativno, kupci mogu zatraziti povrat ili koncesiju.',
+      'delivery_training_delivery_app_usage_body':
+          'U ovom treningu ucimo kako izbjeći koncesije pravilnim koristenjem Delivery App.',
+      'delivery_training_delivery_app_overview_body':
+          'Delivery App je glavni alat za dostavu.\n\nOsim ako DSP to ne trazi, nemojte ga deinstalirati s uredaja.\n\nPogledajmo glavne funkcije!',
+      'delivery_training_offline_maps_prompt_body':
+          'Offline karte mozete preuzeti iz glavnog izbornika, gore lijevo.\n\nDodirnite ga!',
+      'delivery_training_settings_prompt_body':
+          'U glavnom izborniku dodirnite Postavke.\n\nDodirnite!',
+      'delivery_training_offline_maps_allow_body':
+          'Ako Wi-Fi nije dostupan, karte ce koristiti mobilne podatke za preuzimanje azuriranja.',
+      'delivery_training_offline_maps_downloaded_item': 'MDC-HTB karta',
+      'delivery_training_overview_intro_prompt_body':
+          'Na ekranu pregleda naci cete informacije potrebne za dostavu i rjesavanje problema.\n\nPogledajmo!',
+    },
+    'ar': {
+      'delivery_training_module_title': 'MEU - سير عمل التسليم',
+      'delivery_training_step_of_total': 'الخطوة {current}/{total}',
+      'delivery_training_lockers_title': 'الخزائن',
+      'delivery_training_counters_title': 'نقاط الاستلام',
+      'delivery_training_otr_header': 'عمليات تسليم من الباب إلى الباب',
+      'delivery_training_concessions_title': 'التعويضات',
+      'delivery_training_delivery_app_usage_title': 'استخدام تطبيق التسليم',
+      'delivery_training_delivery_app_overview_header':
+          'نظرة عامة على تطبيق التسليم',
+      'delivery_training_transportation_method_header': 'طريقة النقل',
+      'delivery_training_transportation_method_question':
+          'ما طريقة النقل التي تفضلها؟',
+      'delivery_training_transportation_method_walk': 'مشيا',
+      'delivery_training_transportation_method_bike': 'دراجة',
+      'delivery_training_verify_identity_header': 'التحقق من الهوية',
+      'delivery_training_verify_identity_tips_title': 'نصائح',
+      'delivery_training_verify_identity_take_photo': 'التقاط صورة',
+      'delivery_training_offline_maps_prompt_title': 'نظرة عامة',
+      'delivery_training_settings_prompt_current_stop': 'التوقف الحالي',
+      'delivery_training_settings_prompt_feedback': 'ملاحظات',
+      'delivery_training_settings_prompt_settings': 'الإعدادات',
+      'delivery_training_settings_prompt_breaks': 'الاستراحات',
+      'delivery_training_settings_prompt_driver_support': 'دعم السائق',
+      'delivery_training_settings_prompt_emergency_help': 'مساعدة طارئة',
+      'delivery_training_offline_maps_settings_header': 'الإعدادات',
+      'delivery_training_offline_maps_settings_personal': 'المعلومات الشخصية',
+      'delivery_training_offline_maps_settings_phone': 'رقم الهاتف',
+      'delivery_training_offline_maps_settings_legal':
+          'عرض المعلومات القانونية',
+      'delivery_training_offline_maps_settings_offline': 'خرائط دون اتصال',
+      'delivery_training_offline_maps_settings_version': 'معلومات الإصدار',
+      'delivery_training_offline_maps_settings_device': 'معرف الجهاز',
+      'delivery_training_offline_maps_settings_sign_out': 'تسجيل الخروج',
+      'delivery_training_offline_maps_download_header': 'خرائط دون اتصال',
+      'delivery_training_offline_maps_download_settings': 'إعدادات التنزيل',
+      'delivery_training_offline_maps_downloaded_title': 'الخرائط التي تم تنزيلها',
+      'delivery_training_offline_maps_other_maps': 'خرائط أخرى',
+      'delivery_training_screen_title_overview': 'نظرة عامة',
+      'delivery_training_screen_title_itinerary': 'قائمة المسار',
+      'delivery_training_screen_title_itinerary_list_lower': 'قائمة المسار',
+      'delivery_training_itinerary_prompt_access': 'وصول بنقرة واحدة',
+      'delivery_training_screen_title_map': 'خريطة المسار',
+      'delivery_training_screen_title_itinerary_map_lower': 'خريطة المسار',
+      'delivery_training_screen_title_summary': 'الملخص',
+      'delivery_training_summary_work_remaining': 'العمل المتبقي',
+      'delivery_training_summary_stops_count': '5 توقفات',
+      'delivery_training_summary_locations_count': '8 مواقع',
+      'delivery_training_summary_packages_count': '9 طرود',
+      'delivery_training_summary_stops_header': 'التوقفات',
+      'delivery_training_screen_title_type_of_deliveries': 'أنواع التسليم',
+      'delivery_training_screen_title_door_to_door': 'من الباب إلى الباب',
+      'delivery_training_screen_title_lockers': 'الخزائن',
+      'delivery_training_screen_title_counters': 'نقاط الاستلام',
+      'delivery_training_screen_title_otr_supplies':
+          'عمليات تسليم من الباب إلى الباب',
+      'delivery_training_screen_title_otp_badge':
+          'عمليات تسليم من الباب إلى الباب',
+      'delivery_training_screen_title_weather_bags':
+          'عمليات تسليم من الباب إلى الباب',
+      'delivery_training_screen_title_ready_to_go':
+          'عمليات تسليم من الباب إلى الباب',
+      'delivery_training_screen_title_customer_arrival':
+          'عمليات تسليم من الباب إلى الباب',
+      'delivery_training_screen_title_customer_feedback':
+          'عمليات تسليم من الباب إلى الباب',
+      'delivery_training_screen_title_concessions': 'التعويضات',
+      'delivery_training_screen_title_delivery_app_usage':
+          'استخدام تطبيق التسليم',
+      'delivery_training_screen_title_delivery_app_overview':
+          'نظرة عامة على تطبيق التسليم',
+      'delivery_training_screen_title_transportation_method': 'طريقة النقل',
+      'delivery_training_screen_title_verify_identity': 'التحقق من الهوية',
+      'delivery_training_screen_title_menu': 'القائمة الرئيسية',
+      'delivery_training_screen_title_settings': 'الإعدادات',
+      'delivery_training_screen_title_offline_maps': 'خرائط دون اتصال',
+      'delivery_training_screen_title_stop_details': 'تفاصيل التوقف',
+      'delivery_training_lockers_body':
+          'تسمح مواقع Amazon Locker للعملاء باستلام الطرود وإرجاعها بسهولة.',
+      'delivery_training_counters_body':
+          'مواقع يعمل فيها موظفون ويقدم الشركاء مساحة كنقطة استلام.',
+      'delivery_training_otr_body_1':
+          'قبل البدء بعمليات Delivery App لتسليم الباب إلى الباب، لنراجع المعدات في عربة OTR الخاصة بمحطة DS.',
+      'delivery_training_otr_body_2':
+          'تكون العربة عادة بالقرب من منطقة التحميل. بعد ذلك نستعرض الميزات الرئيسية للتطبيق.',
+      'delivery_training_otp_badge_body':
+          'إذا لم يعرف العملاء رمز OTP، اطلب منهم مسح رمز QR على بطاقة OTP.',
+      'delivery_training_otp_badge_help_body':
+          'سيتم توجيههم إلى صفحة المساعدة الرسمية لاستعادة OTP.',
+      'delivery_training_weather_bags_body':
+          'غط الطرود بأكياس الطقس عندما تكون معرضة للطقس.',
+      'delivery_training_ready_to_go_body':
+          'لديك كل معدات التسليم وأنت جاهز للانطلاق.',
+      'delivery_training_ready_to_go_footer': 'هيا بنا!',
+      'delivery_training_customer_arrival_body':
+          'عند الوقوف في عنوان التسليم، يتيح لك التطبيق الاتصال بالعميل أو إرسال رسالة لإبلاغه بوصولك.',
+      'delivery_training_customer_feedback_body':
+          'بعد اكتمال التسليم، يتلقى العملاء استبيانا لتقييم تجربتهم.',
+      'delivery_training_concessions_body':
+          'إذا كانت تجربة التسليم سلبية، يمكن للعملاء طلب استرداد أو تعويض.',
+      'delivery_training_delivery_app_usage_body':
+          'في هذا التدريب نتعلم كيفية تجنب التعويضات باستخدام التطبيق بشكل صحيح.',
+      'delivery_training_delivery_app_overview_body':
+          'تطبيق Delivery App هو الأداة الرئيسية للتسليم.\n\nما لم يطلب DSP ذلك، لا تقم بإزالته من الجهاز.\n\nلنستعرض الميزات الرئيسية!',
+      'delivery_training_offline_maps_prompt_body':
+          'يمكنك تنزيل الخرائط دون اتصال من القائمة الرئيسية في الزاوية العلوية اليسرى.\n\nاضغط عليها!',
+      'delivery_training_settings_prompt_body':
+          'من القائمة الرئيسية اضغط على الإعدادات.\n\nاضغط عليها!',
+      'delivery_training_offline_maps_allow_body':
+          'إذا لم تتوفر شبكة Wi-Fi، ستستخدم الخرائط بيانات الهاتف لتنزيل التحديثات.',
+      'delivery_training_offline_maps_downloaded_item': 'MDC-HTB خريطة',
+      'delivery_training_overview_intro_prompt_body':
+          'في شاشة النظرة العامة ستجد معلومات مهمة للتسليم وحل المشكلات.\n\nلنلق نظرة!',
+    },
+    'tr': {
+      'delivery_training_module_title': 'MEU - Teslimat is akisi',
+      'delivery_training_step_of_total': 'Adim {current}/{total}',
+      'delivery_training_welcome_title': 'Teslimat turleri',
+      'delivery_training_door_to_door_title': 'Kapidan kapiya',
+      'delivery_training_lockers_title': 'Lockerlar',
+      'delivery_training_counters_title': 'Teslim noktalari',
+      'delivery_training_otr_header': 'KAPIDAN KAPIYA TESLIMATLAR',
+      'delivery_training_concessions_title': 'Telafiler',
+      'delivery_training_delivery_app_usage_title':
+          'Delivery App kullanimi',
+      'delivery_training_delivery_app_overview_header':
+          'DELIVERY APP GENEL BAKIS',
+      'delivery_training_transportation_method_header': 'ULASIM YONTEMI',
+      'delivery_training_transportation_method_question':
+          'Hangi ulasim yontemini tercih ediyorsun?',
+      'delivery_training_transportation_method_walk': 'Yuruyus',
+      'delivery_training_transportation_method_bike': 'Bisiklet',
+      'delivery_training_verify_identity_header': 'KIMLIGI DOGRULA',
+      'delivery_training_verify_identity_tips_title': 'Ipuclari',
+      'delivery_training_verify_identity_take_photo': 'Foto cek',
+      'delivery_training_offline_maps_prompt_title': 'Genel bakis',
+      'delivery_training_settings_prompt_current_stop': 'Mevcut durak',
+      'delivery_training_settings_prompt_feedback': 'Geri bildirim',
+      'delivery_training_settings_prompt_settings': 'Ayarlar',
+      'delivery_training_settings_prompt_breaks': 'Molalar',
+      'delivery_training_settings_prompt_driver_support': 'Surucu destegi',
+      'delivery_training_settings_prompt_emergency_help': 'Acil yardim',
+      'delivery_training_offline_maps_settings_header': 'AYARLAR',
+      'delivery_training_offline_maps_settings_personal': 'Kisisel bilgiler',
+      'delivery_training_offline_maps_settings_phone': 'Telefon numarasi',
+      'delivery_training_offline_maps_settings_legal': 'Yasal bilgileri gor',
+      'delivery_training_offline_maps_settings_offline': 'Cevrimdisi haritalar',
+      'delivery_training_offline_maps_settings_version': 'Surum bilgisi',
+      'delivery_training_offline_maps_settings_device': 'Cihaz kimligi',
+      'delivery_training_offline_maps_settings_sign_out': 'CIKIS YAP',
+      'delivery_training_offline_maps_download_header': 'CEVRIMDISI HARITALAR',
+      'delivery_training_offline_maps_download_settings':
+          'Indirme ayarlari',
+      'delivery_training_offline_maps_downloaded_title': 'Indirilen haritalar',
+      'delivery_training_offline_maps_other_maps': 'Diger haritalar',
+      'delivery_training_screen_title_overview': 'Genel bakis',
+      'delivery_training_screen_title_itinerary': 'Rota listesi',
+      'delivery_training_screen_title_itinerary_list_lower': 'Rota listesi',
+      'delivery_training_itinerary_prompt_access': '1-Tik erisim',
+      'delivery_training_screen_title_map': 'Rota haritasi',
+      'delivery_training_screen_title_itinerary_map_lower': 'Rota haritasi',
+      'delivery_training_screen_title_summary': 'Ozet',
+      'delivery_training_summary_work_remaining': 'Kalan is',
+      'delivery_training_summary_stops_count': '5 durak',
+      'delivery_training_summary_locations_count': '8 konum',
+      'delivery_training_summary_packages_count': '9 paket',
+      'delivery_training_summary_stops_header': 'Duraklar',
+      'delivery_training_screen_title_type_of_deliveries': 'Teslimat turleri',
+      'delivery_training_screen_title_door_to_door': 'Kapidan kapiya',
+      'delivery_training_screen_title_lockers': 'Lockerlar',
+      'delivery_training_screen_title_counters': 'Teslim noktalari',
+      'delivery_training_screen_title_otr_supplies': 'Kapidan kapiya teslimat',
+      'delivery_training_screen_title_otp_badge': 'Kapidan kapiya teslimat',
+      'delivery_training_screen_title_weather_bags': 'Kapidan kapiya teslimat',
+      'delivery_training_screen_title_ready_to_go': 'Kapidan kapiya teslimat',
+      'delivery_training_screen_title_customer_arrival':
+          'Kapidan kapiya teslimat',
+      'delivery_training_screen_title_customer_feedback':
+          'Kapidan kapiya teslimat',
+      'delivery_training_screen_title_concessions': 'Telafiler',
+      'delivery_training_screen_title_delivery_app_usage':
+          'Delivery App kullanimi',
+      'delivery_training_screen_title_delivery_app_overview':
+          'Delivery App genel bakis',
+      'delivery_training_screen_title_transportation_method':
+          'Ulasim yontemi',
+      'delivery_training_screen_title_verify_identity': 'Kimligi dogrula',
+      'delivery_training_screen_title_menu': 'Ana menu',
+      'delivery_training_screen_title_settings': 'Ayarlar',
+      'delivery_training_screen_title_offline_maps': 'Cevrimdisi haritalar',
+      'delivery_training_screen_title_stop_details': 'Durak detaylari',
+      'delivery_training_lockers_body':
+          'Amazon Locker noktalarinda musteriler paketleri kolayca teslim alip iade edebilir.',
+      'delivery_training_counters_body':
+          'Partnerlerin magaza alanini teslim alma noktasi olarak sundugu personelli lokasyonlar.',
+      'delivery_training_otr_body_1':
+          'Kapidan kapiya teslimat sureclerine gecmeden once DS OTR Supplies arabasindaki ekipmanlari inceleyelim.',
+      'delivery_training_otr_body_2':
+          'Araba genelde Loadout Area yakinindadir. Ardindan Delivery App ana ozelliklerine bakariz.',
+      'delivery_training_otp_badge_body':
+          'Musteri OTP kodunu bilmiyorsa OTP badge uzerindeki QR kodunu okutmasini isteyin.',
+      'delivery_training_otp_badge_help_body':
+          'OTP kurtarma adimlari icin resmi yardim sayfasina yonlendirilir.',
+      'delivery_training_weather_bags_body':
+          'Hava kosullarina maruz kalan paketleri hava koruma torbalariyla kapatin.',
+      'delivery_training_ready_to_go_body':
+          'Tum teslimat ekipmanina sahipsin ve yola cikmaya hazirsin.',
+      'delivery_training_ready_to_go_footer': 'Haydi baslayalim!',
+      'delivery_training_customer_arrival_body':
+          'Teslimat adresine park ettiginde Delivery App ile musteriyi arayabilir veya mesaj atarak geldigini bildirebilirsin.',
+      'delivery_training_customer_feedback_body':
+          'Teslimat tamamlandiginda musteriler deneyimi degerlendirmek icin anket alir.',
+      'delivery_training_concessions_body':
+          'Teslimat deneyimi olumsuzsa musteriler iade veya telafi talep edebilir.',
+      'delivery_training_delivery_app_usage_body':
+          'Bu egitimde Delivery App dogru kullanilarak telafilerin nasil azaltilacagini ogrenecegiz.',
+      'delivery_training_delivery_app_overview_body':
+          'Delivery App teslimatlar icin ana aracinizdir.\n\nDSP istemedikce cihazinizdan asla kaldirmayin.\n\nAna ozelliklere bakalim!',
+      'delivery_training_offline_maps_prompt_body':
+          'Cevrimdisi haritalari sol ustteki ana menuden indirebilirsin.\n\nUzerine dokun!',
+      'delivery_training_settings_prompt_body':
+          'Ana menuden Ayarlar secenegine dokun.\n\nDokun!',
+      'delivery_training_offline_maps_allow_body':
+          'Wi-Fi yoksa harita guncellemeleri indirmek icin mobil veri kullanilir.',
+      'delivery_training_offline_maps_downloaded_item': 'MDC-HTB harita',
+      'delivery_training_overview_intro_prompt_body':
+          'Genel bakis ekraninda teslimat ve sorun giderme icin gerekli bilgileri bulursun.\n\nHadi bakalim!',
+    },
+    'ru': {
+      'delivery_training_module_title': 'MEU - Процесс доставки',
+      'delivery_training_step_of_total': 'Шаг {current}/{total}',
+      'delivery_training_welcome_title': 'Типы доставок',
+      'delivery_training_door_to_door_title': 'От двери к двери',
+      'delivery_training_lockers_title': 'Локеры',
+      'delivery_training_counters_title': 'Пункты выдачи',
+      'delivery_training_otr_header': 'ДОСТАВКА ОТ ДВЕРИ К ДВЕРИ',
+      'delivery_training_concessions_title': 'Компенсации',
+      'delivery_training_delivery_app_usage_title':
+          'Использование Delivery App',
+      'delivery_training_delivery_app_overview_header':
+          'ОБЗОР DELIVERY APP',
+      'delivery_training_transportation_method_header': 'СПОСОБ ПЕРЕДВИЖЕНИЯ',
+      'delivery_training_transportation_method_question':
+          'Какой способ передвижения вы предпочитаете?',
+      'delivery_training_transportation_method_walk': 'Пешком',
+      'delivery_training_transportation_method_bike': 'Велосипед',
+      'delivery_training_verify_identity_header': 'ПОДТВЕРЖДЕНИЕ ЛИЧНОСТИ',
+      'delivery_training_verify_identity_tips_title': 'Советы',
+      'delivery_training_verify_identity_take_photo': 'Сделать фото',
+      'delivery_training_offline_maps_prompt_title': 'Обзор',
+      'delivery_training_settings_prompt_current_stop': 'Текущая остановка',
+      'delivery_training_settings_prompt_feedback': 'Обратная связь',
+      'delivery_training_settings_prompt_settings': 'Настройки',
+      'delivery_training_settings_prompt_breaks': 'Перерывы',
+      'delivery_training_settings_prompt_driver_support': 'Поддержка водителя',
+      'delivery_training_settings_prompt_emergency_help': 'Экстренная помощь',
+      'delivery_training_offline_maps_settings_header': 'НАСТРОЙКИ',
+      'delivery_training_offline_maps_settings_personal':
+          'Личная информация',
+      'delivery_training_offline_maps_settings_phone': 'Номер телефона',
+      'delivery_training_offline_maps_settings_legal':
+          'Просмотр юридической информации',
+      'delivery_training_offline_maps_settings_offline': 'Офлайн-карты',
+      'delivery_training_offline_maps_settings_version':
+          'Информация о версии',
+      'delivery_training_offline_maps_settings_device':
+          'Идентификатор устройства',
+      'delivery_training_offline_maps_settings_sign_out': 'ВЫЙТИ',
+      'delivery_training_offline_maps_download_header': 'ОФЛАЙН-КАРТЫ',
+      'delivery_training_offline_maps_download_settings':
+          'Настройки загрузки',
+      'delivery_training_offline_maps_downloaded_title': 'Загруженные карты',
+      'delivery_training_offline_maps_other_maps': 'Другие карты',
+      'delivery_training_screen_title_overview': 'Обзор',
+      'delivery_training_screen_title_itinerary': 'Список маршрута',
+      'delivery_training_screen_title_itinerary_list_lower': 'Список маршрута',
+      'delivery_training_itinerary_prompt_access': 'Доступ в 1 клик',
+      'delivery_training_screen_title_map': 'Карта маршрута',
+      'delivery_training_screen_title_itinerary_map_lower': 'Карта маршрута',
+      'delivery_training_screen_title_summary': 'Сводка',
+      'delivery_training_summary_work_remaining': 'Оставшаяся работа',
+      'delivery_training_summary_stops_count': '5 остановок',
+      'delivery_training_summary_locations_count': '8 локаций',
+      'delivery_training_summary_packages_count': '9 посылок',
+      'delivery_training_summary_stops_header': 'Остановки',
+      'delivery_training_screen_title_type_of_deliveries': 'Типы доставок',
+      'delivery_training_screen_title_door_to_door': 'От двери к двери',
+      'delivery_training_screen_title_lockers': 'Локеры',
+      'delivery_training_screen_title_counters': 'Пункты выдачи',
+      'delivery_training_screen_title_otr_supplies':
+          'Доставка от двери к двери',
+      'delivery_training_screen_title_otp_badge':
+          'Доставка от двери к двери',
+      'delivery_training_screen_title_weather_bags':
+          'Доставка от двери к двери',
+      'delivery_training_screen_title_ready_to_go':
+          'Доставка от двери к двери',
+      'delivery_training_screen_title_customer_arrival':
+          'Доставка от двери к двери',
+      'delivery_training_screen_title_customer_feedback':
+          'Доставка от двери к двери',
+      'delivery_training_screen_title_concessions': 'Компенсации',
+      'delivery_training_screen_title_delivery_app_usage':
+          'Использование Delivery App',
+      'delivery_training_screen_title_delivery_app_overview':
+          'Обзор Delivery App',
+      'delivery_training_screen_title_transportation_method':
+          'Способ передвижения',
+      'delivery_training_screen_title_verify_identity':
+          'Подтверждение личности',
+      'delivery_training_screen_title_menu': 'Главное меню',
+      'delivery_training_screen_title_settings': 'Настройки',
+      'delivery_training_screen_title_offline_maps': 'Офлайн-карты',
+      'delivery_training_screen_title_stop_details': 'Детали остановки',
+      'delivery_training_lockers_body':
+          'Локации Amazon Locker позволяют клиентам удобно забирать и возвращать посылки.',
+      'delivery_training_counters_body':
+          'Точки с персоналом, где партнеры предоставляют место как пункт выдачи.',
+      'delivery_training_otr_body_1':
+          'Перед процессами в Delivery App для доставки от двери к двери посмотрим оборудование в тележке OTR Supplies на DS.',
+      'delivery_training_otr_body_2':
+          'Тележка обычно находится рядом с зоной Loadout. Затем разберем основные функции Delivery App.',
+      'delivery_training_otp_badge_body':
+          'Если клиент не знает OTP, попросите его сканировать QR-код на OTP badge.',
+      'delivery_training_otp_badge_help_body':
+          'После этого он будет направлен на официальную страницу помощи по восстановлению OTP.',
+      'delivery_training_weather_bags_body':
+          'Накрывайте посылки защитными пакетами при плохой погоде.',
+      'delivery_training_ready_to_go_body':
+          'У вас есть все оборудование для доставки, и вы готовы выезжать.',
+      'delivery_training_ready_to_go_footer': 'Поехали!',
+      'delivery_training_customer_arrival_body':
+          'Когда вы припарковались по адресу доставки, в Delivery App можно позвонить клиенту или написать ему о прибытии.',
+      'delivery_training_customer_feedback_body':
+          'После завершения доставки клиент получает опрос для оценки опыта.',
+      'delivery_training_concessions_body':
+          'Если опыт доставки был негативным, клиенты могут запросить возврат или компенсацию.',
+      'delivery_training_delivery_app_usage_body':
+          'В этом обучении мы изучим, как избегать компенсаций, правильно используя Delivery App.',
+      'delivery_training_delivery_app_overview_body':
+          'Delivery App - основной инструмент для доставок.\n\nЕсли DSP не требует, не удаляйте его с устройства.\n\nПосмотрим основные функции приложения!',
+      'delivery_training_offline_maps_prompt_body':
+          'Офлайн-карты можно загрузить из главного меню в левом верхнем углу.\n\nНажмите на него!',
+      'delivery_training_settings_prompt_body':
+          'В главном меню нажмите Настройки.\n\nНажмите!',
+      'delivery_training_offline_maps_allow_body':
+          'Если Wi-Fi недоступен, карты будут использовать мобильные данные для загрузки обновлений.',
+      'delivery_training_offline_maps_downloaded_item': 'MDC-HTB карта',
+      'delivery_training_overview_intro_prompt_body':
+          'На экране обзора вы найдете информацию для доставки и устранения проблем.\n\nДавайте посмотрим!',
+    },
+  };
+
   static final Map<String, String> _driversHubSharedValues = {
     'drivers_hub_add_driver': 'Add driver',
     'drivers_hub_add_edit_driver': 'Add / edit driver',
@@ -9323,6 +10800,12 @@ class AppLocalizations {
         _notificationsLocalizedValues['en']!;
     final taskSheetMap =
         _taskSheetLocalizedValues[lang] ?? _taskSheetLocalizedValues['en']!;
+    final deliveryTrainingMap =
+        _deliveryTrainingLocalizedValues[lang] ??
+        _deliveryTrainingLocalizedValues['en']!;
+    final deliveryTrainingOverrideMap =
+        _deliveryTrainingLocalizedOverrides[lang] ??
+        const <String, String>{};
     final driversHubMap =
         _driversHubLocalizedValues[lang] ?? _driversHubLocalizedValues['en']!;
     final adminFaqMap =
@@ -9333,12 +10816,15 @@ class AppLocalizations {
     return langMap[key] ??
         notificationsMap[key] ??
         taskSheetMap[key] ??
+        deliveryTrainingOverrideMap[key] ??
+        deliveryTrainingMap[key] ??
         driversHubMap[key] ??
         adminFaqMap[key] ??
         adminApprovalsMap[key] ??
         _localizedValues['en']![key] ??
         _notificationsLocalizedValues['en']![key] ??
         _taskSheetLocalizedValues['en']![key] ??
+        _deliveryTrainingLocalizedValues['en']![key] ??
         _driversHubLocalizedValues['en']![key] ??
         _adminFaqLocalizedValues['en']![key] ??
         _adminApprovalsLocalizedValues['en']![key] ??

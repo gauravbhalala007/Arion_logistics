@@ -18,6 +18,7 @@ import 'package:firebase_storage/firebase_storage.dart' as fb;
 import '../localization/app_localizations.dart';
 import '../models/driver_notification.dart';
 import 'driver_academy_page.dart';
+import 'driver_amazon_delivery_page.dart';
 import 'driver_green_book_page.dart';
 import 'driver_green_book_test_page.dart';
 import 'driver_onboarding_page.dart';
@@ -54,6 +55,7 @@ ImageProvider? _profileImageFromUserData({dynamic directBase64}) {
 enum DriverView {
   home,
   academy,
+  amazonDelivery,
   greenBook,
   greenBookTest,
   shiftPlan,
@@ -112,6 +114,8 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
   }
 
   bool _pinPromptShown = false;
+
+  bool get _hideShellChrome => _view == DriverView.amazonDelivery;
 
   @override
   void initState() {
@@ -313,76 +317,80 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
 
         return Scaffold(
           backgroundColor: _kBg,
-          extendBody: true,
-          body: SafeArea(
-            child: Column(
-              children: [
-                // ---------- HEADER (always visible) ----------
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 12,
-                  ),
-                  child: _HeaderBar(
-                    driverName: driverName,
-                    profileImage: accountImage,
-                    unreadCount: _unreadCount,
-                    onChangePhoto: () => _changeProfilePhoto(context),
-                    onOpenProfile: () {
-                      setState(() {
-                        _view = DriverView.profile;
-                        _tabIndex = 0;
-                      });
-                    },
-                    onOpenNotifications: () {
-                      setState(() {
-                        _view = DriverView.notifications;
-                        _tabIndex = 0;
-                      });
-                    },
-                  ),
-                ),
+          extendBody: !_hideShellChrome,
+          body: _hideShellChrome
+              ? _buildTabContent(context)
+              : SafeArea(
+                  child: Column(
+                    children: [
+                      // ---------- HEADER (always visible) ----------
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 12,
+                        ),
+                        child: _HeaderBar(
+                          driverName: driverName,
+                          profileImage: accountImage,
+                          unreadCount: _unreadCount,
+                          onChangePhoto: () => _changeProfilePhoto(context),
+                          onOpenProfile: () {
+                            setState(() {
+                              _view = DriverView.profile;
+                              _tabIndex = 0;
+                            });
+                          },
+                          onOpenNotifications: () {
+                            setState(() {
+                              _view = DriverView.notifications;
+                              _tabIndex = 0;
+                            });
+                          },
+                        ),
+                      ),
 
-                // ---------- TAB CONTENT ----------
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 18),
-                    child: _buildTabContent(context),
+                      // ---------- TAB CONTENT ----------
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 18),
+                          child: _buildTabContent(context),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
-          ),
 
           // ---------- BOTTOM NAV (always visible) ----------
-          bottomNavigationBar: SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
-              child: _DriverBottomNav(
-                index: _tabIndex,
-                pendingTasksCount: _pendingTasksCount,
-                unconfirmedRulesCount: _unconfirmedRulesCount,
-                onTap: (i) {
-                  setState(() {
-                    _tabIndex = i;
+          bottomNavigationBar: _hideShellChrome
+              ? null
+              : SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
+                    child: _DriverBottomNav(
+                      index: _tabIndex,
+                      pendingTasksCount: _pendingTasksCount,
+                      unconfirmedRulesCount: _unconfirmedRulesCount,
+                      onTap: (i) {
+                        setState(() {
+                          _tabIndex = i;
 
-                    if (i == 0) {
-                      _view = DriverView.home;
-                    } else if (i == 1) {
-                      _view = DriverView.dashboard;
-                    } else if (i == 2) {
-                      _view = DriverView.faq;
-                    } else if (i == 3) {
-                      _view = DriverView.tasks;
-                    } else if (i == 4) {
-                      _view = DriverView.rules;
-                    }
-                  });
-                },
-              ),
-            ),
-          ),
+                          if (i == 0) {
+                            _view = DriverView.home;
+                          } else if (i == 1) {
+                            _view = DriverView.dashboard;
+                          } else if (i == 2) {
+                            _view = DriverView.faq;
+                          } else if (i == 3) {
+                            _view = DriverView.tasks;
+                          } else if (i == 4) {
+                            _view = DriverView.rules;
+                          }
+                        });
+                      },
+                    ),
+                  ),
+                ),
         );
       },
     );
@@ -470,7 +478,7 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
           onOpenAmazonDelivery: () {
             setState(() {
               _tabIndex = 0;
-              _view = DriverView.comingSoon;
+              _view = DriverView.amazonDelivery;
             });
           },
           onOpenCoDriverApp: () {
@@ -507,6 +515,18 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
             setState(() {
               _tabIndex = 0;
               _view = DriverView.greenBook;
+            });
+          },
+        );
+
+      case DriverView.amazonDelivery:
+        return DriverAmazonDeliveryPage(
+          dspUid: widget.dspUid,
+          driverTransporterId: widget.driverTransporterId,
+          onBack: () {
+            setState(() {
+              _tabIndex = 0;
+              _view = DriverView.academy;
             });
           },
         );

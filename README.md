@@ -27,6 +27,15 @@ flutter pub get
 flutter run -d chrome
 ```
 
+### Web production deploy (no offline cache)
+
+```sh
+cd flutter_app/kpi_admin
+flutter build web --release --pwa-strategy=none
+cd ../../firebase
+firebase deploy --only hosting
+```
+
 ### Parser service
 
 ```sh

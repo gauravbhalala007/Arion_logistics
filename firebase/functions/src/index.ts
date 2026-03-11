@@ -88,6 +88,51 @@ function requireAuthUid(authCtx: unknown): string {
 }
 
 /**
+ * Driver "working" flag from users/{dspUid}/drivers/{driverId}.active
+ * Missing values default to true for backward compatibility.
+ * @param {Record<string, unknown>} driverData
+ * @return {boolean}
+ */
+function isDriverWorking(driverData: Record<string, unknown>): boolean {
+  const parseBoolish = (raw: unknown): boolean | null => {
+    if (typeof raw === "boolean") return raw;
+    if (typeof raw === "number") return raw !== 0;
+    if (typeof raw === "string") {
+      const v = raw.trim().toLowerCase();
+      if (v === "false" || v === "0" || v === "off" || v === "inactive") {
+        return false;
+      }
+      if (v === "true" || v === "1" || v === "on" || v === "active") {
+        return true;
+      }
+    }
+    return null;
+  };
+
+  const active = parseBoolish(driverData.active);
+  const working = parseBoolish(driverData.working);
+  const isWorking = parseBoolish(driverData.isWorking);
+
+  if (active === false || working === false || isWorking === false) {
+    return false;
+  }
+
+  const statusRaw = driverData.status;
+  if (typeof statusRaw === "string") {
+    const status = statusRaw.trim().toLowerCase();
+    if (status === "off" || status === "inactive" || status === "suspended") {
+      return false;
+    }
+  }
+
+  if (active === true || working === true || isWorking === true) {
+    return true;
+  }
+
+  return true;
+}
+
+/**
  * Very small helper for GET calls without adding dependencies.
  * @param {string} url
  * @return {Promise<string>}
@@ -426,7 +471,10 @@ export const publishNotificationToAllDrivers = onCall(async (request) => {
     .collection("drivers")
     .get();
 
-  const drivers = driversSnap.docs;
+  const drivers = driversSnap.docs.filter((d) => {
+    const data = d.data() as Record<string, unknown>;
+    return isDriverWorking(data);
+  });
   const targetCount = drivers.length;
 
   // Create history record first (single doc)

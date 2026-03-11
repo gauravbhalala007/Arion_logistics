@@ -419,11 +419,11 @@ class _AdminIncidentReportsPageState extends State<AdminIncidentReportsPage> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            'DSP scope: $scopeUid',
-            style: const TextStyle(color: _kMuted, fontWeight: FontWeight.w600),
-          ),
+          // const SizedBox(height: 8),
+          // Text(
+          //   'DSP scope: $scopeUid',
+          //   style: const TextStyle(color: _kMuted, fontWeight: FontWeight.w600),
+          // ),
           const SizedBox(height: 14),
           Wrap(
             spacing: 10,

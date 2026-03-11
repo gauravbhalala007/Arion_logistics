@@ -2,11 +2,16 @@
 import 'package:flutter/material.dart';
 
 class AppShell extends StatelessWidget {
-  final Widget sideMenu;         // your left menu widget (styled)
-  final Widget body;             // page content
-  final Widget? title;           // shown in AppBar on narrow screens
-  final List<Widget>? actions;   // right-side actions in AppBar (e.g., CSV button)
+  final Widget sideMenu; // your left menu widget (styled)
+  final Widget body; // page content
+  final Widget? title; // shown in AppBar on narrow screens
+  final List<Widget>?
+  actions; // right-side actions in AppBar (e.g., CSV button)
   final double menuWidth;
+  final bool? centerTitle;
+  final Color? appBarBackgroundColor;
+  final Color? appBarForegroundColor;
+  final double? appBarToolbarHeight;
 
   const AppShell({
     super.key,
@@ -15,6 +20,10 @@ class AppShell extends StatelessWidget {
     this.title,
     this.actions,
     this.menuWidth = 280,
+    this.centerTitle,
+    this.appBarBackgroundColor,
+    this.appBarForegroundColor,
+    this.appBarToolbarHeight,
   });
 
   bool _isNarrow(BuildContext c) => MediaQuery.of(c).size.width < 1100;
@@ -28,8 +37,16 @@ class AppShell extends StatelessWidget {
       appBar: narrow
           ? AppBar(
               elevation: 0,
-              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+              backgroundColor:
+                  appBarBackgroundColor ??
+                  Theme.of(context).scaffoldBackgroundColor,
+              foregroundColor: appBarForegroundColor,
+              iconTheme: appBarForegroundColor == null
+                  ? null
+                  : IconThemeData(color: appBarForegroundColor),
+              toolbarHeight: appBarToolbarHeight,
               title: title ?? const SizedBox(),
+              centerTitle: centerTitle,
               actions: actions,
             )
           : null,
@@ -46,7 +63,7 @@ class AppShell extends StatelessWidget {
         children: [
           if (!narrow)
             SizedBox(width: menuWidth, child: sideMenu), // persistent menu
-          Expanded(child: body),                          // page content
+          Expanded(child: body), // page content
         ],
       ),
     );

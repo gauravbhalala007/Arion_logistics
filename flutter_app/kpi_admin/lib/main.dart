@@ -55,6 +55,8 @@ Future<void> main() async {
 class App extends StatelessWidget {
   const App({super.key});
 
+  Widget _wrapSelectable(Widget child) => SelectionArea(child: child);
+
   @override
   Widget build(BuildContext context) {
     // 🔑 AnimatedBuilder listens to the global localeController.
@@ -84,35 +86,52 @@ class App extends StatelessWidget {
             scaffoldBackgroundColor: const Color(0xFFF6F7F5),
           ),
 
-          home: const AuthGate(),
+          home: _wrapSelectable(const AuthGate()),
           routes: {
-            '/login': (_) => const LoginPage(),
-            '/signup': (_) => const SignupPage(),
-            '/verify-email': (_) => const VerifyEmailPage(),
-            '/profile': (_) => const AdminShellPage(initialNav: AppNav.profile),
+            '/login': (_) => _wrapSelectable(const LoginPage()),
+            '/signup': (_) => _wrapSelectable(const SignupPage()),
+            '/verify-email': (_) => _wrapSelectable(const VerifyEmailPage()),
+            '/profile': (_) => _wrapSelectable(
+              const AdminShellPage(initialNav: AppNav.profile),
+            ),
 
             // ✅ all side-menu destinations go through the shell
-            '/home': (_) => const AdminShellPage(initialNav: AppNav.home),
-            '/dashboard': (_) =>
-                const AdminShellPage(initialNav: AppNav.dashboard),
-            '/pod-quality': (_) =>
-                const AdminShellPage(initialNav: AppNav.podQuality),
-            '/drivers': (_) => const AdminShellPage(initialNav: AppNav.drivers),
-            '/tasks': (_) => const AdminShellPage(initialNav: AppNav.tasks),
-            '/shift-absence': (_) =>
-                const AdminShellPage(initialNav: AppNav.shiftAbsence),
-            '/incident-reports': (_) =>
-                const AdminShellPage(initialNav: AppNav.incidentReports),
-            '/academy': (_) => const AdminShellPage(initialNav: AppNav.academy),
-            '/dispatcher-pill': (_) =>
-                const AdminShellPage(initialNav: AppNav.dispatcherPill),
-            '/notifications': (_) =>
-                const AdminShellPage(initialNav: AppNav.notifications),
-            '/faqs': (_) => const AdminShellPage(initialNav: AppNav.faqs),
-            '/admin-approvals': (_) =>
-                const AdminShellPage(initialNav: AppNav.adminApprovals),
+            '/home': (_) =>
+                _wrapSelectable(const AdminShellPage(initialNav: AppNav.home)),
+            '/dashboard': (_) => _wrapSelectable(
+              const AdminShellPage(initialNav: AppNav.dashboard),
+            ),
+            '/pod-quality': (_) => _wrapSelectable(
+              const AdminShellPage(initialNav: AppNav.podQuality),
+            ),
+            '/drivers': (_) => _wrapSelectable(
+              const AdminShellPage(initialNav: AppNav.drivers),
+            ),
+            '/tasks': (_) =>
+                _wrapSelectable(const AdminShellPage(initialNav: AppNav.tasks)),
+            '/shift-absence': (_) => _wrapSelectable(
+              const AdminShellPage(initialNav: AppNav.shiftAbsence),
+            ),
+            '/incident-reports': (_) => _wrapSelectable(
+              const AdminShellPage(initialNav: AppNav.incidentReports),
+            ),
+            '/academy': (_) => _wrapSelectable(
+              const AdminShellPage(initialNav: AppNav.academy),
+            ),
+            '/dispatcher-pill': (_) => _wrapSelectable(
+              const AdminShellPage(initialNav: AppNav.dispatcherPill),
+            ),
+            '/notifications': (_) => _wrapSelectable(
+              const AdminShellPage(initialNav: AppNav.notifications),
+            ),
+            '/faqs': (_) =>
+                _wrapSelectable(const AdminShellPage(initialNav: AppNav.faqs)),
+            '/admin-approvals': (_) => _wrapSelectable(
+              const AdminShellPage(initialNav: AppNav.adminApprovals),
+            ),
 
-            '/coming-soon': (_) => const _PlaceholderPage(title: 'Coming Soon'),
+            '/coming-soon': (_) =>
+                _wrapSelectable(const _PlaceholderPage(title: 'Coming Soon')),
           },
         );
       },

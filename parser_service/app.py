@@ -155,11 +155,34 @@ def to_percent(x: Any) -> Optional[float]:
 def clamp(v: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, v))
 
-def status_bucket(final_score: Optional[float]) -> str:
+def _is_week10_policy_active(
+    year: Optional[int],
+    week_number: Optional[int],
+) -> bool:
+    # Policy change starts at scorecard week 9 of 2026 and remains active.
+    if year is None:
+        return False
+    if year > 2026:
+        return True
+    if year < 2026:
+        return False
+    return (week_number or 0) >= 9
+
+def _fantastic_plus_cutoff(
+    year: Optional[int],
+    week_number: Optional[int],
+) -> float:
+    return 88.0 if _is_week10_policy_active(year, week_number) else 93.0
+
+def status_bucket(
+    final_score: Optional[float],
+    week_number: Optional[int] = None,
+    year: Optional[int] = None,
+) -> str:
     if final_score is None:
         return "Unknown"
     s = float(final_score)
-    if s >= 93:
+    if s >= _fantastic_plus_cutoff(year, week_number):
         return "FANTASTIC_PLUS"
     if s >= 85:
         return "FANTASTIC"
@@ -582,10 +605,37 @@ def extract_summary(pdf: pdfplumber.PDF) -> Dict[str, Any]:
 # ===============================
 def _is_pod_quality_pdf(pdf: pdfplumber.PDF, filename: str) -> bool:
     name = (filename or "").lower()
-    if "pod-quality" in name or "pod_quality" in name:
+    if any(tag in name for tag in ("pod-quality", "pod_quality", "photo_on_delivery")):
         return True
-    first_text = clean_str(pdf.pages[0].extract_text() or "").lower()
-    return "photo on delivery quality report" in first_text
+
+    # Check text on first two pages for common POD report signatures.
+    first_pages_text = " ".join(
+        clean_str(p.extract_text() or "").lower() for p in pdf.pages[:2]
+    )
+    text_signatures = (
+        "photo on delivery quality report",
+        "pod quality report",
+        "photo on delivery quality",
+    )
+    if any(sig in first_pages_text for sig in text_signatures):
+        return True
+
+    # Fallback: detect POD summary tables by header patterns.
+    for page in pdf.pages[:2]:
+        for table in page.extract_tables() or []:
+            if not table or not table[0]:
+                continue
+            header_cells = [clean_str(c).lower() for c in table[0]]
+            header_text = " ".join(header_cells)
+            has_category = "category" in header_cells or "category" in header_text
+            has_pod_totals = (
+                "total opportunities" in header_text or
+                "total rejects" in header_text
+            )
+            if has_category and has_pod_totals:
+                return True
+
+    return False
 
 def _extract_pod_quality_summary(pdf: pdfplumber.PDF, filename: str) -> Dict[str, Any]:
     res: Dict[str, Any] = {}
@@ -695,7 +745,11 @@ def _extract_pod_quality_drivers(pdf: pdfplumber.PDF) -> List[Dict[str, Any]]:
 # ===============================
 # RANKING
 # ===============================
-def add_ranking_and_status(drivers: List[Dict[str, Any]]) -> None:
+def add_ranking_and_status(
+    drivers: List[Dict[str, Any]],
+    week_number: Optional[int] = None,
+    year: Optional[int] = None,
+) -> None:
     sortable = [d for d in drivers if isinstance(d.get("FinalScore"), (int, float))]
     sortable.sort(key=lambda x: x["FinalScore"], reverse=True)
 
@@ -712,7 +766,7 @@ def add_ranking_and_status(drivers: List[Dict[str, Any]]) -> None:
     for d in drivers:
         fs = d.get("FinalScore")
         d["rank"] = score_to_rank.get(fs) if isinstance(fs, (int, float)) else None
-        d["statusBucket"] = status_bucket(fs)
+        d["statusBucket"] = status_bucket(fs, week_number=week_number, year=year)
 
 # ===============================
 # ROUTES
@@ -736,7 +790,7 @@ async def parse_pdf(file: UploadFile = File(...)):
             # ONLY CHANGE: pass year through so FinalScore uses (year, week)
             drivers = extract_driver_rows(pdf, week_number=week_number, year=year)
 
-            add_ranking_and_status(drivers)
+            add_ranking_and_status(drivers, week_number=week_number, year=year)
 
     for d in drivers:
         if isinstance(d, dict) and "_cdf_mode" in d:
