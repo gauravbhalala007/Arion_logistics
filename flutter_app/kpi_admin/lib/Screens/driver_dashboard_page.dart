@@ -23,6 +23,157 @@ num _numOr0(dynamic v) {
   return 0;
 }
 
+double _ceDisplayPenalty(num? ceCount) {
+  final count = (ceCount ?? 0).toDouble();
+  if (count <= 0) return 100.0;
+  return -(50.0 * count);
+}
+
+Map<String, dynamic> _mapFromDynamic(dynamic value) {
+  if (value is Map<String, dynamic>) return value;
+  if (value is Map) {
+    return value.map(
+      (key, val) => MapEntry(key.toString(), val),
+    );
+  }
+  return <String, dynamic>{};
+}
+
+String _companySummarySectionLabel(BuildContext context, String key) {
+  final loc = AppLocalizations.of(context);
+  switch (key) {
+    case 'safety':
+      return loc.t('dash_company_section_safety');
+    case 'compliance':
+      return loc.t('dash_company_section_compliance');
+    case 'customerDeliveryExperience':
+      return loc.t('dash_company_section_customer_delivery_experience');
+    case 'quality':
+      return loc.t('dash_company_section_quality');
+    case 'standardWorkCompliance':
+      return loc.t('dash_company_section_standard_work_compliance');
+    default:
+      return key;
+  }
+}
+
+String _companySummaryMetricLabel(BuildContext context, String key) {
+  final loc = AppLocalizations.of(context);
+  switch (key) {
+    case 'fico':
+      return loc.t('dash_metric_fico');
+    case 'speedingEventRatePer100Trips':
+      return loc.t('dash_metric_speeding_event_rate');
+    case 'mentorAdoptionRate':
+      return loc.t('dash_metric_mentor_adoption_rate');
+    case 'vehicleAuditCompliance':
+      return loc.t('dash_metric_vehicle_audit_compliance');
+    case 'breachOfContract':
+      return loc.t('dash_metric_breach_of_contract');
+    case 'workingHoursCompliance':
+      return loc.t('dash_metric_working_hours_compliance');
+    case 'comprehensiveAuditScore':
+      return loc.t('dash_metric_comprehensive_audit_score');
+    case 'customerEscalationDpmo':
+      return loc.t('dash_metric_customer_escalation_dpmo');
+    case 'customerDeliveryFeedback':
+      return loc.t('dash_metric_customer_delivery_feedback');
+    case 'deliveryCompletionRate':
+      return loc.t('dash_metric_delivery_completion_rate');
+    case 'dnrDpmo':
+      return loc.t('dash_metric_dnr_dpmo');
+    case 'lorDpmo':
+      return loc.t('dash_metric_lor_dpmo');
+    case 'dscDpmo':
+      return loc.t('dash_metric_dsc_dpmo');
+    case 'photoOnDelivery':
+      return loc.t('dash_metric_photo_on_delivery');
+    case 'contactCompliance':
+      return loc.t('dash_metric_contact_compliance');
+    default:
+      return key;
+  }
+}
+
+List<String> _orderedCompanySectionKeys(Iterable<String> keys) {
+  const order = <String>[
+    'safety',
+    'compliance',
+    'customerDeliveryExperience',
+    'quality',
+    'standardWorkCompliance',
+  ];
+  final existing = keys.toSet();
+  return [
+    ...order.where(existing.contains),
+    ...keys.where((k) => !order.contains(k)),
+  ];
+}
+
+List<String> _orderedCompanyMetricKeys(String sectionKey, Iterable<String> keys) {
+  const metricOrder = <String, List<String>>{
+    'safety': <String>[
+      'fico',
+      'speedingEventRatePer100Trips',
+      'mentorAdoptionRate',
+    ],
+    'compliance': <String>[
+      'vehicleAuditCompliance',
+      'workingHoursCompliance',
+      'comprehensiveAuditScore',
+      'breachOfContract',
+    ],
+    'customerDeliveryExperience': <String>[
+      'customerEscalationDpmo',
+      'customerDeliveryFeedback',
+    ],
+    'quality': <String>[
+      'deliveryCompletionRate',
+      'dnrDpmo',
+      'lorDpmo',
+    ],
+    'standardWorkCompliance': <String>[
+      'dscDpmo',
+      'photoOnDelivery',
+      'contactCompliance',
+    ],
+  };
+  final desired = metricOrder[sectionKey] ?? const <String>[];
+  final existing = keys.toSet();
+  return [
+    ...desired.where(existing.contains),
+    ...keys.where((k) => !desired.contains(k)),
+  ];
+}
+
+bool _companyMetricUsesPercent(String key) {
+  switch (key) {
+    case 'mentorAdoptionRate':
+    case 'vehicleAuditCompliance':
+    case 'workingHoursCompliance':
+    case 'deliveryCompletionRate':
+    case 'photoOnDelivery':
+    case 'contactCompliance':
+      return true;
+    default:
+      return false;
+  }
+}
+
+String _formatCompanyMetricValue(String key, dynamic rawValue) {
+  if (rawValue == null) return '—';
+  if (rawValue is num) {
+    final num value = rawValue;
+    final hasFraction = value % 1 != 0;
+    final formatted = hasFraction
+        ? value.toStringAsFixed(2).replaceAll('.', ',')
+        : value.toString();
+    return _companyMetricUsesPercent(key) ? '$formatted%' : formatted;
+  }
+  final text = _s(rawValue).trim();
+  return text.isEmpty ? '—' : text;
+}
+
 const _kPrimaryGreen = Color(0xFF1D7F5A);
 const _kPrimaryGreenLight = Color(0xFF36B27B);
 
@@ -33,12 +184,71 @@ const _kGreatColor = Color(0xFFF7AA00); // Great
 const _kFairColor = Color(0xFFF47400); // Fair
 const _kPoorColor = Color(0xFFCE4121); // Poor
 
-Color _monthlyBucketColorFromScore(double s) {
-  if (s > 93) return _kFantasticPlusColor; // Fantastic Plus
-  if (s >= 85) return _kFantasticColor; // Fantastic
-  if (s >= 70) return _kGreatColor; // Great
-  if (s >= 50) return _kFairColor; // Fair
-  return _kPoorColor; // Poor
+String _prettyBucketText(String raw) {
+  switch (_s(raw).trim().toUpperCase()) {
+    case 'FANTASTIC_PLUS':
+      return 'Fantastic Plus';
+    case 'FANTASTIC':
+      return 'Fantastic';
+    case 'GREAT':
+      return 'Great';
+    case 'FAIR':
+      return 'Fair';
+    case 'POOR':
+      return 'Poor';
+    default:
+      return _s(raw);
+  }
+}
+
+Color _colorFromBucket(String apiBucket) {
+  switch (_s(apiBucket).trim().toUpperCase()) {
+    case 'FANTASTIC_PLUS':
+      return _kFantasticPlusColor;
+    case 'FANTASTIC':
+      return _kFantasticColor;
+    case 'GREAT':
+      return _kGreatColor;
+    case 'FAIR':
+      return _kFairColor;
+    case 'POOR':
+      return _kPoorColor;
+    default:
+      return const Color(0xFF64748B);
+  }
+}
+
+String _companyScoreBucketFromScore(double? score) {
+  if (score == null) return '';
+  if (score >= 88.0) return 'FANTASTIC_PLUS';
+  if (score >= 80.0) return 'FANTASTIC';
+  if (score >= 70.0) return 'GREAT';
+  if (score >= 60.0) return 'FAIR';
+  return 'POOR';
+}
+
+String _companyScoreThresholdHint(BuildContext context, double? score) {
+  if (score == null) return '';
+  final formatted = score.toStringAsFixed(2).replaceAll('.', ',');
+  if (score >= 88.0) {
+    return AppLocalizations.of(
+      context,
+    ).tf('dash_company_threshold_met', {'score': formatted, 'target': '88'});
+  }
+  final double nextThreshold;
+  if (score >= 80.0) {
+    nextThreshold = 88.0;
+  } else if (score >= 70.0) {
+    nextThreshold = 80.0;
+  } else if (score >= 60.0) {
+    nextThreshold = 70.0;
+  } else {
+    nextThreshold = 60.0;
+  }
+  return AppLocalizations.of(context).tf('dash_company_threshold_hint', {
+    'score': formatted,
+    'target': nextThreshold.toStringAsFixed(0),
+  });
 }
 
 enum _ViewMode { company, myScore }
@@ -63,6 +273,7 @@ class DashboardTabBody extends StatefulWidget {
 class _DashboardTabBodyState extends State<DashboardTabBody> {
   _ViewMode _viewMode = _ViewMode.company;
   _TimeFilter _timeFilter = _TimeFilter.week;
+  bool _showCompanySummaryDetails = false;
 
   String _bucket =
       'ALL'; // ALL | FANTASTIC_PLUS | FANTASTIC | GREAT | FAIR | POOR
@@ -192,74 +403,23 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
     );
   }
 
-  // Localized status text from numeric score
-  String _statusText(BuildContext context, double v) {
-    if (v >= 85) return 'Fantastic';
-    if (v >= 70) return 'Great';
-    if (v >= 55) return 'Fair';
-    return 'Poor';
-  }
-
-  Color _statusColor(double v) {
-    if (v >= 85) return const Color(0xFF16A34A);
-    if (v >= 70) return const Color(0xFF22C55E);
-    if (v >= 55) return const Color(0xFFF59E0B);
-    return const Color(0xFFEF4444);
-  }
-
-  bool _isWeek10PolicyActive({int? year, int? weekNumber}) {
-    if (year == null) return false;
-    if (year > 2026) return true;
-    if (year < 2026) return false;
-    return (weekNumber ?? 0) >= 9;
-  }
-
-  double _fantasticPlusCutoff({int? year, int? weekNumber}) {
-    return _isWeek10PolicyActive(year: year, weekNumber: weekNumber) ? 88 : 93;
-  }
-
-  String _statusCodeFromScore(double v, {int? year, int? weekNumber}) {
-    if (v >= _fantasticPlusCutoff(year: year, weekNumber: weekNumber)) {
-      return 'FANTASTIC_PLUS';
-    }
-    if (v >= 85) return 'FANTASTIC';
-    if (v >= 70) return 'GREAT';
-    if (v >= 50) return 'FAIR';
-    return 'POOR';
-  }
-
   // Pretty bucket name from API bucket code
   String _prettyBucket(BuildContext context, String raw) {
-    switch (_s(raw).trim().toUpperCase()) {
-      case 'FANTASTIC_PLUS':
-        return 'Fantastic Plus';
-      case 'FANTASTIC':
-        return 'Fantastic';
-      case 'GREAT':
-        return 'Great';
-      case 'FAIR':
-        return 'Fair';
-      case 'POOR':
-        return 'Poor';
-      default:
-        return _s(raw);
-    }
+    return _prettyBucketText(raw);
   }
 
   Color _colorFromApiBucket(String apiBucket) {
-    switch (_s(apiBucket).trim().toUpperCase()) {
-      case 'FANTASTIC_PLUS':
-        return _kFantasticPlusColor;
-      case 'FANTASTIC':
-        return _kFantasticColor;
-      case 'GREAT':
-        return _kGreatColor;
-      case 'FAIR':
-        return _kFairColor;
-      case 'POOR':
-      default:
-        return _kPoorColor;
-    }
+    return _colorFromBucket(apiBucket);
+  }
+
+  String _statusCodeFromScore(double? score) {
+    if (score == null) return '';
+    final s = score;
+    if (s >= 93.0) return 'FANTASTIC_PLUS';
+    if (s >= 86.0) return 'FANTASTIC';
+    if (s >= 70.0) return 'GREAT';
+    if (s >= 50.0) return 'FAIR';
+    return 'POOR';
   }
 
   int _monthIndexFromWeek(int year, int week) {
@@ -532,6 +692,14 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
         final stationName = _s(
           summary['stationCode'] ?? reportData['stationCode'],
         );
+        final complianceAndSafetyRaw = summary['complianceAndSafety'];
+        final complianceAndSafety = complianceAndSafetyRaw is Map
+            ? Map<String, dynamic>.from(complianceAndSafetyRaw as Map)
+            : <String, dynamic>{};
+        final deliveryQualitySwcRaw = summary['deliveryQualitySwc'];
+        final deliveryQualitySwc = deliveryQualitySwcRaw is Map
+            ? Map<String, dynamic>.from(deliveryQualitySwcRaw as Map)
+            : <String, dynamic>{};
 
         String rankText = '—';
         if (rankAtStation != null) {
@@ -543,9 +711,22 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
           }
         }
 
-        final overallStatusRaw = _s(summary['overallStatus']);
-        final statusText = _prettyBucket(context, overallStatusRaw);
-        final statusColor = _colorFromApiBucket(overallStatusRaw);
+        final companyStatusCode = _companyScoreBucketFromScore(overall);
+        final statusText = _prettyBucket(context, companyStatusCode);
+        final companyStatusHint = _companyScoreThresholdHint(context, overall);
+        final complianceAndSafetyStatusRaw = _s(
+          complianceAndSafety['overallStatus'],
+        );
+        final complianceAndSafetyStatusText =
+            complianceAndSafetyStatusRaw.isEmpty
+            ? '—'
+            : _prettyBucket(context, complianceAndSafetyStatusRaw);
+        final deliveryQualitySwcStatusRaw = _s(
+          deliveryQualitySwc['overallStatus'],
+        );
+        final deliveryQualitySwcStatusText = deliveryQualitySwcStatusRaw.isEmpty
+            ? '—'
+            : _prettyBucket(context, deliveryQualitySwcStatusRaw);
 
         final reportRef = selectedReport.reference;
 
@@ -704,9 +885,11 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
                     rankText: rankText,
                     stationName: stationName,
                     statusText: statusText,
-                    statusColor: statusColor,
+                    statusHint: companyStatusHint,
                     reliability: reliability,
                     viewMode: _viewMode,
+                    complianceAndSafetyText: complianceAndSafetyStatusText,
+                    deliveryQualitySwcText: deliveryQualitySwcStatusText,
                   )
                 else if (isMonthView && monthHeaderName != null)
                   _BestPeriodHeader(
@@ -720,6 +903,23 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
                     title: loc.t('dash_best_da_year'),
                     subtitle: yearHeader.toString(),
                   ),
+              ],
+
+              if (_viewMode == _ViewMode.company &&
+                  isWeekView &&
+                  (complianceAndSafety.isNotEmpty ||
+                      deliveryQualitySwc.isNotEmpty)) ...[
+                const SizedBox(height: 12),
+                _CompanySummaryDetailsSection(
+                  expanded: _showCompanySummaryDetails,
+                  onToggle: () {
+                    setState(() {
+                      _showCompanySummaryDetails = !_showCompanySummaryDetails;
+                    });
+                  },
+                  complianceAndSafety: complianceAndSafety,
+                  deliveryQualitySwc: deliveryQualitySwc,
+                ),
               ],
 
               const SizedBox(height: 18),
@@ -850,19 +1050,12 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
                                   final rank =
                                       (data['rank'] as num?)?.toInt() ?? i + 1;
                                   final apiBucketRaw = _s(data['statusBucket']);
-                                  final statusCode = apiBucketRaw.isNotEmpty
-                                      ? apiBucketRaw
-                                      : _statusCodeFromScore(
-                                          score,
-                                          year: year,
-                                          weekNumber: weekNumber,
-                                        );
                                   final statusText = _prettyBucket(
                                     context,
-                                    statusCode,
+                                    apiBucketRaw,
                                   );
                                   final statusColor = _colorFromApiBucket(
-                                    statusCode,
+                                    apiBucketRaw,
                                   );
 
                                   return _LeaderboardRowCard(
@@ -907,6 +1100,7 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
                                   _MonthlyEntry(
                                     transporterId: tid,
                                     avgScore: avgScore,
+                                    statusCode: _statusCodeFromScore(avgScore),
                                   ),
                                 );
                               });
@@ -944,16 +1138,12 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
                                       _s(nameMap[e.transporterId]).isNotEmpty
                                       ? _s(nameMap[e.transporterId])
                                       : loc.t('dash_no_name');
-                                  final statusCode = _statusCodeFromScore(
-                                    e.avgScore,
-                                    year: filterYear,
-                                  );
                                   final statusText = _prettyBucket(
                                     context,
-                                    statusCode,
+                                    e.statusCode,
                                   );
                                   final statusColor = _colorFromApiBucket(
-                                    statusCode,
+                                    e.statusCode,
                                   );
 
                                   return _LeaderboardRowCard(
@@ -962,10 +1152,6 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
                                     name: name,
                                     statusText: statusText,
                                     statusColor: statusColor,
-                                    backgroundColor:
-                                        _monthlyBucketColorFromScore(
-                                          e.avgScore,
-                                        ),
                                   );
                                 },
                               );
@@ -1015,13 +1201,14 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
                             final rankMy = (myData['rank'] as num?)?.toInt();
                             final apiBucketRaw = _s(myData['statusBucket']);
 
-                            final statusTextMy = apiBucketRaw.isNotEmpty
-                                ? _prettyBucket(context, apiBucketRaw)
-                                : _statusText(context, scoreTotal);
+                            final statusTextMy = _prettyBucket(
+                              context,
+                              apiBucketRaw,
+                            );
 
-                            final statusColorMy = apiBucketRaw.isNotEmpty
-                                ? _colorFromApiBucket(apiBucketRaw)
-                                : _statusColor(scoreTotal);
+                            final statusColorMy = _colorFromApiBucket(
+                              apiBucketRaw,
+                            );
 
                             final dcrScore = _numOr0(
                               comp['DCR_Score'],
@@ -1037,9 +1224,6 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
                             ).toDouble();
                             final ccScore = _numOr0(
                               comp['CC_Score'],
-                            ).toDouble();
-                            final ceScore = _numOr0(
-                              comp['CE_Score'] ?? comp['CE'],
                             ).toDouble();
                             final cdfScore = _numOr0(
                               comp['CDF_Score'],
@@ -1063,6 +1247,7 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
                             final ceValue = _numOr0(
                               kpis['CE'] ?? kpis['CE %'] ?? kpis['CE_PCT'],
                             ).toDouble();
+                            final ceScore = _ceDisplayPenalty(ceValue);
                             final cdfValue = _numOr0(
                               kpis['CDF'] ?? kpis['CDF DPMO'],
                             ).toDouble();
@@ -1829,9 +2014,11 @@ class _SummaryStrip extends StatelessWidget {
   final String rankText;
   final String stationName;
   final String statusText;
-  final Color statusColor;
+  final String statusHint;
   final double? reliability;
   final _ViewMode viewMode;
+  final String complianceAndSafetyText;
+  final String deliveryQualitySwcText;
 
   const _SummaryStrip({
     required this.weekNumber,
@@ -1839,9 +2026,11 @@ class _SummaryStrip extends StatelessWidget {
     required this.rankText,
     required this.stationName,
     required this.statusText,
-    required this.statusColor,
+    required this.statusHint,
     required this.reliability,
     required this.viewMode,
+    required this.complianceAndSafetyText,
+    required this.deliveryQualitySwcText,
   });
 
   @override
@@ -1859,13 +2048,10 @@ class _SummaryStrip extends StatelessWidget {
     const valueColorDefault = Colors.white;
     final separatorColor = Colors.white.withOpacity(0.3);
 
-    final totalScoreStr = totalScore == 0
-        ? '—'
-        : totalScore.toStringAsFixed(2).replaceAll('.', ',');
-
     Widget _cell({
       required String label,
       required String value,
+      String? subtext,
       Color? valueColor,
     }) {
       return Expanded(
@@ -1896,6 +2082,21 @@ class _SummaryStrip extends StatelessWidget {
                 color: valueColor ?? valueColorDefault,
               ),
             ),
+            if (subtext != null && subtext.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                subtext,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 10,
+                  height: 1.25,
+                  color: Colors.white.withOpacity(0.88),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ],
         ),
       );
@@ -1903,29 +2104,418 @@ class _SummaryStrip extends StatelessWidget {
 
     final cells = <Widget>[
       _cell(label: loc.t('dash_rank_in_station'), value: rankText),
-      _cell(label: loc.t('dash_status'), value: statusText.toUpperCase()),
+      _cell(
+        label: loc.t('dash_status'),
+        value: statusText.toUpperCase(),
+        subtext: statusHint,
+      ),
+      _cell(
+        label: loc.t('dash_compliance_safety'),
+        value: complianceAndSafetyText.toUpperCase(),
+      ),
+      _cell(
+        label: loc.t('dash_delivery_quality_swc'),
+        value: deliveryQualitySwcText.toUpperCase(),
+      ),
     ];
 
-    return Container(
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: borderColor),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 720;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(color: borderColor),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+          child: isCompact
+              ? Column(
+                  children: [
+                    Row(
+                      children: [
+                        cells[0],
+                        const SizedBox(width: 12),
+                        Container(width: 1, height: 32, color: separatorColor),
+                        const SizedBox(width: 12),
+                        cells[1],
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Container(height: 1, color: separatorColor),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        cells[2],
+                        const SizedBox(width: 12),
+                        Container(width: 1, height: 32, color: separatorColor),
+                        const SizedBox(width: 12),
+                        cells[3],
+                      ],
+                    ),
+                  ],
+                )
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    for (int i = 0; i < cells.length; i++) ...[
+                      cells[i],
+                      if (i != cells.length - 1) ...[
+                        const SizedBox(width: 12),
+                        Container(
+                          width: 1,
+                          height: 32,
+                          color: separatorColor,
+                        ),
+                        const SizedBox(width: 12),
+                      ],
+                    ],
+                  ],
+                ),
+        );
+      },
+    );
+  }
+}
+
+class _CompanySummaryDetailsSection extends StatelessWidget {
+  final bool expanded;
+  final VoidCallback onToggle;
+  final Map<String, dynamic> complianceAndSafety;
+  final Map<String, dynamic> deliveryQualitySwc;
+
+  const _CompanySummaryDetailsSection({
+    required this.expanded,
+    required this.onToggle,
+    required this.complianceAndSafety,
+    required this.deliveryQualitySwc,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cards = <Widget>[
+      if (complianceAndSafety.isNotEmpty)
+        _CompanySummaryCard(
+          title: AppLocalizations.of(context).t('dash_compliance_safety'),
+          summary: complianceAndSafety,
+          hiddenSections: const {'compliance'},
+        ),
+      if (deliveryQualitySwc.isNotEmpty)
+        _CompanySummaryCard(
+          title: AppLocalizations.of(context).t('dash_delivery_quality_swc'),
+          summary: deliveryQualitySwc,
+        ),
+    ];
+    final loc = AppLocalizations.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InkWell(
+          onTap: onToggle,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0FDF4),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: const Color(0xFFBBF7D0)),
+                  ),
+                  child: Text(
+                    loc.t('dash_company_data_section'),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF166534),
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    expanded
+                        ? loc.t('dash_company_data_hide')
+                        : loc.t('dash_company_data_show'),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF475569),
+                    ),
+                  ),
+                ),
+                Icon(
+                  expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                  color: const Color(0xFF475569),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (expanded) ...[
+          const SizedBox(height: 12),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxWidth < 900;
+              if (isCompact) {
+                return Column(
+                  children: [
+                    for (int i = 0; i < cards.length; i++) ...[
+                      cards[i],
+                      if (i != cards.length - 1) const SizedBox(height: 12),
+                    ],
+                  ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (int i = 0; i < cards.length; i++) ...[
+                    Expanded(child: cards[i]),
+                    if (i != cards.length - 1) const SizedBox(width: 12),
+                  ],
+                ],
+              );
+            },
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _CompanySummaryCard extends StatelessWidget {
+  final String title;
+  final Map<String, dynamic> summary;
+  final Set<String> hiddenSections;
+
+  const _CompanySummaryCard({
+    required this.title,
+    required this.summary,
+    this.hiddenSections = const <String>{},
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final overallStatus = _s(summary['overallStatus']);
+    final overallStatusText = overallStatus.isEmpty
+        ? '—'
+        : _prettyBucketText(overallStatus);
+    final overallStatusColor = overallStatus.isEmpty
+        ? const Color(0xFF64748B)
+        : _colorFromBucket(overallStatus);
+
+    final sectionKeys = _orderedCompanySectionKeys(
+      summary.keys.where(
+        (key) => key != 'overallStatus' && !hiddenSections.contains(key),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    );
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          for (int i = 0; i < cells.length; i++) ...[
-            cells[i],
-            if (i != cells.length - 1) ...[
-              const SizedBox(width: 12),
-              Container(width: 1, height: 32, color: separatorColor),
-              const SizedBox(width: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF111827),
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: overallStatusColor.withOpacity(0.14),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  overallStatusText,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: overallStatusColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (sectionKeys.isNotEmpty) const SizedBox(height: 14),
+          for (int i = 0; i < sectionKeys.length; i++) ...[
+            _CompanySummaryGroup(
+              sectionKey: sectionKeys[i],
+              metrics: _mapFromDynamic(summary[sectionKeys[i]]),
+            ),
+            if (i != sectionKeys.length - 1) ...[
+              const SizedBox(height: 14),
             ],
           ],
         ],
       ),
+    );
+  }
+}
+
+class _CompanySummaryGroup extends StatelessWidget {
+  final String sectionKey;
+  final Map<String, dynamic> metrics;
+
+  const _CompanySummaryGroup({
+    required this.sectionKey,
+    required this.metrics,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final metricKeys = _orderedCompanyMetricKeys(sectionKey, metrics.keys);
+    if (metricKeys.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Text(
+            _companySummarySectionLabel(context, sectionKey),
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF334155),
+              letterSpacing: 0.2,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFFFDFDFD),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+          ),
+          child: Column(
+            children: [
+              for (int i = 0; i < metricKeys.length; i++) ...[
+                _CompanySummaryMetricRow(
+                  metricKey: metricKeys[i],
+                  metric: _mapFromDynamic(metrics[metricKeys[i]]),
+                ),
+                if (i != metricKeys.length - 1)
+                  Divider(color: Colors.grey.shade200, height: 1),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CompanySummaryMetricRow extends StatelessWidget {
+  final String metricKey;
+  final Map<String, dynamic> metric;
+
+  const _CompanySummaryMetricRow({
+    required this.metricKey,
+    required this.metric,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final valueText = _formatCompanyMetricValue(metricKey, metric['value']);
+    final statusRaw = _s(metric['status']);
+    final statusText = statusRaw.isEmpty
+        ? ''
+        : _prettyBucketText(statusRaw);
+    final statusColor = statusRaw.isEmpty
+        ? const Color(0xFF64748B)
+        : _colorFromBucket(statusRaw);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+            child: Text(
+              _companySummaryMetricLabel(context, metricKey),
+              style: const TextStyle(
+                fontSize: 13,
+                height: 1.3,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF475569),
+              ),
+            ),
+          ),
+        ),
+        ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 90, maxWidth: 160),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 12, 14, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  valueText,
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF111827),
+                  ),
+                ),
+                if (statusText.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    statusText,
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: statusColor,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -2251,8 +2841,13 @@ class _MonthlyAgg {
 class _MonthlyEntry {
   final String transporterId;
   final double avgScore;
+  final String statusCode;
 
-  _MonthlyEntry({required this.transporterId, required this.avgScore});
+  _MonthlyEntry({
+    required this.transporterId,
+    required this.avgScore,
+    required this.statusCode,
+  });
 }
 
 // ---------- My Score KPI tiles ----------
@@ -2433,9 +3028,14 @@ class _ExpandableKpiTileState extends State<_ExpandableKpiTile> {
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context);
+    final isCeMetric = widget.code.trim().toUpperCase() == 'CE';
 
-    final scoreStr = widget.score.toStringAsFixed(2).replaceAll('.', ',');
-    final valueStr = widget.value.toStringAsFixed(2).replaceAll('.', ',');
+    final scoreStr = isCeMetric
+        ? '${widget.score.toStringAsFixed(0).replaceAll('.', ',')}%'
+        : widget.score.toStringAsFixed(2).replaceAll('.', ',');
+    final valueStr = isCeMetric
+        ? scoreStr
+        : widget.value.toStringAsFixed(2).replaceAll('.', ',');
 
     const labelStyle = TextStyle(
       fontSize: 11,

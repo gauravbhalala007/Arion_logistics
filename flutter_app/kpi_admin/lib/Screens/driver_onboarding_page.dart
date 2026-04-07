@@ -287,7 +287,13 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to save: $e')),
+        SnackBar(
+          content: Text(
+            _loc.tf('driver_onboarding_save_failed_template', {
+              'error': '$e',
+            }),
+          ),
+        ),
       );
     } finally {
       if (mounted) {
@@ -359,12 +365,24 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${_docTypeLabel(docType)} uploaded.')),
+        SnackBar(
+          content: Text(
+            _loc.tf('driver_onboarding_document_uploaded_template', {
+              'document': _docTypeLabel(docType),
+            }),
+          ),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to upload documents: $e')),
+        SnackBar(
+          content: Text(
+            _loc.tf('driver_onboarding_upload_documents_failed_template', {
+              'error': '$e',
+            }),
+          ),
+        ),
       );
     } finally {
       if (mounted) {
@@ -401,9 +419,7 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
       if (bytes == null) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not read image bytes from file picker.'),
-          ),
+          SnackBar(content: Text(_loc.t('could_not_read_image_bytes'))),
         );
         setState(() {
           _uploadingProfilePhoto = false;
@@ -437,12 +453,16 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile photo updated.')),
+        SnackBar(content: Text(_loc.t('profile_photo_updated'))),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to upload profile photo: $e')),
+        SnackBar(
+          content: Text(
+            _loc.tf('failed_upload_profile_photo', {'error': '$e'}),
+          ),
+        ),
       );
     } finally {
       if (mounted) {
@@ -1873,7 +1893,7 @@ class _DriverDocsPreview extends StatelessWidget {
                     ),
                     IconButton(
                       icon: const Icon(Icons.open_in_new, size: 18),
-                      tooltip: 'Open',
+                      tooltip: loc.t('driver_onboarding_open_document_tooltip'),
                       onPressed: url.isEmpty
                           ? null
                           : () async {
@@ -1885,8 +1905,12 @@ class _DriverDocsPreview extends StatelessWidget {
                                 );
                               } else {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Could not open document URL'),
+                                  SnackBar(
+                                    content: Text(
+                                      loc.t(
+                                        'driver_onboarding_open_document_failed',
+                                      ),
+                                    ),
                                   ),
                                 );
                               }
@@ -1894,18 +1918,28 @@ class _DriverDocsPreview extends StatelessWidget {
                     ),
                     IconButton(
                       icon: const Icon(Icons.delete_outline, size: 18),
-                      tooltip: 'Delete',
+                      tooltip:
+                          loc.t('driver_onboarding_delete_document_tooltip'),
                       onPressed: () async {
                         try {
                           await d.reference.delete();
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Document deleted.')),
+                            SnackBar(
+                              content: Text(
+                                loc.t('driver_onboarding_document_deleted'),
+                              ),
+                            ),
                           );
                         } catch (e) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                                content:
-                                    Text('Failed to delete document: $e')),
+                              content: Text(
+                                loc.tf(
+                                  'driver_onboarding_delete_document_failed_template',
+                                  {'error': '$e'},
+                                ),
+                              ),
+                            ),
                           );
                         }
                       },

@@ -15,6 +15,7 @@ final _int = NumberFormat.decimalPattern('de');
 
 // ---- tiny helpers ----
 String _s(dynamic v) => (v == null) ? '' : v.toString();
+String _normTid(dynamic v) => DriverCsvService.normalizeTransporterId(_s(v));
 
 String _pctStr(num? v) {
   if (v == null) return '';
@@ -23,6 +24,16 @@ String _pctStr(num? v) {
   } catch (_) {
     return '';
   }
+}
+
+double _ceDisplayPenalty(num? ceCount) {
+  final count = (ceCount ?? 0).toDouble();
+  if (count <= 0) return 100.0;
+  return -(50.0 * count);
+}
+
+String _ceDisplayStr(num? ceCount) {
+  return _pctStr(_ceDisplayPenalty(ceCount));
 }
 
 String _intStr(num? v) {
@@ -111,7 +122,7 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
         .collection('users')
         .doc(uid)
         .collection('scores')
-        .where('reportRef', isEqualTo: widget.reportRef)
+        .where('reportId', isEqualTo: widget.reportRef.id)
         .snapshots()
         .map((s) => s.docs);
   }
@@ -122,7 +133,7 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
       final m = <String, String>{};
       for (final d in snap.docs) {
         final data = _strMap(d.data());
-        final id = _s(data['transporterId'] ?? d.id);
+        final id = _normTid(data['transporterId'] ?? d.id);
         final name = _s(data['driverName']);
         if (id.isNotEmpty) m[id] = name;
       }
@@ -132,39 +143,30 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
 
   /// Global fallback (/drivers)
   Stream<Map<String, String>> _driversNameMapGlobal() {
-    return FirebaseFirestore.instance.collection('drivers').snapshots().map((
-      snap,
-    ) {
-      final m = <String, String>{};
-      for (final d in snap.docs) {
-        final data = d.data();
-        final id = _s(data['transporterId']);
-        final name = _s(data['driverName']);
-        if (id.isNotEmpty) m[id] = name;
-      }
-      return m;
-    });
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return Stream.value(const <String, String>{});
+
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('drivers')
+        .snapshots()
+        .map((snap) {
+          final m = <String, String>{};
+          for (final d in snap.docs) {
+            final data = d.data();
+            final id = _normTid(data['transporterId'] ?? d.id);
+            final name = _s(data['driverName']);
+            if (id.isNotEmpty) m[id] = name;
+          }
+          return m;
+        });
   }
 
   @override
   void initState() {
     super.initState();
     _reportStream = widget.reportRef.snapshots();
-  }
-
-  // ===== summary helpers =====
-  String _statusText(double v, AppLocalizations t) {
-    if (v >= 85) return t.t('bucket_fantastic');
-    if (v >= 70) return t.t('bucket_great');
-    if (v >= 55) return t.t('bucket_fair');
-    return t.t('bucket_poor');
-  }
-
-  Color _statusColor(double v) {
-    if (v >= 85) return const Color(0xFF16A34A);
-    if (v >= 70) return const Color(0xFF22C55E);
-    if (v >= 55) return const Color(0xFFF59E0B);
-    return const Color(0xFFEF4444);
   }
 
   Widget _fitNameText(String name, double fontSize) {
@@ -187,15 +189,15 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
   String _prettyBucket(String raw, AppLocalizations t) {
     switch (_s(raw).trim().toUpperCase()) {
       case 'FANTASTIC_PLUS':
-        return t.t('bucket_fantastic_plus');
+        return 'Fantastic Plus';
       case 'FANTASTIC':
-        return t.t('bucket_fantastic');
+        return 'Fantastic';
       case 'GREAT':
-        return t.t('bucket_great');
+        return 'Great';
       case 'FAIR':
-        return t.t('bucket_fair');
+        return 'Fair';
       case 'POOR':
-        return t.t('bucket_poor');
+        return 'Poor';
       default:
         return _s(raw);
     }
@@ -211,8 +213,9 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
       case 'FAIR':
         return const Color(0xFFF59E0B);
       case 'POOR':
-      default:
         return const Color(0xFFEF4444);
+      default:
+        return const Color(0xFF64748B);
     }
   }
 
@@ -237,11 +240,22 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
 
       // ✅ NEW: user-scoped update so ALL of this user’s reports/scores get names
       final uid = FirebaseAuth.instance.currentUser!.uid;
-      await DriverCsvService.importForUser(uid: uid, csvBytes: bytes);
+      final result = await DriverCsvService.importForUser(
+        uid: uid,
+        csvBytes: bytes,
+      );
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(t.t('scorecard_overview_csv_updated'))),
+        SnackBar(
+          content: Text(
+            '${t.t('scorecard_overview_csv_updated')} '
+            'Parsed ${result.parsedRows}, '
+            'matched ${result.mappedDrivers}, '
+            'new ${result.newDrivers}, '
+            'score rows updated ${result.updatedScores}.',
+          ),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
@@ -369,23 +383,23 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
                             ),
                             DropdownMenuItem(
                               value: 'FANTASTIC_PLUS',
-                              child: Text(t.t('bucket_fantastic_plus')),
+                              child: const Text('Fantastic Plus'),
                             ),
                             DropdownMenuItem(
                               value: 'FANTASTIC',
-                              child: Text(t.t('bucket_fantastic')),
+                              child: const Text('Fantastic'),
                             ),
                             DropdownMenuItem(
                               value: 'GREAT',
-                              child: Text(t.t('bucket_great')),
+                              child: const Text('Great'),
                             ),
                             DropdownMenuItem(
                               value: 'FAIR',
-                              child: Text(t.t('bucket_fair')),
+                              child: const Text('Fair'),
                             ),
                             DropdownMenuItem(
                               value: 'POOR',
-                              child: Text(t.t('bucket_poor')),
+                              child: const Text('Poor'),
                             ),
                           ],
                           onChanged: (v) =>
@@ -543,9 +557,7 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
                                   big: reliability == null
                                       ? '—'
                                       : '${_pct.format(reliability)} %',
-                                  small: reliability == null
-                                      ? ''
-                                      : _statusText(reliability, t),
+                                  small: '',
                                   accent: const Color(0xFF16A34A),
                                 ),
                               ),
@@ -610,11 +622,12 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
                         final q = _query.toLowerCase();
                         if (q.isNotEmpty) {
                           docs = docs.where((d) {
-                            final id = _s(
+                            final normalizedId = _normTid(
                               d.data()['transporterId'],
-                            ).toLowerCase();
+                            );
+                            final id = normalizedId.toLowerCase();
                             final name = _s(
-                              nameMap[_s(d.data()['transporterId'])],
+                              nameMap[normalizedId],
                             ).toLowerCase();
                             return id.contains(q) || name.contains(q);
                           }).toList();
@@ -672,16 +685,17 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
                               final transporterId = _s(
                                 data['transporterId'],
                               ).trim();
-                              final name = _s(nameMap[transporterId]).isNotEmpty
-                                  ? _s(nameMap[transporterId])
+                              final normalizedTid = _normTid(transporterId);
+                              final name = _s(nameMap[normalizedTid]).isNotEmpty
+                                  ? _s(nameMap[normalizedTid])
                                   : t.t('dash_no_name');
 
                               final score = _numOr0(comp['FinalScore']);
                               final dcr = _numOr0(comp['DCR_Score']);
                               final pod = _numOr0(comp['POD_Score']);
                               final cc = _numOr0(comp['CC_Score']);
-                              final ce = _numOr0(
-                                comp['CE_Score'] ?? comp['CE'],
+                              final ceCount = _numOr0(
+                                kpis['CE'] ?? kpis['CE %'] ?? kpis['CE_PCT'],
                               );
 
                               final delivered = _numOr0(
@@ -701,12 +715,10 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
 
                               final rank = (data['rank'] as num?)?.toInt();
                               final apiBucketRaw = _s(data['statusBucket']);
-                              final statusText = apiBucketRaw.isNotEmpty
-                                  ? _prettyBucket(apiBucketRaw, t)
-                                  : _statusText(score, t);
-                              final statusColor = apiBucketRaw.isNotEmpty
-                                  ? _colorFromApiBucket(apiBucketRaw)
-                                  : _statusColor(score);
+                              final statusText = _prettyBucket(apiBucketRaw, t);
+                              final statusColor = _colorFromApiBucket(
+                                apiBucketRaw,
+                              );
 
                               return Center(
                                 child: ConstrainedBox(
@@ -860,7 +872,7 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
                                                       w: w,
                                                     ),
                                                     _KpiCell(
-                                                      label: 'DNR DPMO',
+                                                      label: 'DSC DPMO',
                                                       value: _intStr(
                                                         dnr.round(),
                                                       ),
@@ -885,7 +897,9 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
                                                     ),
                                                     _KpiCell(
                                                       label: 'CE',
-                                                      value: _pctStr(ce),
+                                                      value: _ceDisplayStr(
+                                                        ceCount,
+                                                      ),
                                                       w: w,
                                                     ),
                                                     _KpiCell(
@@ -1042,7 +1056,7 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
                                                 ),
 
                                                 _MetricCol(
-                                                  title: 'DNR DPMO',
+                                                  title: 'DSC DPMO',
                                                   value: _intStr(dnr.round()),
                                                   w: w,
                                                 ),
@@ -1087,7 +1101,9 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
 
                                                 _MetricCol(
                                                   title: 'CE',
-                                                  value: _intStr(ce),
+                                                  value: _ceDisplayStr(
+                                                    ceCount,
+                                                  ),
                                                   w: w,
                                                 ),
                                                 VerticalDivider(

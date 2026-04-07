@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../localization/app_localizations.dart';
 
 class DriverShiftPlanPage extends StatelessWidget {
   final String dspUid;
@@ -16,9 +17,10 @@ class DriverShiftPlanPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     final driverId = driverTransporterId.toUpperCase().trim();
     if (dspUid.trim().isEmpty || driverId.isEmpty) {
-      return const Center(child: Text('Missing DSP or driver scope.'));
+      return Center(child: Text(t.t('driver_shift_plan_missing_scope')));
     }
 
     final shiftsCol = FirebaseFirestore.instance
@@ -47,8 +49,8 @@ class DriverShiftPlanPage extends StatelessWidget {
                   size: 20,
                 ),
                 const SizedBox(width: 8),
-                const Text(
-                  'Shift Plan',
+                Text(
+                  t.t('driver_shift_plan_title'),
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.w900,
@@ -69,13 +71,17 @@ class DriverShiftPlanPage extends StatelessWidget {
                   }
                   if (snap.hasError) {
                     return Center(
-                      child: Text('Failed to load shifts: ${snap.error}'),
+                      child: Text(
+                        t.tf('driver_shift_plan_load_failed_template', {
+                          'error': '${snap.error}',
+                        }),
+                      ),
                     );
                   }
 
                   final docs = snap.data?.docs ?? const [];
                   if (docs.isEmpty) {
-                    return const Center(child: Text('No shifts assigned yet.'));
+                    return Center(child: Text(t.t('driver_shift_plan_empty')));
                   }
 
                   final now = DateTime.now();
@@ -96,17 +102,17 @@ class DriverShiftPlanPage extends StatelessWidget {
                   return ListView(
                     padding: const EdgeInsets.only(bottom: 14),
                     children: [
-                      _sectionLabel('Upcoming shifts'),
+                      _sectionLabel(t.t('driver_shift_plan_upcoming')),
                       if (upcoming.isEmpty)
-                        _emptyCard('No upcoming shifts.')
+                        _emptyCard(t.t('driver_shift_plan_upcoming_empty'))
                       else
-                        ...upcoming.map(_shiftCard),
+                        ...upcoming.map((doc) => _shiftCard(context, doc)),
                       const SizedBox(height: 10),
-                      _sectionLabel('Past shifts'),
+                      _sectionLabel(t.t('driver_shift_plan_past')),
                       if (past.isEmpty)
-                        _emptyCard('No past shifts.')
+                        _emptyCard(t.t('driver_shift_plan_past_empty'))
                       else
-                        ...past.reversed.map(_shiftCard),
+                        ...past.reversed.map((doc) => _shiftCard(context, doc)),
                     ],
                   );
                 },
@@ -150,7 +156,10 @@ class DriverShiftPlanPage extends StatelessWidget {
     );
   }
 
-  Widget _shiftCard(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+  Widget _shiftCard(
+    BuildContext context,
+    QueryDocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
     final data = doc.data();
     final start = _toDateTime(data['shiftStart']);
     final end = _toDateTime(data['shiftEnd']);
@@ -204,7 +213,12 @@ class DriverShiftPlanPage extends StatelessWidget {
                   color: const Color(0xFFE4F5EC),
                 ),
                 child: Text(
-                  status.toUpperCase(),
+                  (status.trim().toLowerCase() == 'scheduled'
+                          ? AppLocalizations.of(
+                              context,
+                            ).t('driver_shift_plan_status_scheduled')
+                          : status)
+                      .toUpperCase(),
                   style: const TextStyle(
                     color: Color(0xFF1D7F5A),
                     fontSize: 11,

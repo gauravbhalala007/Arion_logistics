@@ -1,6 +1,9 @@
 // lib/widgets/driver_notification_card.dart
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
+import '../localization/app_localizations.dart';
 import '../models/driver_notification.dart';
 
 class DriverNotificationCard extends StatelessWidget {
@@ -15,10 +18,11 @@ class DriverNotificationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final statusText =
         notification.requiresConfirmation && !notification.confirmed
-            ? 'confirmation required'
-            : 'confirmed';
+            ? l10n.t('driver_notification_confirmation_required')
+            : l10n.t('driver_notification_confirmed');
 
     final statusColor =
         (notification.requiresConfirmation && !notification.confirmed)
@@ -27,6 +31,9 @@ class DriverNotificationCard extends StatelessWidget {
 
     final typeLabel = _typeLabel(notification.type);
     final icon = _typeIcon(notification.type);
+    final publishedDate = DateFormat(
+      'dd.MM.yyyy',
+    ).format(notification.createdAt.toLocal());
 
     return InkWell(
       onTap: onTap,
@@ -132,6 +139,31 @@ class DriverNotificationCard extends StatelessWidget {
                       color: Color(0xFF4A4F59),
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.calendar_today_rounded,
+                        size: 13,
+                        color: Color(0xFF8B95A7),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          l10n.tf('driver_notification_published_on', {
+                            'date': publishedDate,
+                          }),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF8B95A7),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -169,4 +201,3 @@ IconData _typeIcon(DriverNotificationType t) {
       return Icons.gavel_outlined;
   }
 }
-

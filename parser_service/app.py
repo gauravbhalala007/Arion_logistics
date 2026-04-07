@@ -91,6 +91,8 @@ class ParserSummary(BaseModel):
 
     podQualitySummary: Optional[Dict[str, Any]] = None
     podQualityRejects: Optional[Dict[str, Any]] = None
+    complianceAndSafety: Optional[Dict[str, Any]] = None
+    deliveryQualitySwc: Optional[Dict[str, Any]] = None
 
 class ParserResponse(BaseModel):
     count: int
@@ -155,24 +157,13 @@ def to_percent(x: Any) -> Optional[float]:
 def clamp(v: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, v))
 
-def _is_week10_policy_active(
-    year: Optional[int],
-    week_number: Optional[int],
-) -> bool:
-    # Policy change starts at scorecard week 9 of 2026 and remains active.
-    if year is None:
-        return False
-    if year > 2026:
-        return True
-    if year < 2026:
-        return False
-    return (week_number or 0) >= 9
-
-def _fantastic_plus_cutoff(
-    year: Optional[int],
-    week_number: Optional[int],
-) -> float:
-    return 88.0 if _is_week10_policy_active(year, week_number) else 93.0
+def normalize_status_label(raw: Any) -> str:
+    s = clean_str(raw)
+    if not s:
+        return ""
+    s = re.sub(r"[\s\-]+", "_", s.upper())
+    s = re.sub(r"[^A-Z0-9_]", "", s)
+    return s.strip("_")
 
 def status_bucket(
     final_score: Optional[float],
@@ -182,9 +173,9 @@ def status_bucket(
     if final_score is None:
         return "Unknown"
     s = float(final_score)
-    if s >= _fantastic_plus_cutoff(year, week_number):
+    if s >= 93.0:
         return "FANTASTIC_PLUS"
-    if s >= 85:
+    if s >= 86.0:
         return "FANTASTIC"
     if s >= 70:
         return "GREAT"
@@ -193,6 +184,202 @@ def status_bucket(
     if s >= 0:
         return "POOR"
     return "POOR"
+
+def _extract_metric_token(
+    text: str,
+    label: str,
+    next_labels: List[str],
+) -> Optional[str]:
+    lookahead = ""
+    if next_labels:
+        joined = "|".join(re.escape(v) for v in next_labels)
+        lookahead = rf"(?=\s+(?:{joined})\b|$)"
+    pattern = re.compile(rf"{re.escape(label)}\s+(.+?){lookahead}", re.IGNORECASE)
+    match = pattern.search(text)
+    if not match:
+        return None
+    return clean_str(match.group(1))
+
+def _extract_tokens_by_labels(
+    text: str,
+    labels: List[str],
+) -> Dict[str, str]:
+    found: List[tuple[str, int]] = []
+    cursor = 0
+    lower_text = text.lower()
+
+    for label in labels:
+        idx = lower_text.find(label.lower(), cursor)
+        if idx < 0:
+            continue
+        found.append((label, idx))
+        cursor = idx + len(label)
+
+    tokens: Dict[str, str] = {}
+    for i, (label, start) in enumerate(found):
+        value_start = start + len(label)
+        value_end = found[i + 1][1] if i + 1 < len(found) else len(text)
+        tokens[label] = clean_str(text[value_start:value_end])
+    return tokens
+
+def _extract_section_overall_status(
+    text: str,
+    section_label: str,
+    stop_labels: List[str],
+) -> str:
+    lower_text = text.lower()
+    start = lower_text.find(section_label.lower())
+    if start < 0:
+        return ""
+
+    start += len(section_label)
+    end = len(text)
+    for stop_label in stop_labels:
+        idx = lower_text.find(stop_label.lower(), start)
+        if idx >= 0:
+            end = min(end, idx)
+
+    snippet = clean_str(text[start:end])
+    if not snippet:
+        return ""
+
+    match = re.search(r"\b(Fantastic Plus|Fantastic|Great|Fair|Poor)\b", snippet, re.IGNORECASE)
+    return normalize_status_label(match.group(1)) if match else ""
+
+def _parse_metric_value(token: Optional[str]) -> Optional[Dict[str, Any]]:
+    s = clean_str(token)
+    if not s:
+        return None
+    s = re.sub(r"^[^A-Za-z0-9]+", "", s)
+    s = re.sub(r"\s+", " ", s).strip()
+
+    value_part = s
+    status_part = ""
+    if "|" in s:
+        left, right = s.split("|", 1)
+        value_part = clean_str(left)
+        status_part = clean_str(right)
+
+    parsed_num = to_num(value_part)
+    value: Any = parsed_num if parsed_num is not None else value_part
+    out: Dict[str, Any] = {"value": value}
+    if status_part:
+        out["status"] = normalize_status_label(status_part)
+    return out
+
+def _parse_scorecard_summary_sections(pdf: pdfplumber.PDF) -> Dict[str, Any]:
+    page_text = ""
+    for page in pdf.pages[:3]:
+        text = page.extract_text() or ""
+        if "Compliance and Safety" in text and "Delivery Quality & SWC" in text:
+            page_text = text
+            break
+    if not page_text:
+        return {}
+
+    flat = clean_str(page_text)
+    result: Dict[str, Any] = {}
+
+    safety_overall = _extract_section_overall_status(
+        flat,
+        "Compliance and Safety",
+        [
+            "Safe Driving Metric (FICO)",
+            "Safety",
+            "Safety Compliance",
+            "Delivery Quality & SWC:",
+        ],
+    )
+    delivery_overall = _extract_section_overall_status(
+        flat,
+        "Delivery Quality & SWC:",
+        [
+            "Customer delivery Experience",
+            "Customer escalation DPMO",
+            "Quality",
+            "Metrics highlighted in red",
+        ],
+    )
+
+    safety_labels = [
+        ("Safe Driving Metric (FICO)", "fico"),
+        ("Vehicle Audit (VSA) Compliance", "vehicleAuditCompliance"),
+        ("Speeding Event Rate (Per 100 Trips)", "speedingEventRatePer100Trips"),
+        ("Breach of Contract (BOC)", "breachOfContract"),
+        ("Mentor Adoption Rate", "mentorAdoptionRate"),
+        ("Working Hours Compliance (WHC)", "workingHoursCompliance"),
+        ("Comprehensive Audit Score (CAS)", "comprehensiveAuditScore"),
+    ]
+    delivery_labels = [
+        ("Customer escalation DPMO", "customerEscalationDpmo"),
+        ("Delivery Completion Rate(DCR)", "deliveryCompletionRate"),
+        ("Customer Delivery Feedback", "customerDeliveryFeedback"),
+        ("Delivered Not Received(DNR DPMO)", "dnrDpmo"),
+        ("Lost on Road (LoR) DPMO", "lorDpmo"),
+        ("Delivery Success Conditions (DSC DPMO)", "dscDpmo"),
+        ("Photo-On-Delivery", "photoOnDelivery"),
+        ("Contact Compliance", "contactCompliance"),
+    ]
+    safety_tokens = _extract_tokens_by_labels(
+        flat,
+        [label for label, _ in safety_labels] + ["Delivery Quality & SWC:"],
+    )
+    delivery_tokens = _extract_tokens_by_labels(
+        flat,
+        [
+            "Customer escalation DPMO",
+            "Delivery Completion Rate(DCR)",
+            "Customer Delivery Feedback",
+            "Delivered Not Received(DNR DPMO)",
+            "Lost on Road (LoR) DPMO",
+            "Standard Work Compliance",
+            "Delivery Success Conditions (DSC DPMO)",
+            "Photo-On-Delivery",
+            "Contact Compliance",
+            "Metrics highlighted in red",
+        ],
+    )
+
+    compliance_and_safety = {
+        "overallStatus": safety_overall,
+        "safety": {},
+        "compliance": {},
+    }
+    for label, key in safety_labels:
+        token = safety_tokens.get(label)
+        metric = _parse_metric_value(token)
+        if metric is None:
+            continue
+        if key in {"fico", "speedingEventRatePer100Trips", "mentorAdoptionRate"}:
+            compliance_and_safety["safety"][key] = metric
+        else:
+            compliance_and_safety["compliance"][key] = metric
+
+    if compliance_and_safety["overallStatus"] or compliance_and_safety["safety"] or compliance_and_safety["compliance"]:
+        result["complianceAndSafety"] = compliance_and_safety
+
+    delivery_quality_swc = {
+        "overallStatus": delivery_overall,
+        "customerDeliveryExperience": {},
+        "quality": {},
+        "standardWorkCompliance": {},
+    }
+    for label, key in delivery_labels:
+        token = delivery_tokens.get(label)
+        metric = _parse_metric_value(token)
+        if metric is None:
+            continue
+        if key in {"customerEscalationDpmo", "customerDeliveryFeedback"}:
+            delivery_quality_swc["customerDeliveryExperience"][key] = metric
+        elif key in {"deliveryCompletionRate", "dnrDpmo", "lorDpmo"}:
+            delivery_quality_swc["quality"][key] = metric
+        else:
+            delivery_quality_swc["standardWorkCompliance"][key] = metric
+
+    if delivery_quality_swc["overallStatus"] or delivery_quality_swc["customerDeliveryExperience"] or delivery_quality_swc["quality"] or delivery_quality_swc["standardWorkCompliance"]:
+        result["deliveryQualitySwc"] = delivery_quality_swc
+
+    return result
 
 # ===============================
 # KPI FORMULAS (Albert’s rules)
@@ -249,75 +436,43 @@ def compute_scores(
 
     FinalScore: Optional[float] = None
 
-    # ==========================
-    # FINAL SCORE REGIME SWITCH (ONLY CHANGE):
-    # Old formula valid through (Year=2025, Week=40)
-    # ==========================
-    def use_old_formula(y: Optional[int], w: Optional[int]) -> bool:
-        if w is None:
-            return False
-        if y is None:
-            # If year is missing, keep legacy behavior (week-only)
-            return w <= 40
-        if y < 2025:
-            return True
-        if y == 2025 and w <= 40:
-            return True
-        return False
+    def dsc_penalty_rate(dpmo: float) -> float:
+        if dpmo <= 0:
+            return 0.0
+        if dpmo < 600:
+            return 0.05
+        if dpmo <= 1000:
+            return 0.08
+        if dpmo <= 2500:
+            return 0.20
+        if dpmo <= 5000:
+            return 0.35
+        if dpmo <= 10000:
+            return 0.50
+        return 0.70
 
-    if use_old_formula(year, week_number):
-        # ==========================
-        #  OLD FORMULA
-        # ==========================
-        dcr_v = DCR_Score
-        pod_v = POD_Score
-        cc_v  = CC_Score
-        cdf_v = CDF_Score
+    def lor_penalty_rate(dpmo: float) -> float:
+        if dpmo <= 0:
+            return 0.0
+        if dpmo <= 500:
+            return 0.10
+        if dpmo <= 1500:
+            return 0.25
+        if dpmo <= 4000:
+            return 0.40
+        return 0.80
 
-        vals = [v for v in [dcr_v, pod_v, cc_v, cdf_v] if v is not None]
-        if vals:
-            avg_base = sum(vals) / len(vals)
-            ce_raw   = z(ce)
-            delivered_v = z(delivered)
-            dnr_v = z(dnr)
-
-            value_term = 0.0
-            if delivered_v > 0:
-                value_term = (dnr_v / delivered_v - 10.0 * ce_raw) * 11.0 + 10.0 * ce_raw
-
-            FinalScore = avg_base * 1.0 - value_term - 10.0 * ce_raw
-        else:
-            FinalScore = None
-
-    else:
-        # ==========================
-        #  NEW FORMULAS
-        # ==========================
-        denom = 14.1
-        w_dnr = 4.0
-        w_lor = 4.0
-
-        # Week-41/42 transition applies only for 2025 (otherwise week numbers repeat each year)
-        if year == 2025 and week_number == 41:
-            denom = 16.1
-            w_dnr = 5.0
-            w_lor = 5.0
-        elif year == 2025 and week_number == 42:
-            denom = 16.5
-            w_dnr = 5.0
-            w_lor = 5.0
-
-        numerator = (
-            z(DCR_Score) +
-            z(POD_Score) +
-            3.0 * z(CC_Score) +
-            w_dnr * z(DNR_Score) +
-            w_lor * z(LoR_Score) +
-            (z(CE_Score) / 50.0) +
-            z(CDF_Score)
-        )
-
-        FinalScore = numerator / denom if denom != 0 else None
+    # Final score uses the KPI average as the base, then applies:
+    #   1) a direct CE penalty
+    #   2) a DSC/DNR DPMO percentage penalty based on manager thresholds
+    #   3) a LoR DPMO percentage penalty based on manager thresholds
+    vals = [v for v in [DCR_Score, POD_Score, CC_Score, CDF_Score] if v is not None]
+    if vals:
+        avg_base = sum(vals) / len(vals)
+        ce_penalty = 90.0 * abs(ce_val)
+        dsc_penalty = avg_base * dsc_penalty_rate(dnr_val)
+        lor_penalty = avg_base * lor_penalty_rate(lor_val)
+        FinalScore = avg_base - ce_penalty - dsc_penalty - lor_penalty
 
     return {
         "POD_Score": POD_Score, "CC_Score": CC_Score, "DCR_Score": DCR_Score,
@@ -597,6 +752,8 @@ def extract_summary(pdf: pdfplumber.PDF) -> Dict[str, Any]:
     if m := grab(r"(?:Rank\s+(?:in\s+Station|at\s+[A-Z0-9\-]+))\D*(\d+)\D*(?:of|/|von)\D*(\d+)", re.IGNORECASE):
         res["rankAtStation"] = int(m.group(1))
         res["stationCount"] = int(m.group(2))
+
+    res.update(_parse_scorecard_summary_sections(pdf))
 
     return res
 

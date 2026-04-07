@@ -2,6 +2,8 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../localization/app_localizations.dart';
+
 enum DriverNotificationType {
   rule,
   message,
@@ -67,6 +69,33 @@ class DriverNotification {
     return null;
   }
 
+  static String _activeLanguageCode() {
+    final supported = AppLocalizations.supportedLocales
+        .map((l) => l.languageCode.toLowerCase())
+        .toSet();
+    final raw = localeController.locale?.languageCode.toLowerCase() ?? 'en';
+    return supported.contains(raw) ? raw : 'en';
+  }
+
+  static String _localizedText(
+    Map<String, dynamic> data,
+    String field,
+    String fallback,
+  ) {
+    final lang = _activeLanguageCode();
+    final translations =
+        (data['translations'] as Map?)?.cast<String, dynamic>() ??
+        const <String, dynamic>{};
+
+    final current = translations[lang];
+    if (current is Map) {
+      final localized = (current[field] ?? '').toString().trim();
+      if (localized.isNotEmpty) return localized;
+    }
+
+    return fallback;
+  }
+
   factory DriverNotification.fromDoc(
     DocumentSnapshot<Map<String, dynamic>> doc,
   ) {
@@ -75,8 +104,10 @@ class DriverNotification {
     final typeRaw = (data['type'] ?? '').toString().trim();
     final statusRaw = (data['status'] ?? 'unread').toString().trim();
 
-    final title = (data['title'] ?? '').toString();
-    final body = (data['body'] ?? '').toString();
+    final baseTitle = (data['title'] ?? '').toString();
+    final baseBody = (data['body'] ?? '').toString();
+    final title = _localizedText(data, 'title', baseTitle);
+    final body = _localizedText(data, 'body', baseBody);
 
     final createdAt = _parseDate(data['createdAt']);
     final requiresConfirmation = (data['requiresConfirmation'] as bool?) ?? true;

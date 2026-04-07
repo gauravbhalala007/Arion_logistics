@@ -125,13 +125,16 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
         badgeColor: const Color(0xFFFF4B4B),
         onTap: widget.onOpenTasks,
       ),
+      // Page: DriverAcademyPage
+      // Wiring: driver_home_shell.dart -> DriverView.academy
       _HomeCardData(
         title: t.t('driver_academy_title'),
         subtitle: t.t('driver_home_academy_subtitle'),
         icon: Icons.school_outlined,
         iconColor: const Color(0xFF3E82F7),
         iconBackground: const Color(0xFFE9F1FE),
-        onTap: widget.onOpenAcademy,
+        badgeText: t.t('coming_soon'),
+        onTap: null,
       ),
       _HomeCardData(
         title: t.t('driver_home_rules_title'),
@@ -145,14 +148,19 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
         badgeColor: const Color(0xFFFF4B4B),
         onTap: widget.onOpenRules,
       ),
+      // Planned page: Vehicles overview
+      // Current placeholder card only; no driver page is wired yet.
       _HomeCardData(
         title: t.t('driver_home_vehicles_title'),
         subtitle: t.t('driver_home_vehicles_subtitle'),
         icon: Icons.directions_car_filled_outlined,
         iconColor: const Color(0xFF3E82F7),
         iconBackground: const Color(0xFFE9F1FE),
-        onTap: widget.onOpenComingSoon,
+        badgeText: t.t('coming_soon'),
+        onTap: null,
       ),
+      // Planned page: CoDriver AI assistant
+      // Current placeholder card only; no driver page is wired yet.
       _HomeCardData(
         title: t.t('driver_home_codriver_title'),
         subtitle: t.t('driver_home_codriver_subtitle'),
@@ -162,8 +170,11 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
         borderGradient: const LinearGradient(
           colors: [Color(0xFF2784FF), Color(0xFF27C79A)],
         ),
-        onTap: widget.onOpenComingSoon,
+        badgeText: t.t('coming_soon'),
+        onTap: null,
       ),
+      // Page: DriverAbsencePage
+      // Wiring: driver_home_shell.dart -> DriverView.absence
       _HomeCardData(
         title: t.t('driver_home_absence_title'),
         subtitle: t.t('driver_home_absence_subtitle'),
@@ -173,6 +184,8 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
         borderColor: const Color(0xFFFF8A1F),
         onTap: widget.onOpenAbsence,
       ),
+      // Page: DriverIncidentReportPage
+      // Wiring: driver_home_shell.dart -> DriverView.incidentReport
       _HomeCardData(
         title: t.t('driver_home_incident_title'),
         subtitle: t.t('driver_home_incident_subtitle'),
@@ -180,7 +193,8 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
         iconColor: const Color(0xFFFF7A18),
         iconBackground: const Color(0xFFFFF0E4),
         borderColor: const Color(0xFFFF8A1F),
-        onTap: widget.onOpenIncidentReport,
+        badgeText: t.t('coming_soon'),
+        onTap: null,
       ),
     ];
 
@@ -228,11 +242,14 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
               ),
               const SizedBox(width: 8),
               Expanded(
+                // Page: DriverShiftPlanPage
+                // Wiring: driver_home_shell.dart -> DriverView.comingSoon for now
                 child: _TopFeatureCard(
                   title: t.t('driver_home_shift_plan_title'),
                   subtitle: t.t('driver_home_shift_plan_subtitle'),
                   icon: Icons.calendar_today_rounded,
-                  onTap: widget.onOpenShiftPlan,
+                  badgeText: t.t('coming_soon'),
+                  onTap: null,
                 ),
               ),
             ],
@@ -262,26 +279,8 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
   }
 
   List<_DispatcherContact> _parseDispatchers(Map<String, dynamic>? data) {
-    final fallback = <_DispatcherContact>[
-      const _DispatcherContact(
-        name: 'ISRAFIL',
-        startTime: '06:00',
-        endTime: '13:00',
-      ),
-      const _DispatcherContact(
-        name: 'HALIM',
-        startTime: '13:00',
-        endTime: '20:00',
-      ),
-      const _DispatcherContact(
-        name: 'ANES',
-        startTime: '20:00',
-        endTime: '03:00',
-      ),
-    ];
-
     final raw = data?['dispatchers'];
-    if (raw is! List) return fallback;
+    if (raw is! List) return const <_DispatcherContact>[];
 
     final out = <_DispatcherContact>[];
     for (final row in raw) {
@@ -321,7 +320,7 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
       );
     }
 
-    return out.isEmpty ? fallback : out;
+    return out;
   }
 
   Future<void> _callNumber(String rawNumber) async {
@@ -579,17 +578,22 @@ class _TopFeatureCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final IconData icon;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final String? badgeText;
 
   const _TopFeatureCard({
     required this.title,
     required this.subtitle,
     required this.icon,
-    required this.onTap,
+    this.onTap,
+    this.badgeText,
   });
 
   @override
   Widget build(BuildContext context) {
+    final isEnabled = onTap != null;
+    final badge = badgeText?.trim();
+    final hasBadge = badge != null && badge.isNotEmpty;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -597,44 +601,91 @@ class _TopFeatureCard extends StatelessWidget {
         onTap: onTap,
         child: Container(
           height: _kTopCardHeight,
+          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isEnabled ? Colors.white : const Color(0xFFF8FAFB),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: const Color(0xFFDFE4E7)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.06),
+                color: Colors.black.withValues(alpha: isEnabled ? 0.06 : 0.03),
                 blurRadius: 8,
                 offset: const Offset(0, 3),
               ),
             ],
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+          child: Stack(
             children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFE9F5F1),
-                  shape: BoxShape.circle,
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: isEnabled
+                            ? const Color(0xFFE9F5F1)
+                            : const Color(0xFFEEF2F4),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        icon,
+                        color: isEnabled
+                            ? const Color(0xFF38B888)
+                            : const Color(0xFF9AA4B2),
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 29 / 2,
+                        fontWeight: FontWeight.w800,
+                        color: isEnabled
+                            ? const Color(0xFF1F2937)
+                            : const Color(0xFF4B5563),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: isEnabled
+                            ? const Color(0xFF6B7280)
+                            : const Color(0xFF98A2B3),
+                      ),
+                    ),
+                  ],
                 ),
-                child: Icon(icon, color: Color(0xFF38B888), size: 28),
               ),
-              const SizedBox(height: 10),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 29 / 2,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF1F2937),
+              if (hasBadge)
+                Positioned(
+                  right: 10,
+                  top: 10,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEEF2F6),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: const Color(0xFFD7DEE6)),
+                    ),
+                    child: Text(
+                      badge,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF667085),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: const TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
-              ),
             ],
           ),
         ),
@@ -654,7 +705,7 @@ class _HomeCardData {
   final Gradient? borderGradient;
   final String? badgeText;
   final Color badgeColor;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const _HomeCardData({
     required this.title,
@@ -680,22 +731,25 @@ class _HomeFeatureCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final badge = data.badgeText?.trim();
     final hasBadge = badge != null && badge.isNotEmpty;
-    final usesPillBadge = hasBadge && badge.length > 2;
+    final usesPillBadge = hasBadge;
+    final isEnabled = data.onTap != null;
 
     final inner = Container(
       height: 92,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isEnabled ? Colors.white : const Color(0xFFF8FAFB),
         borderRadius: BorderRadius.circular(14),
         border: data.borderGradient == null
             ? Border.all(
-                color: data.borderColor ?? const Color(0xFFDDE3E7),
+                color: isEnabled
+                    ? (data.borderColor ?? const Color(0xFFDDE3E7))
+                    : const Color(0xFFDDE3E7),
                 width: 1.6,
               )
             : null,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
+            color: Colors.black.withValues(alpha: isEnabled ? 0.06 : 0.03),
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),
@@ -708,7 +762,7 @@ class _HomeFeatureCard extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: data.iconBackground,
+              color: isEnabled ? data.iconBackground : const Color(0xFFEEF2F4),
               shape: BoxShape.circle,
             ),
             child: data.iconAsset != null
@@ -718,12 +772,18 @@ class _HomeFeatureCard extends StatelessWidget {
                       width: 22,
                       height: 22,
                       colorFilter: ColorFilter.mode(
-                        data.iconColor,
+                        isEnabled ? data.iconColor : const Color(0xFF9AA4B2),
                         BlendMode.srcIn,
                       ),
                     ),
                   )
-                : Icon(data.icon, size: 23, color: data.iconColor),
+                : Icon(
+                    data.icon,
+                    size: 23,
+                    color: isEnabled
+                        ? data.iconColor
+                        : const Color(0xFF9AA4B2),
+                  ),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -735,10 +795,12 @@ class _HomeFeatureCard extends StatelessWidget {
                   data.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 29 / 2,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF1F2937),
+                    color: isEnabled
+                        ? const Color(0xFF1F2937)
+                        : const Color(0xFF4B5563),
                   ),
                 ),
                 const SizedBox(height: 1),
@@ -746,9 +808,11 @@ class _HomeFeatureCard extends StatelessWidget {
                   data.subtitle,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    color: Color(0xFF7A8699),
+                    color: isEnabled
+                        ? const Color(0xFF7A8699)
+                        : const Color(0xFF98A2B3),
                     height: 1.2,
                   ),
                 ),
@@ -793,14 +857,21 @@ class _HomeFeatureCard extends StatelessWidget {
                     vertical: 3,
                   ),
                   decoration: BoxDecoration(
-                    color: data.badgeColor,
+                    color: isEnabled
+                        ? data.badgeColor
+                        : const Color(0xFFEEF2F6),
                     borderRadius: BorderRadius.circular(999),
+                    border: isEnabled
+                        ? null
+                        : Border.all(color: const Color(0xFFD7DEE6)),
                   ),
                   child: Text(
                     badge,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: isEnabled
+                          ? Colors.white
+                          : const Color(0xFF667085),
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
                     ),

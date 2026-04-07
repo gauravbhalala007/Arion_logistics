@@ -120,6 +120,9 @@ service cloud.firestore {
             'completedConfirmed',
             'completedConfirmedAt',
             'updatedAt',
+            'respondedAt',
+            'feedbackText',
+            'feedbackSelectedOption',
           ])
           && request.resource.data.status in ['pending', 'in_progress', 'completed'];
       }

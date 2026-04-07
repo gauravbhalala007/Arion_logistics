@@ -27,20 +27,64 @@ Widget buildWebImagePreview(String url) {
 
 Widget buildWebPdfPreview(String url) {
   final viewType = 'web-pdf-${DateTime.now().microsecondsSinceEpoch}';
+  final inlineUrl = _inlinePdfUrl(url);
 
   // ignore: undefined_prefixed_name
   ui_web.platformViewRegistry.registerViewFactory(viewType, (int viewId) {
-    final frame = html.IFrameElement()
-      ..src = url
-      ..style.border = 'none'
+    final container = html.DivElement()
       ..style.width = '100%'
-      ..style.height = '100%';
-    return frame;
+      ..style.height = '100%'
+      ..style.backgroundColor = '#f3f4f6'
+      ..style.display = 'flex'
+      ..style.alignItems = 'center'
+      ..style.justifyContent = 'center';
+
+    final status = html.DivElement()
+      ..text = 'Loading PDF preview...'
+      ..style.fontFamily = 'sans-serif'
+      ..style.fontSize = '14px'
+      ..style.color = '#6b7280';
+    container.children = [status];
+
+    html.HttpRequest.request(inlineUrl, responseType: 'blob').then((request) {
+      final blob = request.response;
+      if (blob is! html.Blob) {
+        status.text = 'Could not load PDF preview.';
+        return;
+      }
+
+      final objectUrl = html.Url.createObjectUrlFromBlob(blob);
+      final embed = html.EmbedElement()
+        ..src = objectUrl
+        ..type = 'application/pdf'
+        ..style.border = 'none'
+        ..style.width = '100%'
+        ..style.height = '100%';
+
+      container.children = [embed];
+    }).catchError((_) {
+      status.text = 'Could not load PDF preview.';
+    });
+
+    return container;
   });
 
   return SizedBox.expand(
     child: HtmlElementView(viewType: viewType),
   );
+}
+
+String _inlinePdfUrl(String url) {
+  var adjusted = url;
+  if (!adjusted.contains('response-content-type=')) {
+    adjusted =
+        '$adjusted${adjusted.contains('?') ? '&' : '?'}response-content-type=${Uri.encodeQueryComponent('application/pdf')}';
+  }
+  if (!adjusted.contains('response-content-disposition=')) {
+    adjusted =
+        '$adjusted${adjusted.contains('?') ? '&' : '?'}response-content-disposition=${Uri.encodeQueryComponent('inline')}';
+  }
+  return adjusted;
 }
 
 Future<void> downloadWebFile(String url, String filename) async {

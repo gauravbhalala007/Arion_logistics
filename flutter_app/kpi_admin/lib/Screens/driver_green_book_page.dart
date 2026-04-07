@@ -1,55 +1,221 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:video_player/video_player.dart';
 
 import '../localization/app_localizations.dart';
+import '../widgets/web_video_embed.dart';
+import 'driver_green_book_test_page.dart';
 
-const String _settingsCollection = 'settings';
-const String _faqResourcesDoc = 'faq_resources';
-const Map<String, String> _defaultGreenBookVideoUrls = {
+const Color _kGreenBookText = Color(0xFF1F2937);
+const Color _kGreenBookMuted = Color(0xFF7A869F);
+const Color _kGreenBookPrimary = Color(0xFF2BBE63);
+const Color _kGreenBookCardTint = Color(0xFFF3FBF5);
+const Map<String, String> _kGreenBookVideoFallbacks = {
   'en':
-      'https://drive.google.com/file/d/1ucFruV-uBg84u_smauEdUuPwIy4GFhO5/view?usp=sharing',
+      'https://drive.google.com/file/d/1ucFruV-uBg84u_smauEdUuPwIy4GFhO5/view?usp=drive_link',
   'sq':
-      'https://drive.google.com/file/d/1jwpTXIYgWjF7UOJVeuQ38Kz3vvVjLiLi/view?usp=sharing',
+      'https://drive.google.com/file/d/1jwpTXIYgWjF7UOJVeuQ38Kz3vvVjLiLi/view?usp=drive_link',
   'ar':
-      'https://drive.google.com/file/d/1r788LPjImJS5AS0HXapWYL1hq9CXvjrT/view?usp=sharing',
+      'https://drive.google.com/file/d/1r788LPjImJS5AS0HXapWYL1hq9CXvjrT/view?usp=drive_link',
   'de':
-      'https://drive.google.com/file/d/19oj-1MVWvZrWUwt5KyDgpv75XDIrSn4r/view?usp=sharing',
-  'hu':
-      'https://drive.google.com/file/d/11JWbV6EBA3JpSgjxXfaoRR4O6baerLxj/view?usp=sharing',
-  'hr':
-      'https://drive.google.com/file/d/1h0WbPTwzUFkw8LY1_w9aeQ2TkBTPY4R3/view?usp=sharing',
+      'https://drive.google.com/file/d/19oj-1MVWvZrWUwt5KyDgpv75XDIrSn4r/view?usp=drive_link',
   'ro':
-      'https://drive.google.com/file/d/1AtSfBDwL4JvlFa82E8BL6Fft-fuJnSxF/view?usp=sharing',
+      'https://drive.google.com/file/d/1AtSfBDwL4JvlFa82E8BL6Fft-fuJnSxF/view?usp=drive_link',
+  'hr':
+      'https://drive.google.com/file/d/1h0WbPTwzUFkw8LY1_w9aeQ2TkBTPY4R3/view?usp=drive_link',
+  'hu':
+      'https://drive.google.com/file/d/11JWbV6EBA3JpSgjxXfaoRR4O6baerLxj/view?usp=drive_link',
 };
-const String _defaultGreenBookVideoUrl =
-    'https://drive.google.com/file/d/19oj-1MVWvZrWUwt5KyDgpv75XDIrSn4r/view?usp=sharing';
 
-class DriverGreenBookPage extends StatelessWidget {
+class DriverGreenBookPage extends StatefulWidget {
   final String dspUid;
+  final String driverTransporterId;
   final VoidCallback onBack;
-  final VoidCallback onStartTest;
 
   const DriverGreenBookPage({
     super.key,
     required this.dspUid,
+    required this.driverTransporterId,
     required this.onBack,
-    required this.onStartTest,
   });
+
+  @override
+  State<DriverGreenBookPage> createState() => _DriverGreenBookPageState();
+}
+
+class _DriverGreenBookPageState extends State<DriverGreenBookPage> {
+  late Future<String> _videoUrlFuture;
+  String _lastLocaleCode = '';
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final localeCode = Localizations.localeOf(context).languageCode
+        .toLowerCase()
+        .trim();
+    if (_lastLocaleCode == localeCode) return;
+    _lastLocaleCode = localeCode;
+    _videoUrlFuture = _loadVideoUrl();
+  }
+
+  Future<String> _loadVideoUrl() async {
+    final lang = Localizations.localeOf(context).languageCode.toLowerCase();
+    String fallbackFor(String code) {
+      return _kGreenBookVideoFallbacks[code] ??
+          _kGreenBookVideoFallbacks['en'] ??
+          '';
+    }
+
+    if (widget.dspUid.trim().isEmpty) {
+      return fallbackFor(lang);
+    }
+    final ref = FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.dspUid.trim())
+        .collection('academy_tests')
+        .doc('green_book');
+
+    try {
+      DocumentSnapshot<Map<String, dynamic>> snap;
+      try {
+        snap = await ref.get(const GetOptions(source: Source.server));
+      } on FirebaseException {
+        snap = await ref.get();
+      }
+      final data = snap.data() ?? const <String, dynamic>{};
+      final candidates = [
+        (data['videoUrl_$lang'] ?? '').toString().trim(),
+        (data['mediaUrl_$lang'] ?? '').toString().trim(),
+        (data['url_$lang'] ?? '').toString().trim(),
+        (data['videoUrl'] ?? '').toString().trim(),
+        (data['mediaUrl'] ?? '').toString().trim(),
+        (data['url'] ?? '').toString().trim(),
+        fallbackFor(lang),
+      ];
+      for (final value in candidates) {
+        if (value.isNotEmpty) return value;
+      }
+      return '';
+    } catch (_) {
+      return fallbackFor(lang);
+    }
+  }
+
+  Uri? _googleDrivePreviewUri(Uri uri) {
+    final fileId = _extractGoogleDriveFileId(uri);
+    if (fileId.isEmpty) return null;
+    return Uri.parse('https://drive.google.com/file/d/$fileId/preview');
+  }
+
+  String _extractGoogleDriveFileId(Uri uri) {
+    final idFromQuery = uri.queryParameters['id']?.trim() ?? '';
+    if (idFromQuery.isNotEmpty) return idFromQuery;
+
+    final segments = uri.pathSegments;
+    final fileIndex = segments.indexOf('d');
+    if (fileIndex >= 0 && fileIndex + 1 < segments.length) {
+      final id = segments[fileIndex + 1].trim();
+      if (id.isNotEmpty) return id;
+    }
+
+    return '';
+  }
+
+  Future<void> _openVideo(String url) async {
+    final t = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final raw = url.trim();
+    if (raw.isEmpty) {
+      messenger?.showSnackBar(
+        SnackBar(content: Text(t.t('faq_green_book_video_missing'))),
+      );
+      return;
+    }
+
+    final uri = Uri.tryParse(raw);
+    if (uri == null) {
+      messenger?.showSnackBar(
+        SnackBar(content: Text(t.t('faq_green_book_video_open_failed'))),
+      );
+      return;
+    }
+
+    final googleDrivePreviewUri = _googleDrivePreviewUri(uri);
+    if (!kIsWeb && googleDrivePreviewUri != null) {
+      final opened = await launchUrl(
+        googleDrivePreviewUri,
+        mode: LaunchMode.inAppBrowserView,
+      );
+      if (!opened && mounted) {
+        messenger?.showSnackBar(
+          SnackBar(content: Text(t.t('faq_green_book_video_open_failed'))),
+        );
+      }
+      return;
+    }
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => _GreenBookVideoDialog(
+        videoUri: googleDrivePreviewUri ?? uri,
+        title: t.t('driver_green_book_video_title'),
+        useWebEmbed: kIsWeb && googleDrivePreviewUri != null,
+      ),
+    );
+  }
+
+  void _openTest() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => DriverGreenBookTestPage(
+          dspUid: widget.dspUid,
+          driverTransporterId: widget.driverTransporterId,
+          onBack: () => Navigator.of(context).pop(),
+        ),
+      ),
+    );
+  }
+
+  _LanguageMeta _languageMeta(String code) {
+    switch (code) {
+      case 'de':
+        return const _LanguageMeta(flag: '🇩🇪', label: 'Deutsch');
+      case 'sq':
+        return const _LanguageMeta(flag: '🇦🇱', label: 'Shqip');
+      case 'hu':
+        return const _LanguageMeta(flag: '🇭🇺', label: 'Magyar');
+      case 'ro':
+        return const _LanguageMeta(flag: '🇷🇴', label: 'Romana');
+      case 'hr':
+        return const _LanguageMeta(flag: '🇭🇷', label: 'Hrvatski');
+      case 'ar':
+        return const _LanguageMeta(flag: '🇸🇦', label: 'العربية');
+      case 'tr':
+        return const _LanguageMeta(flag: '🇹🇷', label: 'Turkce');
+      case 'ru':
+        return const _LanguageMeta(flag: '🇷🇺', label: 'Русский');
+      default:
+        return const _LanguageMeta(flag: '🇬🇧', label: 'English');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    final langCode = Localizations.localeOf(context).languageCode;
-    final resourcesFuture = _loadResources();
+    final langCode = Localizations.localeOf(context).languageCode.toLowerCase();
+    final langMeta = _languageMeta(langCode);
+    const noUnderline = TextStyle(
+      decoration: TextDecoration.none,
+      decorationColor: Colors.transparent,
+    );
 
-    return FutureBuilder<Map<String, dynamic>>(
-      future: resourcesFuture,
-      builder: (context, snap) {
-        final resources = snap.data ?? const <String, dynamic>{};
-        final videoUrl = _resolveGreenBookVideoUrl(resources, langCode);
-
-        return SingleChildScrollView(
+    return DefaultTextStyle.merge(
+      style: noUnderline,
+      child: SelectionContainer.disabled(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(10, 8, 10, 28),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -58,200 +224,93 @@ class DriverGreenBookPage extends StatelessWidget {
                 children: [
                   _RoundIconButton(
                     icon: Icons.arrow_back_ios_new_rounded,
-                    onTap: onBack,
+                    onTap: widget.onBack,
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 12),
                   Text(
-                    t.t('driver_green_book_title'),
+                    t.t('driver_academy_green_book_title'),
                     style: const TextStyle(
-                      fontSize: 36 / 2,
+                      fontSize: 18,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF1F2937),
+                      color: _kGreenBookText,
+                      decoration: TextDecoration.none,
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 14),
-              _VideoCard(
-                title: t.t('driver_green_book_video_title'),
-                subtitle: t.t('driver_green_book_video_subtitle'),
-                onTap: () => _openGreenBookVideo(context, videoUrl),
+              FutureBuilder<String>(
+                future: _videoUrlFuture,
+                builder: (context, snap) {
+                  return _GreenBookVideoCard(
+                    title: t.t('driver_green_book_video_title'),
+                    flag: langMeta.flag,
+                    languageLabel: langMeta.label,
+                    onTap: () => _openVideo(snap.data ?? ''),
+                  );
+                },
               ),
               const SizedBox(height: 14),
-              _StartTestButton(
+              _GreenBookTestCta(
                 label: t.t('driver_green_book_start_test'),
-                onTap: onStartTest,
+                note: t.t('driver_green_book_test_required'),
+                onTap: _openTest,
               ),
-              const SizedBox(height: 8),
-              Center(
-                child: Text(
-                  t.t('driver_green_book_test_required'),
-                  style: const TextStyle(
-                    color: Color(0xFFEF4444),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              _InfoCard(
-                borderColor: const Color(0xFFDDE3E7),
+              const SizedBox(height: 16),
+              _SectionCard(
+                icon: Icons.content_paste_rounded,
+                iconColor: const Color(0xFFD09A55),
                 title: t.t('driver_green_book_section1_title'),
-                paragraph: t.t('driver_green_book_section1_text'),
+                body: t.t('driver_green_book_section1_text'),
                 bullets: [
                   t.t('driver_green_book_section1_b1'),
                   t.t('driver_green_book_section1_b2'),
                   t.t('driver_green_book_section1_b3'),
                 ],
-                bulletIcon: const Icon(
-                  Icons.check_rounded,
-                  color: Color(0xFF22C55E),
-                  size: 22,
-                ),
               ),
-              const SizedBox(height: 14),
-              _InfoCard(
-                borderColor: const Color(0xFFFCA5A5),
+              const SizedBox(height: 12),
+              _SectionCard(
+                icon: Icons.warning_amber_rounded,
+                iconColor: const Color(0xFFF97316),
                 title: t.t('driver_green_book_section2_title'),
-                paragraph: t.t('driver_green_book_section2_text'),
+                body: t.t('driver_green_book_section2_text'),
                 bullets: [
                   t.t('driver_green_book_section2_b1'),
                   t.t('driver_green_book_section2_b2'),
                   t.t('driver_green_book_section2_b3'),
                 ],
-                bulletIcon: const Icon(
-                  Icons.looks_one_rounded,
-                  color: Color(0xFFEF4444),
-                  size: 20,
-                ),
               ),
-              const SizedBox(height: 14),
-              _InfoCard(
-                borderColor: const Color(0xFFFCA5A5),
+              const SizedBox(height: 12),
+              _SectionCard(
+                icon: Icons.gavel_rounded,
+                iconColor: const Color(0xFFEF4444),
                 title: t.t('driver_green_book_section3_title'),
-                paragraph: t.t('driver_green_book_section3_text'),
+                body: t.t('driver_green_book_section3_text'),
                 bullets: [
                   t.t('driver_green_book_section3_b1'),
                   t.t('driver_green_book_section3_b2'),
                   t.t('driver_green_book_section3_b3'),
                   t.t('driver_green_book_section3_b4'),
                 ],
-                bulletIcon: const Icon(
-                  Icons.error_outline_rounded,
-                  color: Color(0xFFEF4444),
-                  size: 20,
-                ),
               ),
             ],
           ),
-        );
-      },
+        ),
+      ),
     );
-  }
-
-  Future<Map<String, dynamic>> _loadResources() async {
-    if (dspUid.trim().isEmpty) return const <String, dynamic>{};
-
-    final ref = FirebaseFirestore.instance
-        .collection('users')
-        .doc(dspUid)
-        .collection(_settingsCollection)
-        .doc(_faqResourcesDoc);
-    try {
-      final serverSnap = await ref.get(const GetOptions(source: Source.server));
-      return serverSnap.data() ?? const <String, dynamic>{};
-    } catch (_) {
-      try {
-        final cacheSnap = await ref.get();
-        return cacheSnap.data() ?? const <String, dynamic>{};
-      } catch (_) {
-        return const <String, dynamic>{};
-      }
-    }
-  }
-
-  String _resolveGreenBookVideoUrl(
-    Map<String, dynamic> resources,
-    String langCode,
-  ) {
-    String pick(dynamic value) => value?.toString().trim() ?? '';
-    final normalizedLang = langCode.trim().toLowerCase();
-
-    if (normalizedLang.isNotEmpty) {
-      final flatByLang = pick(resources['greenBookVideoUrl_$normalizedLang']);
-      if (flatByLang.isNotEmpty) return flatByLang;
-
-      final mapRaw = resources['greenBookVideoUrls'];
-      if (mapRaw is Map) {
-        final normalizedMap = mapRaw.map(
-          (k, v) => MapEntry(k.toString().trim().toLowerCase(), v),
-        );
-        final mapByLang = pick(normalizedMap[normalizedLang]);
-        if (mapByLang.isNotEmpty) return mapByLang;
-      }
-    }
-
-    final generic = pick(resources['greenBookVideoUrl']);
-    if (generic.isNotEmpty) return generic;
-
-    final mapRaw = resources['greenBookVideoUrls'];
-    if (mapRaw is Map) {
-      final normalizedMap = mapRaw.map(
-        (k, v) => MapEntry(k.toString().trim().toLowerCase(), v),
-      );
-      final mapDefault = pick(normalizedMap['default']);
-      if (mapDefault.isNotEmpty) return mapDefault;
-    }
-
-    final byLangDefault = _defaultGreenBookVideoUrls[normalizedLang];
-    if (byLangDefault != null && byLangDefault.trim().isNotEmpty) {
-      return byLangDefault;
-    }
-    return _defaultGreenBookVideoUrl;
-  }
-
-  Future<void> _openGreenBookVideo(BuildContext context, String rawUrl) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final t = AppLocalizations.of(context);
-    final openFailedMessage = t.t('faq_green_book_video_open_failed');
-    final trimmed = rawUrl.trim();
-    if (trimmed.isEmpty) {
-      _showSnack(messenger, t.t('faq_green_book_video_missing'));
-      return;
-    }
-
-    Uri? uri = Uri.tryParse(trimmed);
-    if (uri == null || (!uri.hasScheme && !trimmed.startsWith('www.'))) {
-      _showSnack(messenger, openFailedMessage);
-      return;
-    }
-    if (!uri.hasScheme) {
-      uri = Uri.tryParse('https://$trimmed');
-    }
-    if (uri == null) {
-      _showSnack(messenger, openFailedMessage);
-      return;
-    }
-
-    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!launched) {
-      _showSnack(messenger, openFailedMessage);
-    }
-  }
-
-  void _showSnack(ScaffoldMessengerState messenger, String message) {
-    messenger.showSnackBar(SnackBar(content: Text(message)));
   }
 }
 
-class _VideoCard extends StatelessWidget {
+class _GreenBookVideoCard extends StatelessWidget {
   final String title;
-  final String subtitle;
+  final String flag;
+  final String languageLabel;
   final VoidCallback onTap;
 
-  const _VideoCard({
+  const _GreenBookVideoCard({
     required this.title,
-    required this.subtitle,
+    required this.flag,
+    required this.languageLabel,
     required this.onTap,
   });
 
@@ -260,44 +319,52 @@ class _VideoCard extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         onTap: onTap,
         child: Container(
-          height: 270,
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 28),
           decoration: BoxDecoration(
-            color: const Color(0xFFDCEBE3),
-            borderRadius: BorderRadius.circular(18),
+            color: _kGreenBookCardTint,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFDDE9DF), width: 1.2),
           ),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: 98,
-                height: 98,
+                width: 92,
+                height: 92,
                 decoration: const BoxDecoration(
-                  color: Color(0xFFB8DEC7),
+                  color: Color(0xFFD8F1DE),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
                   Icons.play_arrow_rounded,
                   size: 54,
-                  color: Color(0xFF22AF66),
+                  color: _kGreenBookPrimary,
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
               Text(
                 title,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
-                  fontSize: 35 / 2,
+                  fontSize: 16,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF1F2937),
+                  color: _kGreenBookText,
+                  decoration: TextDecoration.none,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Text(
-                subtitle,
-                style: const TextStyle(fontSize: 16, color: Color(0xFF667085)),
+                '$flag $languageLabel',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: _kGreenBookMuted,
+                  decoration: TextDecoration.none,
+                ),
               ),
             ],
           ),
@@ -307,124 +374,320 @@ class _VideoCard extends StatelessWidget {
   }
 }
 
-class _StartTestButton extends StatelessWidget {
+class _GreenBookTestCta extends StatelessWidget {
   final String label;
+  final String note;
   final VoidCallback onTap;
 
-  const _StartTestButton({required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: onTap,
-        child: Container(
-          height: 68,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: const Color(0xFF22AF66), width: 3),
-            color: Colors.white,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 41 / 2,
-                  color: Color(0xFF667085),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(width: 10),
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: Color(0xFF667085),
-                size: 34,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _InfoCard extends StatelessWidget {
-  final Color borderColor;
-  final String title;
-  final String paragraph;
-  final List<String> bullets;
-  final Icon bulletIcon;
-
-  const _InfoCard({
-    required this.borderColor,
-    required this.title,
-    required this.paragraph,
-    required this.bullets,
-    required this.bulletIcon,
+  const _GreenBookTestCta({
+    required this.label,
+    required this.note,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: borderColor, width: 2),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 44 / 2,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF1F2937),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            paragraph,
-            style: const TextStyle(
-              fontSize: 40 / 2,
-              color: Color(0xFF667085),
-              height: 1.45,
-            ),
-          ),
-          const SizedBox(height: 12),
-          ...bullets.map(
-            (line) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
+    return Column(
+      children: [
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(999),
+            onTap: onTap,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: _kGreenBookPrimary, width: 2.2),
+              ),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: bulletIcon,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      line,
-                      style: const TextStyle(
-                        fontSize: 36 / 2,
-                        color: Color(0xFF667085),
-                        height: 1.35,
-                        fontWeight: FontWeight.w600,
-                      ),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF70809D),
+                      decoration: TextDecoration.none,
                     ),
+                  ),
+                  const SizedBox(width: 10),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: Color(0xFF70809D),
+                    size: 24,
                   ),
                 ],
               ),
             ),
           ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          note,
+          style: const TextStyle(
+            color: Color(0xFFFF3B30),
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            decoration: TextDecoration.none,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SectionCard extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String body;
+  final List<String> bullets;
+
+  const _SectionCard({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.body,
+    required this.bullets,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cleanBullets = bullets.where((b) => b.trim().isNotEmpty).toList();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFDDE3E7), width: 1.2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Icon(icon, size: 21, color: iconColor),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: _kGreenBookText,
+                    decoration: TextDecoration.none,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (body.trim().isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Text(
+              body,
+              style: const TextStyle(
+                fontSize: 14,
+                height: 1.55,
+                color: _kGreenBookMuted,
+                fontWeight: FontWeight.w500,
+                decoration: TextDecoration.none,
+              ),
+            ),
+          ],
+          for (final bullet in cleanBullets) ...[
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.only(top: 2),
+                  child: Icon(
+                    Icons.check_rounded,
+                    size: 21,
+                    color: _kGreenBookPrimary,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    bullet,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      height: 1.45,
+                      color: _kGreenBookMuted,
+                      fontWeight: FontWeight.w600,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+class _GreenBookVideoDialog extends StatefulWidget {
+  final Uri videoUri;
+  final String title;
+  final bool useWebEmbed;
+
+  const _GreenBookVideoDialog({
+    required this.videoUri,
+    required this.title,
+    required this.useWebEmbed,
+  });
+
+  @override
+  State<_GreenBookVideoDialog> createState() => _GreenBookVideoDialogState();
+}
+
+class _GreenBookVideoDialogState extends State<_GreenBookVideoDialog> {
+  VideoPlayerController? _controller;
+  Future<void>? _initializeFuture;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.useWebEmbed) return;
+    _controller = VideoPlayerController.networkUrl(widget.videoUri);
+    _initializeFuture = _controller!.initialize().then((_) {
+      _controller!.setLooping(false);
+      if (mounted) setState(() {});
+    }).catchError((_) {
+      _error = 'load_failed';
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final media = MediaQuery.sizeOf(context);
+    final dialogWidth = media.width > 960 ? 960.0 : media.width - 24;
+    final dialogHeight = media.height > 780 ? 780.0 : media.height - 32;
+
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: SizedBox(
+        width: dialogWidth,
+        height: dialogHeight,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: _kGreenBookText,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    width: double.infinity,
+                    color: Colors.black,
+                    child: widget.useWebEmbed
+                        ? buildWebVideoEmbed(
+                            viewType:
+                                'green-book-video-${DateTime.now().microsecondsSinceEpoch}',
+                            uri: widget.videoUri,
+                          )
+                        : FutureBuilder<void>(
+                            future: _initializeFuture,
+                            builder: (context, snap) {
+                              if (_error != null || _controller == null) {
+                                return Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(24),
+                                    child: Text(
+                                      t.t('faq_green_book_video_open_failed'),
+                                      style:
+                                          const TextStyle(color: Colors.white),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                                );
+                              }
+                              if (snap.connectionState !=
+                                      ConnectionState.done ||
+                                  !_controller!.value.isInitialized) {
+                                return const Center(
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                  ),
+                                );
+                              }
+                              return Center(
+                                child: AspectRatio(
+                                  aspectRatio: _controller!.value.aspectRatio,
+                                  child: VideoPlayer(_controller!),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ),
+              ),
+              if (!widget.useWebEmbed) ...[
+                const SizedBox(height: 12),
+                if (_controller != null && _controller!.value.isInitialized)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        onPressed: () {
+                          final c = _controller!;
+                          c.value.isPlaying ? c.pause() : c.play();
+                          setState(() {});
+                        },
+                        icon: Icon(
+                          _controller!.value.isPlaying
+                              ? Icons.pause_circle_filled_rounded
+                              : Icons.play_circle_fill_rounded,
+                          size: 42,
+                          color: _kGreenBookPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -439,21 +702,24 @@ class _RoundIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.transparent,
+      color: Colors.white,
+      shape: const CircleBorder(),
       child: InkWell(
+        customBorder: const CircleBorder(),
         onTap: onTap,
-        borderRadius: BorderRadius.circular(999),
-        child: Container(
-          width: 52,
-          height: 52,
-          decoration: BoxDecoration(
-            color: const Color(0xFFF1F3F5),
-            shape: BoxShape.circle,
-            border: Border.all(color: const Color(0xFFDDE3E7), width: 1),
-          ),
-          child: Icon(icon, size: 24, color: const Color(0xFF1F2937)),
+        child: SizedBox(
+          width: 42,
+          height: 42,
+          child: Icon(icon, size: 18, color: _kGreenBookText),
         ),
       ),
     );
   }
+}
+
+class _LanguageMeta {
+  final String flag;
+  final String label;
+
+  const _LanguageMeta({required this.flag, required this.label});
 }

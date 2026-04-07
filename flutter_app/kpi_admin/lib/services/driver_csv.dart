@@ -3,7 +3,20 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:csv/csv.dart';
+
+class DriverCsvImportResult {
+  const DriverCsvImportResult({
+    required this.parsedRows,
+    required this.mappedDrivers,
+    required this.newDrivers,
+    required this.updatedScores,
+  });
+
+  final int parsedRows;
+  final int mappedDrivers;
+  final int newDrivers;
+  final int updatedScores;
+}
 
 class DriverCsvService {
   /// Upload a CSV with driver names for the CURRENT USER.
@@ -11,7 +24,7 @@ class DriverCsvService {
   /// 1) users/{uid}/drivers (master dictionary)
   /// 2) users/{uid}/reports/*/driverNames
   /// 3) users/{uid}/scores (adds/refreshes driverName)
-  static Future<void> importForUser({
+  static Future<DriverCsvImportResult> importForUser({
     required String uid,
     required Uint8List csvBytes,
   }) async {
@@ -20,25 +33,22 @@ class DriverCsvService {
     // ---------- Parse CSV (detect delimiter) ----------
     final text = utf8.decode(csvBytes, allowMalformed: true).replaceAll('\uFEFF', '');
     final delimiter = _detectDelimiter(text);
-    final rows = const CsvToListConverter(
-      eol: '\n',
-      fieldDelimiter: ',',
-      shouldParseNumbers: false,
-    ).convert(delimiter == ',' ? text : text.replaceAll(delimiter, ','));
+    final rows = _parseCsv(text, delimiter: delimiter);
 
-    if (rows.isEmpty) return;
+    if (rows.isEmpty) {
+      return const DriverCsvImportResult(
+        parsedRows: 0,
+        mappedDrivers: 0,
+        newDrivers: 0,
+        updatedScores: 0,
+      );
+    }
 
     // ---------- Header detection (several variants) ----------
-    final header = rows.first.map((x) => x.toString().trim().toLowerCase()).toList();
+    final header = rows.first.map((x) => x.toString().trim()).toList();
 
-    final idIdx = _firstIndex(header, const [
-      'zustellende-id','zustellende id','transporter id','transporterid',
-      'associate id','driver id','driverid','id','mitarbeiter id',
-    ]);
-
-    final nameIdx = _firstIndex(header, const [
-      'name des zustellenden','driver name','name','employee name','mitarbeiter name',
-    ]);
+    final idIdx = _findIdColumnIndex(header);
+    final nameIdx = _findNameColumnIndex(header);
 
     if (idIdx < 0) {
       throw Exception('CSV missing transporter ID column (e.g. "Transporter ID" / "Zustellende-ID").');
@@ -54,17 +64,24 @@ class DriverCsvService {
       final rawName = (nameIdx >= 0 && nameIdx < r.length ? r[nameIdx] : '').toString().trim();
       if (rawId.isEmpty) continue;
 
-      final tid = _normId(rawId);
+      final tid = normalizeTransporterId(rawId);
       if (tid.isEmpty) continue;
 
       if (rawName.isNotEmpty) {
         latestNameById[tid] = rawName;
       }
     }
-    if (latestNameById.isEmpty) return;
+    if (latestNameById.isEmpty) {
+      return DriverCsvImportResult(
+        parsedRows: rows.length > 1 ? rows.length - 1 : 0,
+        mappedDrivers: 0,
+        newDrivers: 0,
+        updatedScores: 0,
+      );
+    }
 
     // ---------- 1) Update users/{uid}/drivers ----------
-    await _writeDriversUser(db, uid, latestNameById);
+    final newDrivers = await _writeDriversUser(db, uid, latestNameById);
 
     // ---------- 2) Update ALL reports of this user (driverNames subcollection) ----------
     final reportSnaps = await db
@@ -76,7 +93,18 @@ class DriverCsvService {
     await _writeDriverNamesToUserReports(db, reportRefs, latestNameById);
 
     // ---------- 3) Update ALL scores for this user (attach driverName) ----------
-    await _updateAllUserScoresWithNames(db, uid, latestNameById);
+    final updatedScores = await _updateAllUserScoresWithNames(
+      db,
+      uid,
+      latestNameById,
+    );
+
+    return DriverCsvImportResult(
+      parsedRows: rows.length > 1 ? rows.length - 1 : 0,
+      mappedDrivers: latestNameById.length,
+      newDrivers: newDrivers,
+      updatedScores: updatedScores,
+    );
   }
 
   /// Backward compatibility with older call sites. Keeps signature but uses uid
@@ -127,51 +155,202 @@ class DriverCsvService {
     return '\t';
   }
 
-  static int _firstIndex(List<String> header, List<String> alts) {
-    for (var i = 0; i < header.length; i++) {
-      final h = header[i];
-      for (final a in alts) {
-        if (h == a) return i;
-      }
+  static List<List<String>> _parseCsv(String text, {required String delimiter}) {
+    final rows = <List<String>>[];
+    var row = <String>[];
+    var field = StringBuffer();
+    var inQuotes = false;
+
+    void pushField() {
+      row.add(field.toString());
+      field = StringBuffer();
     }
+
+    void pushRow() {
+      final normalized = row.map((value) => value.replaceAll('\r', '')).toList();
+      final hasContent = normalized.any((value) => value.trim().isNotEmpty);
+      if (hasContent) rows.add(normalized);
+      row = <String>[];
+    }
+
+    for (var i = 0; i < text.length; i++) {
+      final ch = text[i];
+
+      if (inQuotes) {
+        if (ch == '"') {
+          final nextIsQuote = i + 1 < text.length && text[i + 1] == '"';
+          if (nextIsQuote) {
+            field.write('"');
+            i++;
+          } else {
+            inQuotes = false;
+          }
+        } else {
+          field.write(ch);
+        }
+        continue;
+      }
+
+      if (ch == '"') {
+        inQuotes = true;
+        continue;
+      }
+
+      if (ch == delimiter) {
+        pushField();
+        continue;
+      }
+
+      if (ch == '\n') {
+        pushField();
+        pushRow();
+        continue;
+      }
+
+      if (ch == '\r') {
+        continue;
+      }
+
+      field.write(ch);
+    }
+
+    final hasTrailingData = field.isNotEmpty || row.isNotEmpty;
+    if (hasTrailingData) {
+      pushField();
+      pushRow();
+    }
+
+    return rows;
+  }
+
+  static int _findIdColumnIndex(List<String> header) {
+    return _findHeaderIndex(
+      header,
+      const [
+        'zustellende-id',
+        'zustellende id',
+        'transporter id',
+        'transporterid',
+        'associate id',
+        'delivery associate id',
+        'driver id',
+        'driverid',
+        'mitarbeiter id',
+        'id',
+      ],
+      const [
+        ['zustellende', 'id'],
+        ['transporter', 'id'],
+        ['delivery', 'associate', 'id'],
+        ['associate', 'id'],
+        ['driver', 'id'],
+        ['mitarbeiter', 'id'],
+      ],
+    );
+  }
+
+  static int _findNameColumnIndex(List<String> header) {
+    return _findHeaderIndex(
+      header,
+      const [
+        'name des zustellenden',
+        'driver name',
+        'delivery associate name',
+        'employee name',
+        'mitarbeiter name',
+        'associate name',
+        'name',
+      ],
+      const [
+        ['name', 'zustellenden'],
+        ['driver', 'name'],
+        ['delivery', 'associate', 'name'],
+        ['employee', 'name'],
+        ['mitarbeiter', 'name'],
+        ['associate', 'name'],
+      ],
+    );
+  }
+
+  static int _findHeaderIndex(
+    List<String> header,
+    List<String> exactAliases,
+    List<List<String>> tokenAliases,
+  ) {
+    final exact = exactAliases.map(_normalizeHeader).toSet();
     for (var i = 0; i < header.length; i++) {
-      final h = header[i];
-      for (final a in alts) {
-        if (h.contains(a)) return i;
+      if (exact.contains(_normalizeHeader(header[i]))) return i;
+    }
+
+    for (var i = 0; i < header.length; i++) {
+      final normalized = _normalizeHeader(header[i]);
+      for (final alias in tokenAliases) {
+        if (alias.every((token) => normalized.contains(_normalizeHeader(token)))) {
+          return i;
+        }
       }
     }
     return -1;
   }
 
-  static String _normId(String raw) {
+  static String _normalizeHeader(String raw) {
+    return raw.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+  }
+
+  static String normalizeTransporterId(String raw) {
     final cleaned = raw.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
     return cleaned.isEmpty ? raw.trim() : cleaned;
   }
 
   // ------------ Firestore write helpers (USER-SCOPED) ------------
 
-  static Future<void> _writeDriversUser(
+  static Future<int> _writeDriversUser(
     FirebaseFirestore db,
     String uid,
     Map<String, String> idToName,
   ) async {
+    final existingIds = <String>{};
+    final driverCol = db.collection('users').doc(uid).collection('drivers');
+    final ids = idToName.keys.toList(growable: false);
+    const lookupChunk = 30;
+    for (var i = 0; i < ids.length; i += lookupChunk) {
+      final slice = ids.sublist(
+        i,
+        (i + lookupChunk > ids.length) ? ids.length : i + lookupChunk,
+      );
+      final snap = await driverCol.where(FieldPath.documentId, whereIn: slice).get();
+      for (final doc in snap.docs) {
+        existingIds.add(doc.id);
+      }
+    }
+
+    var createdCount = 0;
     const chunk = 400;
     final entries = idToName.entries.toList();
     for (var i = 0; i < entries.length; i += chunk) {
       final batch = db.batch();
-      final slice = entries.sublist(i, (i + chunk > entries.length) ? entries.length : i + chunk);
+      final slice = entries.sublist(
+        i,
+        (i + chunk > entries.length) ? entries.length : i + chunk,
+      );
 
       for (final e in slice) {
-        final doc = db.collection('users').doc(uid)
-            .collection('drivers').doc(e.key);
-        batch.set(doc, {
+        final doc = driverCol.doc(e.key);
+        final isNew = !existingIds.contains(e.key);
+        if (isNew) createdCount++;
+        final payload = <String, dynamic>{
           'transporterId': e.key,
-          'driverName'   : e.value,
-          'updatedAt'    : FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
+          'driverName': e.value,
+          'updatedAt': FieldValue.serverTimestamp(),
+          if (isNew) 'createdAt': FieldValue.serverTimestamp(),
+          if (isNew) 'hasLogin': false,
+          if (isNew) 'active': true,
+        };
+        batch.set(doc, payload, SetOptions(merge: true));
       }
       await batch.commit();
     }
+    return createdCount;
   }
 
   static Future<void> _writeDriverNamesToUserReports(
@@ -204,37 +383,53 @@ class DriverCsvService {
     }
   }
 
-  static Future<void> _updateAllUserScoresWithNames(
+  static Future<int> _updateAllUserScoresWithNames(
     FirebaseFirestore db,
     String uid,
     Map<String, String> idToName,
   ) async {
-    for (final entry in idToName.entries) {
-      final tid = entry.key;
-      final name = entry.value;
+    final scoresSnap = await db
+        .collection('users').doc(uid)
+        .collection('scores')
+        .get();
 
-      final q = await db
-          .collection('users').doc(uid)
-          .collection('scores')
-          .where('transporterId', isEqualTo: tid)
-          .get();
+    if (scoresSnap.docs.isEmpty) return 0;
 
-      if (q.docs.isEmpty) continue;
+    const chunk = 400;
+    final docs = scoresSnap.docs;
+    var updatedCount = 0;
+    for (var i = 0; i < docs.length; i += chunk) {
+      final batch = db.batch();
+      final slice = docs.sublist(
+        i,
+        (i + chunk > docs.length) ? docs.length : i + chunk,
+      );
+      var writes = 0;
 
-      const chunk = 400;
-      final docs = q.docs;
-      for (var i = 0; i < docs.length; i += chunk) {
-        final batch = db.batch();
-        final slice = docs.sublist(i, (i + chunk > docs.length) ? docs.length : i + chunk);
+      for (final d in slice) {
+        final data = d.data();
+        final rawTid = (data['transporterId'] ?? '').toString().trim();
+        final normalizedTid = normalizeTransporterId(rawTid);
+        final name = idToName[normalizedTid];
+        if (name == null || name.isEmpty) continue;
 
-        for (final d in slice) {
-          batch.set(d.reference, {
-            'driverName': name,
-            'updatedAt' : FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
+        final update = <String, dynamic>{
+          'driverName': name,
+          'updatedAt': FieldValue.serverTimestamp(),
+        };
+        if (normalizedTid.isNotEmpty && rawTid != normalizedTid) {
+          update['transporterId'] = normalizedTid;
         }
+
+        batch.set(d.reference, update, SetOptions(merge: true));
+        writes++;
+        updatedCount++;
+      }
+
+      if (writes > 0) {
         await batch.commit();
       }
     }
+    return updatedCount;
   }
 }

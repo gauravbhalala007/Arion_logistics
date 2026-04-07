@@ -1799,6 +1799,8 @@ class _NotificationHistoryTileLive extends StatelessWidget {
       final notifType = (adminData['type'] ?? type).toString();
       final createdAt = adminData['createdAt'];
       final now = FieldValue.serverTimestamp();
+      final sourceLang = Localizations.localeOf(context).languageCode
+          .toLowerCase();
 
       final driversSnap = await dspRef.collection('drivers').get();
       final drivers = driversSnap.docs
@@ -1808,6 +1810,8 @@ class _NotificationHistoryTileLive extends StatelessWidget {
       await adminNotifRef.set({
         'title': newTitle,
         'body': newBody,
+        'sourceLang': sourceLang,
+        'translations': <String, dynamic>{},
         'targetCount': drivers.length,
         'confirmedCount': 0,
         'requiresConfirmation': true,
@@ -1832,6 +1836,8 @@ class _NotificationHistoryTileLive extends StatelessWidget {
             'type': notifType,
             'title': newTitle,
             'body': newBody,
+            'sourceLang': sourceLang,
+            'translations': <String, dynamic>{},
             'status': 'unread',
             'readAt': null,
             'confirmedAt': null,
@@ -2146,112 +2152,50 @@ class _FleetHubCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    final compact = MediaQuery.of(context).size.width < 780;
 
     return _AdminCard(
       scale: scale,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (compact)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.directions_car_filled_outlined,
-                      color: AdminHomePage._kGreen,
-                      size: _r(22, scale),
-                    ),
-                    SizedBox(width: _r(10, scale)),
-                    Text(
-                      t.t('admin_home_fleet_hub'),
-                      style: TextStyle(
-                        fontSize: _r(20, scale),
-                        fontWeight: FontWeight.w900,
-                        color: AdminHomePage._kText,
-                      ),
-                    ),
-                  ],
+          Row(
+            children: [
+              Icon(
+                Icons.directions_car_filled_outlined,
+                color: AdminHomePage._kGreen,
+                size: _r(22, scale),
+              ),
+              SizedBox(width: _r(10, scale)),
+              Text(
+                t.t('admin_home_fleet_hub'),
+                style: TextStyle(
+                  fontSize: _r(20, scale),
+                  fontWeight: FontWeight.w900,
+                  color: AdminHomePage._kText,
                 ),
-                SizedBox(height: _r(8, scale)),
-                _FleetStats(scale: scale),
-              ],
-            )
-          else
-            Row(
-              children: [
-                Icon(
-                  Icons.directions_car_filled_outlined,
-                  color: AdminHomePage._kGreen,
-                  size: _r(22, scale),
-                ),
-                SizedBox(width: _r(10, scale)),
-                Text(
-                  t.t('admin_home_fleet_hub'),
-                  style: TextStyle(
-                    fontSize: _r(20, scale),
-                    fontWeight: FontWeight.w900,
-                    color: AdminHomePage._kText,
-                  ),
-                ),
-                const Spacer(),
-                _FleetStats(scale: scale),
-              ],
-            ),
+              ),
+            ],
+          ),
           SizedBox(height: _r(14, scale)),
-          if (adaptiveHeight)
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: _FleetListCompact(
-                    scale: scale,
-                    title: t.t('admin_home_service'),
-                    tag: 'SERVICE',
-                  ),
+          Expanded(
+            child: Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF7F8F8),
+                borderRadius: BorderRadius.circular(_r(18, scale)),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                t.t('coming_soon'),
+                style: TextStyle(
+                  fontSize: _r(18, scale),
+                  fontWeight: FontWeight.w800,
+                  color: AdminHomePage._kMuted,
                 ),
-                SizedBox(width: _r(compact ? 10 : 16, scale)),
-                Container(
-                  width: 1,
-                  margin: EdgeInsets.symmetric(vertical: _r(4, scale)),
-                  color: const Color(0xFFD9DED8),
-                ),
-                SizedBox(width: _r(compact ? 10 : 16, scale)),
-                Expanded(
-                  child: _FleetListCompact(
-                    scale: scale,
-                    title: t.t('admin_home_accidents'),
-                    tag: 'TDV',
-                  ),
-                ),
-              ],
-            )
-          else
-            Expanded(
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _FleetList(
-                      scale: scale,
-                      title: t.t('admin_home_service'),
-                      tag: 'SERVICE',
-                    ),
-                  ),
-                  SizedBox(width: _r(compact ? 10 : 16, scale)),
-                  const VerticalDivider(width: 1),
-                  SizedBox(width: _r(compact ? 10 : 16, scale)),
-                  Expanded(
-                    child: _FleetList(
-                      scale: scale,
-                      title: t.t('admin_home_accidents'),
-                      tag: 'TDV',
-                    ),
-                  ),
-                ],
               ),
             ),
+          ),
         ],
       ),
     );
@@ -2529,6 +2473,7 @@ class _DriverDocumentsCardState extends State<_DriverDocumentsCard> {
   String? get _uid => FirebaseAuth.instance.currentUser?.uid;
 
   static const int _kSoonDays = 30;
+  static const int _kProbezeitExpiredGraceDays = 7;
 
   // Onboarding expiry keys -> labels
   static const List<_ExpiryField> _expiryFields = [
@@ -2696,6 +2641,11 @@ class _DriverDocumentsCardState extends State<_DriverDocumentsCard> {
     if (start == null) return null;
     final sixMonthsLater = _addMonthsClamped(start, 6);
     return sixMonthsLater.subtract(const Duration(days: 1));
+  }
+
+  bool _isProbezeitExpiredWithinGrace(DateTime probationEnd, DateTime today) {
+    final daysSinceEnd = today.difference(probationEnd).inDays;
+    return daysSinceEnd >= 1 && daysSinceEnd <= _kProbezeitExpiredGraceDays;
   }
 
   String _fmtShortDate(DateTime? dt) {
@@ -3038,9 +2988,14 @@ class _DriverDocumentsCardState extends State<_DriverDocumentsCard> {
                 final workStart = _parseDate(onboarding['workStartDate']);
                 final probationEnd = _probationEndFromStart(workStart);
                 if (probationEnd != null) {
-                  final isExpired = probationEnd.isBefore(today);
+                  final diff = probationEnd.difference(today).inDays;
+                  final isExpired = _isProbezeitExpiredWithinGrace(
+                    probationEnd,
+                    today,
+                  );
                   final isSoon =
                       !isExpired &&
+                      diff >= 0 &&
                       (probationEnd.isBefore(soonLimit) ||
                           probationEnd.isAtSameMomentAs(soonLimit));
 

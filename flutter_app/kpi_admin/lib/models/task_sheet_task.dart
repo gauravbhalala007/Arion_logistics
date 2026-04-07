@@ -42,6 +42,14 @@ DateTime _toDateTime(dynamic value) {
   return DateTime.fromMillisecondsSinceEpoch(0);
 }
 
+List<String> _toStringList(dynamic value) {
+  if (value is! List) return const [];
+  return value
+      .map((item) => item.toString().trim())
+      .where((item) => item.isNotEmpty)
+      .toList(growable: false);
+}
+
 class TaskSheetTask {
   final String id;
   final String title;
@@ -50,6 +58,11 @@ class TaskSheetTask {
   final String assignedDriverName;
   final String assignmentScope;
   final String assignmentBatchId;
+  final String taskKind;
+  final List<String> feedbackOptions;
+  final String feedbackText;
+  final String feedbackSelectedOption;
+  final DateTime? respondedAt;
   final DriverTaskStatus status;
   final bool completedConfirmed;
   final DateTime createdAt;
@@ -63,11 +76,25 @@ class TaskSheetTask {
     required this.assignedDriverName,
     required this.assignmentScope,
     required this.assignmentBatchId,
+    required this.taskKind,
+    required this.feedbackOptions,
+    required this.feedbackText,
+    required this.feedbackSelectedOption,
+    required this.respondedAt,
     required this.status,
     required this.completedConfirmed,
     required this.createdAt,
     required this.updatedAt,
   });
+
+  bool get isFeedbackText => taskKind == 'feedback_text';
+
+  bool get isFeedbackChoice => taskKind == 'feedback_choice';
+
+  bool get isFeedbackTask => isFeedbackText || isFeedbackChoice;
+
+  String get feedbackResponse =>
+      feedbackText.isNotEmpty ? feedbackText : feedbackSelectedOption;
 
   factory TaskSheetTask.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? <String, dynamic>{};
@@ -84,6 +111,12 @@ class TaskSheetTask {
     final assignmentBatchId = (data['assignmentBatchId'] ?? '')
         .toString()
         .trim();
+    final taskKind = (data['taskKind'] ?? 'standard').toString().trim();
+    final feedbackOptions = _toStringList(data['feedbackOptions']);
+    final feedbackText = (data['feedbackText'] ?? '').toString().trim();
+    final feedbackSelectedOption = (data['feedbackSelectedOption'] ?? '')
+        .toString()
+        .trim();
     final statusRaw = (data['status'] ?? 'pending').toString().trim();
     final completedConfirmed = data['completedConfirmed'] == true;
 
@@ -95,6 +128,13 @@ class TaskSheetTask {
       assignedDriverName: assignedDriverName,
       assignmentScope: assignmentScope,
       assignmentBatchId: assignmentBatchId,
+      taskKind: taskKind,
+      feedbackOptions: feedbackOptions,
+      feedbackText: feedbackText,
+      feedbackSelectedOption: feedbackSelectedOption,
+      respondedAt: data['respondedAt'] is Timestamp
+          ? (data['respondedAt'] as Timestamp).toDate()
+          : (data['respondedAt'] is DateTime ? data['respondedAt'] as DateTime : null),
       status: parseDriverTaskStatus(statusRaw),
       completedConfirmed: completedConfirmed,
       createdAt: _toDateTime(data['createdAt']),

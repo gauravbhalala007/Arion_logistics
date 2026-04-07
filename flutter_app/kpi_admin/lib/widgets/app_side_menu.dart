@@ -247,11 +247,6 @@ class AppSideMenu extends StatelessWidget {
                             child: TextButton.icon(
                               onPressed: () async {
                                 await AuthService.signOut();
-                                if (!context.mounted) return;
-                                Navigator.of(context).pushNamedAndRemoveUntil(
-                                  '/login',
-                                  (route) => false,
-                                );
                               },
                               icon: const Icon(
                                 Icons.logout,

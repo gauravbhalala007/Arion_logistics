@@ -30,20 +30,23 @@ Future<void> _connectToEmulators() async {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: false,
+  );
 
   // TEMP logs
   // ignore: avoid_print
-  print('🔧 projectId: ${Firebase.app().options.projectId}');
+  // print('🔧 projectId: ${Firebase.app().options.projectId}');
   // ignore: avoid_print
-  print(
-    '🔧 storageBucket (from options): ${DefaultFirebaseOptions.currentPlatform.storageBucket}',
-  );
+  // print(
+  //   '🔧 storageBucket (from options): ${DefaultFirebaseOptions.currentPlatform.storageBucket}',
+  // );
 
   final bucket = DefaultFirebaseOptions.currentPlatform.storageBucket!;
   storage = FirebaseStorage.instanceFor(bucket: 'gs://$bucket');
 
   // ignore: avoid_print
-  print('🔧 storage.bucket runtime: ${storage.bucket}');
+  // print('🔧 storage.bucket runtime: ${storage.bucket}');
 
   // if (useEmulators) {
   //   await _connectToEmulators();

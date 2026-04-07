@@ -3,6 +3,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import '../localization/app_localizations.dart';
 import '../models/driver_notification.dart';
 import '../widgets/driver_notification_card.dart';
 
@@ -40,12 +41,25 @@ class _DriverNotificationsViewState extends State<DriverNotificationsView> {
 
   @override
   Widget build(BuildContext context) {
-    const filters = <Map<String, Object?>>[
-      {'key': null, 'label': 'All'},
-      {'key': DriverNotificationType.rule, 'label': 'Rule'},
-      {'key': DriverNotificationType.academy, 'label': 'DA Academy'},
-      {'key': DriverNotificationType.message, 'label': 'Message'},
-      {'key': DriverNotificationType.rideAlong, 'label': 'Ride Along'},
+    final t = AppLocalizations.of(context);
+    final filters = <Map<String, Object?>>[
+      {'key': null, 'label': t.t('driver_notifications_filter_all')},
+      {
+        'key': DriverNotificationType.rule,
+        'label': t.t('driver_notifications_filter_rule'),
+      },
+      {
+        'key': DriverNotificationType.academy,
+        'label': t.t('driver_notifications_filter_academy'),
+      },
+      {
+        'key': DriverNotificationType.message,
+        'label': t.t('driver_notifications_filter_message'),
+      },
+      {
+        'key': DriverNotificationType.rideAlong,
+        'label': t.t('driver_notifications_filter_ride_along'),
+      },
     ];
 
     String _labelForKey(DriverNotificationType? key) {
@@ -152,14 +166,20 @@ class _DriverNotificationsViewState extends State<DriverNotificationsView> {
           return const Center(child: CircularProgressIndicator());
         }
         if (snap.hasError) {
-          return Center(child: Text('Error: ${snap.error}'));
+          return Center(
+            child: Text(
+              t.tf('driver_notifications_error_template', {
+                'error': '${snap.error}',
+              }),
+            ),
+          );
         }
 
         final docs = snap.data?.docs ?? [];
         if (docs.isEmpty) {
-          return const Center(
+          return Center(
             child: Text(
-              'No notifications yet.',
+              t.t('driver_notifications_empty'),
               style: TextStyle(color: Colors.black54),
             ),
           );
@@ -215,9 +235,9 @@ class _DriverNotificationsViewState extends State<DriverNotificationsView> {
             ),
             Expanded(
               child: filteredItems.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Text(
-                        'No notifications for this filter.',
+                        t.t('driver_notifications_filter_empty'),
                         style: TextStyle(color: Colors.black54),
                       ),
                     )

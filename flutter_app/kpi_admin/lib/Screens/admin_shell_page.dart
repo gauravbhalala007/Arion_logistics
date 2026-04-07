@@ -10,6 +10,7 @@ import 'scorecard_overview.dart';
 import 'pod_quality_overview.dart';
 import 'drivers_hub_page.dart';
 import 'task_sheet_page.dart';
+import 'admin_shift_absence_page.dart';
 import 'admin_incident_reports_page.dart';
 import 'notifications_page.dart';
 import 'admin_approvals_page.dart';
@@ -66,7 +67,7 @@ class _AdminShellPageState extends State<AdminShellPage> {
           PodQualityOverviewPage(),
           DriversHubPage(),
           TaskSheetPage(),
-          _AdminComingSoonPanel(title: 'Shift & Absence'),
+          AdminShiftAbsencePage(),
           AdminIncidentReportsPage(),
           AdminAcademyPage(),
           AdminDispatcherPillPage(),
@@ -110,38 +111,5 @@ class _AdminShellPageState extends State<AdminShellPage> {
       default:
         return 0;
     }
-  }
-}
-
-class _AdminComingSoonPanel extends StatelessWidget {
-  final String title;
-  const _AdminComingSoonPanel({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF111827),
-            ),
-          ),
-          const SizedBox(height: 10),
-          const Text(
-            'Coming Soon',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF6B7280),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }

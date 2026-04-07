@@ -3,6 +3,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import '../localization/app_localizations.dart';
 import '../models/driver_notification.dart';
 import '../widgets/driver_notification_card.dart';
 
@@ -30,6 +31,7 @@ class DriverRulesView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: _col()
           .where('type', isEqualTo: 'rule')
@@ -40,14 +42,18 @@ class DriverRulesView extends StatelessWidget {
           return const Center(child: CircularProgressIndicator());
         }
         if (snap.hasError) {
-          return Center(child: Text('Error: ${snap.error}'));
+          return Center(
+            child: Text(
+              t.tf('driver_rules_error_template', {'error': '${snap.error}'}),
+            ),
+          );
         }
 
         final docs = snap.data?.docs ?? [];
         if (docs.isEmpty) {
-          return const Center(
+          return Center(
             child: Text(
-              'No rules yet.',
+              t.t('driver_rules_empty'),
               style: TextStyle(color: Colors.black54),
             ),
           );

@@ -1,6 +1,7 @@
 // lib/widgets/notification_pin_dialogs.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../localization/app_localizations.dart';
 
 class NotificationPinService {
   static DocumentReference<Map<String, dynamic>> _driverRef({
@@ -189,7 +190,9 @@ class _PinPadCard extends StatelessWidget {
                 right: 6,
                 top: 6,
                 child: IconButton(
-                  tooltip: 'Close',
+                  tooltip: AppLocalizations.of(context).t(
+                    'notification_pin_close_tooltip',
+                  ),
                   onPressed: onClose,
                   icon: const Icon(Icons.close, size: 20),
                   color: const Color(0xFF6B7280),

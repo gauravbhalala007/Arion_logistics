@@ -2,6 +2,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../localization/app_localizations.dart';
 
 class SignUpRequestPage extends StatefulWidget {
   const SignUpRequestPage({super.key});
@@ -49,9 +50,10 @@ class _SignUpRequestPageState extends State<SignUpRequestPage> {
       }, SetOptions(merge: true));
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Verification email sent. Verify, then wait for approval.'),
-      ));
+      final t = AppLocalizations.of(context);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(t.t('signup_request_success'))));
     } on FirebaseAuthException catch (e) {
       setState(() => _error = e.message);
     } catch (e) {
@@ -63,6 +65,7 @@ class _SignUpRequestPageState extends State<SignUpRequestPage> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     return Scaffold(
       body: Center(
         child: ConstrainedBox(
@@ -74,24 +77,70 @@ class _SignUpRequestPageState extends State<SignUpRequestPage> {
               child: Form(
                 key: _form,
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  const Text('Apply for Account',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                  Text(
+                    t.t('signup_request_title'),
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                   const SizedBox(height: 16),
-                  TextFormField(controller: _name, decoration: const InputDecoration(labelText: 'Full name'),
-                    validator: (v)=> v!.trim().isEmpty ? 'Required' : null),
-                  TextFormField(controller: _email, decoration: const InputDecoration(labelText: 'Email'),
-                    validator: (v)=> v!.contains('@') ? null : 'Enter a valid email'),
-                  TextFormField(controller: _password, decoration: const InputDecoration(labelText: 'Password'),
-                    obscureText: true, validator: (v)=> v!.length<6 ? 'Min 6 chars' : null),
-                  TextFormField(controller: _phone, decoration: const InputDecoration(labelText: 'Phone')),
-                  TextFormField(controller: _company, decoration: const InputDecoration(labelText: 'Company')),
-                  TextFormField(controller: _station, decoration: const InputDecoration(labelText: 'Station Code (e.g., DE123)')),
+                  TextFormField(
+                    controller: _name,
+                    decoration: InputDecoration(
+                      labelText: t.t('signup_request_full_name'),
+                    ),
+                    validator: (v) => v!.trim().isEmpty
+                        ? t.t('signup_request_required')
+                        : null,
+                  ),
+                  TextFormField(
+                    controller: _email,
+                    decoration: InputDecoration(
+                      labelText: t.t('signup_request_email'),
+                    ),
+                    validator: (v) => v!.contains('@')
+                        ? null
+                        : t.t('signup_request_valid_email'),
+                  ),
+                  TextFormField(
+                    controller: _password,
+                    decoration: InputDecoration(
+                      labelText: t.t('signup_request_password'),
+                    ),
+                    obscureText: true,
+                    validator: (v) => v!.length < 6
+                        ? t.t('signup_request_password_min')
+                        : null,
+                  ),
+                  TextFormField(
+                    controller: _phone,
+                    decoration: InputDecoration(
+                      labelText: t.t('signup_request_phone'),
+                    ),
+                  ),
+                  TextFormField(
+                    controller: _company,
+                    decoration: InputDecoration(
+                      labelText: t.t('signup_request_company'),
+                    ),
+                  ),
+                  TextFormField(
+                    controller: _station,
+                    decoration: InputDecoration(
+                      labelText: t.t('signup_request_station_code'),
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   if (_error != null) Text(_error!, style: const TextStyle(color: Colors.red)),
                   const SizedBox(height: 12),
                   ElevatedButton(
                     onPressed: _busy ? null : _submit,
-                    child: Text(_busy ? 'Submitting…' : 'Submit & Verify Email'),
+                    child: Text(
+                      _busy
+                          ? t.t('signup_request_submitting')
+                          : t.t('signup_request_submit'),
+                    ),
                   ),
                 ]),
               ),

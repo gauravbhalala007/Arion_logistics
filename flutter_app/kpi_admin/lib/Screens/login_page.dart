@@ -1,5 +1,6 @@
 // /lib/Screens/login_page.dart
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart'; // Ensure this path is correct
 
@@ -19,6 +20,8 @@ class _LoginPageState extends State<LoginPage> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   bool _busy = false;
+  String? _errorMessage;
+  String? _infoMessage;
 
   @override
   void dispose() {
@@ -31,19 +34,33 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _submit() async {
     if (_busy) return;
+    FocusScope.of(context).unfocus();
+    final email = _email.text.trim();
+    final password = _password.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      _showError('Enter both your email and password to continue.');
+      return;
+    }
+
     setState(() => _busy = true);
     try {
       await AuthService.signIn(
-        email: _email.text.trim(),
-        password: _password.text,
+        email: email,
+        password: password,
       );
 
       if (!mounted) return;
+      _clearMessages();
 
       // 🔹 After successful sign-in, go to the root route where AuthGate is
       Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
-    } catch (e) {
-      _snack(e.toString());
+    } on FirebaseAuthException catch (e) {
+      _showError(_mapLoginError(e));
+    } catch (_) {
+      _showError(
+        'We could not sign you in right now. Please try again in a moment.',
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -52,19 +69,118 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _reset() async {
     final email = _email.text.trim();
     if (email.isEmpty) {
-      _snack('Enter your email first.');
+      _showError('Enter your email address first.');
       return;
     }
     try {
       await AuthService.resetPassword(email);
-      _snack('Password reset email sent.');
-    } catch (e) {
-      _snack(e.toString());
+      _showInfo('Password reset email sent. Please check your inbox.');
+    } on FirebaseAuthException catch (e) {
+      _showError(_mapResetError(e));
+    } catch (_) {
+      _showError(
+        'We could not send the password reset email right now. Please try again.',
+      );
     }
   }
 
-  void _snack(String m) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+  void _clearMessages() {
+    if (!mounted) return;
+    setState(() {
+      _errorMessage = null;
+      _infoMessage = null;
+    });
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    setState(() {
+      _errorMessage = message;
+      _infoMessage = null;
+    });
+  }
+
+  void _showInfo(String message) {
+    if (!mounted) return;
+    setState(() {
+      _infoMessage = message;
+      _errorMessage = null;
+    });
+  }
+
+  String _mapLoginError(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'invalid-email':
+        return 'Enter a valid email address.';
+      case 'invalid-credential':
+      case 'wrong-password':
+      case 'user-not-found':
+        return 'Incorrect email or password. Please try again.';
+      case 'user-disabled':
+        return 'This account has been disabled. Please contact support.';
+      case 'too-many-requests':
+        return 'Too many login attempts. Please wait a few minutes and try again.';
+      case 'network-request-failed':
+        return 'Network connection failed. Check your internet and try again.';
+      default:
+        return 'Login failed. Please check your details and try again.';
+    }
+  }
+
+  String _mapResetError(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'invalid-email':
+        return 'Enter a valid email address.';
+      case 'user-not-found':
+        return 'No account was found for that email address.';
+      case 'too-many-requests':
+        return 'Too many requests. Please wait a few minutes and try again.';
+      case 'network-request-failed':
+        return 'Network connection failed. Check your internet and try again.';
+      default:
+        return 'Password reset failed. Please try again.';
+    }
+  }
+
+  Widget _buildStatusCard() {
+    final message = _errorMessage ?? _infoMessage;
+    if (message == null || message.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final isError = _errorMessage != null;
+    final borderColor = isError ? const Color(0xFFF3B0B0) : const Color(0xFF9ED9C8);
+    final bgColor = isError ? const Color(0xFFFFF4F4) : const Color(0xFFF2FBF7);
+    final iconColor = isError ? const Color(0xFFC24141) : primaryTeal;
+    final icon = isError ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: iconColor, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                color: isError ? const Color(0xFF7F1D1D) : const Color(0xFF155E4B),
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   // --- Build Method with Mockup UI ---
@@ -121,11 +237,17 @@ class _LoginPageState extends State<LoginPage> {
                           style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
                         ),
                         const SizedBox(height: 24),
+                        _buildStatusCard(),
                         
                         // Email Input Field
                         TextField(
                           controller: _email,
                           keyboardType: TextInputType.emailAddress,
+                          onChanged: (_) {
+                            if (_errorMessage != null || _infoMessage != null) {
+                              _clearMessages();
+                            }
+                          },
                           decoration: _getInputDecoration('Your email'), 
                         ),
                         const SizedBox(height: 16),
@@ -134,6 +256,12 @@ class _LoginPageState extends State<LoginPage> {
                         TextField(
                           controller: _password,
                           obscureText: true,
+                          onChanged: (_) {
+                            if (_errorMessage != null || _infoMessage != null) {
+                              _clearMessages();
+                            }
+                          },
+                          onSubmitted: (_) => _submit(),
                           decoration: _getInputDecoration('Your password'), 
                         ),
                         const SizedBox(height: 32),

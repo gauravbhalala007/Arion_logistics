@@ -3,9 +3,8 @@
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
+import '../localization/app_localizations.dart';
 import '../widgets/notification_pin_dialogs.dart';
-
-
 import '../models/driver_notification.dart';
 
 class DriverNotificationDetailView extends StatefulWidget {
@@ -62,7 +61,13 @@ class _DriverNotificationDetailViewState
       // Don’t block UX; just show snack
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to mark read: $e')),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(
+              context,
+            ).tf('driver_notification_mark_read_failed', {'error': '$e'}),
+          ),
+        ),
       );
     } finally {
       if (mounted) setState(() => _busyRead = false);
@@ -98,12 +103,24 @@ class _DriverNotificationDetailViewState
 
       // Optional: small feedback
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Confirmed')),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(
+              context,
+            ).t('driver_notification_confirm_success'),
+          ),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Confirm failed: $e')),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(
+              context,
+            ).tf('driver_notification_confirm_failed', {'error': '$e'}),
+          ),
+        ),
       );
     } finally {
       if (mounted) setState(() => _busyConfirm = false);
@@ -153,6 +170,7 @@ class _DriverNotificationDetailViewState
   @override
   Widget build(BuildContext context) {
     final n = widget.notification;
+    final l10n = AppLocalizations.of(context);
 
     final confirmedUi = _confirmedLocal || _justConfirmed;
 
@@ -165,8 +183,8 @@ class _DriverNotificationDetailViewState
               icon: const Icon(Icons.chevron_left),
             ),
             const SizedBox(width: 4),
-            const Text(
-              'Detail',
+            Text(
+              l10n.t('driver_notification_detail_title'),
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
             ),
             const Spacer(),
@@ -234,7 +252,7 @@ class _DriverNotificationDetailViewState
                 : SwipeConfirmButton(
                     key: const ValueKey('swipe_btn'),
                     enabled: !_busyConfirm && !confirmedUi,
-                    label: 'Reading confirmation',
+                    label: l10n.t('driver_notification_reading_confirmation'),
                     onConfirmed: () async {
                       // If PIN not set (should not happen due to login prompt),
                       // this fallback handles it gracefully:
@@ -287,12 +305,15 @@ class _StatusPillConfirmed extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final Color border =
         confirmed ? const Color(0xFF1D7F5A) : const Color(0xFFE9741A);
     final Color text =
         confirmed ? const Color(0xFF1D7F5A) : const Color(0xFFE9741A);
 
-    final String label = confirmed ? 'confirmed' : 'confirmation required';
+    final String label = confirmed
+        ? l10n.t('driver_notification_confirmed')
+        : l10n.t('driver_notification_confirmation_required');
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -325,6 +346,7 @@ class _ConfirmedAnimatedButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return FadeTransition(
       opacity: fadeAnim,
       child: ScaleTransition(
@@ -335,14 +357,14 @@ class _ConfirmedAnimatedButton extends StatelessWidget {
             color: const Color(0xFF1D7F5A),
             borderRadius: BorderRadius.circular(30),
           ),
-          child: const Row(
+          child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.check_circle, color: Colors.white, size: 20),
-              SizedBox(width: 10),
+              const Icon(Icons.check_circle, color: Colors.white, size: 20),
+              const SizedBox(width: 10),
               Text(
-                'confirmed',
-                style: TextStyle(
+                l10n.t('driver_notification_confirmed'),
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
                   color: Colors.white,

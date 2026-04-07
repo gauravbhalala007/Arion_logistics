@@ -54,6 +54,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
   final _bodyCtrl = TextEditingController();
 
   bool _publishing = false;
+  bool _translating = false;
+  Map<String, Map<String, String>> _translationsByLang = const {};
 
   // Matches your UI dropdown type values
   final List<_NotifType> _types = const [
@@ -71,6 +73,122 @@ class _NotificationsPageState extends State<NotificationsPage> {
     _titleCtrl.dispose();
     _bodyCtrl.dispose();
     super.dispose();
+  }
+
+  String _sourceLangCode() {
+    final supported = AppLocalizations.supportedLocales
+        .map((l) => l.languageCode.toLowerCase())
+        .toSet();
+    final code = Localizations.localeOf(context).languageCode.toLowerCase();
+    return supported.contains(code) ? code : 'en';
+  }
+
+  void _clearTranslationsIfAny() {
+    if (_translationsByLang.isEmpty) return;
+    setState(() {
+      _translationsByLang = const {};
+    });
+  }
+
+  void _updateTranslation(String lang, String field, String value) {
+    setState(() {
+      final next = <String, Map<String, String>>{};
+      for (final entry in _translationsByLang.entries) {
+        next[entry.key] = Map<String, String>.from(entry.value);
+      }
+      final row = next.putIfAbsent(lang, () => <String, String>{});
+      row[field] = value;
+      _translationsByLang = next;
+    });
+  }
+
+  Future<void> _translateAllLanguages() async {
+    final l10n = AppLocalizations.of(context);
+    final title = _titleCtrl.text.trim();
+    final body = _bodyCtrl.text.trim();
+    if (title.isEmpty && body.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.t('notifications_page_title_or_message_required')),
+        ),
+      );
+      return;
+    }
+
+    final sourceLang = _sourceLangCode();
+    final targets = AppLocalizations.supportedLocales
+        .map((l) => l.languageCode.toLowerCase())
+        .where((code) => code != sourceLang)
+        .toList(growable: false);
+    if (targets.isEmpty) return;
+
+    setState(() => _translating = true);
+    try {
+      final callable = FirebaseFunctions.instance.httpsCallable(
+        'translateFaqText',
+      );
+      final response = await callable.call({
+        'sourceLang': sourceLang,
+        'targetLangs': targets,
+        'question': title,
+        'answer': body,
+      });
+
+      final data = (response.data as Map?) ?? const {};
+      final translations =
+          (data['translations'] as Map?)?.cast<String, dynamic>() ??
+          const <String, dynamic>{};
+
+      final mapped = <String, Map<String, String>>{};
+      for (final code in targets) {
+        final raw = translations[code];
+        if (raw is! Map) continue;
+        final row = raw.cast<String, dynamic>();
+        final translatedTitle = (row['question'] ?? '').toString().trim();
+        final translatedBody = (row['answer'] ?? '').toString().trim();
+        if (translatedTitle.isEmpty && translatedBody.isEmpty) continue;
+        mapped[code] = {
+          'title': translatedTitle,
+          'body': translatedBody,
+        };
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _translationsByLang = mapped;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            mapped.isEmpty
+                ? 'No translations were generated.'
+                : 'Translated for ${mapped.length} languages.',
+          ),
+        ),
+      );
+    } on FirebaseFunctionsException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            l10n.tf('admin_faq_error_auto_translate', {
+              'error': e.message ?? e.code,
+            }),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            l10n.tf('admin_faq_error_auto_translate', {'error': '$e'}),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _translating = false);
+    }
   }
 
   // ------------------------------------------------------------
@@ -108,6 +226,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
         'type': _selectedType.value,
         'title': title,
         'body': body,
+        'sourceLang': _sourceLangCode(),
+        'translations': _translationsByLang,
         'requiresConfirmation': _selectedType.value == 'rule',
       });
 
@@ -117,6 +237,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
       if (!mounted) return;
       _titleCtrl.clear();
       _bodyCtrl.clear();
+      setState(() {
+        _translationsByLang = const {};
+      });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -441,13 +564,21 @@ class _NotificationsPageState extends State<NotificationsPage> {
               : contentH;
 
           final left = _ComposerCard(
+            stacked: stack,
             selectedType: _selectedType,
             types: _types,
             titleCtrl: _titleCtrl,
             bodyCtrl: _bodyCtrl,
             publishing: _publishing,
+            translating: _translating,
+            translatedCount: _translationsByLang.length,
+            translationsByLang: _translationsByLang,
+            onTranslationChanged: _updateTranslation,
             onTypeChanged: (t) => setState(() => _selectedType = t),
-            onPublish: _publishing ? null : _publish,
+            onContentChanged: _clearTranslationsIfAny,
+            onTranslateAll:
+                (_publishing || _translating) ? null : _translateAllLanguages,
+            onPublish: (_publishing || _translating) ? null : _publish,
           );
 
           final right = _HistoryCard(
@@ -488,9 +619,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
               Expanded(
                 child: stack
                     ? ListView(
-                        // IMPORTANT: bounded heights so Expanded() inside cards works
+                        // Keep the composer natural-height on narrow screens so
+                        // the original source fields remain visible.
                         children: [
-                          SizedBox(height: composerH, child: left),
+                          left,
                           const SizedBox(height: 16),
                           SizedBox(height: historyH, child: right),
                         ],
@@ -515,6 +647,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
 // Left: Composer Card
 // -----------------------------------------------------------------------------
 class _ComposerCard extends StatelessWidget {
+  final bool stacked;
   final _NotifType selectedType;
   final List<_NotifType> types;
 
@@ -522,16 +655,30 @@ class _ComposerCard extends StatelessWidget {
   final TextEditingController bodyCtrl;
 
   final bool publishing;
+  final bool translating;
+  final int translatedCount;
+  final Map<String, Map<String, String>> translationsByLang;
+  final void Function(String lang, String field, String value)
+  onTranslationChanged;
   final ValueChanged<_NotifType> onTypeChanged;
+  final VoidCallback onContentChanged;
+  final VoidCallback? onTranslateAll;
   final VoidCallback? onPublish;
 
   const _ComposerCard({
+    required this.stacked,
     required this.selectedType,
     required this.types,
     required this.titleCtrl,
     required this.bodyCtrl,
     required this.publishing,
+    required this.translating,
+    required this.translatedCount,
+    required this.translationsByLang,
+    required this.onTranslationChanged,
     required this.onTypeChanged,
+    required this.onContentChanged,
+    required this.onTranslateAll,
     required this.onPublish,
   });
 
@@ -559,6 +706,25 @@ class _ComposerCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    Widget buildBodyField() {
+      final field = TextField(
+        controller: bodyCtrl,
+        onChanged: (_) => onContentChanged(),
+        expands: true,
+        maxLines: null,
+        minLines: null,
+        textAlignVertical: TextAlignVertical.top,
+        decoration: _pillField(
+          hint: l10n.t('notifications_page_rule_message_hint'),
+        ),
+      );
+
+      if (stacked) {
+        return SizedBox(height: 180, child: field);
+      }
+      return Expanded(child: field);
+    }
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -666,6 +832,7 @@ class _ComposerCard extends StatelessWidget {
           // Title
           TextField(
             controller: titleCtrl,
+            onChanged: (_) => onContentChanged(),
             decoration: _pillField(
               hint: l10n.t('notifications_page_title_hint'),
             ),
@@ -673,18 +840,167 @@ class _ComposerCard extends StatelessWidget {
           const SizedBox(height: 12),
 
           // Rule / Message big box
-          Expanded(
-            child: TextField(
-              controller: bodyCtrl,
-              expands: true,
-              maxLines: null,
-              minLines: null,
-              textAlignVertical: TextAlignVertical.top,
-              decoration: _pillField(
-                hint: l10n.t('notifications_page_rule_message_hint'),
+          buildBodyField(),
+          const SizedBox(height: 14),
+
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onTranslateAll,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF1D7F5A),
+                    side: const BorderSide(color: Color(0xFF1D7F5A)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                  icon: translating
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.translate, size: 18),
+                  label: Text(
+                    translating
+                        ? 'Translating...'
+                        : 'Translate all languages',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (translatedCount > 0) ...[
+            const SizedBox(height: 8),
+            Text(
+              l10n.tf('notifications_page_translation_ready', {
+                'count': '$translatedCount',
+              }),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1D7F5A),
               ),
             ),
-          ),
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              constraints: BoxConstraints(maxHeight: stacked ? 320 : 220),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF7FAF8),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFD9E7DE)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.t('notifications_page_translation_preview'),
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF1D7F5A),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: ListView.separated(
+                      itemCount: translationsByLang.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final entry = translationsByLang.entries.elementAt(
+                          index,
+                        );
+                        final translatedTitle =
+                            (entry.value['title'] ?? '').trim();
+                        final translatedBody =
+                            (entry.value['body'] ?? '').trim();
+                        return Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: const Color(0xFFE5E7EB),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                entry.key.toUpperCase(),
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF6B7280),
+                                  letterSpacing: 0.4,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              TextFormField(
+                                initialValue: translatedTitle,
+                                key: ValueKey('title-${entry.key}'),
+                                onChanged: (value) => onTranslationChanged(
+                                  entry.key,
+                                  'title',
+                                  value,
+                                ),
+                                decoration: _pillField(
+                                  hint: l10n.t('notifications_page_title_hint'),
+                                ).copyWith(
+                                  isDense: true,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 10,
+                                  ),
+                                ),
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF22252F),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              TextFormField(
+                                initialValue: translatedBody,
+                                key: ValueKey('body-${entry.key}'),
+                                onChanged: (value) => onTranslationChanged(
+                                  entry.key,
+                                  'body',
+                                  value,
+                                ),
+                                minLines: 2,
+                                maxLines: 4,
+                                decoration: _pillField(
+                                  hint: l10n.t(
+                                    'notifications_page_rule_message_hint',
+                                  ),
+                                ).copyWith(
+                                  isDense: true,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 10,
+                                  ),
+                                ),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  height: 1.35,
+                                  color: Color(0xFF4A4F59),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 14),
 
           // Publish button
@@ -1034,6 +1350,8 @@ class _HistoryTile extends StatelessWidget {
       final notifType = (adminData['type'] ?? type).toString();
       final createdAt = adminData['createdAt'];
       final now = FieldValue.serverTimestamp();
+      final sourceLang = Localizations.localeOf(context).languageCode
+          .toLowerCase();
 
       final driversSnap = await dspRef.collection('drivers').get();
       final drivers = driversSnap.docs
@@ -1043,6 +1361,8 @@ class _HistoryTile extends StatelessWidget {
       await adminNotifRef.set({
         'title': newTitle,
         'body': newBody,
+        'sourceLang': sourceLang,
+        'translations': <String, dynamic>{},
         'targetCount': drivers.length,
         'confirmedCount': 0,
         'requiresConfirmation': true,
@@ -1067,6 +1387,8 @@ class _HistoryTile extends StatelessWidget {
             'type': notifType,
             'title': newTitle,
             'body': newBody,
+            'sourceLang': sourceLang,
+            'translations': <String, dynamic>{},
             'status': 'unread',
             'readAt': null,
             'confirmedAt': null,

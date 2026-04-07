@@ -52,10 +52,20 @@ class _AdminDispatcherPillPageState extends State<AdminDispatcherPillPage> {
         .doc(_dispatcherPillDoc);
   }
 
+  void _setLoading(bool value) {
+    if (!mounted) return;
+    setState(() => _loading = value);
+  }
+
+  void _setSaving(bool value) {
+    if (!mounted) return;
+    setState(() => _saving = value);
+  }
+
   Future<void> _resolveScopeAndLoad() async {
     final uid = _uid;
     if (uid == null) {
-      setState(() => _loading = false);
+      _setLoading(false);
       return;
     }
 
@@ -64,27 +74,29 @@ class _AdminDispatcherPillPageState extends State<AdminDispatcherPillPage> {
           .collection('users')
           .doc(uid)
           .get();
+      if (!mounted) return;
       final data = snap.data() ?? const <String, dynamic>{};
       final dspUid = (data['dspUid'] ?? '').toString().trim();
       _resolvedDspUid = dspUid.isEmpty ? uid : dspUid;
     } catch (_) {
+      if (!mounted) return;
       _resolvedDspUid = uid;
     }
 
+    if (!mounted) return;
     await _loadRows();
   }
 
   Future<void> _loadRows() async {
     final ref = _docRef;
     if (ref == null) {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
+      _setLoading(false);
       return;
     }
 
     try {
       final snap = await ref.get();
+      if (!mounted) return;
       final data = snap.data() ?? const <String, dynamic>{};
       final raw = data['dispatchers'];
       final rows = <_DispatcherDraft>[];
@@ -119,18 +131,6 @@ class _AdminDispatcherPillPageState extends State<AdminDispatcherPillPage> {
         }
       }
 
-      if (rows.isEmpty) {
-        rows.addAll([
-          _DispatcherDraft(
-            name: 'ISRAFIL',
-            startTime: '06:00',
-            endTime: '13:00',
-          ),
-          _DispatcherDraft(name: 'HALIM', startTime: '13:00', endTime: '20:00'),
-          _DispatcherDraft(name: 'ANES', startTime: '20:00', endTime: '03:00'),
-        ]);
-      }
-
       for (final row in _rows) {
         row.dispose();
       }
@@ -140,9 +140,7 @@ class _AdminDispatcherPillPageState extends State<AdminDispatcherPillPage> {
     } catch (e) {
       _showSnack('Failed to load dispatcher settings: $e', error: true);
     } finally {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
+      _setLoading(false);
     }
   }
 
@@ -180,7 +178,7 @@ class _AdminDispatcherPillPageState extends State<AdminDispatcherPillPage> {
       return;
     }
 
-    setState(() => _saving = true);
+    _setSaving(true);
     try {
       await ref.set({
         'dispatchers': dispatchers,
@@ -190,9 +188,7 @@ class _AdminDispatcherPillPageState extends State<AdminDispatcherPillPage> {
     } catch (e) {
       _showSnack('Failed to save settings: $e', error: true);
     } finally {
-      if (mounted) {
-        setState(() => _saving = false);
-      }
+      _setSaving(false);
     }
   }
 

@@ -84,10 +84,20 @@ class _AdminIncidentReportsPageState extends State<AdminIncidentReportsPage> {
         .collection(_reportsCollection);
   }
 
+  void _setLoading(bool value) {
+    if (!mounted) return;
+    setState(() => _loading = value);
+  }
+
+  void _setSaving(bool value) {
+    if (!mounted) return;
+    setState(() => _saving = value);
+  }
+
   Future<void> _resolveScopeAndLoad() async {
     final uid = _uid;
     if (uid == null) {
-      if (mounted) setState(() => _loading = false);
+      _setLoading(false);
       return;
     }
 
@@ -96,26 +106,30 @@ class _AdminIncidentReportsPageState extends State<AdminIncidentReportsPage> {
           .collection('users')
           .doc(uid)
           .get();
+      if (!mounted) return;
       final userData = userSnap.data() ?? const <String, dynamic>{};
       final dspUid = (userData['dspUid'] ?? '').toString().trim();
       _resolvedDspUid = dspUid.isEmpty ? uid : dspUid;
     } catch (_) {
+      if (!mounted) return;
       _resolvedDspUid = uid;
     }
 
+    if (!mounted) return;
     await _loadSettings();
   }
 
   Future<void> _loadSettings() async {
     final ref = _settingsRef;
     if (ref == null) {
-      if (mounted) setState(() => _loading = false);
+      _setLoading(false);
       return;
     }
 
-    setState(() => _loading = true);
+    _setLoading(true);
     try {
       final snap = await ref.get();
+      if (!mounted) return;
       final data = snap.data() ?? const <String, dynamic>{};
       final company = _mapOf(data['company']);
       final insurance = _mapOf(data['insurance']);
@@ -156,7 +170,7 @@ class _AdminIncidentReportsPageState extends State<AdminIncidentReportsPage> {
     } catch (e) {
       _showSnack('Failed to load incident settings: $e', error: true);
     } finally {
-      if (mounted) setState(() => _loading = false);
+      _setLoading(false);
     }
   }
 
@@ -167,7 +181,7 @@ class _AdminIncidentReportsPageState extends State<AdminIncidentReportsPage> {
       return;
     }
 
-    setState(() => _saving = true);
+    _setSaving(true);
     try {
       await ref.set({
         'enabled': true,
@@ -199,7 +213,7 @@ class _AdminIncidentReportsPageState extends State<AdminIncidentReportsPage> {
     } catch (e) {
       _showSnack('Failed to save settings: $e', error: true);
     } finally {
-      if (mounted) setState(() => _saving = false);
+      _setSaving(false);
     }
   }
 

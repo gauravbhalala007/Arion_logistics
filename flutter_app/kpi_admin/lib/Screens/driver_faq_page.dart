@@ -1,13 +1,57 @@
 // lib/screens/driver_faq_page.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart' as fb;
 import 'package:flutter/material.dart';
 
 import '../localization/app_localizations.dart';
 import '../data/driver_faq_keys.dart';
+import '../widgets/web_preview.dart';
 
 const String _localizedFaqCollection = 'faqs_localized';
 const String _insertAtStart = '__start__';
 const String _insertAtEnd = '__end__';
+
+Future<String?> _resolveFaqImageUrl({
+  required String rawUrl,
+  required String rawPath,
+}) async {
+  final pathValue = rawPath.trim();
+  if (pathValue.isNotEmpty) {
+    try {
+      final normalized = pathValue.startsWith('/')
+          ? pathValue.substring(1)
+          : pathValue;
+      return await fb.FirebaseStorage.instance
+          .ref()
+          .child(normalized)
+          .getDownloadURL();
+    } catch (_) {
+      // ignore and fall back to URL resolution
+    }
+  }
+
+  final value = rawUrl.trim();
+  if (value.isEmpty) return null;
+  final lower = value.toLowerCase();
+  if (lower.startsWith('http://') || lower.startsWith('https://')) {
+    return value;
+  }
+  try {
+    if (lower.startsWith('gs://')) {
+      return await fb.FirebaseStorage.instance.refFromURL(value).getDownloadURL();
+    }
+    final normalized = value.startsWith('/') ? value.substring(1) : value;
+    if (normalized.isNotEmpty) {
+      return await fb.FirebaseStorage.instance
+          .ref()
+          .child(normalized)
+          .getDownloadURL();
+    }
+  } catch (_) {
+    // ignore resolution failures
+  }
+  return null;
+}
 
 class DriverFaqPage extends StatefulWidget {
   final String dspUid;
@@ -89,6 +133,9 @@ class _DriverFaqPageState extends State<DriverFaqPage> {
                       insertAfterKey:
                           (d.data()['insertAfterKey'] ?? _insertAtEnd)
                               .toString(),
+                      imageUrl: (d.data()['imageUrl'] ?? '').toString().trim(),
+                      imagePath:
+                          (d.data()['imagePath'] ?? '').toString().trim(),
                       order:
                           (d.data()['order'] as num?)?.toInt() ??
                           DateTime.now().millisecondsSinceEpoch,
@@ -105,6 +152,15 @@ class _DriverFaqPageState extends State<DriverFaqPage> {
                 );
                 if (overrideText.isNotEmpty) return overrideText;
                 return t.t(isQuestion ? node.qKey : node.aKey);
+              }
+
+              Map<String, String> resolveImage(DriverFaqNode node) {
+                final overrideData = overrides[node.qKey];
+                return {
+                  'imageUrl': (overrideData?['imageUrl'] ?? '').toString().trim(),
+                  'imagePath':
+                      (overrideData?['imagePath'] ?? '').toString().trim(),
+                };
               }
 
               final filteredCustom = _filterFaqItems(customItems, query);
@@ -158,6 +214,7 @@ class _DriverFaqPageState extends State<DriverFaqPage> {
                       node: node,
                       depth: 0,
                       resolveText: resolveText,
+                      resolveImage: resolveImage,
                     ),
                   );
                   combinedWidgets.add(const SizedBox(height: 8));
@@ -329,12 +386,16 @@ class _FaqItem {
   final String question;
   final String answer;
   final String insertAfterKey;
+  final String imageUrl;
+  final String imagePath;
   final int order;
 
   const _FaqItem({
     required this.question,
     required this.answer,
     required this.insertAfterKey,
+    required this.imageUrl,
+    required this.imagePath,
     required this.order,
   });
 }
@@ -396,17 +457,20 @@ class _FaqNodeCard extends StatelessWidget {
   final DriverFaqNode node;
   final int depth;
   final String Function(DriverFaqNode node, bool isQuestion) resolveText;
+  final Map<String, String> Function(DriverFaqNode node) resolveImage;
 
   const _FaqNodeCard({
     required this.node,
     required this.depth,
     required this.resolveText,
+    required this.resolveImage,
   });
 
   @override
   Widget build(BuildContext context) {
     final question = resolveText(node, true);
     final answer = resolveText(node, false);
+    final image = resolveImage(node);
 
     final bool hasChildren = node.children.isNotEmpty;
 
@@ -448,6 +512,14 @@ class _FaqNodeCard extends StatelessWidget {
                 color: Color(0xFF374151),
               ),
             ),
+            if ((image['imageUrl'] ?? '').isNotEmpty ||
+                (image['imagePath'] ?? '').isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _FaqSampleImage(
+                imageUrl: image['imageUrl'] ?? '',
+                imagePath: image['imagePath'] ?? '',
+              ),
+            ],
             if (hasChildren) ...[
               const SizedBox(height: 10),
               ...node.children.map(
@@ -455,6 +527,7 @@ class _FaqNodeCard extends StatelessWidget {
                   node: child,
                   depth: depth + 1,
                   resolveText: resolveText,
+                  resolveImage: resolveImage,
                 ),
               ),
             ],
@@ -504,7 +577,80 @@ class _FaqItemCard extends StatelessWidget {
                 color: Color(0xFF374151),
               ),
             ),
+            if (item.imageUrl.isNotEmpty || item.imagePath.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _FaqSampleImage(
+                imageUrl: item.imageUrl,
+                imagePath: item.imagePath,
+              ),
+            ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FaqSampleImage extends StatelessWidget {
+  final String imageUrl;
+  final String imagePath;
+
+  const _FaqSampleImage({
+    required this.imageUrl,
+    required this.imagePath,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: const Color(0xFFE5E7EB)),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: SizedBox(
+          height: 320,
+          width: double.infinity,
+          child: FutureBuilder<String?>(
+            future: _resolveFaqImageUrl(
+              rawUrl: imageUrl,
+              rawPath: imagePath,
+            ),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const ColoredBox(
+                  color: Color(0xFFF3F4F6),
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              final resolvedUrl = snapshot.data?.trim() ?? '';
+              final effectiveUrl = resolvedUrl.isNotEmpty
+                  ? resolvedUrl
+                  : ((imageUrl.startsWith('http://') ||
+                            imageUrl.startsWith('https://'))
+                        ? imageUrl
+                        : '');
+              if (effectiveUrl.isEmpty) {
+                return Container(
+                  color: const Color(0xFFF3F4F6),
+                  alignment: Alignment.center,
+                  child: const Text(
+                    'Sample image unavailable.',
+                    style: TextStyle(
+                      color: Color(0xFF6B7280),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                );
+              }
+              return Container(
+                color: const Color(0xFFF3F4F6),
+                alignment: Alignment.center,
+                child: buildWebImagePreview(effectiveUrl),
+              );
+            },
+          ),
         ),
       ),
     );

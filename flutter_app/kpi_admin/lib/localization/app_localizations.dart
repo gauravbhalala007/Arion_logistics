@@ -84,6 +84,7 @@ class AppLocalizations {
       'driver_home_academy_subtitle': 'Training & knowledge',
       'driver_home_rules_title': 'Company Rules',
       'driver_home_rules_subtitle': 'Guidelines & policies',
+      'driver_notification_published_on': 'Published {date}',
       'driver_home_vehicles_title': 'Vehicles',
       'driver_home_vehicles_subtitle': 'Vehicle overview',
       'driver_home_codriver_title': 'CoDriver AI',
@@ -352,6 +353,40 @@ class AppLocalizations {
       'dash_total_score': 'Total Score',
       'dash_rank_in_station': 'Rank in station',
       'dash_status': 'Status',
+      'dash_compliance_safety': 'Compliance & Safety',
+      'dash_delivery_quality_swc': 'Delivery Quality & SWC',
+      'dash_company_threshold_hint': '{score}% out of {target}% minimum',
+      'dash_company_threshold_met': '{score}% meets the {target}% threshold',
+      'dash_company_data_section': 'Data As-Company',
+      'dash_company_data_show': 'Show results as company',
+      'dash_company_data_hide': 'Hide company categories',
+      'dash_company_section_safety': 'Safety',
+      'dash_company_section_compliance': 'Compliance',
+      'dash_company_section_customer_delivery_experience':
+          'Customer Delivery Experience',
+      'dash_company_section_quality': 'Quality',
+      'dash_company_section_standard_work_compliance':
+          'Standard Work Compliance',
+      'dash_metric_fico': 'Safe Driving Metric (FICO)',
+      'dash_metric_speeding_event_rate':
+          'Speeding Event Rate (Per 100 Trips)',
+      'dash_metric_mentor_adoption_rate': 'Mentor Adoption Rate',
+      'dash_metric_vehicle_audit_compliance':
+          'Vehicle Audit (VSA) Compliance',
+      'dash_metric_breach_of_contract': 'Breach of Contract (BOC)',
+      'dash_metric_working_hours_compliance':
+          'Working Hours Compliance (WHC)',
+      'dash_metric_comprehensive_audit_score':
+          'Comprehensive Audit Score (CAS)',
+      'dash_metric_customer_escalation_dpmo': 'Customer Escalation DPMO',
+      'dash_metric_customer_delivery_feedback': 'Customer Delivery Feedback',
+      'dash_metric_delivery_completion_rate':
+          'Delivery Completion Rate (DCR)',
+      'dash_metric_dnr_dpmo': 'DNR DPMO',
+      'dash_metric_lor_dpmo': 'LoR DPMO',
+      'dash_metric_dsc_dpmo': 'DSC DPMO',
+      'dash_metric_photo_on_delivery': 'Photo-On-Delivery',
+      'dash_metric_contact_compliance': 'Contact Compliance',
 
       'dash_rank': 'Rank',
       'dash_score': 'Score',
@@ -815,6 +850,7 @@ class AppLocalizations {
       'driver_home_academy_subtitle': 'Schulungen & Wissen',
       'driver_home_rules_title': 'Firmenregeln',
       'driver_home_rules_subtitle': 'Richtlinien & Vorschriften',
+      'driver_notification_published_on': 'Veroeffentlicht {date}',
       'driver_home_vehicles_title': 'Fahrzeuge',
       'driver_home_vehicles_subtitle': 'Fahrzeugübersicht',
       'driver_home_codriver_title': 'CoDriver AI',
@@ -1080,6 +1116,9 @@ class AppLocalizations {
       'dash_total_score': 'Gesamt-Score',
       'dash_rank_in_station': 'Rang in Station',
       'dash_status': 'Status',
+      'dash_company_data_section': 'Daten als Unternehmen',
+      'dash_company_data_show': 'Ergebnisse als Unternehmen anzeigen',
+      'dash_company_data_hide': 'Unternehmenskategorien ausblenden',
 
       'dash_rank': 'Rang',
       'dash_score': 'Score',
@@ -1568,6 +1607,7 @@ class AppLocalizations {
       'driver_home_academy_subtitle': 'Trajnim & njohuri',
       'driver_home_rules_title': 'Rregullat e kompanise',
       'driver_home_rules_subtitle': 'Udhezime & politika',
+      'driver_notification_published_on': 'Publikuar {date}',
       'driver_home_vehicles_title': 'Automjetet',
       'driver_home_vehicles_subtitle': 'Permbledhja e automjeteve',
       'driver_home_codriver_title': 'CoDriver AI',
@@ -1819,6 +1859,9 @@ class AppLocalizations {
       'dash_total_score': 'Rezultati total',
       'dash_rank_in_station': 'Renditja në stacion',
       'dash_status': 'Statusi',
+      'dash_company_data_section': 'Të dhëna si kompani',
+      'dash_company_data_show': 'Shfaq rezultatet si kompani',
+      'dash_company_data_hide': 'Fshih kategoritë e kompanisë',
 
       'dash_rank': 'Renditja',
       'dash_score': 'Rezultati',
@@ -2310,6 +2353,7 @@ class AppLocalizations {
       'driver_home_academy_subtitle': 'Kepzes & tudas',
       'driver_home_rules_title': 'Ceges szabalyok',
       'driver_home_rules_subtitle': 'Iranyelvek es szabalyzatok',
+      'driver_notification_published_on': 'Kozzeteve {date}',
       'driver_home_vehicles_title': 'Jarmuvek',
       'driver_home_vehicles_subtitle': 'Jarmu attekintes',
       'driver_home_codriver_title': 'CoDriver AI',
@@ -2558,6 +2602,9 @@ class AppLocalizations {
       'dash_total_score': 'Összpontszám',
       'dash_rank_in_station': 'Helyezés az állomáson',
       'dash_status': 'Állapot',
+      'dash_company_data_section': 'Adatok vállalati szinten',
+      'dash_company_data_show': 'Eredmények megjelenítése vállalatként',
+      'dash_company_data_hide': 'Vállalati kategóriák elrejtése',
 
       'dash_rank': 'Helyezés',
       'dash_score': 'Pontszám',
@@ -3063,6 +3110,7 @@ class AppLocalizations {
       'driver_home_academy_subtitle': 'Instruire & cunostinte',
       'driver_home_rules_title': 'Regulile companiei',
       'driver_home_rules_subtitle': 'Ghiduri & politici',
+      'driver_notification_published_on': 'Publicat {date}',
       'driver_home_vehicles_title': 'Vehicule',
       'driver_home_vehicles_subtitle': 'Prezentare vehicule',
       'driver_home_codriver_title': 'CoDriver AI',
@@ -3316,6 +3364,9 @@ class AppLocalizations {
       'dash_total_score': 'Scor total',
       'dash_rank_in_station': 'Rang în stație',
       'dash_status': 'Status',
+      'dash_company_data_section': 'Date la nivel de companie',
+      'dash_company_data_show': 'Arată rezultatele ca companie',
+      'dash_company_data_hide': 'Ascunde categoriile companiei',
 
       'dash_rank': 'Rang',
       'dash_score': 'Scor',
@@ -3786,6 +3837,7 @@ class AppLocalizations {
       'driver_home_academy_subtitle': 'Obuka i znanje',
       'driver_home_rules_title': 'Pravila kompanije',
       'driver_home_rules_subtitle': 'Smjernice i politike',
+      'driver_notification_published_on': 'Objavljeno {date}',
       'driver_home_vehicles_title': 'Vozila',
       'driver_home_vehicles_subtitle': 'Pregled vozila',
       'driver_home_codriver_title': 'CoDriver AI',
@@ -4034,6 +4086,9 @@ class AppLocalizations {
       'dash_total_score': 'Ukupni rezultat',
       'dash_rank_in_station': 'Rang u stanici',
       'dash_status': 'Status',
+      'dash_company_data_section': 'Podaci kao tvrtka',
+      'dash_company_data_show': 'Prikaži rezultate kao tvrtka',
+      'dash_company_data_hide': 'Sakrij kategorije tvrtke',
 
       'dash_rank': 'Rang',
       'dash_score': 'Rezultat',
@@ -4501,6 +4556,7 @@ class AppLocalizations {
       'driver_home_academy_subtitle': 'تدريب ومعرفة',
       'driver_home_rules_title': 'قواعد الشركة',
       'driver_home_rules_subtitle': 'ارشادات وسياسات',
+      'driver_notification_published_on': 'تم النشر {date}',
       'driver_home_vehicles_title': 'المركبات',
       'driver_home_vehicles_subtitle': 'نظرة عامة على المركبات',
       'driver_home_codriver_title': 'CoDriver AI',
@@ -4740,6 +4796,9 @@ class AppLocalizations {
       'dash_total_score': 'النتيجة الإجمالية',
       'dash_rank_in_station': 'الترتيب في المحطة',
       'dash_status': 'الحالة',
+      'dash_company_data_section': 'البيانات على مستوى الشركة',
+      'dash_company_data_show': 'عرض النتائج كشركة',
+      'dash_company_data_hide': 'إخفاء فئات الشركة',
 
       'dash_rank': 'الترتيب',
       'dash_score': 'النتيجة',
@@ -5190,6 +5249,7 @@ class AppLocalizations {
       'driver_home_academy_subtitle': 'Egitim ve bilgi',
       'driver_home_rules_title': 'Sirket Kurallari',
       'driver_home_rules_subtitle': 'Yonergeler ve politikalar',
+      'driver_notification_published_on': 'Yayinlandi {date}',
       'driver_home_vehicles_title': 'Araclar',
       'driver_home_vehicles_subtitle': 'Arac genel bakisi',
       'driver_home_codriver_title': 'CoDriver AI',
@@ -5419,6 +5479,9 @@ class AppLocalizations {
       'dash_total_score': 'Toplam Skor',
       'dash_rank_in_station': 'Istasyondaki siralama',
       'dash_status': 'Durum',
+      'dash_company_data_section': 'Sirket verisi olarak',
+      'dash_company_data_show': 'Sonuclari sirket olarak goster',
+      'dash_company_data_hide': 'Sirket kategorilerini gizle',
       'dash_rank': 'Siralama',
       'dash_score': 'Skor',
       'dash_name': 'Ad',
@@ -5801,6 +5864,7 @@ class AppLocalizations {
       'driver_home_academy_subtitle': 'Обучение и знания',
       'driver_home_rules_title': 'Правила компании',
       'driver_home_rules_subtitle': 'Инструкции и политики',
+      'driver_notification_published_on': 'Опубликовано {date}',
       'driver_home_vehicles_title': 'Транспорт',
       'driver_home_vehicles_subtitle': 'Обзор транспорта',
       'driver_home_codriver_title': 'CoDriver AI',
@@ -6037,6 +6101,9 @@ class AppLocalizations {
       'dash_total_score': 'Общий балл',
       'dash_rank_in_station': 'Ранг на станции',
       'dash_status': 'Статус',
+      'dash_company_data_section': 'Данные по компании',
+      'dash_company_data_show': 'Показать результаты как у компании',
+      'dash_company_data_hide': 'Скрыть категории компании',
       'dash_rank': 'Ранг',
       'dash_score': 'Балл',
       'dash_name': 'Имя',
@@ -6384,11 +6451,801 @@ class AppLocalizations {
     },
   };
 
+  static final Map<String, Map<String, String>>
+  _driverNotificationLocalizedValues = {
+    'en': {
+      'driver_notification_confirmation_required': 'confirmation required',
+      'driver_notification_confirmed': 'confirmed',
+      'driver_notification_detail_title': 'Detail',
+      'driver_notification_reading_confirmation': 'Reading confirmation',
+      'driver_notification_confirm_success': 'Confirmed',
+      'driver_notification_confirm_failed': 'Confirm failed: {error}',
+      'driver_notification_mark_read_failed':
+          'Failed to mark as read: {error}',
+    },
+    'de': {
+      'driver_notification_confirmation_required':
+          'Bestaetigung erforderlich',
+      'driver_notification_confirmed': 'bestaetigt',
+      'driver_notification_detail_title': 'Detail',
+      'driver_notification_reading_confirmation': 'Lesebestaetigung',
+      'driver_notification_confirm_success': 'Bestaetigt',
+      'driver_notification_confirm_failed':
+          'Bestaetigung fehlgeschlagen: {error}',
+      'driver_notification_mark_read_failed':
+          'Als gelesen markieren fehlgeschlagen: {error}',
+    },
+    'sq': {
+      'driver_notification_confirmation_required': 'konfirmimi kerkohet',
+      'driver_notification_confirmed': 'konfirmuar',
+      'driver_notification_detail_title': 'Detaje',
+      'driver_notification_reading_confirmation': 'Konfirmimi i leximit',
+      'driver_notification_confirm_success': 'U konfirmua',
+      'driver_notification_confirm_failed': 'Konfirmimi deshtoi: {error}',
+      'driver_notification_mark_read_failed':
+          'Shenjimi si i lexuar deshtoi: {error}',
+    },
+    'hu': {
+      'driver_notification_confirmation_required':
+          'megerosites szukseges',
+      'driver_notification_confirmed': 'megerositve',
+      'driver_notification_detail_title': 'Reszletek',
+      'driver_notification_reading_confirmation': 'Olvasas megerositese',
+      'driver_notification_confirm_success': 'Megerositve',
+      'driver_notification_confirm_failed':
+          'A megerosites sikertelen: {error}',
+      'driver_notification_mark_read_failed':
+          'Sikertelen olvasottkent jeloles: {error}',
+    },
+    'ro': {
+      'driver_notification_confirmation_required': 'confirmare necesara',
+      'driver_notification_confirmed': 'confirmat',
+      'driver_notification_detail_title': 'Detalii',
+      'driver_notification_reading_confirmation': 'Confirmare citire',
+      'driver_notification_confirm_success': 'Confirmat',
+      'driver_notification_confirm_failed':
+          'Confirmarea a esuat: {error}',
+      'driver_notification_mark_read_failed':
+          'Marcarea ca citit a esuat: {error}',
+    },
+    'hr': {
+      'driver_notification_confirmation_required': 'potvrda je potrebna',
+      'driver_notification_confirmed': 'potvrdeno',
+      'driver_notification_detail_title': 'Detalji',
+      'driver_notification_reading_confirmation': 'Potvrda citanja',
+      'driver_notification_confirm_success': 'Potvrdeno',
+      'driver_notification_confirm_failed': 'Potvrda nije uspjela: {error}',
+      'driver_notification_mark_read_failed':
+          'Oznacavanje kao procitano nije uspjelo: {error}',
+    },
+    'ar': {
+      'driver_notification_confirmation_required': 'التأكيد مطلوب',
+      'driver_notification_confirmed': 'تم التأكيد',
+      'driver_notification_detail_title': 'التفاصيل',
+      'driver_notification_reading_confirmation': 'تأكيد القراءة',
+      'driver_notification_confirm_success': 'تم التأكيد',
+      'driver_notification_confirm_failed': 'فشل التأكيد: {error}',
+      'driver_notification_mark_read_failed':
+          'فشل تعليم الإشعار كمقروء: {error}',
+    },
+    'tr': {
+      'driver_notification_confirmation_required': 'onay gerekli',
+      'driver_notification_confirmed': 'onaylandi',
+      'driver_notification_detail_title': 'Detay',
+      'driver_notification_reading_confirmation': 'Okuma onayi',
+      'driver_notification_confirm_success': 'Onaylandi',
+      'driver_notification_confirm_failed': 'Onay basarisiz: {error}',
+      'driver_notification_mark_read_failed':
+          'Okundu olarak isaretleme basarisiz: {error}',
+    },
+    'ru': {
+      'driver_notification_confirmation_required': 'требуется подтверждение',
+      'driver_notification_confirmed': 'подтверждено',
+      'driver_notification_detail_title': 'Детали',
+      'driver_notification_reading_confirmation': 'Подтверждение прочтения',
+      'driver_notification_confirm_success': 'Подтверждено',
+      'driver_notification_confirm_failed':
+          'Не удалось подтвердить: {error}',
+      'driver_notification_mark_read_failed':
+          'Не удалось отметить как прочитано: {error}',
+    },
+  };
+
+  static final Map<String, Map<String, String>> _driverAbsenceLocalizedValues = {
+    'en': {
+      'driver_absence_page_eyebrow': 'Absence',
+      'driver_absence_overview_title': 'Absence overview',
+      'driver_absence_periods_title': 'Requested periods',
+      'driver_absence_total_label': 'Total',
+      'driver_absence_special_label': 'Special leave',
+      'driver_absence_taken_label': 'Taken',
+      'driver_absence_available_vacation_label': 'Available vacation',
+      'driver_absence_start_label': 'Start',
+      'driver_absence_end_label': 'End',
+      'driver_absence_days_label': 'Days',
+      'driver_absence_day_label': 'day',
+      'driver_absence_days_per_year': 'days / year',
+      'driver_absence_of_word': 'of',
+      'driver_absence_request_button': 'Request absence',
+      'driver_absence_request_sheet_title': 'New absence request',
+      'driver_absence_type_label': 'Type',
+      'driver_absence_vacation_type': 'Vacation',
+      'driver_absence_sick_leave_type': 'Sick leave',
+      'driver_absence_from_label': 'From',
+      'driver_absence_to_label': 'To',
+      'driver_absence_reason_label': 'Reason',
+      'driver_absence_reason_hint': 'Enter a short reason',
+      'driver_absence_submit_label': 'Submit request',
+      'driver_absence_submitting_label': 'Submitting...',
+      'driver_absence_empty_vacation_list': 'No absence requests yet.',
+      'driver_absence_submit_success': 'Absence request submitted.',
+      'driver_absence_login_required': 'You must be logged in.',
+      'driver_absence_scope_missing': 'Driver scope is missing.',
+      'driver_absence_pick_date_validation': 'Please select both dates.',
+      'driver_absence_reason_validation': 'Please enter a reason.',
+      'driver_absence_available_vacation_hint_label': 'Available vacation',
+      'driver_absence_vacation_limit_exceeded_template':
+          'Requested {requested} days, but only {available} are available.',
+      'driver_absence_submit_failed_template': 'Submit failed: {error}',
+      'driver_absence_load_failed_template':
+          'Failed to load absence data: {error}',
+    },
+    'de': {
+      'driver_absence_page_eyebrow': 'Abwesenheit',
+      'driver_absence_overview_title': 'Abwesenheitsuebersicht',
+      'driver_absence_periods_title': 'Beantragte Zeitraeume',
+      'driver_absence_total_label': 'Gesamt',
+      'driver_absence_special_label': 'Sonderurlaub',
+      'driver_absence_taken_label': 'Genommen',
+      'driver_absence_available_vacation_label': 'Verfuegbarer Urlaub',
+      'driver_absence_start_label': 'Start',
+      'driver_absence_end_label': 'Ende',
+      'driver_absence_days_label': 'Tage',
+      'driver_absence_day_label': 'Tag',
+      'driver_absence_days_per_year': 'Tage / Jahr',
+      'driver_absence_of_word': 'von',
+      'driver_absence_request_button': 'Abwesenheit beantragen',
+      'driver_absence_request_sheet_title': 'Neue Abwesenheitsanfrage',
+      'driver_absence_type_label': 'Typ',
+      'driver_absence_vacation_type': 'Urlaub',
+      'driver_absence_sick_leave_type': 'Krankmeldung',
+      'driver_absence_from_label': 'Von',
+      'driver_absence_to_label': 'Bis',
+      'driver_absence_reason_label': 'Grund',
+      'driver_absence_reason_hint': 'Kurzen Grund eingeben',
+      'driver_absence_submit_label': 'Anfrage senden',
+      'driver_absence_submitting_label': 'Wird gesendet...',
+      'driver_absence_empty_vacation_list':
+          'Noch keine Abwesenheitsanfragen.',
+      'driver_absence_submit_success': 'Abwesenheitsanfrage gesendet.',
+      'driver_absence_login_required': 'Du musst angemeldet sein.',
+      'driver_absence_scope_missing': 'Fahrerbereich fehlt.',
+      'driver_absence_pick_date_validation':
+          'Bitte waehle beide Daten aus.',
+      'driver_absence_reason_validation': 'Bitte gib einen Grund ein.',
+      'driver_absence_available_vacation_hint_label': 'Verfuegbarer Urlaub',
+      'driver_absence_vacation_limit_exceeded_template':
+          '{requested} Tage angefragt, aber nur {available} verfuegbar.',
+      'driver_absence_submit_failed_template':
+          'Senden fehlgeschlagen: {error}',
+      'driver_absence_load_failed_template':
+          'Laden der Abwesenheitsdaten fehlgeschlagen: {error}',
+    },
+    'sq': {
+      'driver_absence_page_eyebrow': 'Mungesa',
+      'driver_absence_overview_title': 'Permbledhje e mungesave',
+      'driver_absence_periods_title': 'Periudhat e kerkuara',
+      'driver_absence_total_label': 'Totali',
+      'driver_absence_special_label': 'Leje speciale',
+      'driver_absence_taken_label': 'Te marra',
+      'driver_absence_available_vacation_label': 'Pushime te disponueshme',
+      'driver_absence_start_label': 'Fillimi',
+      'driver_absence_end_label': 'Fundi',
+      'driver_absence_days_label': 'Dite',
+      'driver_absence_day_label': 'dite',
+      'driver_absence_days_per_year': 'dite / vit',
+      'driver_absence_of_word': 'nga',
+      'driver_absence_request_button': 'Kerko mungese',
+      'driver_absence_request_sheet_title': 'Kerkese e re per mungese',
+      'driver_absence_type_label': 'Lloji',
+      'driver_absence_vacation_type': 'Pushim',
+      'driver_absence_sick_leave_type': 'Leje mjekesore',
+      'driver_absence_from_label': 'Nga',
+      'driver_absence_to_label': 'Deri',
+      'driver_absence_reason_label': 'Arsyeja',
+      'driver_absence_reason_hint': 'Shkruani nje arsye te shkurter',
+      'driver_absence_submit_label': 'Dergo kerkesen',
+      'driver_absence_submitting_label': 'Duke u derguar...',
+      'driver_absence_empty_vacation_list':
+          'Ende nuk ka kerkesa per mungese.',
+      'driver_absence_submit_success': 'Kerkesa per mungese u dergua.',
+      'driver_absence_login_required': 'Duhet te jesh i kycur.',
+      'driver_absence_scope_missing': 'Mungon konteksti i shoferit.',
+      'driver_absence_pick_date_validation':
+          'Ju lutem zgjidhni te dy datat.',
+      'driver_absence_reason_validation':
+          'Ju lutem shkruani nje arsye.',
+      'driver_absence_available_vacation_hint_label':
+          'Pushime te disponueshme',
+      'driver_absence_vacation_limit_exceeded_template':
+          'U kerkuan {requested} dite, por vetem {available} jane ne dispozicion.',
+      'driver_absence_submit_failed_template': 'Dergimi deshtoi: {error}',
+      'driver_absence_load_failed_template':
+          'Ngarkimi i te dhenave te mungeses deshtoi: {error}',
+    },
+    'hu': {
+      'driver_absence_page_eyebrow': 'Tavollet',
+      'driver_absence_overview_title': 'Tavollet attekintes',
+      'driver_absence_periods_title': 'Igenyelt idoszakok',
+      'driver_absence_total_label': 'Osszesen',
+      'driver_absence_special_label': 'Kulonleges szabadsag',
+      'driver_absence_taken_label': 'Kivett',
+      'driver_absence_available_vacation_label': 'Elerheto szabadsag',
+      'driver_absence_start_label': 'Kezdet',
+      'driver_absence_end_label': 'Vege',
+      'driver_absence_days_label': 'Napok',
+      'driver_absence_day_label': 'nap',
+      'driver_absence_days_per_year': 'nap / ev',
+      'driver_absence_of_word': 'bol',
+      'driver_absence_request_button': 'Tavollet igenylese',
+      'driver_absence_request_sheet_title': 'Uj tavolleti kerelem',
+      'driver_absence_type_label': 'Tipus',
+      'driver_absence_vacation_type': 'Szabadsag',
+      'driver_absence_sick_leave_type': 'Betegszabadsag',
+      'driver_absence_from_label': 'Tol',
+      'driver_absence_to_label': 'Ig',
+      'driver_absence_reason_label': 'Indok',
+      'driver_absence_reason_hint': 'Adj meg rovid indokot',
+      'driver_absence_submit_label': 'Kerelem kuldese',
+      'driver_absence_submitting_label': 'Kuldes...',
+      'driver_absence_empty_vacation_list':
+          'Meg nincsenek tavolleti kerelmek.',
+      'driver_absence_submit_success': 'A tavolleti kerelem elkuldve.',
+      'driver_absence_login_required': 'Be kell jelentkezned.',
+      'driver_absence_scope_missing': 'A sofor kontextusa hianyzik.',
+      'driver_absence_pick_date_validation':
+          'Kerlek valaszd ki mindket datumot.',
+      'driver_absence_reason_validation': 'Kerlek adj meg indokot.',
+      'driver_absence_available_vacation_hint_label': 'Elerheto szabadsag',
+      'driver_absence_vacation_limit_exceeded_template':
+          '{requested} nap lett igenyelve, de csak {available} erheto el.',
+      'driver_absence_submit_failed_template':
+          'Kuldes sikertelen: {error}',
+      'driver_absence_load_failed_template':
+          'A tavolleti adatok betoltese sikertelen: {error}',
+    },
+    'ro': {
+      'driver_absence_page_eyebrow': 'Absenta',
+      'driver_absence_overview_title': 'Prezentare absente',
+      'driver_absence_periods_title': 'Perioade solicitate',
+      'driver_absence_total_label': 'Total',
+      'driver_absence_special_label': 'Concediu special',
+      'driver_absence_taken_label': 'Efectuate',
+      'driver_absence_available_vacation_label': 'Vacanta disponibila',
+      'driver_absence_start_label': 'Inceput',
+      'driver_absence_end_label': 'Sfarsit',
+      'driver_absence_days_label': 'Zile',
+      'driver_absence_day_label': 'zi',
+      'driver_absence_days_per_year': 'zile / an',
+      'driver_absence_of_word': 'din',
+      'driver_absence_request_button': 'Solicita absenta',
+      'driver_absence_request_sheet_title': 'Cerere noua de absenta',
+      'driver_absence_type_label': 'Tip',
+      'driver_absence_vacation_type': 'Vacanta',
+      'driver_absence_sick_leave_type': 'Concediu medical',
+      'driver_absence_from_label': 'De la',
+      'driver_absence_to_label': 'Pana la',
+      'driver_absence_reason_label': 'Motiv',
+      'driver_absence_reason_hint': 'Introdu un motiv scurt',
+      'driver_absence_submit_label': 'Trimite cererea',
+      'driver_absence_submitting_label': 'Se trimite...',
+      'driver_absence_empty_vacation_list': 'Nu exista cereri de absenta inca.',
+      'driver_absence_submit_success': 'Cererea de absenta a fost trimisa.',
+      'driver_absence_login_required': 'Trebuie sa fii autentificat.',
+      'driver_absence_scope_missing': 'Lipseste contextul soferului.',
+      'driver_absence_pick_date_validation':
+          'Te rugam selecteaza ambele date.',
+      'driver_absence_reason_validation':
+          'Te rugam introdu un motiv.',
+      'driver_absence_available_vacation_hint_label': 'Vacanta disponibila',
+      'driver_absence_vacation_limit_exceeded_template':
+          'Au fost cerute {requested} zile, dar doar {available} sunt disponibile.',
+      'driver_absence_submit_failed_template':
+          'Trimiterea a esuat: {error}',
+      'driver_absence_load_failed_template':
+          'Incarcarea datelor de absenta a esuat: {error}',
+    },
+    'hr': {
+      'driver_absence_page_eyebrow': 'Odsutnost',
+      'driver_absence_overview_title': 'Pregled odsutnosti',
+      'driver_absence_periods_title': 'Zatrazena razdoblja',
+      'driver_absence_total_label': 'Ukupno',
+      'driver_absence_special_label': 'Posebni dopust',
+      'driver_absence_taken_label': 'Iskoristeno',
+      'driver_absence_available_vacation_label': 'Dostupan godisnji odmor',
+      'driver_absence_start_label': 'Pocetak',
+      'driver_absence_end_label': 'Kraj',
+      'driver_absence_days_label': 'Dani',
+      'driver_absence_day_label': 'dan',
+      'driver_absence_days_per_year': 'dana / godina',
+      'driver_absence_of_word': 'od',
+      'driver_absence_request_button': 'Zatrazi odsutnost',
+      'driver_absence_request_sheet_title': 'Novi zahtjev za odsutnost',
+      'driver_absence_type_label': 'Vrsta',
+      'driver_absence_vacation_type': 'Godisnji odmor',
+      'driver_absence_sick_leave_type': 'Bolovanje',
+      'driver_absence_from_label': 'Od',
+      'driver_absence_to_label': 'Do',
+      'driver_absence_reason_label': 'Razlog',
+      'driver_absence_reason_hint': 'Unesite kratak razlog',
+      'driver_absence_submit_label': 'Posalji zahtjev',
+      'driver_absence_submitting_label': 'Slanje...',
+      'driver_absence_empty_vacation_list':
+          'Jos nema zahtjeva za odsutnost.',
+      'driver_absence_submit_success': 'Zahtjev za odsutnost je poslan.',
+      'driver_absence_login_required': 'Morate biti prijavljeni.',
+      'driver_absence_scope_missing': 'Nedostaje kontekst vozaca.',
+      'driver_absence_pick_date_validation': 'Odaberite oba datuma.',
+      'driver_absence_reason_validation': 'Unesite razlog.',
+      'driver_absence_available_vacation_hint_label':
+          'Dostupan godisnji odmor',
+      'driver_absence_vacation_limit_exceeded_template':
+          'Zatrazeno je {requested} dana, ali dostupno je samo {available}.',
+      'driver_absence_submit_failed_template':
+          'Slanje nije uspjelo: {error}',
+      'driver_absence_load_failed_template':
+          'Ucitavanje podataka o odsutnosti nije uspjelo: {error}',
+    },
+    'ar': {
+      'driver_absence_page_eyebrow': 'الغياب',
+      'driver_absence_overview_title': 'نظرة عامة على الغياب',
+      'driver_absence_periods_title': 'الفترات المطلوبة',
+      'driver_absence_total_label': 'الإجمالي',
+      'driver_absence_special_label': 'إجازة خاصة',
+      'driver_absence_taken_label': 'المستخدم',
+      'driver_absence_available_vacation_label': 'الإجازة المتاحة',
+      'driver_absence_start_label': 'البداية',
+      'driver_absence_end_label': 'النهاية',
+      'driver_absence_days_label': 'الأيام',
+      'driver_absence_day_label': 'يوم',
+      'driver_absence_days_per_year': 'يوم / سنة',
+      'driver_absence_of_word': 'من',
+      'driver_absence_request_button': 'طلب غياب',
+      'driver_absence_request_sheet_title': 'طلب غياب جديد',
+      'driver_absence_type_label': 'النوع',
+      'driver_absence_vacation_type': 'إجازة',
+      'driver_absence_sick_leave_type': 'إجازة مرضية',
+      'driver_absence_from_label': 'من',
+      'driver_absence_to_label': 'إلى',
+      'driver_absence_reason_label': 'السبب',
+      'driver_absence_reason_hint': 'اكتب سببًا قصيرًا',
+      'driver_absence_submit_label': 'إرسال الطلب',
+      'driver_absence_submitting_label': 'جارٍ الإرسال...',
+      'driver_absence_empty_vacation_list': 'لا توجد طلبات غياب بعد.',
+      'driver_absence_submit_success': 'تم إرسال طلب الغياب.',
+      'driver_absence_login_required': 'يجب تسجيل الدخول.',
+      'driver_absence_scope_missing': 'نطاق السائق مفقود.',
+      'driver_absence_pick_date_validation':
+          'يرجى اختيار التاريخين.',
+      'driver_absence_reason_validation': 'يرجى إدخال سبب.',
+      'driver_absence_available_vacation_hint_label': 'الإجازة المتاحة',
+      'driver_absence_vacation_limit_exceeded_template':
+          'تم طلب {requested} يومًا ولكن المتاح فقط {available}.',
+      'driver_absence_submit_failed_template': 'فشل الإرسال: {error}',
+      'driver_absence_load_failed_template':
+          'فشل تحميل بيانات الغياب: {error}',
+    },
+    'tr': {
+      'driver_absence_page_eyebrow': 'Devamsizlik',
+      'driver_absence_overview_title': 'Devamsizlik ozeti',
+      'driver_absence_periods_title': 'Talep edilen donemler',
+      'driver_absence_total_label': 'Toplam',
+      'driver_absence_special_label': 'Ozel izin',
+      'driver_absence_taken_label': 'Kullanilan',
+      'driver_absence_available_vacation_label': 'Mevcut izin',
+      'driver_absence_start_label': 'Baslangic',
+      'driver_absence_end_label': 'Bitis',
+      'driver_absence_days_label': 'Gunler',
+      'driver_absence_day_label': 'gun',
+      'driver_absence_days_per_year': 'gun / yil',
+      'driver_absence_of_word': 'den',
+      'driver_absence_request_button': 'Devamsizlik talep et',
+      'driver_absence_request_sheet_title': 'Yeni devamsizlik talebi',
+      'driver_absence_type_label': 'Tur',
+      'driver_absence_vacation_type': 'Izin',
+      'driver_absence_sick_leave_type': 'Hastalik izni',
+      'driver_absence_from_label': 'Baslangic',
+      'driver_absence_to_label': 'Bitis',
+      'driver_absence_reason_label': 'Neden',
+      'driver_absence_reason_hint': 'Kisa bir neden girin',
+      'driver_absence_submit_label': 'Talebi gonder',
+      'driver_absence_submitting_label': 'Gonderiliyor...',
+      'driver_absence_empty_vacation_list':
+          'Henuz devamsizlik talebi yok.',
+      'driver_absence_submit_success': 'Devamsizlik talebi gonderildi.',
+      'driver_absence_login_required': 'Giris yapmis olmalisin.',
+      'driver_absence_scope_missing': 'Surucu kapsami eksik.',
+      'driver_absence_pick_date_validation':
+          'Lutfen iki tarihi de secin.',
+      'driver_absence_reason_validation': 'Lutfen bir neden girin.',
+      'driver_absence_available_vacation_hint_label': 'Mevcut izin',
+      'driver_absence_vacation_limit_exceeded_template':
+          '{requested} gun talep edildi ancak sadece {available} gun mevcut.',
+      'driver_absence_submit_failed_template':
+          'Gonderim basarisiz: {error}',
+      'driver_absence_load_failed_template':
+          'Devamsizlik verileri yuklenemedi: {error}',
+    },
+    'ru': {
+      'driver_absence_page_eyebrow': 'Отсутствие',
+      'driver_absence_overview_title': 'Обзор отсутствий',
+      'driver_absence_periods_title': 'Запрошенные периоды',
+      'driver_absence_total_label': 'Итого',
+      'driver_absence_special_label': 'Специальный отпуск',
+      'driver_absence_taken_label': 'Использовано',
+      'driver_absence_available_vacation_label': 'Доступный отпуск',
+      'driver_absence_start_label': 'Начало',
+      'driver_absence_end_label': 'Конец',
+      'driver_absence_days_label': 'Дни',
+      'driver_absence_day_label': 'день',
+      'driver_absence_days_per_year': 'дней / год',
+      'driver_absence_of_word': 'из',
+      'driver_absence_request_button': 'Запросить отсутствие',
+      'driver_absence_request_sheet_title': 'Новый запрос на отсутствие',
+      'driver_absence_type_label': 'Тип',
+      'driver_absence_vacation_type': 'Отпуск',
+      'driver_absence_sick_leave_type': 'Больничный',
+      'driver_absence_from_label': 'С',
+      'driver_absence_to_label': 'По',
+      'driver_absence_reason_label': 'Причина',
+      'driver_absence_reason_hint': 'Введите короткую причину',
+      'driver_absence_submit_label': 'Отправить запрос',
+      'driver_absence_submitting_label': 'Отправка...',
+      'driver_absence_empty_vacation_list':
+          'Пока нет запросов на отсутствие.',
+      'driver_absence_submit_success': 'Запрос на отсутствие отправлен.',
+      'driver_absence_login_required': 'Вы должны войти в систему.',
+      'driver_absence_scope_missing': 'Отсутствует контекст водителя.',
+      'driver_absence_pick_date_validation':
+          'Пожалуйста, выберите обе даты.',
+      'driver_absence_reason_validation': 'Пожалуйста, укажите причину.',
+      'driver_absence_available_vacation_hint_label': 'Доступный отпуск',
+      'driver_absence_vacation_limit_exceeded_template':
+          'Запрошено {requested} дней, но доступно только {available}.',
+      'driver_absence_submit_failed_template':
+          'Не удалось отправить запрос: {error}',
+      'driver_absence_load_failed_template':
+          'Не удалось загрузить данные об отсутствии: {error}',
+    },
+  };
+
+  static final Map<String, Map<String, String>>
+  _driverDashboardLocalizedValues = {
+    'en': {
+      'dash_compliance_safety': 'Compliance & Safety',
+      'dash_delivery_quality_swc': 'Delivery Quality & SWC',
+      'dash_company_threshold_hint': '{score}% out of {target}% minimum',
+      'dash_company_threshold_met': '{score}% meets the {target}% threshold',
+      'dash_company_section_safety': 'Safety',
+      'dash_company_section_compliance': 'Compliance',
+      'dash_company_section_customer_delivery_experience':
+          'Customer Delivery Experience',
+      'dash_company_section_quality': 'Quality',
+      'dash_company_section_standard_work_compliance':
+          'Standard Work Compliance',
+      'dash_metric_fico': 'Safe Driving Metric (FICO)',
+      'dash_metric_speeding_event_rate':
+          'Speeding Event Rate (Per 100 Trips)',
+      'dash_metric_mentor_adoption_rate': 'Mentor Adoption Rate',
+      'dash_metric_vehicle_audit_compliance':
+          'Vehicle Audit (VSA) Compliance',
+      'dash_metric_breach_of_contract': 'Breach of Contract (BOC)',
+      'dash_metric_working_hours_compliance':
+          'Working Hours Compliance (WHC)',
+      'dash_metric_comprehensive_audit_score':
+          'Comprehensive Audit Score (CAS)',
+      'dash_metric_customer_escalation_dpmo': 'Customer Escalation DPMO',
+      'dash_metric_customer_delivery_feedback': 'Customer Delivery Feedback',
+      'dash_metric_delivery_completion_rate':
+          'Delivery Completion Rate (DCR)',
+      'dash_metric_dnr_dpmo': 'DNR DPMO',
+      'dash_metric_lor_dpmo': 'LoR DPMO',
+      'dash_metric_dsc_dpmo': 'DSC DPMO',
+      'dash_metric_photo_on_delivery': 'Photo-On-Delivery',
+      'dash_metric_contact_compliance': 'Contact Compliance',
+    },
+    'de': {
+      'dash_compliance_safety': 'Compliance & Sicherheit',
+      'dash_delivery_quality_swc': 'Zustellqualitaet & SWC',
+      'dash_company_threshold_hint': '{score}% von mindestens {target}%',
+      'dash_company_threshold_met':
+          '{score}% erfuellt den Schwellenwert von {target}%',
+      'dash_company_section_safety': 'Sicherheit',
+      'dash_company_section_compliance': 'Compliance',
+      'dash_company_section_customer_delivery_experience':
+          'Kundenerlebnis bei Zustellung',
+      'dash_company_section_quality': 'Qualitaet',
+      'dash_company_section_standard_work_compliance':
+          'Standardarbeits-Compliance',
+      'dash_metric_fico': 'Sicheres Fahrverhalten (FICO)',
+      'dash_metric_speeding_event_rate':
+          'Geschwindigkeitsrate (pro 100 Fahrten)',
+      'dash_metric_mentor_adoption_rate': 'Mentor-Nutzungsrate',
+      'dash_metric_vehicle_audit_compliance':
+          'Fahrzeugaudit-Compliance (VSA)',
+      'dash_metric_breach_of_contract': 'Vertragsverstoss (BOC)',
+      'dash_metric_working_hours_compliance':
+          'Arbeitszeit-Compliance (WHC)',
+      'dash_metric_comprehensive_audit_score':
+          'Umfassender Audit-Score (CAS)',
+      'dash_metric_customer_escalation_dpmo':
+          'Kundeneskalation DPMO',
+      'dash_metric_customer_delivery_feedback':
+          'Kundenfeedback zur Zustellung',
+      'dash_metric_delivery_completion_rate':
+          'Zustellabschlussrate (DCR)',
+      'dash_metric_dnr_dpmo': 'DNR DPMO',
+      'dash_metric_lor_dpmo': 'LoR DPMO',
+      'dash_metric_dsc_dpmo': 'DSC DPMO',
+      'dash_metric_photo_on_delivery': 'Foto bei Zustellung',
+      'dash_metric_contact_compliance': 'Kontakt-Compliance',
+    },
+    'sq': {
+      'dash_compliance_safety': 'Perputhshmeria & Siguria',
+      'dash_delivery_quality_swc': 'Cilesia e dorezimit & SWC',
+      'dash_company_threshold_hint': '{score}% nga minimumi {target}%',
+      'dash_company_threshold_met': '{score}% arrin pragun {target}%',
+      'dash_company_section_safety': 'Siguria',
+      'dash_company_section_compliance': 'Perputhshmeria',
+      'dash_company_section_customer_delivery_experience':
+          'Pervoja e klientit ne dorezim',
+      'dash_company_section_quality': 'Cilesia',
+      'dash_company_section_standard_work_compliance':
+          'Perputhshmeria me standardin e punes',
+      'dash_metric_fico': 'Metrika e drejtimit te sigurt (FICO)',
+      'dash_metric_speeding_event_rate':
+          'Norma e shpejtesise (per 100 udhetime)',
+      'dash_metric_mentor_adoption_rate': 'Shkalla e perdorimit te Mentor',
+      'dash_metric_vehicle_audit_compliance':
+          'Perputhshmeria e auditimit te automjetit (VSA)',
+      'dash_metric_breach_of_contract': 'Shkelja e kontrates (BOC)',
+      'dash_metric_working_hours_compliance':
+          'Perputhshmeria e oreve te punes (WHC)',
+      'dash_metric_comprehensive_audit_score':
+          'Rezultati i auditimit gjitheperfshires (CAS)',
+      'dash_metric_customer_escalation_dpmo':
+          'Pershkallezimi i klientit DPMO',
+      'dash_metric_customer_delivery_feedback':
+          'Reagimi i klientit per dorezimin',
+      'dash_metric_delivery_completion_rate':
+          'Norma e perfundimit te dorezimit (DCR)',
+      'dash_metric_dnr_dpmo': 'DNR DPMO',
+      'dash_metric_lor_dpmo': 'LoR DPMO',
+      'dash_metric_dsc_dpmo': 'DSC DPMO',
+      'dash_metric_photo_on_delivery': 'Foto ne dorezim',
+      'dash_metric_contact_compliance': 'Perputhshmeria e kontaktit',
+    },
+    'hu': {
+      'dash_compliance_safety': 'Megfeleles & Biztonsag',
+      'dash_delivery_quality_swc': 'Kezbesitesi minoseg & SWC',
+      'dash_company_threshold_hint': '{score}% / minimum {target}%',
+      'dash_company_threshold_met':
+          '{score}% teljesiti a(z) {target}% kuszobot',
+      'dash_company_section_safety': 'Biztonsag',
+      'dash_company_section_compliance': 'Megfeleles',
+      'dash_company_section_customer_delivery_experience':
+          'Ugyfeleredmeny a kezbesitesnel',
+      'dash_company_section_quality': 'Minoseg',
+      'dash_company_section_standard_work_compliance':
+          'Standard munka megfeleles',
+      'dash_metric_fico': 'Biztonsagos vezetes mutato (FICO)',
+      'dash_metric_speeding_event_rate':
+          'Gyorshajtas esemenyrata (100 utankent)',
+      'dash_metric_mentor_adoption_rate': 'Mentor hasznalati arany',
+      'dash_metric_vehicle_audit_compliance':
+          'Jarmuaudit-megfeleles (VSA)',
+      'dash_metric_breach_of_contract': 'Szerzodesszeges (BOC)',
+      'dash_metric_working_hours_compliance':
+          'Munkaido-megfeleles (WHC)',
+      'dash_metric_comprehensive_audit_score':
+          'Atfogo auditpontszam (CAS)',
+      'dash_metric_customer_escalation_dpmo': 'Ugyfeleszkalacio DPMO',
+      'dash_metric_customer_delivery_feedback':
+          'Ugyfel visszajelzes a kezbesitesrol',
+      'dash_metric_delivery_completion_rate':
+          'Kezbesites befejezesi arany (DCR)',
+      'dash_metric_dnr_dpmo': 'DNR DPMO',
+      'dash_metric_lor_dpmo': 'LoR DPMO',
+      'dash_metric_dsc_dpmo': 'DSC DPMO',
+      'dash_metric_photo_on_delivery': 'Foto kezbesiteskor',
+      'dash_metric_contact_compliance': 'Kapcsolati megfeleles',
+    },
+    'ro': {
+      'dash_compliance_safety': 'Conformitate & Siguranta',
+      'dash_delivery_quality_swc': 'Calitatea livrarii & SWC',
+      'dash_company_threshold_hint': '{score}% din minimul de {target}%',
+      'dash_company_threshold_met':
+          '{score}% atinge pragul de {target}%',
+      'dash_company_section_safety': 'Siguranta',
+      'dash_company_section_compliance': 'Conformitate',
+      'dash_company_section_customer_delivery_experience':
+          'Experienta clientului la livrare',
+      'dash_company_section_quality': 'Calitate',
+      'dash_company_section_standard_work_compliance':
+          'Conformitate standard de lucru',
+      'dash_metric_fico': 'Indicator de condus sigur (FICO)',
+      'dash_metric_speeding_event_rate':
+          'Rata de viteza (la 100 de curse)',
+      'dash_metric_mentor_adoption_rate': 'Rata de utilizare Mentor',
+      'dash_metric_vehicle_audit_compliance':
+          'Conformitate audit vehicul (VSA)',
+      'dash_metric_breach_of_contract': 'Incalcare contract (BOC)',
+      'dash_metric_working_hours_compliance':
+          'Conformitate ore de lucru (WHC)',
+      'dash_metric_comprehensive_audit_score':
+          'Scor audit complet (CAS)',
+      'dash_metric_customer_escalation_dpmo': 'Escaladare client DPMO',
+      'dash_metric_customer_delivery_feedback':
+          'Feedback clienti la livrare',
+      'dash_metric_delivery_completion_rate':
+          'Rata de finalizare a livrarii (DCR)',
+      'dash_metric_dnr_dpmo': 'DNR DPMO',
+      'dash_metric_lor_dpmo': 'LoR DPMO',
+      'dash_metric_dsc_dpmo': 'DSC DPMO',
+      'dash_metric_photo_on_delivery': 'Fotografie la livrare',
+      'dash_metric_contact_compliance': 'Conformitate contact',
+    },
+    'hr': {
+      'dash_compliance_safety': 'Uskladenost & Sigurnost',
+      'dash_delivery_quality_swc': 'Kvaliteta dostave & SWC',
+      'dash_company_threshold_hint': '{score}% od minimuma {target}%',
+      'dash_company_threshold_met':
+          '{score}% doseze prag od {target}%',
+      'dash_company_section_safety': 'Sigurnost',
+      'dash_company_section_compliance': 'Uskladenost',
+      'dash_company_section_customer_delivery_experience':
+          'Iskustvo kupca pri dostavi',
+      'dash_company_section_quality': 'Kvaliteta',
+      'dash_company_section_standard_work_compliance':
+          'Uskladenost sa standardnim radom',
+      'dash_metric_fico': 'Mjera sigurne voznje (FICO)',
+      'dash_metric_speeding_event_rate':
+          'Stopa prekoracenja brzine (na 100 voznji)',
+      'dash_metric_mentor_adoption_rate': 'Stopa koristenja Mentora',
+      'dash_metric_vehicle_audit_compliance':
+          'Uskladenost audita vozila (VSA)',
+      'dash_metric_breach_of_contract': 'Krsenje ugovora (BOC)',
+      'dash_metric_working_hours_compliance':
+          'Uskladenost radnog vremena (WHC)',
+      'dash_metric_comprehensive_audit_score':
+          'Sveobuhvatni rezultat audita (CAS)',
+      'dash_metric_customer_escalation_dpmo':
+          'Eskalacija korisnika DPMO',
+      'dash_metric_customer_delivery_feedback':
+          'Povratne informacije kupca o dostavi',
+      'dash_metric_delivery_completion_rate':
+          'Stopa dovrsenja dostave (DCR)',
+      'dash_metric_dnr_dpmo': 'DNR DPMO',
+      'dash_metric_lor_dpmo': 'LoR DPMO',
+      'dash_metric_dsc_dpmo': 'DSC DPMO',
+      'dash_metric_photo_on_delivery': 'Fotografija pri dostavi',
+      'dash_metric_contact_compliance': 'Uskladenost kontakta',
+    },
+    'ar': {
+      'dash_compliance_safety': 'الالتزام والسلامة',
+      'dash_delivery_quality_swc': 'جودة التسليم و SWC',
+      'dash_company_threshold_hint': '{score}% من الحد الأدنى {target}%',
+      'dash_company_threshold_met':
+          '{score}% يحقق الحد الأدنى {target}%',
+      'dash_company_section_safety': 'السلامة',
+      'dash_company_section_compliance': 'الالتزام',
+      'dash_company_section_customer_delivery_experience':
+          'تجربة العميل في التسليم',
+      'dash_company_section_quality': 'الجودة',
+      'dash_company_section_standard_work_compliance':
+          'الالتزام بمعايير العمل',
+      'dash_metric_fico': 'مقياس القيادة الآمنة (FICO)',
+      'dash_metric_speeding_event_rate':
+          'معدل السرعة الزائدة (لكل 100 رحلة)',
+      'dash_metric_mentor_adoption_rate': 'معدل استخدام Mentor',
+      'dash_metric_vehicle_audit_compliance':
+          'التزام تدقيق المركبة (VSA)',
+      'dash_metric_breach_of_contract': 'خرق العقد (BOC)',
+      'dash_metric_working_hours_compliance':
+          'الالتزام بساعات العمل (WHC)',
+      'dash_metric_comprehensive_audit_score':
+          'درجة التدقيق الشاملة (CAS)',
+      'dash_metric_customer_escalation_dpmo': 'تصعيد العميل DPMO',
+      'dash_metric_customer_delivery_feedback':
+          'ملاحظات العميل على التسليم',
+      'dash_metric_delivery_completion_rate':
+          'معدل إكمال التسليم (DCR)',
+      'dash_metric_dnr_dpmo': 'DNR DPMO',
+      'dash_metric_lor_dpmo': 'LoR DPMO',
+      'dash_metric_dsc_dpmo': 'DSC DPMO',
+      'dash_metric_photo_on_delivery': 'صورة عند التسليم',
+      'dash_metric_contact_compliance': 'الالتزام بالتواصل',
+    },
+    'tr': {
+      'dash_compliance_safety': 'Uyum & Guvenlik',
+      'dash_delivery_quality_swc': 'Teslimat kalitesi & SWC',
+      'dash_company_threshold_hint': '{score}% / minimum {target}%',
+      'dash_company_threshold_met':
+          '{score}% {target}% esigini karsiliyor',
+      'dash_company_section_safety': 'Guvenlik',
+      'dash_company_section_compliance': 'Uyum',
+      'dash_company_section_customer_delivery_experience':
+          'Musteri teslimat deneyimi',
+      'dash_company_section_quality': 'Kalite',
+      'dash_company_section_standard_work_compliance':
+          'Standart calisma uyumu',
+      'dash_metric_fico': 'Guvenli surus metrigi (FICO)',
+      'dash_metric_speeding_event_rate':
+          'Hiz asimi orani (100 yolculukta)',
+      'dash_metric_mentor_adoption_rate': 'Mentor kullanim orani',
+      'dash_metric_vehicle_audit_compliance':
+          'Arac denetimi uyumu (VSA)',
+      'dash_metric_breach_of_contract': 'Sozlesme ihlali (BOC)',
+      'dash_metric_working_hours_compliance':
+          'Calisma saati uyumu (WHC)',
+      'dash_metric_comprehensive_audit_score':
+          'Kapsamli denetim skoru (CAS)',
+      'dash_metric_customer_escalation_dpmo': 'Musteri eskalasyonu DPMO',
+      'dash_metric_customer_delivery_feedback':
+          'Musteri teslimat geri bildirimi',
+      'dash_metric_delivery_completion_rate':
+          'Teslimat tamamlama orani (DCR)',
+      'dash_metric_dnr_dpmo': 'DNR DPMO',
+      'dash_metric_lor_dpmo': 'LoR DPMO',
+      'dash_metric_dsc_dpmo': 'DSC DPMO',
+      'dash_metric_photo_on_delivery': 'Teslimatta fotograf',
+      'dash_metric_contact_compliance': 'Iletisim uyumu',
+    },
+    'ru': {
+      'dash_compliance_safety': 'Соответствие и безопасность',
+      'dash_delivery_quality_swc': 'Качество доставки и SWC',
+      'dash_company_threshold_hint': '{score}% при минимуме {target}%',
+      'dash_company_threshold_met':
+          '{score}% соответствует порогу {target}%',
+      'dash_company_section_safety': 'Безопасность',
+      'dash_company_section_compliance': 'Соответствие',
+      'dash_company_section_customer_delivery_experience':
+          'Опыт клиента при доставке',
+      'dash_company_section_quality': 'Качество',
+      'dash_company_section_standard_work_compliance':
+          'Соответствие стандартной работе',
+      'dash_metric_fico': 'Показатель безопасного вождения (FICO)',
+      'dash_metric_speeding_event_rate':
+          'Частота превышения скорости (на 100 поездок)',
+      'dash_metric_mentor_adoption_rate': 'Уровень использования Mentor',
+      'dash_metric_vehicle_audit_compliance':
+          'Соответствие аудиту транспорта (VSA)',
+      'dash_metric_breach_of_contract': 'Нарушение контракта (BOC)',
+      'dash_metric_working_hours_compliance':
+          'Соответствие рабочим часам (WHC)',
+      'dash_metric_comprehensive_audit_score':
+          'Итоговый аудит-скор (CAS)',
+      'dash_metric_customer_escalation_dpmo':
+          'Эскалация клиента DPMO',
+      'dash_metric_customer_delivery_feedback':
+          'Отзыв клиента о доставке',
+      'dash_metric_delivery_completion_rate':
+          'Уровень завершения доставки (DCR)',
+      'dash_metric_dnr_dpmo': 'DNR DPMO',
+      'dash_metric_lor_dpmo': 'LoR DPMO',
+      'dash_metric_dsc_dpmo': 'DSC DPMO',
+      'dash_metric_photo_on_delivery': 'Фото при доставке',
+      'dash_metric_contact_compliance': 'Соответствие контакту',
+    },
+  };
+
   static final Map<String, String> _notificationsSharedValues = {
     'notifications_page_title': 'Notifications',
     'notifications_page_new_content': 'NEW CONTENT | Notifications',
     'notifications_page_history': 'History',
     'notifications_page_publish': 'publish',
+    'notifications_page_translation_preview': 'Translation preview',
+    'notifications_page_translation_ready': 'Ready in {count} languages.',
     'notifications_page_title_hint': 'TITLE',
     'notifications_page_rule_message_hint': 'RULE / MESSAGE',
     'notifications_page_not_logged_in': 'Not logged in',
@@ -6448,6 +7305,8 @@ class AppLocalizations {
       'notifications_page_new_content': 'NEUER INHALT | Benachrichtigungen',
       'notifications_page_history': 'Verlauf',
       'notifications_page_publish': 'veroeffentlichen',
+      'notifications_page_translation_preview': 'Uebersetzungsvorschau',
+      'notifications_page_translation_ready': 'In {count} Sprachen bereit.',
       'notifications_page_title_hint': 'TITEL',
       'notifications_page_rule_message_hint': 'REGEL / NACHRICHT',
       'notifications_page_not_logged_in': 'Nicht angemeldet',
@@ -6505,6 +7364,8 @@ class AppLocalizations {
       'notifications_page_new_content': 'PERMBAJTJE E RE | Njoftimet',
       'notifications_page_history': 'Historiku',
       'notifications_page_publish': 'publiko',
+      'notifications_page_translation_preview': 'Pamje paraprake e perkthimit',
+      'notifications_page_translation_ready': 'Gati ne {count} gjuhe.',
       'notifications_page_title_hint': 'TITULLI',
       'notifications_page_rule_message_hint': 'RREGULL / MESAZH',
       'notifications_page_not_logged_in': 'Nuk je i kycur',
@@ -6559,6 +7420,8 @@ class AppLocalizations {
       'notifications_page_new_content': 'UJ TARTALOM | Ertesitesek',
       'notifications_page_history': 'Elozmenyek',
       'notifications_page_publish': 'kozzetesz',
+      'notifications_page_translation_preview': 'Forditasi elonezet',
+      'notifications_page_translation_ready': '{count} nyelven kesz.',
       'notifications_page_title_hint': 'CIM',
       'notifications_page_rule_message_hint': 'SZABALY / UZENET',
       'notifications_page_not_logged_in': 'Nincs bejelentkezve',
@@ -6611,6 +7474,8 @@ class AppLocalizations {
       'notifications_page_new_content': 'CONTINUT NOU | Notificari',
       'notifications_page_history': 'Istoric',
       'notifications_page_publish': 'publica',
+      'notifications_page_translation_preview': 'Previzualizare traduceri',
+      'notifications_page_translation_ready': 'Pregatit in {count} limbi.',
       'notifications_page_title_hint': 'TITLU',
       'notifications_page_rule_message_hint': 'REGULA / MESAJ',
       'notifications_page_not_logged_in': 'Neautentificat',
@@ -6665,6 +7530,8 @@ class AppLocalizations {
       'notifications_page_new_content': 'NOVI SADRZAJ | Obavijesti',
       'notifications_page_history': 'Povijest',
       'notifications_page_publish': 'objavi',
+      'notifications_page_translation_preview': 'Pregled prijevoda',
+      'notifications_page_translation_ready': 'Spremno na {count} jezika.',
       'notifications_page_title_hint': 'NASLOV',
       'notifications_page_rule_message_hint': 'PRAVILO / PORUKA',
       'notifications_page_not_logged_in': 'Niste prijavljeni',
@@ -6718,6 +7585,8 @@ class AppLocalizations {
       'notifications_page_new_content': 'محتوى جديد | الإشعارات',
       'notifications_page_history': 'السجل',
       'notifications_page_publish': 'نشر',
+      'notifications_page_translation_preview': 'معاينة الترجمة',
+      'notifications_page_translation_ready': 'جاهز بـ {count} لغة.',
       'notifications_page_title_hint': 'العنوان',
       'notifications_page_rule_message_hint': 'قاعدة / رسالة',
       'notifications_page_not_logged_in': 'غير مسجل الدخول',
@@ -6771,6 +7640,8 @@ class AppLocalizations {
       'notifications_page_new_content': 'YENI ICERIK | Bildirimler',
       'notifications_page_history': 'Gecmis',
       'notifications_page_publish': 'yayinla',
+      'notifications_page_translation_preview': 'Ceviri onizlemesi',
+      'notifications_page_translation_ready': '{count} dil icin hazir.',
       'notifications_page_title_hint': 'BASLIK',
       'notifications_page_rule_message_hint': 'KURAL / MESAJ',
       'notifications_page_not_logged_in': 'Giris yapilmamis',
@@ -6823,6 +7694,8 @@ class AppLocalizations {
       'notifications_page_new_content': 'НОВЫЙ КОНТЕНТ | Уведомления',
       'notifications_page_history': 'История',
       'notifications_page_publish': 'опубликовать',
+      'notifications_page_translation_preview': 'Предпросмотр перевода',
+      'notifications_page_translation_ready': 'Готово на {count} языках.',
       'notifications_page_title_hint': 'ЗАГОЛОВОК',
       'notifications_page_rule_message_hint': 'ПРАВИЛО / СООБЩЕНИЕ',
       'notifications_page_not_logged_in': 'Не выполнен вход',
@@ -6904,8 +7777,40 @@ class AppLocalizations {
     'task_sheet_search_driver_hint': 'Search driver by name or ID',
     'task_sheet_no_drivers_found': 'No drivers found.',
     'task_sheet_selected_driver': 'Selected: {name} ({id})',
+    'task_sheet_response_type': 'Response type',
+    'task_sheet_response_type_help':
+        'Choose whether this task is a standard action, a written feedback prompt, or a fixed-choice survey.',
+    'task_sheet_response_standard': 'Standard task',
+    'task_sheet_response_standard_help':
+        'Driver updates progress and confirms when done.',
+    'task_sheet_response_feedback_text': 'Written feedback',
+    'task_sheet_response_feedback_text_help':
+        'Driver submits a custom written answer.',
+    'task_sheet_response_feedback_choice': 'Select an option',
+    'task_sheet_response_feedback_choice_help':
+        'Driver picks one response from predefined options.',
     'task_sheet_title_hint': 'TASK TITLE',
     'task_sheet_details_hint': 'TASK DETAILS',
+    'task_sheet_feedback_options_title': 'Feedback options',
+    'task_sheet_feedback_options_hint':
+        'Add at least 2 options. Drivers will be able to choose one.',
+    'task_sheet_feedback_add_option': 'Add option',
+    'task_sheet_feedback_option_label': 'Option {index}',
+    'task_sheet_feedback_remove_option': 'Remove option',
+    'task_sheet_feedback_options_required':
+        'Please add at least two feedback options.',
+    'task_sheet_feedback_response_label': 'Response',
+    'task_sheet_feedback_prompt_text': 'Driver feedback',
+    'task_sheet_feedback_prompt_choice': 'Choose one option',
+    'task_sheet_feedback_input_hint': 'Write your feedback here',
+    'task_sheet_feedback_submit': 'Submit feedback',
+    'task_sheet_feedback_update': 'Update feedback',
+    'task_sheet_feedback_received': 'Feedback submitted',
+    'task_sheet_feedback_waiting': 'Waiting for driver feedback',
+    'task_sheet_feedback_text_required': 'Please write feedback first.',
+    'task_sheet_feedback_choice_required':
+        'Please select one option first.',
+    'task_sheet_feedback_submitted': 'Feedback submitted.',
     'task_sheet_publish': 'publish',
     'task_sheet_history': 'History',
     'task_sheet_error_generic': 'Error: {error}',
@@ -7858,8 +8763,7 @@ class AppLocalizations {
       'delivery_training_counters_title': 'Schalter',
       'delivery_training_otr_header': 'TUeR-ZU-TUeR-LIEFERUNGEN',
       'delivery_training_concessions_title': 'Kulanzfaelle',
-      'delivery_training_delivery_app_usage_title':
-          'Nutzung der Delivery App',
+      'delivery_training_delivery_app_usage_title': 'Nutzung der Delivery App',
       'delivery_training_delivery_app_overview_header':
           'UEBERSICHT DELIVERY APP',
       'delivery_training_transportation_method_header': 'TRANSPORTMETHODE',
@@ -7909,14 +8813,10 @@ class AppLocalizations {
       'delivery_training_screen_title_door_to_door': 'Tür zu Tür',
       'delivery_training_screen_title_lockers': 'Locker',
       'delivery_training_screen_title_counters': 'Schalter',
-      'delivery_training_screen_title_otr_supplies':
-          'Tür-zu-Tür-Lieferungen',
-      'delivery_training_screen_title_otp_badge':
-          'Tür-zu-Tür-Lieferungen',
-      'delivery_training_screen_title_weather_bags':
-          'Tür-zu-Tür-Lieferungen',
-      'delivery_training_screen_title_ready_to_go':
-          'Tür-zu-Tür-Lieferungen',
+      'delivery_training_screen_title_otr_supplies': 'Tür-zu-Tür-Lieferungen',
+      'delivery_training_screen_title_otp_badge': 'Tür-zu-Tür-Lieferungen',
+      'delivery_training_screen_title_weather_bags': 'Tür-zu-Tür-Lieferungen',
+      'delivery_training_screen_title_ready_to_go': 'Tür-zu-Tür-Lieferungen',
       'delivery_training_screen_title_customer_arrival':
           'Tür-zu-Tür-Lieferungen',
       'delivery_training_screen_title_customer_feedback':
@@ -7979,12 +8879,10 @@ class AppLocalizations {
       'delivery_training_counters_title': 'Pika sporteli',
       'delivery_training_otr_header': 'DOREZIME DERE ME DERE',
       'delivery_training_concessions_title': 'Koncesione',
-      'delivery_training_delivery_app_usage_title':
-          'Perdorimi i Delivery App',
+      'delivery_training_delivery_app_usage_title': 'Perdorimi i Delivery App',
       'delivery_training_delivery_app_overview_header':
           'PAMJE E PERGJITHSHME E DELIVERY APP',
-      'delivery_training_transportation_method_header':
-          'MENYRA E TRANSPORTIT',
+      'delivery_training_transportation_method_header': 'MENYRA E TRANSPORTIT',
       'delivery_training_transportation_method_question':
           'Cilen menyre transporti preferon?',
       'delivery_training_transportation_method_walk': 'Ne kembe',
@@ -8001,15 +8899,15 @@ class AppLocalizations {
           'Mbeshtejtje per shoferin',
       'delivery_training_settings_prompt_emergency_help': 'Ndihme emergjente',
       'delivery_training_offline_maps_settings_header': 'CILESIMET',
-      'delivery_training_offline_maps_settings_personal':
-          'Te dhena personale',
+      'delivery_training_offline_maps_settings_personal': 'Te dhena personale',
       'delivery_training_offline_maps_settings_phone': 'Numri i telefonit',
       'delivery_training_offline_maps_settings_legal':
           'Shiko informacionin ligjor',
       'delivery_training_offline_maps_settings_offline': 'Harta offline',
       'delivery_training_offline_maps_settings_version':
           'Informacion i versionit',
-      'delivery_training_offline_maps_settings_device': 'Identifikues pajisjeje',
+      'delivery_training_offline_maps_settings_device':
+          'Identifikues pajisjeje',
       'delivery_training_offline_maps_settings_sign_out': 'DIL',
       'delivery_training_offline_maps_download_header': 'HARTA OFFLINE',
       'delivery_training_offline_maps_download_settings':
@@ -8030,8 +8928,7 @@ class AppLocalizations {
       'delivery_training_summary_locations_count': '8 lokacione',
       'delivery_training_summary_packages_count': '9 pako',
       'delivery_training_summary_stops_header': 'Ndalesa',
-      'delivery_training_screen_title_type_of_deliveries':
-          'Llojet e dorezimit',
+      'delivery_training_screen_title_type_of_deliveries': 'Llojet e dorezimit',
       'delivery_training_screen_title_door_to_door': 'Dere me dere',
       'delivery_training_screen_title_lockers': 'Locker',
       'delivery_training_screen_title_counters': 'Pika sporteli',
@@ -8050,8 +8947,7 @@ class AppLocalizations {
           'Pamje e Delivery App',
       'delivery_training_screen_title_transportation_method':
           'Menyra e transportit',
-      'delivery_training_screen_title_verify_identity':
-          'Verifiko identitetin',
+      'delivery_training_screen_title_verify_identity': 'Verifiko identitetin',
       'delivery_training_screen_title_menu': 'Menuja kryesore',
       'delivery_training_screen_title_settings': 'Cilesimet',
       'delivery_training_screen_title_offline_maps': 'Harta offline',
@@ -8109,7 +9005,8 @@ class AppLocalizations {
           'Melyik szallitasi modot preferalod?',
       'delivery_training_transportation_method_walk': 'Gyalog',
       'delivery_training_transportation_method_bike': 'Kerekpar',
-      'delivery_training_verify_identity_header': 'SZEMELYAZONOSSAG ELLENORZESE',
+      'delivery_training_verify_identity_header':
+          'SZEMELYAZONOSSAG ELLENORZESE',
       'delivery_training_verify_identity_tips_title': 'Tippek',
       'delivery_training_verify_identity_take_photo': 'Foto keszitese',
       'delivery_training_offline_maps_prompt_title': 'Attekintes',
@@ -8117,8 +9014,7 @@ class AppLocalizations {
       'delivery_training_settings_prompt_feedback': 'Visszajelzes',
       'delivery_training_settings_prompt_settings': 'Beallitasok',
       'delivery_training_settings_prompt_breaks': 'Szünetek',
-      'delivery_training_settings_prompt_driver_support':
-          'Sofor tamogatas',
+      'delivery_training_settings_prompt_driver_support': 'Sofor tamogatas',
       'delivery_training_settings_prompt_emergency_help': 'Surgossegi segitseg',
       'delivery_training_offline_maps_settings_header': 'BEALLITASOK',
       'delivery_training_offline_maps_settings_personal': 'Szemelyes adatok',
@@ -8126,8 +9022,7 @@ class AppLocalizations {
       'delivery_training_offline_maps_settings_legal':
           'Jogi informaciok megtekintese',
       'delivery_training_offline_maps_settings_offline': 'Offline terkep',
-      'delivery_training_offline_maps_settings_version':
-          'Verzioinformacio',
+      'delivery_training_offline_maps_settings_version': 'Verzioinformacio',
       'delivery_training_offline_maps_settings_device': 'Eszkozonosito',
       'delivery_training_offline_maps_settings_sign_out': 'KIJELENTKEZES',
       'delivery_training_offline_maps_download_header': 'OFFLINE TERKEPEK',
@@ -8152,12 +9047,12 @@ class AppLocalizations {
       'delivery_training_screen_title_door_to_door': 'Ajtotol ajtoig',
       'delivery_training_screen_title_lockers': 'Lockerek',
       'delivery_training_screen_title_counters': 'Atveteli pontok',
-      'delivery_training_screen_title_otr_supplies': 'Ajtotol ajtoig kezbesites',
+      'delivery_training_screen_title_otr_supplies':
+          'Ajtotol ajtoig kezbesites',
       'delivery_training_screen_title_otp_badge': 'Ajtotol ajtoig kezbesites',
       'delivery_training_screen_title_weather_bags':
           'Ajtotol ajtoig kezbesites',
-      'delivery_training_screen_title_ready_to_go':
-          'Ajtotol ajtoig kezbesites',
+      'delivery_training_screen_title_ready_to_go': 'Ajtotol ajtoig kezbesites',
       'delivery_training_screen_title_customer_arrival':
           'Ajtotol ajtoig kezbesites',
       'delivery_training_screen_title_customer_feedback':
@@ -8220,8 +9115,7 @@ class AppLocalizations {
       'delivery_training_counters_title': 'Puncte ghiseu',
       'delivery_training_otr_header': 'LIVRARI USA LA USA',
       'delivery_training_concessions_title': 'Concesii',
-      'delivery_training_delivery_app_usage_title':
-          'Utilizarea Delivery App',
+      'delivery_training_delivery_app_usage_title': 'Utilizarea Delivery App',
       'delivery_training_delivery_app_overview_header':
           'PREZENTARE DELIVERY APP',
       'delivery_training_transportation_method_header': 'METODA DE TRANSPORT',
@@ -8243,16 +9137,14 @@ class AppLocalizations {
       'delivery_training_offline_maps_settings_personal':
           'Informatii personale',
       'delivery_training_offline_maps_settings_phone': 'Numar de telefon',
-      'delivery_training_offline_maps_settings_legal':
-          'Vezi informatii legale',
+      'delivery_training_offline_maps_settings_legal': 'Vezi informatii legale',
       'delivery_training_offline_maps_settings_offline': 'Harti offline',
       'delivery_training_offline_maps_settings_version': 'Informatii versiune',
       'delivery_training_offline_maps_settings_device':
           'Identificator dispozitiv',
       'delivery_training_offline_maps_settings_sign_out': 'DECONECTARE',
       'delivery_training_offline_maps_download_header': 'HARTI OFFLINE',
-      'delivery_training_offline_maps_download_settings':
-          'Setari descarcare',
+      'delivery_training_offline_maps_download_settings': 'Setari descarcare',
       'delivery_training_offline_maps_downloaded_title': 'Harti descarcate',
       'delivery_training_offline_maps_other_maps': 'Alte harti',
       'delivery_training_screen_title_overview': 'Prezentare',
@@ -8267,8 +9159,7 @@ class AppLocalizations {
       'delivery_training_summary_locations_count': '8 locatii',
       'delivery_training_summary_packages_count': '9 colete',
       'delivery_training_summary_stops_header': 'Opriri',
-      'delivery_training_screen_title_type_of_deliveries':
-          'Tipuri de livrare',
+      'delivery_training_screen_title_type_of_deliveries': 'Tipuri de livrare',
       'delivery_training_screen_title_door_to_door': 'Usa la usa',
       'delivery_training_screen_title_lockers': 'Lockere',
       'delivery_training_screen_title_counters': 'Puncte ghiseu',
@@ -8277,8 +9168,7 @@ class AppLocalizations {
       'delivery_training_screen_title_weather_bags': 'Livrari usa la usa',
       'delivery_training_screen_title_ready_to_go': 'Livrari usa la usa',
       'delivery_training_screen_title_customer_arrival': 'Livrari usa la usa',
-      'delivery_training_screen_title_customer_feedback':
-          'Livrari usa la usa',
+      'delivery_training_screen_title_customer_feedback': 'Livrari usa la usa',
       'delivery_training_screen_title_concessions': 'Concesii',
       'delivery_training_screen_title_delivery_app_usage':
           'Utilizarea Delivery App',
@@ -8286,8 +9176,7 @@ class AppLocalizations {
           'Prezentare Delivery App',
       'delivery_training_screen_title_transportation_method':
           'Metoda de transport',
-      'delivery_training_screen_title_verify_identity':
-          'Verifica identitatea',
+      'delivery_training_screen_title_verify_identity': 'Verifica identitatea',
       'delivery_training_screen_title_menu': 'Meniu principal',
       'delivery_training_screen_title_settings': 'Setari',
       'delivery_training_screen_title_offline_maps': 'Harti offline',
@@ -8337,10 +9226,8 @@ class AppLocalizations {
       'delivery_training_counters_title': 'Pultovi',
       'delivery_training_otr_header': 'DOSTAVE OD VRATA DO VRATA',
       'delivery_training_concessions_title': 'Koncesije',
-      'delivery_training_delivery_app_usage_title':
-          'Koristenje Delivery App',
-      'delivery_training_delivery_app_overview_header':
-          'PREGLED DELIVERY APP',
+      'delivery_training_delivery_app_usage_title': 'Koristenje Delivery App',
+      'delivery_training_delivery_app_overview_header': 'PREGLED DELIVERY APP',
       'delivery_training_transportation_method_header': 'NACIN PRIJEVOZA',
       'delivery_training_transportation_method_question':
           'Koji nacin prijevoza preferiras?',
@@ -8357,15 +9244,14 @@ class AppLocalizations {
       'delivery_training_settings_prompt_driver_support': 'Podrska vozacu',
       'delivery_training_settings_prompt_emergency_help': 'Hitna pomoc',
       'delivery_training_offline_maps_settings_header': 'POSTAVKE',
-      'delivery_training_offline_maps_settings_personal':
-          'Osobni podaci',
+      'delivery_training_offline_maps_settings_personal': 'Osobni podaci',
       'delivery_training_offline_maps_settings_phone': 'Broj telefona',
       'delivery_training_offline_maps_settings_legal':
           'Pregled pravnih informacija',
       'delivery_training_offline_maps_settings_offline': 'Offline karte',
-      'delivery_training_offline_maps_settings_version': 'Informacije o verziji',
-      'delivery_training_offline_maps_settings_device':
-          'Identifikator uredaja',
+      'delivery_training_offline_maps_settings_version':
+          'Informacije o verziji',
+      'delivery_training_offline_maps_settings_device': 'Identifikator uredaja',
       'delivery_training_offline_maps_settings_sign_out': 'ODJAVA',
       'delivery_training_offline_maps_download_header': 'OFFLINE KARTE',
       'delivery_training_offline_maps_download_settings':
@@ -8390,12 +9276,10 @@ class AppLocalizations {
       'delivery_training_screen_title_counters': 'Pultovi',
       'delivery_training_screen_title_otr_supplies':
           'Dostave od vrata do vrata',
-      'delivery_training_screen_title_otp_badge':
-          'Dostave od vrata do vrata',
+      'delivery_training_screen_title_otp_badge': 'Dostave od vrata do vrata',
       'delivery_training_screen_title_weather_bags':
           'Dostave od vrata do vrata',
-      'delivery_training_screen_title_ready_to_go':
-          'Dostave od vrata do vrata',
+      'delivery_training_screen_title_ready_to_go': 'Dostave od vrata do vrata',
       'delivery_training_screen_title_customer_arrival':
           'Dostave od vrata do vrata',
       'delivery_training_screen_title_customer_feedback':
@@ -8405,8 +9289,7 @@ class AppLocalizations {
           'Koristenje Delivery App',
       'delivery_training_screen_title_delivery_app_overview':
           'Pregled Delivery App',
-      'delivery_training_screen_title_transportation_method':
-          'Nacin prijevoza',
+      'delivery_training_screen_title_transportation_method': 'Nacin prijevoza',
       'delivery_training_screen_title_verify_identity': 'Potvrdi identitet',
       'delivery_training_screen_title_menu': 'Glavni izbornik',
       'delivery_training_screen_title_settings': 'Postavke',
@@ -8485,7 +9368,8 @@ class AppLocalizations {
       'delivery_training_offline_maps_settings_sign_out': 'تسجيل الخروج',
       'delivery_training_offline_maps_download_header': 'خرائط دون اتصال',
       'delivery_training_offline_maps_download_settings': 'إعدادات التنزيل',
-      'delivery_training_offline_maps_downloaded_title': 'الخرائط التي تم تنزيلها',
+      'delivery_training_offline_maps_downloaded_title':
+          'الخرائط التي تم تنزيلها',
       'delivery_training_offline_maps_other_maps': 'خرائط أخرى',
       'delivery_training_screen_title_overview': 'نظرة عامة',
       'delivery_training_screen_title_itinerary': 'قائمة المسار',
@@ -8572,8 +9456,7 @@ class AppLocalizations {
       'delivery_training_counters_title': 'Teslim noktalari',
       'delivery_training_otr_header': 'KAPIDAN KAPIYA TESLIMATLAR',
       'delivery_training_concessions_title': 'Telafiler',
-      'delivery_training_delivery_app_usage_title':
-          'Delivery App kullanimi',
+      'delivery_training_delivery_app_usage_title': 'Delivery App kullanimi',
       'delivery_training_delivery_app_overview_header':
           'DELIVERY APP GENEL BAKIS',
       'delivery_training_transportation_method_header': 'ULASIM YONTEMI',
@@ -8600,8 +9483,7 @@ class AppLocalizations {
       'delivery_training_offline_maps_settings_device': 'Cihaz kimligi',
       'delivery_training_offline_maps_settings_sign_out': 'CIKIS YAP',
       'delivery_training_offline_maps_download_header': 'CEVRIMDISI HARITALAR',
-      'delivery_training_offline_maps_download_settings':
-          'Indirme ayarlari',
+      'delivery_training_offline_maps_download_settings': 'Indirme ayarlari',
       'delivery_training_offline_maps_downloaded_title': 'Indirilen haritalar',
       'delivery_training_offline_maps_other_maps': 'Diger haritalar',
       'delivery_training_screen_title_overview': 'Genel bakis',
@@ -8633,8 +9515,7 @@ class AppLocalizations {
           'Delivery App kullanimi',
       'delivery_training_screen_title_delivery_app_overview':
           'Delivery App genel bakis',
-      'delivery_training_screen_title_transportation_method':
-          'Ulasim yontemi',
+      'delivery_training_screen_title_transportation_method': 'Ulasim yontemi',
       'delivery_training_screen_title_verify_identity': 'Kimligi dogrula',
       'delivery_training_screen_title_menu': 'Ana menu',
       'delivery_training_screen_title_settings': 'Ayarlar',
@@ -8688,8 +9569,7 @@ class AppLocalizations {
       'delivery_training_concessions_title': 'Компенсации',
       'delivery_training_delivery_app_usage_title':
           'Использование Delivery App',
-      'delivery_training_delivery_app_overview_header':
-          'ОБЗОР DELIVERY APP',
+      'delivery_training_delivery_app_overview_header': 'ОБЗОР DELIVERY APP',
       'delivery_training_transportation_method_header': 'СПОСОБ ПЕРЕДВИЖЕНИЯ',
       'delivery_training_transportation_method_question':
           'Какой способ передвижения вы предпочитаете?',
@@ -8706,20 +9586,17 @@ class AppLocalizations {
       'delivery_training_settings_prompt_driver_support': 'Поддержка водителя',
       'delivery_training_settings_prompt_emergency_help': 'Экстренная помощь',
       'delivery_training_offline_maps_settings_header': 'НАСТРОЙКИ',
-      'delivery_training_offline_maps_settings_personal':
-          'Личная информация',
+      'delivery_training_offline_maps_settings_personal': 'Личная информация',
       'delivery_training_offline_maps_settings_phone': 'Номер телефона',
       'delivery_training_offline_maps_settings_legal':
           'Просмотр юридической информации',
       'delivery_training_offline_maps_settings_offline': 'Офлайн-карты',
-      'delivery_training_offline_maps_settings_version':
-          'Информация о версии',
+      'delivery_training_offline_maps_settings_version': 'Информация о версии',
       'delivery_training_offline_maps_settings_device':
           'Идентификатор устройства',
       'delivery_training_offline_maps_settings_sign_out': 'ВЫЙТИ',
       'delivery_training_offline_maps_download_header': 'ОФЛАЙН-КАРТЫ',
-      'delivery_training_offline_maps_download_settings':
-          'Настройки загрузки',
+      'delivery_training_offline_maps_download_settings': 'Настройки загрузки',
       'delivery_training_offline_maps_downloaded_title': 'Загруженные карты',
       'delivery_training_offline_maps_other_maps': 'Другие карты',
       'delivery_training_screen_title_overview': 'Обзор',
@@ -8740,12 +9617,10 @@ class AppLocalizations {
       'delivery_training_screen_title_counters': 'Пункты выдачи',
       'delivery_training_screen_title_otr_supplies':
           'Доставка от двери к двери',
-      'delivery_training_screen_title_otp_badge':
-          'Доставка от двери к двери',
+      'delivery_training_screen_title_otp_badge': 'Доставка от двери к двери',
       'delivery_training_screen_title_weather_bags':
           'Доставка от двери к двери',
-      'delivery_training_screen_title_ready_to_go':
-          'Доставка от двери к двери',
+      'delivery_training_screen_title_ready_to_go': 'Доставка от двери к двери',
       'delivery_training_screen_title_customer_arrival':
           'Доставка от двери к двери',
       'delivery_training_screen_title_customer_feedback':
@@ -8859,6 +9734,8 @@ class AppLocalizations {
     'drivers_hub_expiry_items_expiring_soon': '{items} expiring soon',
     'drivers_hub_expiry_probezeit': 'Probezeit',
     'drivers_hub_expiry_work_permit': 'Work permit',
+    'drivers_hub_expiry_work_visa': 'Working visa',
+    'drivers_hub_expiry_zusatzblatt': 'Zusatzblatt',
     'drivers_hub_export_pdf': 'Export PDF',
     'drivers_hub_failed_create_logins': 'Failed to create logins: {error}',
     'drivers_hub_failed_delete_document': 'Failed to delete document: {error}',
@@ -8872,6 +9749,8 @@ class AppLocalizations {
     'drivers_hub_field_city': 'City',
     'drivers_hub_field_city_of_birth': 'City of birth',
     'drivers_hub_field_contract_expiry': 'Contract expiry',
+    'drivers_hub_field_annual_vacation_days': 'Vacation days per year',
+    'drivers_hub_field_remaining_vacation_days': 'Remaining vacation days',
     'drivers_hub_field_country': 'Country',
     'drivers_hub_field_date_of_birth': 'Date of birth',
     'drivers_hub_field_driving_license_number': 'Driving license number',
@@ -8892,10 +9771,14 @@ class AppLocalizations {
     'drivers_hub_field_street_address': 'Street address',
     'drivers_hub_field_tax_id': 'Tax ID',
     'drivers_hub_field_tshirt_size': 'T-shirt size',
+    'drivers_hub_field_work_permit_type': 'Work permit',
     'drivers_hub_field_work_permit_expiry': 'Work permit expiry',
+    'drivers_hub_field_work_visa_expiry': 'Expiry date of Working Visa',
     'drivers_hub_field_work_start_date': 'Work start date',
+    'drivers_hub_field_zusatzblatt_expiry': 'Expiry date of Zusatzblatt',
     'drivers_hub_header_action': 'Action',
     'drivers_hub_header_login': 'Login',
+    'drivers_hub_header_overall': 'Overall',
     'drivers_hub_header_profile': 'Profile',
     'drivers_hub_header_status': 'Status',
     'drivers_hub_header_working': 'Working',
@@ -8919,6 +9802,7 @@ class AppLocalizations {
     'drivers_hub_no_drivers_yet':
         'No drivers yet.\nImport a CSV or add a driver manually.',
     'drivers_hub_no_login': 'No login',
+    'drivers_hub_no_scores_yet': 'No weekly score summary yet.',
     'drivers_hub_not_set': 'Not set',
     'drivers_hub_not_uploaded': 'Not uploaded',
     'drivers_hub_notification_pin': 'Notification PIN',
@@ -8951,8 +9835,11 @@ class AppLocalizations {
     'drivers_hub_sort_id_asc': 'ID A-Z',
     'drivers_hub_sort_name_asc': 'Name A-Z',
     'drivers_hub_sort_name_desc': 'Name Z-A',
+    'drivers_hub_sort_approved': 'Approved',
     'drivers_hub_sort_newest': 'Newest',
     'drivers_hub_sort_oldest': 'Oldest',
+    'drivers_hub_sort_pending': 'Pending',
+    'drivers_hub_sort_rejected': 'Rejected',
     'drivers_hub_status_approved': 'Approved',
     'drivers_hub_status_pending': 'Pending',
     'drivers_hub_status_rejected': 'Rejected',
@@ -8971,6 +9858,9 @@ class AppLocalizations {
     'drivers_hub_upload_driver_document': 'Upload driver document',
     'drivers_hub_valid_driver_email_required':
         'A valid driver email is required.',
+    'drivers_hub_weekly_score_summary': 'Weekly score summary',
+    'drivers_hub_work_permit_eu': 'EU',
+    'drivers_hub_work_permit_working_visa': 'Working Visa',
   };
 
   static final Map<String, Map<String, String>> _driversHubLocalizedValues = {
@@ -9050,6 +9940,8 @@ class AppLocalizations {
       'drivers_hub_field_city': 'Stadt',
       'drivers_hub_field_city_of_birth': 'Geburtsort',
       'drivers_hub_field_contract_expiry': 'Vertragsende',
+      'drivers_hub_field_annual_vacation_days': 'Urlaubstage pro Jahr',
+      'drivers_hub_field_remaining_vacation_days': 'Resturlaub',
       'drivers_hub_field_country': 'Land',
       'drivers_hub_field_date_of_birth': 'Geburtsdatum',
       'drivers_hub_field_driving_license_number': 'Fuehrerscheinnummer',
@@ -9073,6 +9965,7 @@ class AppLocalizations {
       'drivers_hub_field_work_start_date': 'Arbeitsbeginn',
       'drivers_hub_header_action': 'Aktion',
       'drivers_hub_header_login': 'Login',
+      'drivers_hub_header_overall': 'Gesamt',
       'drivers_hub_header_profile': 'Profil',
       'drivers_hub_header_status': 'Status',
       'drivers_hub_header_working': 'Aktiv',
@@ -9127,8 +10020,11 @@ class AppLocalizations {
       'drivers_hub_sort_id_asc': 'ID A-Z',
       'drivers_hub_sort_name_asc': 'Name A-Z',
       'drivers_hub_sort_name_desc': 'Name Z-A',
+      'drivers_hub_sort_approved': 'Genehmigt',
       'drivers_hub_sort_newest': 'Neueste',
       'drivers_hub_sort_oldest': 'Aelteste',
+      'drivers_hub_sort_pending': 'Ausstehend',
+      'drivers_hub_sort_rejected': 'Abgelehnt',
       'drivers_hub_status_approved': 'Genehmigt',
       'drivers_hub_status_pending': 'Ausstehend',
       'drivers_hub_status_rejected': 'Abgelehnt',
@@ -9247,6 +10143,7 @@ class AppLocalizations {
       'drivers_hub_field_work_start_date': 'Data e fillimit te punes',
       'drivers_hub_header_action': 'Veprim',
       'drivers_hub_header_login': 'Login',
+      'drivers_hub_header_overall': 'Mesatarja',
       'drivers_hub_header_profile': 'Profili',
       'drivers_hub_header_status': 'Statusi',
       'drivers_hub_header_working': 'Aktiv',
@@ -9301,8 +10198,11 @@ class AppLocalizations {
       'drivers_hub_sort_id_asc': 'ID A-Z',
       'drivers_hub_sort_name_asc': 'Emri A-Z',
       'drivers_hub_sort_name_desc': 'Emri Z-A',
+      'drivers_hub_sort_approved': 'Miratuar',
       'drivers_hub_sort_newest': 'Me te rinjte',
       'drivers_hub_sort_oldest': 'Me te vjeterit',
+      'drivers_hub_sort_pending': 'Ne pritje',
+      'drivers_hub_sort_rejected': 'Refuzuar',
       'drivers_hub_status_approved': 'Miratuar',
       'drivers_hub_status_pending': 'Ne pritje',
       'drivers_hub_status_rejected': 'Refuzuar',
@@ -9424,6 +10324,7 @@ class AppLocalizations {
       'drivers_hub_field_work_start_date': 'Munkakezdes datuma',
       'drivers_hub_header_action': 'Muvelet',
       'drivers_hub_header_login': 'Belepes',
+      'drivers_hub_header_overall': 'Atlag',
       'drivers_hub_header_profile': 'Profil',
       'drivers_hub_header_status': 'Statusz',
       'drivers_hub_header_working': 'Aktiv',
@@ -9477,8 +10378,11 @@ class AppLocalizations {
       'drivers_hub_sort_id_asc': 'ID A-Z',
       'drivers_hub_sort_name_asc': 'Nev A-Z',
       'drivers_hub_sort_name_desc': 'Nev Z-A',
+      'drivers_hub_sort_approved': 'Jovahagyva',
       'drivers_hub_sort_newest': 'Legujabb',
       'drivers_hub_sort_oldest': 'Legregebbi',
+      'drivers_hub_sort_pending': 'Fuggoben',
+      'drivers_hub_sort_rejected': 'Elutasitva',
       'drivers_hub_status_approved': 'Jovahagyva',
       'drivers_hub_status_pending': 'Fuggoben',
       'drivers_hub_status_rejected': 'Elutasitva',
@@ -9595,6 +10499,7 @@ class AppLocalizations {
       'drivers_hub_field_work_start_date': 'Data inceperii muncii',
       'drivers_hub_header_action': 'Actiune',
       'drivers_hub_header_login': 'Login',
+      'drivers_hub_header_overall': 'General',
       'drivers_hub_header_profile': 'Profil',
       'drivers_hub_header_status': 'Status',
       'drivers_hub_header_working': 'Activ',
@@ -9649,8 +10554,11 @@ class AppLocalizations {
       'drivers_hub_sort_id_asc': 'ID A-Z',
       'drivers_hub_sort_name_asc': 'Nume A-Z',
       'drivers_hub_sort_name_desc': 'Nume Z-A',
+      'drivers_hub_sort_approved': 'Aprobat',
       'drivers_hub_sort_newest': 'Cele mai noi',
       'drivers_hub_sort_oldest': 'Cele mai vechi',
+      'drivers_hub_sort_pending': 'In asteptare',
+      'drivers_hub_sort_rejected': 'Respins',
       'drivers_hub_status_approved': 'Aprobat',
       'drivers_hub_status_pending': 'In asteptare',
       'drivers_hub_status_rejected': 'Respins',
@@ -9767,6 +10675,7 @@ class AppLocalizations {
       'drivers_hub_field_work_start_date': 'Datum pocetka rada',
       'drivers_hub_header_action': 'Akcija',
       'drivers_hub_header_login': 'Login',
+      'drivers_hub_header_overall': 'Ukupno',
       'drivers_hub_header_profile': 'Profil',
       'drivers_hub_header_status': 'Status',
       'drivers_hub_header_working': 'Aktivan',
@@ -9819,8 +10728,11 @@ class AppLocalizations {
       'drivers_hub_sort_id_asc': 'ID A-Z',
       'drivers_hub_sort_name_asc': 'Ime A-Z',
       'drivers_hub_sort_name_desc': 'Ime Z-A',
+      'drivers_hub_sort_approved': 'Odobreno',
       'drivers_hub_sort_newest': 'Najnoviji',
       'drivers_hub_sort_oldest': 'Najstariji',
+      'drivers_hub_sort_pending': 'Na cekanju',
+      'drivers_hub_sort_rejected': 'Odbijeno',
       'drivers_hub_status_approved': 'Odobreno',
       'drivers_hub_status_pending': 'Na cekanju',
       'drivers_hub_status_rejected': 'Odbijeno',
@@ -9931,6 +10843,7 @@ class AppLocalizations {
       'drivers_hub_field_work_start_date': 'تاريخ بدء العمل',
       'drivers_hub_header_action': 'إجراء',
       'drivers_hub_header_login': 'دخول',
+      'drivers_hub_header_overall': 'الإجمالي',
       'drivers_hub_header_profile': 'الملف',
       'drivers_hub_header_status': 'الحالة',
       'drivers_hub_header_working': 'نشط',
@@ -9976,8 +10889,11 @@ class AppLocalizations {
       'drivers_hub_set_driver_login': 'تعيين دخول السائق',
       'drivers_hub_set_pin': 'تعيين PIN',
       'drivers_hub_show_pin': 'إظهار PIN',
+      'drivers_hub_sort_approved': 'معتمد',
       'drivers_hub_sort_newest': 'الأحدث',
       'drivers_hub_sort_oldest': 'الأقدم',
+      'drivers_hub_sort_pending': 'قيد الانتظار',
+      'drivers_hub_sort_rejected': 'مرفوض',
       'drivers_hub_status_approved': 'معتمد',
       'drivers_hub_status_pending': 'قيد الانتظار',
       'drivers_hub_status_rejected': 'مرفوض',
@@ -10087,6 +11003,7 @@ class AppLocalizations {
       'drivers_hub_field_work_start_date': 'Ise baslama tarihi',
       'drivers_hub_header_action': 'Islem',
       'drivers_hub_header_login': 'Giris',
+      'drivers_hub_header_overall': 'Genel',
       'drivers_hub_header_profile': 'Profil',
       'drivers_hub_header_status': 'Durum',
       'drivers_hub_header_working': 'Aktif',
@@ -10139,8 +11056,11 @@ class AppLocalizations {
       'drivers_hub_sort_id_asc': 'ID A-Z',
       'drivers_hub_sort_name_asc': 'Isim A-Z',
       'drivers_hub_sort_name_desc': 'Isim Z-A',
+      'drivers_hub_sort_approved': 'Onaylandi',
       'drivers_hub_sort_newest': 'En yeni',
       'drivers_hub_sort_oldest': 'En eski',
+      'drivers_hub_sort_pending': 'Beklemede',
+      'drivers_hub_sort_rejected': 'Reddedildi',
       'drivers_hub_status_approved': 'Onaylandi',
       'drivers_hub_status_pending': 'Beklemede',
       'drivers_hub_status_rejected': 'Reddedildi',
@@ -10257,6 +11177,7 @@ class AppLocalizations {
       'drivers_hub_field_work_start_date': 'Дата начала работы',
       'drivers_hub_header_action': 'Действие',
       'drivers_hub_header_login': 'Вход',
+      'drivers_hub_header_overall': 'Среднее',
       'drivers_hub_header_profile': 'Профиль',
       'drivers_hub_header_status': 'Статус',
       'drivers_hub_header_working': 'Активен',
@@ -10310,8 +11231,11 @@ class AppLocalizations {
       'drivers_hub_sort_id_asc': 'ID A-Z',
       'drivers_hub_sort_name_asc': 'Имя A-Z',
       'drivers_hub_sort_name_desc': 'Имя Z-A',
+      'drivers_hub_sort_approved': 'Одобрен',
       'drivers_hub_sort_newest': 'Новые',
       'drivers_hub_sort_oldest': 'Старые',
+      'drivers_hub_sort_pending': 'В ожидании',
+      'drivers_hub_sort_rejected': 'Отклонен',
       'drivers_hub_status_approved': 'Одобрен',
       'drivers_hub_status_pending': 'В ожидании',
       'drivers_hub_status_rejected': 'Отклонен',
@@ -10338,6 +11262,9 @@ class AppLocalizations {
     'admin_faq_question_label': 'Question',
     'admin_faq_answer_label': 'Answer',
     'admin_faq_error_auto_translate': 'Auto-translation failed: {error}',
+    'admin_faq_translate_all_languages': 'Translate all languages',
+    'admin_faq_translate_done': 'Translated {count} fields.',
+    'admin_faq_translate_none': 'No new translations were generated.',
     'admin_faq_add_title': 'Add custom FAQ',
     'admin_faq_edit_title': 'Edit custom FAQ',
     'admin_faq_insert_after': 'Insert after',
@@ -10380,6 +11307,9 @@ class AppLocalizations {
       'admin_faq_answer_label': 'Antwort',
       'admin_faq_error_auto_translate':
           'Automatische Uebersetzung fehlgeschlagen: {error}',
+      'admin_faq_translate_all_languages': 'Alle Sprachen uebersetzen',
+      'admin_faq_translate_done': '{count} Felder wurden uebersetzt.',
+      'admin_faq_translate_none': 'Es wurden keine neuen Uebersetzungen erstellt.',
       'admin_faq_add_title': 'Benutzerdefinierte FAQ hinzufuegen',
       'admin_faq_edit_title': 'Benutzerdefinierte FAQ bearbeiten',
       'admin_faq_insert_after': 'Einfuegen nach',
@@ -10421,6 +11351,9 @@ class AppLocalizations {
       'admin_faq_question_label': 'Pyetja',
       'admin_faq_answer_label': 'Pergjigjja',
       'admin_faq_error_auto_translate': 'Perkthimi automatik deshtoi: {error}',
+      'admin_faq_translate_all_languages': 'Perkthe te gjitha gjuhet',
+      'admin_faq_translate_done': 'U perkthyen {count} fusha.',
+      'admin_faq_translate_none': 'Nuk u gjeneruan perkthime te reja.',
       'admin_faq_add_title': 'Shto FAQ te personalizuar',
       'admin_faq_edit_title': 'Ndrysho FAQ te personalizuar',
       'admin_faq_insert_after': 'Vendos pas',
@@ -10463,6 +11396,9 @@ class AppLocalizations {
       'admin_faq_answer_label': 'Valasz',
       'admin_faq_error_auto_translate':
           'Automatikus forditas sikertelen: {error}',
+      'admin_faq_translate_all_languages': 'Forditas minden nyelvre',
+      'admin_faq_translate_done': '{count} mezo leforditva.',
+      'admin_faq_translate_none': 'Nem keszult uj forditas.',
       'admin_faq_add_title': 'Egyedi GYIK hozzaadasa',
       'admin_faq_edit_title': 'Egyedi GYIK szerkesztese',
       'admin_faq_insert_after': 'Beszuras ez utan',
@@ -10504,6 +11440,9 @@ class AppLocalizations {
       'admin_faq_question_label': 'Intrebare',
       'admin_faq_answer_label': 'Raspuns',
       'admin_faq_error_auto_translate': 'Traducerea automata a esuat: {error}',
+      'admin_faq_translate_all_languages': 'Tradu toate limbile',
+      'admin_faq_translate_done': 'Au fost traduse {count} campuri.',
+      'admin_faq_translate_none': 'Nu au fost generate traduceri noi.',
       'admin_faq_add_title': 'Adauga FAQ personalizat',
       'admin_faq_edit_title': 'Editeaza FAQ personalizat',
       'admin_faq_insert_after': 'Insereaza dupa',
@@ -10546,6 +11485,9 @@ class AppLocalizations {
       'admin_faq_answer_label': 'Odgovor',
       'admin_faq_error_auto_translate':
           'Automatski prijevod nije uspio: {error}',
+      'admin_faq_translate_all_languages': 'Prevedi sve jezike',
+      'admin_faq_translate_done': 'Prevedeno je {count} polja.',
+      'admin_faq_translate_none': 'Nisu generirani novi prijevodi.',
       'admin_faq_add_title': 'Dodaj prilagodeni FAQ',
       'admin_faq_edit_title': 'Uredi prilagodeni FAQ',
       'admin_faq_insert_after': 'Umetni nakon',
@@ -10587,6 +11529,9 @@ class AppLocalizations {
       'admin_faq_question_label': 'السؤال',
       'admin_faq_answer_label': 'الإجابة',
       'admin_faq_error_auto_translate': 'فشلت الترجمة التلقائية: {error}',
+      'admin_faq_translate_all_languages': 'ترجمة جميع اللغات',
+      'admin_faq_translate_done': 'تمت ترجمة {count} حقول.',
+      'admin_faq_translate_none': 'لم يتم إنشاء ترجمات جديدة.',
       'admin_faq_add_title': 'إضافة سؤال شائع مخصص',
       'admin_faq_edit_title': 'تعديل سؤال شائع مخصص',
       'admin_faq_insert_after': 'إدراج بعد',
@@ -10627,6 +11572,9 @@ class AppLocalizations {
       'admin_faq_question_label': 'Soru',
       'admin_faq_answer_label': 'Cevap',
       'admin_faq_error_auto_translate': 'Otomatik ceviri basarisiz: {error}',
+      'admin_faq_translate_all_languages': 'Tum dilleri cevir',
+      'admin_faq_translate_done': '{count} alan cevrildi.',
+      'admin_faq_translate_none': 'Yeni ceviri uretilmedi.',
       'admin_faq_add_title': 'Ozel SSS ekle',
       'admin_faq_edit_title': 'Ozel SSS duzenle',
       'admin_faq_insert_after': 'Sonrasina ekle',
@@ -10667,6 +11615,9 @@ class AppLocalizations {
       'admin_faq_question_label': 'Вопрос',
       'admin_faq_answer_label': 'Ответ',
       'admin_faq_error_auto_translate': 'Ошибка авто-перевода: {error}',
+      'admin_faq_translate_all_languages': 'Перевести на все языки',
+      'admin_faq_translate_done': 'Переведено полей: {count}.',
+      'admin_faq_translate_none': 'Новые переводы не были созданы.',
       'admin_faq_add_title': 'Добавить пользовательский FAQ',
       'admin_faq_edit_title': 'Редактировать пользовательский FAQ',
       'admin_faq_insert_after': 'Вставить после',
@@ -10790,11 +11741,741 @@ class AppLocalizations {
         },
       };
 
+  static final Map<String, String> _miscSharedValues = {
+    'button_close': 'Close',
+    'button_open': 'Open',
+    'button_delete': 'Delete',
+    'button_reload': 'Reload',
+    'button_add': 'Add',
+    'button_edit': 'Edit',
+    'button_sign_out': 'Sign out',
+    'verify_email_sent': 'Verification email sent.',
+    'verify_email_title': 'Verify your email',
+    'verify_email_intro': 'We sent a verification link to:',
+    'verify_email_sending': 'Sending...',
+    'verify_email_resend': 'Resend verification email',
+    'verify_email_reload': 'I verified - Reload',
+    'verify_email_back_to_login': 'Back to login',
+    'verify_email_failed_template': 'Failed to resend verification email: {error}',
+    'driver_shift_plan_missing_scope': 'Missing DSP or driver scope.',
+    'driver_shift_plan_title': 'Shift Plan',
+    'driver_shift_plan_load_failed_template': 'Failed to load shifts: {error}',
+    'driver_shift_plan_empty': 'No shifts assigned yet.',
+    'driver_shift_plan_upcoming': 'Upcoming shifts',
+    'driver_shift_plan_upcoming_empty': 'No upcoming shifts.',
+    'driver_shift_plan_past': 'Past shifts',
+    'driver_shift_plan_past_empty': 'No past shifts.',
+    'driver_shift_plan_status_scheduled': 'Scheduled',
+    'driver_rules_error_template': 'Error: {error}',
+    'driver_rules_empty': 'No rules yet.',
+    'driver_notifications_filter_all': 'All',
+    'driver_notifications_filter_rule': 'Rule',
+    'driver_notifications_filter_academy': 'DA Academy',
+    'driver_notifications_filter_message': 'Message',
+    'driver_notifications_filter_ride_along': 'Ride Along',
+    'driver_notifications_error_template': 'Error: {error}',
+    'driver_notifications_empty': 'No notifications yet.',
+    'driver_notifications_filter_empty': 'No notifications for this filter.',
+    'auth_gate_driver_profile_error_template':
+        'Error loading driver profile: {error}',
+    'auth_gate_no_profile_found':
+        'Your login is active, but no driver/DSP profile could be found.',
+    'auth_gate_contact_admin': 'Please contact your DSP or admin.',
+    'auth_gate_awaiting_approval_title': 'Your DSP account is awaiting approval.',
+    'auth_gate_awaiting_approval_body':
+        'Once an admin approves your account, you can access the dashboard.',
+    'auth_gate_awaiting_approval_tab_hint':
+        'You can close this tab; we will allow access after approval.',
+    'notification_pin_close_tooltip': 'Close',
+    'driver_onboarding_save_failed_template': 'Failed to save: {error}',
+    'driver_onboarding_document_uploaded_template': '{document} uploaded.',
+    'driver_onboarding_upload_documents_failed_template':
+        'Failed to upload documents: {error}',
+    'driver_onboarding_open_document_tooltip': 'Open',
+    'driver_onboarding_delete_document_tooltip': 'Delete',
+    'driver_onboarding_open_document_failed': 'Could not open document URL',
+    'driver_onboarding_document_deleted': 'Document deleted.',
+    'driver_onboarding_delete_document_failed_template':
+        'Failed to delete document: {error}',
+    'signup_request_title': 'Apply for Account',
+    'signup_request_success':
+        'Verification email sent. Verify, then wait for approval.',
+    'signup_request_full_name': 'Full name',
+    'signup_request_email': 'Email',
+    'signup_request_password': 'Password',
+    'signup_request_phone': 'Phone',
+    'signup_request_company': 'Company',
+    'signup_request_station_code': 'Station Code (e.g., DE123)',
+    'signup_request_required': 'Required',
+    'signup_request_valid_email': 'Enter a valid email',
+    'signup_request_password_min': 'Min 6 chars',
+    'signup_request_submitting': 'Submitting...',
+    'signup_request_submit': 'Submit & Verify Email',
+  };
+
+  static final Map<String, Map<String, String>> _miscLocalizedValues = {
+    'en': _miscSharedValues,
+    'de': {
+      ..._miscSharedValues,
+      'button_close': 'Schließen',
+      'button_open': 'Öffnen',
+      'button_delete': 'Löschen',
+      'button_reload': 'Neu laden',
+      'button_add': 'Hinzufügen',
+      'button_edit': 'Bearbeiten',
+      'button_sign_out': 'Abmelden',
+      'verify_email_sent': 'Bestätigungs-E-Mail gesendet.',
+      'verify_email_title': 'E-Mail bestätigen',
+      'verify_email_intro': 'Wir haben einen Bestätigungslink gesendet an:',
+      'verify_email_sending': 'Wird gesendet...',
+      'verify_email_resend': 'Bestätigungs-E-Mail erneut senden',
+      'verify_email_reload': 'Ich habe bestätigt - Neu laden',
+      'verify_email_back_to_login': 'Zurück zum Login',
+      'verify_email_failed_template':
+          'Bestätigungs-E-Mail konnte nicht erneut gesendet werden: {error}',
+      'driver_shift_plan_missing_scope': 'DSP- oder Fahrerkontext fehlt.',
+      'driver_shift_plan_title': 'Schichtplan',
+      'driver_shift_plan_load_failed_template':
+          'Schichten konnten nicht geladen werden: {error}',
+      'driver_shift_plan_empty': 'Noch keine Schichten zugewiesen.',
+      'driver_shift_plan_upcoming': 'Kommende Schichten',
+      'driver_shift_plan_upcoming_empty': 'Keine kommenden Schichten.',
+      'driver_shift_plan_past': 'Vergangene Schichten',
+      'driver_shift_plan_past_empty': 'Keine vergangenen Schichten.',
+      'driver_shift_plan_status_scheduled': 'Geplant',
+      'driver_rules_error_template': 'Fehler: {error}',
+      'driver_rules_empty': 'Noch keine Regeln.',
+      'driver_notifications_filter_all': 'Alle',
+      'driver_notifications_filter_rule': 'Regel',
+      'driver_notifications_filter_academy': 'DA Academy',
+      'driver_notifications_filter_message': 'Nachricht',
+      'driver_notifications_filter_ride_along': 'Mitfahrt',
+      'driver_notifications_error_template': 'Fehler: {error}',
+      'driver_notifications_empty': 'Noch keine Benachrichtigungen.',
+      'driver_notifications_filter_empty':
+          'Keine Benachrichtigungen für diesen Filter.',
+      'auth_gate_driver_profile_error_template':
+          'Fehler beim Laden des Fahrerprofils: {error}',
+      'auth_gate_no_profile_found':
+          'Dein Login ist aktiv, aber es konnte kein Fahrer-/DSP-Profil gefunden werden.',
+      'auth_gate_contact_admin': 'Bitte kontaktiere deinen DSP oder Admin.',
+      'auth_gate_awaiting_approval_title':
+          'Dein DSP-Konto wartet auf Genehmigung.',
+      'auth_gate_awaiting_approval_body':
+          'Sobald ein Admin dein Konto genehmigt, kannst du auf das Dashboard zugreifen.',
+      'auth_gate_awaiting_approval_tab_hint':
+          'Du kannst diesen Tab schließen; der Zugriff wird nach der Genehmigung freigeschaltet.',
+      'notification_pin_close_tooltip': 'Schließen',
+      'driver_onboarding_save_failed_template':
+          'Speichern fehlgeschlagen: {error}',
+      'driver_onboarding_document_uploaded_template':
+          '{document} hochgeladen.',
+      'driver_onboarding_upload_documents_failed_template':
+          'Dokumente konnten nicht hochgeladen werden: {error}',
+      'driver_onboarding_open_document_tooltip': 'Öffnen',
+      'driver_onboarding_delete_document_tooltip': 'Löschen',
+      'driver_onboarding_open_document_failed':
+          'Dokument-URL konnte nicht geöffnet werden',
+      'driver_onboarding_document_deleted': 'Dokument gelöscht.',
+      'driver_onboarding_delete_document_failed_template':
+          'Dokument konnte nicht gelöscht werden: {error}',
+      'signup_request_title': 'Konto beantragen',
+      'signup_request_success':
+          'Bestätigungs-E-Mail gesendet. Bitte bestätigen und dann auf Genehmigung warten.',
+      'signup_request_full_name': 'Vollständiger Name',
+      'signup_request_email': 'E-Mail',
+      'signup_request_password': 'Passwort',
+      'signup_request_phone': 'Telefon',
+      'signup_request_company': 'Firma',
+      'signup_request_station_code': 'Stationscode (z. B. DE123)',
+      'signup_request_required': 'Erforderlich',
+      'signup_request_valid_email': 'Gültige E-Mail eingeben',
+      'signup_request_password_min': 'Mindestens 6 Zeichen',
+      'signup_request_submitting': 'Wird gesendet...',
+      'signup_request_submit': 'Absenden & E-Mail bestätigen',
+    },
+    'sq': {
+      ..._miscSharedValues,
+      'button_close': 'Mbyll',
+      'button_open': 'Hap',
+      'button_delete': 'Fshi',
+      'button_reload': 'Ringarko',
+      'button_add': 'Shto',
+      'button_edit': 'Ndrysho',
+      'button_sign_out': 'Dil',
+      'verify_email_sent': 'Emaili i verifikimit u dërgua.',
+      'verify_email_title': 'Verifiko emailin',
+      'verify_email_intro': 'Kemi dërguar një lidhje verifikimi te:',
+      'verify_email_sending': 'Duke dërguar...',
+      'verify_email_resend': 'Ridërgo emailin e verifikimit',
+      'verify_email_reload': 'E verifikova - Ringarko',
+      'verify_email_back_to_login': 'Kthehu te hyrja',
+      'verify_email_failed_template':
+          'Ridërgimi i emailit të verifikimit dështoi: {error}',
+      'driver_shift_plan_missing_scope':
+          'Mungon konteksti i DSP-së ose i shoferit.',
+      'driver_shift_plan_title': 'Plani i turnit',
+      'driver_shift_plan_load_failed_template':
+          'Turnet nuk u ngarkuan: {error}',
+      'driver_shift_plan_empty': 'Nuk ka ende turne të caktuara.',
+      'driver_shift_plan_upcoming': 'Turnet e ardhshme',
+      'driver_shift_plan_upcoming_empty': 'Nuk ka turne të ardhshme.',
+      'driver_shift_plan_past': 'Turnet e kaluara',
+      'driver_shift_plan_past_empty': 'Nuk ka turne të kaluara.',
+      'driver_shift_plan_status_scheduled': 'Planifikuar',
+      'driver_rules_error_template': 'Gabim: {error}',
+      'driver_rules_empty': 'Nuk ka ende rregulla.',
+      'driver_notifications_filter_all': 'Të gjitha',
+      'driver_notifications_filter_rule': 'Rregull',
+      'driver_notifications_filter_academy': 'DA Academy',
+      'driver_notifications_filter_message': 'Mesazh',
+      'driver_notifications_filter_ride_along': 'Ride Along',
+      'driver_notifications_error_template': 'Gabim: {error}',
+      'driver_notifications_empty': 'Nuk ka ende njoftime.',
+      'driver_notifications_filter_empty':
+          'Nuk ka njoftime për këtë filtër.',
+      'auth_gate_driver_profile_error_template':
+          'Gabim gjatë ngarkimit të profilit të shoferit: {error}',
+      'auth_gate_no_profile_found':
+          'Hyrja juaj është aktive, por nuk u gjet profil shoferi/DSP.',
+      'auth_gate_contact_admin':
+          'Ju lutem kontaktoni DSP-në ose administratorin tuaj.',
+      'auth_gate_awaiting_approval_title':
+          'Llogaria juaj DSP po pret miratimin.',
+      'auth_gate_awaiting_approval_body':
+          'Pasi një administrator ta miratojë llogarinë tuaj, mund të hyni në panel.',
+      'auth_gate_awaiting_approval_tab_hint':
+          'Mund ta mbyllni këtë skedë; qasja do të lejohet pas miratimit.',
+      'notification_pin_close_tooltip': 'Mbyll',
+      'driver_onboarding_save_failed_template':
+          'Ruajtja dështoi: {error}',
+      'driver_onboarding_document_uploaded_template':
+          '{document} u ngarkua.',
+      'driver_onboarding_upload_documents_failed_template':
+          'Ngarkimi i dokumenteve dështoi: {error}',
+      'driver_onboarding_open_document_tooltip': 'Hap',
+      'driver_onboarding_delete_document_tooltip': 'Fshi',
+      'driver_onboarding_open_document_failed':
+          'URL-ja e dokumentit nuk mund të hapej',
+      'driver_onboarding_document_deleted': 'Dokumenti u fshi.',
+      'driver_onboarding_delete_document_failed_template':
+          'Fshirja e dokumentit dështoi: {error}',
+      'signup_request_title': 'Apliko për llogari',
+      'signup_request_success':
+          'Emaili i verifikimit u dërgua. Verifikoje dhe prit miratimin.',
+      'signup_request_full_name': 'Emri i plotë',
+      'signup_request_email': 'Email',
+      'signup_request_password': 'Fjalëkalimi',
+      'signup_request_phone': 'Telefon',
+      'signup_request_company': 'Kompania',
+      'signup_request_station_code': 'Kodi i stacionit (p.sh. DE123)',
+      'signup_request_required': 'E detyrueshme',
+      'signup_request_valid_email': 'Shkruani një email të vlefshëm',
+      'signup_request_password_min': 'Minimumi 6 karaktere',
+      'signup_request_submitting': 'Duke dërguar...',
+      'signup_request_submit': 'Dërgo & verifiko emailin',
+    },
+    'hu': {
+      ..._miscSharedValues,
+      'button_close': 'Bezárás',
+      'button_open': 'Megnyitás',
+      'button_delete': 'Törlés',
+      'button_reload': 'Újratöltés',
+      'button_add': 'Hozzáadás',
+      'button_edit': 'Szerkesztés',
+      'button_sign_out': 'Kijelentkezés',
+      'verify_email_sent': 'Az ellenőrző email elküldve.',
+      'verify_email_title': 'E-mail megerősítése',
+      'verify_email_intro': 'Ellenőrző linket küldtünk ide:',
+      'verify_email_sending': 'Küldés...',
+      'verify_email_resend': 'Ellenőrző email újraküldése',
+      'verify_email_reload': 'Megerősítettem - Újratöltés',
+      'verify_email_back_to_login': 'Vissza a bejelentkezéshez',
+      'verify_email_failed_template':
+          'Az ellenőrző email újraküldése sikertelen: {error}',
+      'driver_shift_plan_missing_scope':
+          'Hiányzik a DSP vagy a sofőr azonosítása.',
+      'driver_shift_plan_title': 'Műszakterv',
+      'driver_shift_plan_load_failed_template':
+          'A műszakok betöltése sikertelen: {error}',
+      'driver_shift_plan_empty': 'Még nincsenek kiosztott műszakok.',
+      'driver_shift_plan_upcoming': 'Közelgő műszakok',
+      'driver_shift_plan_upcoming_empty': 'Nincsenek közelgő műszakok.',
+      'driver_shift_plan_past': 'Korábbi műszakok',
+      'driver_shift_plan_past_empty': 'Nincsenek korábbi műszakok.',
+      'driver_shift_plan_status_scheduled': 'Ütemezett',
+      'driver_rules_error_template': 'Hiba: {error}',
+      'driver_rules_empty': 'Még nincsenek szabályok.',
+      'driver_notifications_filter_all': 'Összes',
+      'driver_notifications_filter_rule': 'Szabály',
+      'driver_notifications_filter_academy': 'DA Academy',
+      'driver_notifications_filter_message': 'Üzenet',
+      'driver_notifications_filter_ride_along': 'Ride Along',
+      'driver_notifications_error_template': 'Hiba: {error}',
+      'driver_notifications_empty': 'Még nincsenek értesítések.',
+      'driver_notifications_filter_empty':
+          'Ehhez a szűrőhöz nincs értesítés.',
+      'auth_gate_driver_profile_error_template':
+          'Hiba a sofőr profiljának betöltésekor: {error}',
+      'auth_gate_no_profile_found':
+          'A bejelentkezés aktív, de nem található sofőr/DSP profil.',
+      'auth_gate_contact_admin':
+          'Kérjük, lépjen kapcsolatba a DSP-vel vagy az adminnal.',
+      'auth_gate_awaiting_approval_title':
+          'A DSP-fiók jóváhagyásra vár.',
+      'auth_gate_awaiting_approval_body':
+          'Amint egy admin jóváhagyja a fiókját, hozzáférhet az irányítópulthoz.',
+      'auth_gate_awaiting_approval_tab_hint':
+          'Bezárhatja ezt a lapot; a hozzáférés jóváhagyás után engedélyezett lesz.',
+      'notification_pin_close_tooltip': 'Bezárás',
+      'driver_onboarding_save_failed_template':
+          'A mentés sikertelen: {error}',
+      'driver_onboarding_document_uploaded_template':
+          '{document} feltöltve.',
+      'driver_onboarding_upload_documents_failed_template':
+          'A dokumentumok feltöltése sikertelen: {error}',
+      'driver_onboarding_open_document_tooltip': 'Megnyitás',
+      'driver_onboarding_delete_document_tooltip': 'Törlés',
+      'driver_onboarding_open_document_failed':
+          'A dokumentum URL nem nyitható meg',
+      'driver_onboarding_document_deleted': 'A dokumentum törölve.',
+      'driver_onboarding_delete_document_failed_template':
+          'A dokumentum törlése sikertelen: {error}',
+      'signup_request_title': 'Fiók igénylése',
+      'signup_request_success':
+          'Az ellenőrző email elküldve. Erősítse meg, majd várja a jóváhagyást.',
+      'signup_request_full_name': 'Teljes név',
+      'signup_request_email': 'Email',
+      'signup_request_password': 'Jelszó',
+      'signup_request_phone': 'Telefon',
+      'signup_request_company': 'Cég',
+      'signup_request_station_code': 'Állomáskód (pl. DE123)',
+      'signup_request_required': 'Kötelező',
+      'signup_request_valid_email': 'Adjon meg érvényes emailt',
+      'signup_request_password_min': 'Minimum 6 karakter',
+      'signup_request_submitting': 'Küldés...',
+      'signup_request_submit': 'Beküldés és email megerősítése',
+    },
+    'ro': {
+      ..._miscSharedValues,
+      'button_close': 'Închide',
+      'button_open': 'Deschide',
+      'button_delete': 'Șterge',
+      'button_reload': 'Reîncarcă',
+      'button_add': 'Adaugă',
+      'button_edit': 'Editează',
+      'button_sign_out': 'Deconectare',
+      'verify_email_sent': 'Emailul de verificare a fost trimis.',
+      'verify_email_title': 'Verifică emailul',
+      'verify_email_intro': 'Am trimis un link de verificare către:',
+      'verify_email_sending': 'Se trimite...',
+      'verify_email_resend': 'Retrimite emailul de verificare',
+      'verify_email_reload': 'Am verificat - Reîncarcă',
+      'verify_email_back_to_login': 'Înapoi la autentificare',
+      'verify_email_failed_template':
+          'Retrimiterea emailului de verificare a eșuat: {error}',
+      'driver_shift_plan_missing_scope':
+          'Lipsește contextul DSP sau al șoferului.',
+      'driver_shift_plan_title': 'Planul turei',
+      'driver_shift_plan_load_failed_template':
+          'Încărcarea turelor a eșuat: {error}',
+      'driver_shift_plan_empty': 'Nu există încă ture alocate.',
+      'driver_shift_plan_upcoming': 'Ture viitoare',
+      'driver_shift_plan_upcoming_empty': 'Nu există ture viitoare.',
+      'driver_shift_plan_past': 'Ture trecute',
+      'driver_shift_plan_past_empty': 'Nu există ture trecute.',
+      'driver_shift_plan_status_scheduled': 'Programat',
+      'driver_rules_error_template': 'Eroare: {error}',
+      'driver_rules_empty': 'Nu există reguli încă.',
+      'driver_notifications_filter_all': 'Toate',
+      'driver_notifications_filter_rule': 'Regulă',
+      'driver_notifications_filter_academy': 'DA Academy',
+      'driver_notifications_filter_message': 'Mesaj',
+      'driver_notifications_filter_ride_along': 'Ride Along',
+      'driver_notifications_error_template': 'Eroare: {error}',
+      'driver_notifications_empty': 'Nu există notificări încă.',
+      'driver_notifications_filter_empty':
+          'Nu există notificări pentru acest filtru.',
+      'auth_gate_driver_profile_error_template':
+          'Eroare la încărcarea profilului șoferului: {error}',
+      'auth_gate_no_profile_found':
+          'Autentificarea este activă, dar nu a fost găsit niciun profil de șofer/DSP.',
+      'auth_gate_contact_admin':
+          'Vă rugăm să contactați DSP-ul sau administratorul.',
+      'auth_gate_awaiting_approval_title':
+          'Contul DSP așteaptă aprobarea.',
+      'auth_gate_awaiting_approval_body':
+          'După ce un administrator aprobă contul, puteți accesa tabloul de bord.',
+      'auth_gate_awaiting_approval_tab_hint':
+          'Puteți închide această filă; accesul va fi permis după aprobare.',
+      'notification_pin_close_tooltip': 'Închide',
+      'driver_onboarding_save_failed_template':
+          'Salvarea a eșuat: {error}',
+      'driver_onboarding_document_uploaded_template':
+          '{document} a fost încărcat.',
+      'driver_onboarding_upload_documents_failed_template':
+          'Încărcarea documentelor a eșuat: {error}',
+      'driver_onboarding_open_document_tooltip': 'Deschide',
+      'driver_onboarding_delete_document_tooltip': 'Șterge',
+      'driver_onboarding_open_document_failed':
+          'URL-ul documentului nu a putut fi deschis',
+      'driver_onboarding_document_deleted': 'Documentul a fost șters.',
+      'driver_onboarding_delete_document_failed_template':
+          'Ștergerea documentului a eșuat: {error}',
+      'signup_request_title': 'Aplică pentru cont',
+      'signup_request_success':
+          'Emailul de verificare a fost trimis. Verifică-l, apoi așteaptă aprobarea.',
+      'signup_request_full_name': 'Nume complet',
+      'signup_request_email': 'Email',
+      'signup_request_password': 'Parolă',
+      'signup_request_phone': 'Telefon',
+      'signup_request_company': 'Companie',
+      'signup_request_station_code': 'Cod stație (ex. DE123)',
+      'signup_request_required': 'Obligatoriu',
+      'signup_request_valid_email': 'Introduceți un email valid',
+      'signup_request_password_min': 'Minim 6 caractere',
+      'signup_request_submitting': 'Se trimite...',
+      'signup_request_submit': 'Trimite și verifică emailul',
+    },
+    'hr': {
+      ..._miscSharedValues,
+      'button_close': 'Zatvori',
+      'button_open': 'Otvori',
+      'button_delete': 'Izbriši',
+      'button_reload': 'Ponovno učitaj',
+      'button_add': 'Dodaj',
+      'button_edit': 'Uredi',
+      'button_sign_out': 'Odjava',
+      'verify_email_sent': 'Verifikacijski email je poslan.',
+      'verify_email_title': 'Potvrdi email',
+      'verify_email_intro': 'Poslali smo verifikacijski link na:',
+      'verify_email_sending': 'Slanje...',
+      'verify_email_resend': 'Ponovno pošalji verifikacijski email',
+      'verify_email_reload': 'Potvrdio sam - Ponovno učitaj',
+      'verify_email_back_to_login': 'Natrag na prijavu',
+      'verify_email_failed_template':
+          'Ponovno slanje verifikacijskog emaila nije uspjelo: {error}',
+      'driver_shift_plan_missing_scope':
+          'Nedostaje DSP ili vozački kontekst.',
+      'driver_shift_plan_title': 'Plan smjene',
+      'driver_shift_plan_load_failed_template':
+          'Učitavanje smjena nije uspjelo: {error}',
+      'driver_shift_plan_empty': 'Još nema dodijeljenih smjena.',
+      'driver_shift_plan_upcoming': 'Nadolazeće smjene',
+      'driver_shift_plan_upcoming_empty': 'Nema nadolazećih smjena.',
+      'driver_shift_plan_past': 'Prošle smjene',
+      'driver_shift_plan_past_empty': 'Nema prošlih smjena.',
+      'driver_shift_plan_status_scheduled': 'Planirano',
+      'driver_rules_error_template': 'Greška: {error}',
+      'driver_rules_empty': 'Još nema pravila.',
+      'driver_notifications_filter_all': 'Sve',
+      'driver_notifications_filter_rule': 'Pravilo',
+      'driver_notifications_filter_academy': 'DA Academy',
+      'driver_notifications_filter_message': 'Poruka',
+      'driver_notifications_filter_ride_along': 'Ride Along',
+      'driver_notifications_error_template': 'Greška: {error}',
+      'driver_notifications_empty': 'Još nema obavijesti.',
+      'driver_notifications_filter_empty':
+          'Nema obavijesti za ovaj filter.',
+      'auth_gate_driver_profile_error_template':
+          'Greška pri učitavanju profila vozača: {error}',
+      'auth_gate_no_profile_found':
+          'Vaša prijava je aktivna, ali nije pronađen profil vozača/DSP-a.',
+      'auth_gate_contact_admin':
+          'Molimo kontaktirajte svoj DSP ili administratora.',
+      'auth_gate_awaiting_approval_title':
+          'Vaš DSP račun čeka odobrenje.',
+      'auth_gate_awaiting_approval_body':
+          'Nakon što administrator odobri vaš račun, moći ćete pristupiti nadzornoj ploči.',
+      'auth_gate_awaiting_approval_tab_hint':
+          'Možete zatvoriti ovu karticu; pristup će biti omogućen nakon odobrenja.',
+      'notification_pin_close_tooltip': 'Zatvori',
+      'driver_onboarding_save_failed_template':
+          'Spremanje nije uspjelo: {error}',
+      'driver_onboarding_document_uploaded_template':
+          '{document} je prenesen.',
+      'driver_onboarding_upload_documents_failed_template':
+          'Prijenos dokumenata nije uspio: {error}',
+      'driver_onboarding_open_document_tooltip': 'Otvori',
+      'driver_onboarding_delete_document_tooltip': 'Izbriši',
+      'driver_onboarding_open_document_failed':
+          'URL dokumenta nije moguće otvoriti',
+      'driver_onboarding_document_deleted': 'Dokument je izbrisan.',
+      'driver_onboarding_delete_document_failed_template':
+          'Brisanje dokumenta nije uspjelo: {error}',
+      'signup_request_title': 'Zatraži račun',
+      'signup_request_success':
+          'Verifikacijski email je poslan. Potvrdite ga i pričekajte odobrenje.',
+      'signup_request_full_name': 'Puno ime',
+      'signup_request_email': 'Email',
+      'signup_request_password': 'Lozinka',
+      'signup_request_phone': 'Telefon',
+      'signup_request_company': 'Tvrtka',
+      'signup_request_station_code': 'Kod stanice (npr. DE123)',
+      'signup_request_required': 'Obavezno',
+      'signup_request_valid_email': 'Unesite valjan email',
+      'signup_request_password_min': 'Najmanje 6 znakova',
+      'signup_request_submitting': 'Slanje...',
+      'signup_request_submit': 'Pošalji i potvrdi email',
+    },
+    'ar': {
+      ..._miscSharedValues,
+      'button_close': 'إغلاق',
+      'button_open': 'فتح',
+      'button_delete': 'حذف',
+      'button_reload': 'إعادة تحميل',
+      'button_add': 'إضافة',
+      'button_edit': 'تعديل',
+      'button_sign_out': 'تسجيل الخروج',
+      'verify_email_sent': 'تم إرسال بريد التحقق.',
+      'verify_email_title': 'تحقق من بريدك الإلكتروني',
+      'verify_email_intro': 'لقد أرسلنا رابط تحقق إلى:',
+      'verify_email_sending': 'جارٍ الإرسال...',
+      'verify_email_resend': 'إعادة إرسال بريد التحقق',
+      'verify_email_reload': 'لقد تحققت - أعد التحميل',
+      'verify_email_back_to_login': 'العودة إلى تسجيل الدخول',
+      'verify_email_failed_template':
+          'فشلت إعادة إرسال بريد التحقق: {error}',
+      'driver_shift_plan_missing_scope': 'نطاق DSP أو السائق مفقود.',
+      'driver_shift_plan_title': 'خطة المناوبة',
+      'driver_shift_plan_load_failed_template':
+          'فشل تحميل المناوبات: {error}',
+      'driver_shift_plan_empty': 'لا توجد مناوبات مخصصة بعد.',
+      'driver_shift_plan_upcoming': 'المناوبات القادمة',
+      'driver_shift_plan_upcoming_empty': 'لا توجد مناوبات قادمة.',
+      'driver_shift_plan_past': 'المناوبات السابقة',
+      'driver_shift_plan_past_empty': 'لا توجد مناوبات سابقة.',
+      'driver_shift_plan_status_scheduled': 'مجدول',
+      'driver_rules_error_template': 'خطأ: {error}',
+      'driver_rules_empty': 'لا توجد قواعد بعد.',
+      'driver_notifications_filter_all': 'الكل',
+      'driver_notifications_filter_rule': 'قاعدة',
+      'driver_notifications_filter_academy': 'أكاديمية DA',
+      'driver_notifications_filter_message': 'رسالة',
+      'driver_notifications_filter_ride_along': 'مرافقة',
+      'driver_notifications_error_template': 'خطأ: {error}',
+      'driver_notifications_empty': 'لا توجد إشعارات بعد.',
+      'driver_notifications_filter_empty':
+          'لا توجد إشعارات لهذا الفلتر.',
+      'auth_gate_driver_profile_error_template':
+          'خطأ أثناء تحميل ملف السائق: {error}',
+      'auth_gate_no_profile_found':
+          'تسجيل الدخول نشط، لكن لم يتم العثور على ملف سائق أو DSP.',
+      'auth_gate_contact_admin': 'يرجى التواصل مع DSP أو المسؤول.',
+      'auth_gate_awaiting_approval_title':
+          'حساب DSP الخاص بك بانتظار الموافقة.',
+      'auth_gate_awaiting_approval_body':
+          'بمجرد موافقة المسؤول على حسابك، ستتمكن من الوصول إلى لوحة التحكم.',
+      'auth_gate_awaiting_approval_tab_hint':
+          'يمكنك إغلاق هذه الصفحة؛ سيتم السماح بالوصول بعد الموافقة.',
+      'notification_pin_close_tooltip': 'إغلاق',
+      'driver_onboarding_save_failed_template':
+          'فشل الحفظ: {error}',
+      'driver_onboarding_document_uploaded_template':
+          'تم رفع {document}.',
+      'driver_onboarding_upload_documents_failed_template':
+          'فشل رفع المستندات: {error}',
+      'driver_onboarding_open_document_tooltip': 'فتح',
+      'driver_onboarding_delete_document_tooltip': 'حذف',
+      'driver_onboarding_open_document_failed':
+          'تعذر فتح رابط المستند',
+      'driver_onboarding_document_deleted': 'تم حذف المستند.',
+      'driver_onboarding_delete_document_failed_template':
+          'فشل حذف المستند: {error}',
+      'signup_request_title': 'التقديم على حساب',
+      'signup_request_success':
+          'تم إرسال بريد التحقق. يرجى التحقق ثم انتظار الموافقة.',
+      'signup_request_full_name': 'الاسم الكامل',
+      'signup_request_email': 'البريد الإلكتروني',
+      'signup_request_password': 'كلمة المرور',
+      'signup_request_phone': 'الهاتف',
+      'signup_request_company': 'الشركة',
+      'signup_request_station_code': 'رمز المحطة (مثال DE123)',
+      'signup_request_required': 'مطلوب',
+      'signup_request_valid_email':
+          'يرجى إدخال بريد إلكتروني صالح',
+      'signup_request_password_min': '6 أحرف على الأقل',
+      'signup_request_submitting': 'جارٍ الإرسال...',
+      'signup_request_submit': 'إرسال والتحقق من البريد',
+    },
+    'tr': {
+      ..._miscSharedValues,
+      'button_close': 'Kapat',
+      'button_open': 'Ac',
+      'button_delete': 'Sil',
+      'button_reload': 'Yeniden yukle',
+      'button_add': 'Ekle',
+      'button_edit': 'Duzenle',
+      'button_sign_out': 'Cikis yap',
+      'verify_email_sent': 'Dogrulama e-postasi gonderildi.',
+      'verify_email_title': 'E-postani dogrula',
+      'verify_email_intro': 'Dogrulama baglantisi su adrese gonderildi:',
+      'verify_email_sending': 'Gonderiliyor...',
+      'verify_email_resend': 'Dogrulama e-postasini yeniden gonder',
+      'verify_email_reload': 'Dogruladim - Yenile',
+      'verify_email_back_to_login': 'Girise don',
+      'verify_email_failed_template':
+          'Dogrulama e-postasi yeniden gonderilemedi: {error}',
+      'driver_shift_plan_missing_scope':
+          'DSP veya surucu kapsami eksik.',
+      'driver_shift_plan_title': 'Vardiya Plani',
+      'driver_shift_plan_load_failed_template':
+          'Vardiyalar yuklenemedi: {error}',
+      'driver_shift_plan_empty': 'Henuz atanmis vardiya yok.',
+      'driver_shift_plan_upcoming': 'Yaklasan vardiyalar',
+      'driver_shift_plan_upcoming_empty': 'Yaklasan vardiya yok.',
+      'driver_shift_plan_past': 'Gecmis vardiyalar',
+      'driver_shift_plan_past_empty': 'Gecmis vardiya yok.',
+      'driver_shift_plan_status_scheduled': 'Planlandi',
+      'driver_rules_error_template': 'Hata: {error}',
+      'driver_rules_empty': 'Henuz kural yok.',
+      'driver_notifications_filter_all': 'Tum',
+      'driver_notifications_filter_rule': 'Kural',
+      'driver_notifications_filter_academy': 'DA Academy',
+      'driver_notifications_filter_message': 'Mesaj',
+      'driver_notifications_filter_ride_along': 'Ride Along',
+      'driver_notifications_error_template': 'Hata: {error}',
+      'driver_notifications_empty': 'Henuz bildirim yok.',
+      'driver_notifications_filter_empty':
+          'Bu filtre icin bildirim yok.',
+      'auth_gate_driver_profile_error_template':
+          'Surucu profili yuklenirken hata olustu: {error}',
+      'auth_gate_no_profile_found':
+          'Girisiniz aktif, ancak surucu/DSP profili bulunamadi.',
+      'auth_gate_contact_admin':
+          'Lutfen DSP veya yonetici ile iletisime gecin.',
+      'auth_gate_awaiting_approval_title':
+          'DSP hesabin onay bekliyor.',
+      'auth_gate_awaiting_approval_body':
+          'Bir yonetici hesabinizi onayladiginda panele erisebilirsiniz.',
+      'auth_gate_awaiting_approval_tab_hint':
+          'Bu sekmeyi kapatabilirsiniz; onaydan sonra erisim acilacaktir.',
+      'notification_pin_close_tooltip': 'Kapat',
+      'driver_onboarding_save_failed_template':
+          'Kaydetme basarisiz: {error}',
+      'driver_onboarding_document_uploaded_template':
+          '{document} yuklendi.',
+      'driver_onboarding_upload_documents_failed_template':
+          'Belgeler yuklenemedi: {error}',
+      'driver_onboarding_open_document_tooltip': 'Ac',
+      'driver_onboarding_delete_document_tooltip': 'Sil',
+      'driver_onboarding_open_document_failed':
+          'Belge URLsi acilamadi',
+      'driver_onboarding_document_deleted': 'Belge silindi.',
+      'driver_onboarding_delete_document_failed_template':
+          'Belge silinemedi: {error}',
+      'signup_request_title': 'Hesap basvurusu',
+      'signup_request_success':
+          'Dogrulama e-postasi gonderildi. Dogrulayin ve onay bekleyin.',
+      'signup_request_full_name': 'Ad soyad',
+      'signup_request_email': 'E-posta',
+      'signup_request_password': 'Sifre',
+      'signup_request_phone': 'Telefon',
+      'signup_request_company': 'Sirket',
+      'signup_request_station_code': 'Istasyon Kodu (orn. DE123)',
+      'signup_request_required': 'Zorunlu',
+      'signup_request_valid_email': 'Gecerli bir e-posta girin',
+      'signup_request_password_min': 'En az 6 karakter',
+      'signup_request_submitting': 'Gonderiliyor...',
+      'signup_request_submit': 'Gonder ve e-postayi dogrula',
+    },
+    'ru': {
+      ..._miscSharedValues,
+      'button_close': 'Закрыть',
+      'button_open': 'Открыть',
+      'button_delete': 'Удалить',
+      'button_reload': 'Перезагрузить',
+      'button_add': 'Добавить',
+      'button_edit': 'Редактировать',
+      'button_sign_out': 'Выйти',
+      'verify_email_sent': 'Письмо для подтверждения отправлено.',
+      'verify_email_title': 'Подтвердите email',
+      'verify_email_intro': 'Мы отправили ссылку подтверждения на:',
+      'verify_email_sending': 'Отправка...',
+      'verify_email_resend': 'Отправить письмо повторно',
+      'verify_email_reload': 'Я подтвердил - Обновить',
+      'verify_email_back_to_login': 'Назад к входу',
+      'verify_email_failed_template':
+          'Не удалось повторно отправить письмо подтверждения: {error}',
+      'driver_shift_plan_missing_scope':
+          'Отсутствует контекст DSP или водителя.',
+      'driver_shift_plan_title': 'План смен',
+      'driver_shift_plan_load_failed_template':
+          'Не удалось загрузить смены: {error}',
+      'driver_shift_plan_empty': 'Смены еще не назначены.',
+      'driver_shift_plan_upcoming': 'Предстоящие смены',
+      'driver_shift_plan_upcoming_empty': 'Нет предстоящих смен.',
+      'driver_shift_plan_past': 'Прошедшие смены',
+      'driver_shift_plan_past_empty': 'Нет прошедших смен.',
+      'driver_shift_plan_status_scheduled': 'Запланировано',
+      'driver_rules_error_template': 'Ошибка: {error}',
+      'driver_rules_empty': 'Правил пока нет.',
+      'driver_notifications_filter_all': 'Все',
+      'driver_notifications_filter_rule': 'Правило',
+      'driver_notifications_filter_academy': 'DA Academy',
+      'driver_notifications_filter_message': 'Сообщение',
+      'driver_notifications_filter_ride_along': 'Ride Along',
+      'driver_notifications_error_template': 'Ошибка: {error}',
+      'driver_notifications_empty': 'Уведомлений пока нет.',
+      'driver_notifications_filter_empty':
+          'Для этого фильтра уведомлений нет.',
+      'auth_gate_driver_profile_error_template':
+          'Ошибка загрузки профиля водителя: {error}',
+      'auth_gate_no_profile_found':
+          'Ваш вход активен, но профиль водителя/DSP не найден.',
+      'auth_gate_contact_admin':
+          'Пожалуйста, свяжитесь с DSP или администратором.',
+      'auth_gate_awaiting_approval_title':
+          'Ваш аккаунт DSP ожидает одобрения.',
+      'auth_gate_awaiting_approval_body':
+          'Как только администратор одобрит ваш аккаунт, вы получите доступ к панели.',
+      'auth_gate_awaiting_approval_tab_hint':
+          'Вы можете закрыть эту вкладку; доступ будет открыт после одобрения.',
+      'notification_pin_close_tooltip': 'Закрыть',
+      'driver_onboarding_save_failed_template':
+          'Не удалось сохранить: {error}',
+      'driver_onboarding_document_uploaded_template':
+          '{document} загружен.',
+      'driver_onboarding_upload_documents_failed_template':
+          'Не удалось загрузить документы: {error}',
+      'driver_onboarding_open_document_tooltip': 'Открыть',
+      'driver_onboarding_delete_document_tooltip': 'Удалить',
+      'driver_onboarding_open_document_failed':
+          'Не удалось открыть URL документа',
+      'driver_onboarding_document_deleted': 'Документ удален.',
+      'driver_onboarding_delete_document_failed_template':
+          'Не удалось удалить документ: {error}',
+      'signup_request_title': 'Подать заявку на аккаунт',
+      'signup_request_success':
+          'Письмо подтверждения отправлено. Подтвердите email и ждите одобрения.',
+      'signup_request_full_name': 'Полное имя',
+      'signup_request_email': 'Email',
+      'signup_request_password': 'Пароль',
+      'signup_request_phone': 'Телефон',
+      'signup_request_company': 'Компания',
+      'signup_request_station_code': 'Код станции (например, DE123)',
+      'signup_request_required': 'Обязательно',
+      'signup_request_valid_email': 'Введите корректный email',
+      'signup_request_password_min': 'Минимум 6 символов',
+      'signup_request_submitting': 'Отправка...',
+      'signup_request_submit': 'Отправить и подтвердить email',
+    },
+  };
+
   String _lang() => locale.languageCode.toLowerCase();
 
   String t(String key) {
     final lang = _lang();
     final langMap = _localizedValues[lang] ?? _localizedValues['en']!;
+    final driverNotificationMap =
+        _driverNotificationLocalizedValues[lang] ??
+        _driverNotificationLocalizedValues['en']!;
+    final driverAbsenceMap =
+        _driverAbsenceLocalizedValues[lang] ??
+        _driverAbsenceLocalizedValues['en']!;
+    final driverDashboardMap =
+        _driverDashboardLocalizedValues[lang] ??
+        _driverDashboardLocalizedValues['en']!;
     final notificationsMap =
         _notificationsLocalizedValues[lang] ??
         _notificationsLocalizedValues['en']!;
@@ -10804,8 +12485,7 @@ class AppLocalizations {
         _deliveryTrainingLocalizedValues[lang] ??
         _deliveryTrainingLocalizedValues['en']!;
     final deliveryTrainingOverrideMap =
-        _deliveryTrainingLocalizedOverrides[lang] ??
-        const <String, String>{};
+        _deliveryTrainingLocalizedOverrides[lang] ?? const <String, String>{};
     final driversHubMap =
         _driversHubLocalizedValues[lang] ?? _driversHubLocalizedValues['en']!;
     final adminFaqMap =
@@ -10813,7 +12493,11 @@ class AppLocalizations {
     final adminApprovalsMap =
         _adminApprovalsLocalizedValues[lang] ??
         _adminApprovalsLocalizedValues['en']!;
-    return langMap[key] ??
+    final miscMap = _miscLocalizedValues[lang] ?? _miscLocalizedValues['en']!;
+    final text = langMap[key] ??
+        driverNotificationMap[key] ??
+        driverAbsenceMap[key] ??
+        driverDashboardMap[key] ??
         notificationsMap[key] ??
         taskSheetMap[key] ??
         deliveryTrainingOverrideMap[key] ??
@@ -10821,14 +12505,27 @@ class AppLocalizations {
         driversHubMap[key] ??
         adminFaqMap[key] ??
         adminApprovalsMap[key] ??
+        miscMap[key] ??
         _localizedValues['en']![key] ??
+        _driverNotificationLocalizedValues['en']![key] ??
+        _driverAbsenceLocalizedValues['en']![key] ??
+        _driverDashboardLocalizedValues['en']![key] ??
         _notificationsLocalizedValues['en']![key] ??
         _taskSheetLocalizedValues['en']![key] ??
         _deliveryTrainingLocalizedValues['en']![key] ??
         _driversHubLocalizedValues['en']![key] ??
         _adminFaqLocalizedValues['en']![key] ??
         _adminApprovalsLocalizedValues['en']![key] ??
+        _miscLocalizedValues['en']![key] ??
         key;
+    return _normalizeScorecardTerms(text);
+  }
+
+  String _normalizeScorecardTerms(String text) {
+    return text
+        .replaceAll('DNR DPMO', 'DSC DPMO')
+        .replaceAll('Delivered Not Received', 'Delivery Success Conditions')
+        .replaceAllMapped(RegExp(r'\bDNR\b'), (_) => 'DSC');
   }
 
   /// Translation with simple placeholder replacement: {name}, {week}, {error}, etc.

@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:firebase_storage/firebase_storage.dart' as fb;
 
@@ -27,7 +28,26 @@ const String kDefaultDriverPassword = String.fromEnvironment(
   defaultValue: 'Pommersfelden2024!',
 );
 
-enum _DriverSort { newest, oldest, nameAsc, nameDesc, idAsc }
+enum _DriverSort {
+  newest,
+  oldest,
+  nameAsc,
+  nameDesc,
+  idAsc,
+  pending,
+  approved,
+  rejected,
+}
+
+class _DriverOverallScoreData {
+  const _DriverOverallScoreData({
+    required this.averageScore,
+    required this.weeksCount,
+  });
+
+  final double averageScore;
+  final int weeksCount;
+}
 
 class DriversHubPage extends StatefulWidget {
   const DriversHubPage({super.key});
@@ -50,6 +70,7 @@ class _DriversHubPageState extends State<DriversHubPage> {
     text: kDefaultDriverPassword,
   );
   bool _busyBulkLogins = false;
+  final Set<String> _expandedWeeklySummaries = <String>{};
   // 🔹 New: visibility toggle for default password field
   bool _bulkPwdVisible = false;
   bool _defaultPwdLoaded = false;
@@ -72,6 +93,12 @@ class _DriversHubPageState extends State<DriversHubPage> {
         return t.t('drivers_hub_sort_name_desc');
       case _DriverSort.idAsc:
         return t.t('drivers_hub_sort_id_asc');
+      case _DriverSort.pending:
+        return t.t('drivers_hub_sort_pending');
+      case _DriverSort.approved:
+        return t.t('drivers_hub_sort_approved');
+      case _DriverSort.rejected:
+        return t.t('drivers_hub_sort_rejected');
     }
   }
 
@@ -192,6 +219,7 @@ class _DriversHubPageState extends State<DriversHubPage> {
     required String fieldKey,
     required String initialValue,
     bool isDate = false,
+    bool isNumeric = false,
   }) async {
     final t = AppLocalizations.of(context);
     String _formatDate(DateTime d) {
@@ -226,6 +254,12 @@ class _DriversHubPageState extends State<DriversHubPage> {
       return parsed == null ? text : _formatDate(parsed);
     }
 
+    num? _parseNumber(String text) {
+      final normalized = text.trim().replaceAll(',', '.');
+      if (normalized.isEmpty) return null;
+      return num.tryParse(normalized);
+    }
+
     DateTime _parseExistingOrNow(String text) {
       return _parseDate(text) ?? DateTime.now();
     }
@@ -256,6 +290,9 @@ class _DriversHubPageState extends State<DriversHubPage> {
           child: TextFormField(
             controller: ctrl,
             readOnly: isDate,
+            keyboardType: isNumeric
+                ? const TextInputType.numberWithOptions(decimal: true)
+                : null,
             decoration: InputDecoration(
               labelText: label,
               hintText: isDate ? t.t('drivers_hub_date_format_hint') : null,
@@ -289,8 +326,17 @@ class _DriversHubPageState extends State<DriversHubPage> {
     }
 
     try {
+      final rawValue = ctrl.text.trim();
+      dynamic storedValue = rawValue;
+      if (isNumeric) {
+        final parsed = _parseNumber(rawValue);
+        if (parsed != null) {
+          storedValue = parsed % 1 == 0 ? parsed.toInt() : parsed.toDouble();
+        }
+      }
+
       await driverRef.set({
-        'onboarding': {fieldKey: ctrl.text.trim()},
+        'onboarding': {fieldKey: storedValue},
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
@@ -317,6 +363,138 @@ class _DriversHubPageState extends State<DriversHubPage> {
     }
   }
 
+  String _normalizeWorkPermitType(dynamic raw, {dynamic fallbackExpiry}) {
+    final value = (raw ?? '').toString().trim().toLowerCase();
+    if (value.isEmpty) {
+      final hasLegacyExpiry = (fallbackExpiry ?? '')
+          .toString()
+          .trim()
+          .isNotEmpty;
+      return hasLegacyExpiry ? 'working_visa' : 'eu';
+    }
+    if (value == 'eu' || value == 'permit_eu_id' || value == 'eu_id') {
+      return 'eu';
+    }
+    if (value == 'working_visa' ||
+        value == 'work_visa' ||
+        value == 'permit_work_visa' ||
+        value == 'visa') {
+      return 'working_visa';
+    }
+    return value;
+  }
+
+  bool _isWorkingVisaPermitType(dynamic raw, {dynamic fallbackExpiry}) {
+    return _normalizeWorkPermitType(raw, fallbackExpiry: fallbackExpiry) ==
+        'working_visa';
+  }
+
+  String _workPermitTypeLabel(
+    AppLocalizations t,
+    dynamic raw, {
+    dynamic fallbackExpiry,
+  }) {
+    switch (_normalizeWorkPermitType(raw, fallbackExpiry: fallbackExpiry)) {
+      case 'working_visa':
+        return t.t('drivers_hub_work_permit_working_visa');
+      case 'eu':
+      default:
+        return t.t('drivers_hub_work_permit_eu');
+    }
+  }
+
+  Future<void> _adminEditWorkPermitType({
+    required DocumentReference<Map<String, dynamic>> driverRef,
+    required dynamic initialValue,
+    dynamic fallbackExpiry,
+  }) async {
+    final t = AppLocalizations.of(context);
+    String selected = _normalizeWorkPermitType(
+      initialValue,
+      fallbackExpiry: fallbackExpiry,
+    );
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t.t('drivers_hub_field_work_permit_type')),
+        content: SizedBox(
+          width: 420,
+          child: DropdownButtonFormField<String>(
+            value: selected,
+            decoration: InputDecoration(
+              labelText: t.t('drivers_hub_field_work_permit_type'),
+              border: const OutlineInputBorder(),
+            ),
+            items: [
+              DropdownMenuItem(
+                value: 'eu',
+                child: Text(t.t('drivers_hub_work_permit_eu')),
+              ),
+              DropdownMenuItem(
+                value: 'working_visa',
+                child: Text(t.t('drivers_hub_work_permit_working_visa')),
+              ),
+            ],
+            onChanged: (value) {
+              if (value != null) {
+                selected = value;
+              }
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(t.t('admin_home_cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(t.t('button_save')),
+          ),
+        ],
+      ),
+    );
+
+    if (ok != true) return;
+
+    try {
+      final update = <String, dynamic>{'workPermitType': selected};
+      if (selected == 'eu') {
+        update['workVisaExpiry'] = '';
+        update['zusatzblattExpiry'] = '';
+      }
+
+      await driverRef.set({
+        'onboarding': update,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            t.tf('drivers_hub_label_updated', {
+              'label': t.t('drivers_hub_field_work_permit_type'),
+            }),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            t.tf('drivers_hub_failed_update_label', {
+              'label': t.t('drivers_hub_field_work_permit_type'),
+              'error': '$e',
+            }),
+          ),
+        ),
+      );
+    }
+  }
+
   // ---------- Reusable detail row with copy & edit button ----------
   String _formatDisplayDate(String raw) {
     final parsed = _parseIsoDate(raw);
@@ -340,9 +518,14 @@ class _DriversHubPageState extends State<DriversHubPage> {
     required dynamic value,
     required String fieldKey,
     bool isDate = false,
+    bool isNumeric = false,
+    String Function(String rawText)? displayValueBuilder,
+    VoidCallback? onEdit,
   }) {
     final rawText = (value ?? '').toString();
-    final displayText = isDate ? _formatDisplayDate(rawText) : rawText;
+    final displayText = displayValueBuilder != null
+        ? displayValueBuilder(rawText)
+        : (isDate ? _formatDisplayDate(rawText) : rawText);
     final hasText = displayText.trim().isNotEmpty;
 
     return Padding(
@@ -376,13 +559,16 @@ class _DriversHubPageState extends State<DriversHubPage> {
                   tooltip: AppLocalizations.of(
                     context,
                   ).tf('drivers_hub_edit_label', {'label': label}),
-                  onPressed: () => _adminEditField(
-                    driverRef: driverRef,
-                    label: label,
-                    fieldKey: fieldKey,
-                    initialValue: rawText,
-                    isDate: isDate,
-                  ),
+                  onPressed:
+                      onEdit ??
+                      () => _adminEditField(
+                        driverRef: driverRef,
+                        label: label,
+                        fieldKey: fieldKey,
+                        initialValue: rawText,
+                        isDate: isDate,
+                        isNumeric: isNumeric,
+                      ),
                 ),
 
                 // 📋 Copy
@@ -473,6 +659,112 @@ class _DriversHubPageState extends State<DriversHubPage> {
         ],
       ),
     );
+  }
+
+  Widget _remainingVacationDaysRow({
+    required DocumentReference<Map<String, dynamic>> driverRef,
+    required Map<String, dynamic> onboarding,
+  }) {
+    final t = AppLocalizations.of(context);
+    final annualVacationDays = _annualVacationDaysFromOnboarding(onboarding);
+    final workStartDate = _dateFromDynamic(onboarding['workStartDate']);
+
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: driverRef.collection('absence_requests').snapshots(),
+      builder: (context, snap) {
+        if (snap.hasError) {
+          return _detailRowReadOnly(
+            label: t.t('drivers_hub_field_remaining_vacation_days'),
+            value: '—',
+          );
+        }
+
+        if (snap.connectionState == ConnectionState.waiting) {
+          return _detailRowReadOnly(
+            label: t.t('drivers_hub_field_remaining_vacation_days'),
+            value: '...',
+          );
+        }
+
+        final approvedVacationDays = _approvedVacationDaysFromRequests(
+          snap.data?.docs ??
+              const <QueryDocumentSnapshot<Map<String, dynamic>>>[],
+        );
+        final now = DateTime.now();
+        final accruedDays = workStartDate == null
+            ? annualVacationDays
+            : (annualVacationDays / 12.0) *
+                  _completedMonthsSince(workStartDate, now);
+        final remainingDays = accruedDays - approvedVacationDays;
+
+        return _detailRowReadOnly(
+          label: t.t('drivers_hub_field_remaining_vacation_days'),
+          value: _formatVacationDays(remainingDays < 0 ? 0 : remainingDays),
+        );
+      },
+    );
+  }
+
+  double _annualVacationDaysFromOnboarding(Map<String, dynamic> onboarding) {
+    final raw = onboarding['annualVacationDays'];
+    if (raw is num && raw > 0) return raw.toDouble();
+    if (raw is String) {
+      final parsed = num.tryParse(raw.trim().replaceAll(',', '.'));
+      if (parsed != null && parsed > 0) return parsed.toDouble();
+    }
+    return 20;
+  }
+
+  DateTime? _dateFromDynamic(dynamic raw) {
+    if (raw is Timestamp) return raw.toDate();
+    if (raw is DateTime) return raw;
+    return _parseIsoDate(raw?.toString());
+  }
+
+  double _approvedVacationDaysFromRequests(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) {
+    var total = 0.0;
+    for (final doc in docs) {
+      final data = doc.data();
+      final type = (data['type'] ?? '').toString().trim().toLowerCase();
+      final status = (data['status'] ?? '').toString().trim().toLowerCase();
+      if (type != 'vacation' || status != 'approved') continue;
+
+      total += _inclusiveDays(
+        _dateFromDynamic(data['fromDate']),
+        _dateFromDynamic(data['toDate']),
+      );
+    }
+    return total;
+  }
+
+  static int _inclusiveDays(DateTime? from, DateTime? to) {
+    if (from == null || to == null) return 0;
+    final start = DateTime(from.year, from.month, from.day);
+    final end = DateTime(to.year, to.month, to.day);
+    if (end.isBefore(start)) return 0;
+    return end.difference(start).inDays + 1;
+  }
+
+  static int _completedMonthsSince(DateTime start, DateTime now) {
+    final safeStart = DateTime(start.year, start.month, start.day);
+    final safeNow = DateTime(now.year, now.month, now.day);
+    var months =
+        (safeNow.year - safeStart.year) * 12 +
+        (safeNow.month - safeStart.month);
+    if (safeNow.day < safeStart.day) {
+      months -= 1;
+    }
+    return months < 0 ? 0 : months;
+  }
+
+  String _formatVacationDays(double value) {
+    if (value % 1 == 0) return value.toInt().toString();
+    return value
+        .toStringAsFixed(2)
+        .replaceFirst(RegExp(r'0+$'), '')
+        .replaceFirst(RegExp(r'\.$'), '');
   }
 
   // ---------------------------------------------------------------------------
@@ -571,26 +863,40 @@ class _DriversHubPageState extends State<DriversHubPage> {
 
     setState(() => _busyCsv = true);
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final picked = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['csv'],
         withData: true,
       );
-      if (result == null || result.files.isEmpty) {
+      if (picked == null || picked.files.isEmpty) {
         return;
       }
-      final f = result.files.first;
+      final f = picked.files.first;
       final Uint8List? bytes = f.bytes;
       if (bytes == null)
         throw Exception(t.t('scorecard_overview_no_file_bytes'));
 
-      await DriverCsvService.importForUser(uid: _uid!, csvBytes: bytes);
+      final importResult = await DriverCsvService.importForUser(
+        uid: _uid!,
+        csvBytes: bytes,
+      );
+
+      if (mounted) {
+        setState(() {
+          _search = '';
+          _driverSort = _DriverSort.idAsc;
+        });
+      }
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            t.tf('drivers_hub_csv_imported_for_dsp', {'file': f.name}),
+            '${t.tf('drivers_hub_csv_imported_for_dsp', {'file': f.name})} '
+            'Parsed ${importResult.parsedRows}, '
+            'matched ${importResult.mappedDrivers}, '
+            'new ${importResult.newDrivers}, '
+            'score rows updated ${importResult.updatedScores}.',
           ),
         ),
       );
@@ -656,6 +962,8 @@ class _DriversHubPageState extends State<DriversHubPage> {
           'type': 'rule',
           'title': (adminData['title'] ?? '').toString(),
           'body': (adminData['body'] ?? '').toString(),
+          'sourceLang': (adminData['sourceLang'] ?? 'en').toString(),
+          'translations': adminData['translations'] ?? const {},
           'status': 'unread',
           'createdAt': adminData['createdAt'] ?? now,
           'readAt': null,
@@ -1328,7 +1636,7 @@ class _DriversHubPageState extends State<DriversHubPage> {
     }
   }
 
-  Future<void> _adminPickAndUploadDriverDoc({
+  Future<bool> _adminPickAndUploadDriverDoc({
     required DocumentReference<Map<String, dynamic>> driverRef,
     required String docType,
   }) async {
@@ -1339,7 +1647,7 @@ class _DriversHubPageState extends State<DriversHubPage> {
         withData: true,
       );
 
-      if (result == null || result.files.isEmpty) return;
+      if (result == null || result.files.isEmpty) return false;
 
       final f = result.files.first;
       final bytes = f.bytes;
@@ -1351,10 +1659,26 @@ class _DriversHubPageState extends State<DriversHubPage> {
       final typeLabel = _adminDocTypeLabel(docType);
 
       String displayName = typeLabel;
+      String? contentType;
       final dotIndex = originalName.lastIndexOf('.');
       if (dotIndex != -1 && dotIndex < originalName.length - 1) {
         final ext = originalName.substring(dotIndex + 1);
         displayName = '$typeLabel.$ext';
+        switch (ext.toLowerCase()) {
+          case 'pdf':
+            contentType = 'application/pdf';
+            break;
+          case 'png':
+            contentType = 'image/png';
+            break;
+          case 'jpg':
+          case 'jpeg':
+            contentType = 'image/jpeg';
+            break;
+          case 'webp':
+            contentType = 'image/webp';
+            break;
+        }
       }
 
       final storage = fb.FirebaseStorage.instance;
@@ -1366,12 +1690,17 @@ class _DriversHubPageState extends State<DriversHubPage> {
           .child(driverRef.id)
           .child('${DateTime.now().millisecondsSinceEpoch}_$originalName');
 
-      await ref.putData(bytes);
+      await ref.putData(
+        bytes,
+        contentType == null ? null : fb.SettableMetadata(contentType: contentType),
+      );
       final url = await ref.getDownloadURL();
 
       await docsCol.doc(docType).set({
         'fileName': displayName,
         'downloadUrl': url,
+        'storagePath': ref.fullPath,
+        if (contentType != null) 'contentType': contentType,
         'uploadedAt': FieldValue.serverTimestamp(),
         'uploadedAtClient': Timestamp.now(),
         'size': f.size,
@@ -1379,7 +1708,7 @@ class _DriversHubPageState extends State<DriversHubPage> {
         'uploadedBy': 'admin',
       }, SetOptions(merge: true));
 
-      if (!mounted) return;
+      if (!mounted) return true;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -1387,8 +1716,9 @@ class _DriversHubPageState extends State<DriversHubPage> {
           ),
         ),
       );
+      return true;
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) return false;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -1396,7 +1726,9 @@ class _DriversHubPageState extends State<DriversHubPage> {
           ),
         ),
       );
+      return false;
     }
+    return false;
   }
 
   Future<void> _showAdminUploadDocDialog(
@@ -1404,9 +1736,11 @@ class _DriversHubPageState extends State<DriversHubPage> {
   ) async {
     final t = AppLocalizations.of(context);
     String selected = 'contract';
+    bool busy = false;
 
     await showDialog<void>(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx2, setLocal) {
@@ -1463,7 +1797,9 @@ class _DriversHubPageState extends State<DriversHubPage> {
                         child: Text(t.t('doc_insurance')),
                       ),
                     ],
-                    onChanged: (v) {
+                    onChanged: busy
+                        ? null
+                        : (v) {
                       if (v == null) return;
                       setLocal(() => selected = v);
                     },
@@ -1485,18 +1821,37 @@ class _DriversHubPageState extends State<DriversHubPage> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.of(ctx2).pop(),
+                  onPressed: busy ? null : () => Navigator.of(ctx2).pop(),
                   child: Text(t.t('admin_home_cancel')),
                 ),
                 FilledButton.icon(
-                  onPressed: () async {
-                    Navigator.of(ctx2).pop();
-                    await _adminPickAndUploadDriverDoc(
+                  onPressed: busy
+                      ? null
+                      : () async {
+                    setLocal(() => busy = true);
+                    final ok = await _adminPickAndUploadDriverDoc(
                       driverRef: driverRef,
                       docType: selected,
                     );
+                    if (!ctx2.mounted) return;
+                    if (ok) {
+                      Navigator.of(ctx2).pop();
+                      return;
+                    }
+                    setLocal(() => busy = false);
                   },
-                  icon: const Icon(Icons.upload_outlined, size: 18),
+                  icon: busy
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
+                          ),
+                        )
+                      : const Icon(Icons.upload_outlined, size: 18),
                   label: Text(t.t('scorecard_overview_choose_file')),
                 ),
               ],
@@ -1990,6 +2345,17 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                             ],
                                           );
 
+                                          final workPermitType =
+                                              _normalizeWorkPermitType(
+                                                onboarding['workPermitType'],
+                                                fallbackExpiry:
+                                                    onboarding['residencePermitExpiry'],
+                                              );
+                                          final workVisaExpiryValue =
+                                              (onboarding['workVisaExpiry'] ??
+                                                      onboarding['residencePermitExpiry'])
+                                                  .toString();
+
                                           final documentsDatesSection = Column(
                                             crossAxisAlignment:
                                                 CrossAxisAlignment.start,
@@ -2010,12 +2376,53 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                               _detailRowEditable(
                                                 driverRef: snap.data!.reference,
                                                 label: t.t(
+                                                  'drivers_hub_field_work_permit_type',
+                                                ),
+                                                value: workPermitType,
+                                                fieldKey: 'workPermitType',
+                                                displayValueBuilder: (_) =>
+                                                    _workPermitTypeLabel(
+                                                      t,
+                                                      workPermitType,
+                                                      fallbackExpiry:
+                                                          onboarding['residencePermitExpiry'],
+                                                    ),
+                                                onEdit: () => _adminEditWorkPermitType(
+                                                  driverRef:
+                                                      snap.data!.reference,
+                                                  initialValue:
+                                                      onboarding['workPermitType'],
+                                                  fallbackExpiry:
+                                                      onboarding['residencePermitExpiry'],
+                                                ),
+                                              ),
+
+                                              _detailRowEditable(
+                                                driverRef: snap.data!.reference,
+                                                label: t.t(
                                                   'drivers_hub_field_work_start_date',
                                                 ),
                                                 value:
                                                     onboarding['workStartDate'],
                                                 fieldKey: 'workStartDate',
                                                 isDate: true,
+                                              ),
+
+                                              _detailRowEditable(
+                                                driverRef: snap.data!.reference,
+                                                label: t.t(
+                                                  'drivers_hub_field_annual_vacation_days',
+                                                ),
+                                                value:
+                                                    onboarding['annualVacationDays'] ??
+                                                    20,
+                                                fieldKey: 'annualVacationDays',
+                                                isNumeric: true,
+                                              ),
+
+                                              _remainingVacationDaysRow(
+                                                driverRef: snap.data!.reference,
+                                                onboarding: onboarding,
                                               ),
 
                                               _detailRowReadOnly(
@@ -2049,17 +2456,31 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                                 isDate: true,
                                               ),
 
-                                              _detailRowEditable(
-                                                driverRef: snap.data!.reference,
-                                                label: t.t(
-                                                  'drivers_hub_field_work_permit_expiry',
+                                              if (workPermitType ==
+                                                  'working_visa')
+                                                _detailRowEditable(
+                                                  driverRef:
+                                                      snap.data!.reference,
+                                                  label: t.t(
+                                                    'drivers_hub_field_work_visa_expiry',
+                                                  ),
+                                                  value: workVisaExpiryValue,
+                                                  fieldKey: 'workVisaExpiry',
+                                                  isDate: true,
                                                 ),
-                                                value:
-                                                    onboarding['residencePermitExpiry'],
-                                                fieldKey:
-                                                    'residencePermitExpiry',
-                                                isDate: true,
-                                              ),
+                                              if (workPermitType ==
+                                                  'working_visa')
+                                                _detailRowEditable(
+                                                  driverRef:
+                                                      snap.data!.reference,
+                                                  label: t.t(
+                                                    'drivers_hub_field_zusatzblatt_expiry',
+                                                  ),
+                                                  value:
+                                                      onboarding['zusatzblattExpiry'],
+                                                  fieldKey: 'zusatzblattExpiry',
+                                                  isDate: true,
+                                                ),
                                               _detailRowEditable(
                                                 driverRef: snap.data!.reference,
                                                 label: t.t(
@@ -2547,6 +2968,30 @@ class _DriversHubPageState extends State<DriversHubPage> {
 
                                   const SizedBox(height: 16),
 
+                                  if (tid.isNotEmpty)
+                                    _buildWeeklyScoreSummaryCard(
+                                      transporterId: tid,
+                                      t: t,
+                                      onToggleExpanded: () {
+                                        setStateDialog(() {
+                                          if (_expandedWeeklySummaries.contains(
+                                            tid.trim().toUpperCase(),
+                                          )) {
+                                            _expandedWeeklySummaries.remove(
+                                              tid.trim().toUpperCase(),
+                                            );
+                                          } else {
+                                            _expandedWeeklySummaries.add(
+                                              tid.trim().toUpperCase(),
+                                            );
+                                          }
+                                        });
+                                      },
+                                    ),
+
+                                  if (tid.isNotEmpty)
+                                    const SizedBox(height: 16),
+
                                   // ------------------------------------------------------------------
                                   // DOCUMENTS CARD
                                   // ------------------------------------------------------------------
@@ -2628,6 +3073,397 @@ class _DriversHubPageState extends State<DriversHubPage> {
     );
   }
 
+  Widget _buildWeeklyScoreSummaryCard({
+    required String transporterId,
+    required AppLocalizations t,
+    required VoidCallback onToggleExpanded,
+  }) {
+    final uid = _uid;
+    if (uid == null || transporterId.trim().isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final normalizedTid = transporterId.trim().toUpperCase();
+    final expanded = _expandedWeeklySummaries.contains(normalizedTid);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('scores')
+            .where('transporterId', isEqualTo: normalizedTid)
+            .snapshots(),
+        builder: (context, snap) {
+          final title = Text(
+            t.t('drivers_hub_weekly_score_summary'),
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF111827),
+            ),
+          );
+
+          if (snap.connectionState == ConnectionState.waiting &&
+              !snap.hasData) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                title,
+                const SizedBox(height: 14),
+                const Center(child: CircularProgressIndicator()),
+              ],
+            );
+          }
+
+          final docs = [...?snap.data?.docs];
+          docs.sort((a, b) {
+            final ad = a.data();
+            final bd = b.data();
+            final aYear = (ad['year'] as num?)?.toInt() ?? -1;
+            final bYear = (bd['year'] as num?)?.toInt() ?? -1;
+            if (aYear != bYear) return bYear.compareTo(aYear);
+
+            final aWeek = (ad['weekNumber'] as num?)?.toInt() ?? -1;
+            final bWeek = (bd['weekNumber'] as num?)?.toInt() ?? -1;
+            if (aWeek != bWeek) return bWeek.compareTo(aWeek);
+
+            final aDate =
+                (ad['reportDate'] as Timestamp?)?.millisecondsSinceEpoch ??
+                (ad['createdAt'] as Timestamp?)?.millisecondsSinceEpoch ??
+                0;
+            final bDate =
+                (bd['reportDate'] as Timestamp?)?.millisecondsSinceEpoch ??
+                (bd['createdAt'] as Timestamp?)?.millisecondsSinceEpoch ??
+                0;
+            return bDate.compareTo(aDate);
+          });
+
+          final visible = docs.take(8).toList();
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              InkWell(
+                onTap: visible.isEmpty
+                    ? null
+                    : onToggleExpanded,
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    children: [
+                      Expanded(child: title),
+                      if (visible.isNotEmpty) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF3F4F6),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            '${visible.length}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF4B5563),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(
+                          expanded
+                              ? Icons.keyboard_arrow_up
+                              : Icons.keyboard_arrow_down,
+                          color: const Color(0xFF6B7280),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              if (visible.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 16,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF9FAFB),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                  ),
+                  child: Text(
+                    t.t('drivers_hub_no_scores_yet'),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF6B7280),
+                    ),
+                  ),
+                )
+              else if (expanded)
+                Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF9FAFB),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                  ),
+                  child: Column(
+                    children: [
+                      for (var i = 0; i < visible.length; i++) ...[
+                        _buildWeeklyScoreSummaryRow(
+                          data: visible[i].data(),
+                          t: t,
+                        ),
+                        if (i != visible.length - 1)
+                          const Divider(height: 1, color: Color(0xFFE5E7EB)),
+                      ],
+                    ],
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildWeeklyScoreSummaryRow({
+    required Map<String, dynamic> data,
+    required AppLocalizations t,
+  }) {
+    final year = (data['year'] as num?)?.toInt();
+    final week = (data['weekNumber'] as num?)?.toInt();
+    final bucket = _normalizedDriverScoreBucket(
+      raw: data['statusBucket'],
+      score: ((data['comp'] as Map?)?['FinalScore'] as num?)?.toDouble(),
+    );
+    final label = _driverScoreBucketLabel(t, bucket);
+    final color = _driverScoreBucketColor(bucket);
+
+    String leftLabel;
+    if (week != null && year != null) {
+      leftLabel = t.tf(
+        'dash_week_range',
+        {'week': week.toString(), 'year': year.toString()},
+      );
+    } else if (week != null) {
+      leftLabel = '${t.t('dash_week')} $week';
+    } else {
+      leftLabel = t.t('drivers_hub_not_set');
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              leftLabel,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF374151),
+              ),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _normalizedDriverScoreBucket({dynamic raw, double? score}) {
+    final value = (raw ?? '').toString().trim().toUpperCase();
+    if (value.isNotEmpty) {
+      switch (value) {
+        case 'FANTASTIC_PLUS':
+        case 'FANTASTIC PLUS':
+          return 'FANTASTIC_PLUS';
+        case 'FANTASTIC':
+          return 'FANTASTIC';
+        case 'GREAT':
+          return 'GREAT';
+        case 'FAIR':
+          return 'FAIR';
+        case 'POOR':
+          return 'POOR';
+      }
+    }
+
+    final finalScore = score ?? 0;
+    if (finalScore >= 93) return 'FANTASTIC_PLUS';
+    if (finalScore >= 86) return 'FANTASTIC';
+    if (finalScore >= 70) return 'GREAT';
+    if (finalScore >= 50) return 'FAIR';
+    return 'POOR';
+  }
+
+  String _driverScoreBucketLabel(AppLocalizations t, String bucket) {
+    switch (bucket) {
+      case 'FANTASTIC_PLUS':
+        return 'Fantastic Plus';
+      case 'FANTASTIC':
+        return 'Fantastic';
+      case 'GREAT':
+        return 'Great';
+      case 'FAIR':
+        return 'Fair';
+      case 'POOR':
+      default:
+        return 'Poor';
+    }
+  }
+
+  Color _driverScoreBucketColor(String bucket) {
+    switch (bucket) {
+      case 'FANTASTIC_PLUS':
+        return const Color(0xFF14B8A6);
+      case 'FANTASTIC':
+        return const Color(0xFF0EA5E9);
+      case 'GREAT':
+        return const Color(0xFFF59E0B);
+      case 'FAIR':
+        return const Color(0xFFFB923C);
+      case 'POOR':
+      default:
+        return const Color(0xFFEF4444);
+    }
+  }
+
+  Map<String, _DriverOverallScoreData> _aggregateDriverOverallScores(
+    Iterable<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) {
+    final totals = <String, double>{};
+    final counts = <String, int>{};
+
+    for (final doc in docs) {
+      final data = doc.data();
+      final transporterId = (data['transporterId'] ?? '')
+          .toString()
+          .trim()
+          .toUpperCase();
+      if (transporterId.isEmpty) continue;
+
+      final score = ((data['comp'] as Map?)?['FinalScore'] as num?)?.toDouble();
+      if (score == null) continue;
+
+      totals[transporterId] = (totals[transporterId] ?? 0) + score;
+      counts[transporterId] = (counts[transporterId] ?? 0) + 1;
+    }
+
+    return totals.map((transporterId, total) {
+      final count = counts[transporterId] ?? 0;
+      return MapEntry(
+        transporterId,
+        _DriverOverallScoreData(
+          averageScore: count == 0 ? 0 : total / count,
+          weeksCount: count,
+        ),
+      );
+    });
+  }
+
+  String _formatOverallScorePercent(double score) {
+    return '${score.toStringAsFixed(1).replaceAll('.', ',')} %';
+  }
+
+  Widget _buildOverallScoreCell({
+    required _DriverOverallScoreData? data,
+    required AppLocalizations t,
+  }) {
+    if (data == null || data.weeksCount <= 0) {
+      return const Text(
+        '—',
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: Color(0xFF9CA3AF),
+        ),
+      );
+    }
+
+    final bucket = _normalizedDriverScoreBucket(score: data.averageScore);
+    final bucketColor = _driverScoreBucketColor(bucket);
+    final bucketLabel = _driverScoreBucketLabel(t, bucket);
+
+    return Wrap(
+      spacing: 12,
+      runSpacing: 6,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Text(
+            _formatOverallScorePercent(data.averageScore),
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF111827),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Text(
+            bucketLabel,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: bucketColor,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Future<void> _exportOnboardingPdf({
     required String driverName,
     required String transporterId,
@@ -2635,6 +3471,13 @@ class _DriversHubPageState extends State<DriversHubPage> {
   }) async {
     final t = AppLocalizations.of(context);
     final doc = pw.Document();
+    final workPermitType = _normalizeWorkPermitType(
+      onboarding['workPermitType'],
+      fallbackExpiry: onboarding['residencePermitExpiry'],
+    );
+    final workVisaExpiry =
+        (onboarding['workVisaExpiry'] ?? onboarding['residencePermitExpiry'])
+            .toString();
 
     pw.Widget _field(String label, dynamic value) {
       final text = (value ?? '').toString();
@@ -2691,9 +3534,20 @@ class _DriversHubPageState extends State<DriversHubPage> {
           _field(t.t('drivers_hub_field_country'), onboarding['country']),
           pw.SizedBox(height: 10),
           _field(
-            t.t('drivers_hub_field_work_permit_expiry'),
-            onboarding['residencePermitExpiry'],
+            t.t('drivers_hub_field_work_permit_type'),
+            _workPermitTypeLabel(
+              t,
+              workPermitType,
+              fallbackExpiry: onboarding['residencePermitExpiry'],
+            ),
           ),
+          if (workPermitType == 'working_visa')
+            _field(t.t('drivers_hub_field_work_visa_expiry'), workVisaExpiry),
+          if (workPermitType == 'working_visa')
+            _field(
+              t.t('drivers_hub_field_zusatzblatt_expiry'),
+              onboarding['zusatzblattExpiry'],
+            ),
           pw.SizedBox(height: 10),
           _field(
             t.t('drivers_hub_field_driving_license_number'),
@@ -2894,6 +3748,34 @@ class _DriversHubPageState extends State<DriversHubPage> {
                 }).toList();
               }
 
+              if (_driverSort == _DriverSort.pending) {
+                filtered = filtered.where((d) {
+                  final data = d.data();
+                  final onboardingRaw = data['onboarding'];
+                  final hasOnboarding =
+                      onboardingRaw is Map && onboardingRaw.isNotEmpty;
+                  return !hasOnboarding;
+                }).toList();
+              } else if (_driverSort == _DriverSort.approved) {
+                filtered = filtered.where((d) {
+                  final data = d.data();
+                  final onboardingRaw = data['onboarding'];
+                  final hasOnboarding =
+                      onboardingRaw is Map && onboardingRaw.isNotEmpty;
+                  final active = (data['active'] as bool?) ?? true;
+                  return hasOnboarding && active;
+                }).toList();
+              } else if (_driverSort == _DriverSort.rejected) {
+                filtered = filtered.where((d) {
+                  final data = d.data();
+                  final onboardingRaw = data['onboarding'];
+                  final hasOnboarding =
+                      onboardingRaw is Map && onboardingRaw.isNotEmpty;
+                  final active = (data['active'] as bool?) ?? true;
+                  return hasOnboarding && !active;
+                }).toList();
+              }
+
               filtered.sort((a, b) {
                 final ad = a.data();
                 final bd = b.data();
@@ -2941,6 +3823,10 @@ class _DriversHubPageState extends State<DriversHubPage> {
                     return -byName();
                   case _DriverSort.idAsc:
                     return byId();
+                  case _DriverSort.pending:
+                  case _DriverSort.approved:
+                  case _DriverSort.rejected:
+                    return byName();
                 }
               });
 
@@ -2953,57 +3839,76 @@ class _DriversHubPageState extends State<DriversHubPage> {
                 );
               }
 
-              // Single desktop-style layout for all sizes.
-              // On very small screens user can scroll horizontally if needed.
-              return LayoutBuilder(
-                builder: (context, constraints) {
-                  final table = Column(
-                    children: [
-                      // header row
-                      Container(
-                        height: 44,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF9FAFB),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: [
-                            _headerCell(
-                              t.t('drivers_hub_header_profile'),
-                              flex: 5,
+              return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(_uid!)
+                    .collection('scores')
+                    .snapshots(),
+                builder: (context, scoresSnap) {
+                  final overallScores = _aggregateDriverOverallScores(
+                    scoresSnap.data?.docs ?? const [],
+                  );
+
+                  // Single desktop-style layout for all sizes.
+                  // On very small screens user can scroll horizontally if needed.
+                  return LayoutBuilder(
+                    builder: (context, constraints) {
+                      final table = Column(
+                        children: [
+                          // header row
+                          Container(
+                            height: 44,
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF9FAFB),
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            _headerCell(
-                              t.t('drivers_hub_header_status'),
-                              flex: 2,
+                            child: Row(
+                              children: [
+                                _headerCell(
+                                  t.t('drivers_hub_header_profile'),
+                                  flex: 5,
+                                ),
+                                _headerCell(
+                                  t.t('drivers_hub_header_overall'),
+                                  flex: 3,
+                                ),
+                                _headerCell(
+                                  t.t('drivers_hub_header_status'),
+                                  flex: 2,
+                                ),
+                                _headerCell(
+                                  t.t('drivers_hub_header_working'),
+                                  flex: 2,
+                                ),
+                                _headerCell(
+                                  t.t('drivers_hub_header_login'),
+                                  flex: 2,
+                                ),
+                                _headerCell(
+                                  t.t('drivers_hub_header_action'),
+                                  flex: 3,
+                                  alignment: Alignment.centerRight,
+                                ),
+                              ],
                             ),
-                            _headerCell(
-                              t.t('drivers_hub_header_working'),
-                              flex: 2,
-                            ),
-                            _headerCell(
-                              t.t('drivers_hub_header_login'),
-                              flex: 2,
-                            ),
-                            _headerCell(
-                              t.t('drivers_hub_header_action'),
-                              flex: 3,
-                              alignment: Alignment.centerRight,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Expanded(
-                        child: ListView.separated(
-                          itemCount: filtered.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: 6),
-                          itemBuilder: (context, index) {
+                          ),
+                          const SizedBox(height: 8),
+                          Expanded(
+                            child: ListView.separated(
+                              itemCount: filtered.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(height: 6),
+                              itemBuilder: (context, index) {
                             final d = filtered[index];
                             final data = d.data();
                             final name = (data['driverName'] ?? '').toString();
                             final email = (data['email'] ?? '').toString();
+                            final transporterId = (data['transporterId'] ?? d.id)
+                                .toString()
+                                .trim()
+                                .toUpperCase();
                             final hasLogin =
                                 (data['hasLogin'] as bool?) ?? false;
                             final active = (data['active'] as bool?) ?? true;
@@ -3028,6 +3933,7 @@ class _DriversHubPageState extends State<DriversHubPage> {
                             final profileImage = _profileImageFromOnboarding(
                               onboardingRaw,
                             );
+                            final overallScore = overallScores[transporterId];
 
                             return Container(
                               padding: const EdgeInsets.symmetric(
@@ -3110,6 +4016,13 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                           ),
                                         ],
                                       ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 3,
+                                    child: _buildOverallScoreCell(
+                                      data: overallScore,
+                                      t: t,
                                     ),
                                   ),
                                   Expanded(
@@ -3198,21 +4111,23 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                 ],
                               ),
                             );
-                          },
-                        ),
-                      ),
-                    ],
+                              },
+                            ),
+                          ),
+                        ],
+                      );
+
+                      // If screen is very narrow, allow horizontal scroll so layout stays same.
+                      if (constraints.maxWidth < 860) {
+                        return SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: SizedBox(width: 860, child: table),
+                        );
+                      }
+
+                      return table;
+                    },
                   );
-
-                  // If screen is very narrow, allow horizontal scroll so layout stays same.
-                  if (constraints.maxWidth < 600) {
-                    return SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: SizedBox(width: 600, child: table),
-                    );
-                  }
-
-                  return table;
                 },
               );
             },
@@ -3226,6 +4141,52 @@ class _DriversHubPageState extends State<DriversHubPage> {
 // ---------------------------------------------------------------------------
 // Small widgets & helpers
 // ---------------------------------------------------------------------------
+
+String _normalizeDriversHubWorkPermitType(
+  dynamic raw, {
+  dynamic fallbackExpiry,
+}) {
+  final value = (raw ?? '').toString().trim().toLowerCase();
+  if (value.isEmpty) {
+    final hasLegacyExpiry = (fallbackExpiry ?? '').toString().trim().isNotEmpty;
+    return hasLegacyExpiry ? 'working_visa' : 'eu';
+  }
+  if (value == 'eu' || value == 'permit_eu_id' || value == 'eu_id') {
+    return 'eu';
+  }
+  if (value == 'working_visa' ||
+      value == 'work_visa' ||
+      value == 'permit_work_visa' ||
+      value == 'visa') {
+    return 'working_visa';
+  }
+  return value;
+}
+
+bool _isDriversHubWorkingVisaPermitType(dynamic raw, {dynamic fallbackExpiry}) {
+  return _normalizeDriversHubWorkPermitType(
+        raw,
+        fallbackExpiry: fallbackExpiry,
+      ) ==
+      'working_visa';
+}
+
+String _driversHubWorkPermitTypeLabel(
+  AppLocalizations t,
+  dynamic raw, {
+  dynamic fallbackExpiry,
+}) {
+  switch (_normalizeDriversHubWorkPermitType(
+    raw,
+    fallbackExpiry: fallbackExpiry,
+  )) {
+    case 'working_visa':
+      return t.t('drivers_hub_work_permit_working_visa');
+    case 'eu':
+    default:
+      return t.t('drivers_hub_work_permit_eu');
+  }
+}
 
 class _DriverActionButton extends StatelessWidget {
   final String label;
@@ -3327,6 +4288,18 @@ class _DriverSortPill extends StatelessWidget {
               PopupMenuItem(
                 value: _DriverSort.idAsc,
                 child: Text(t.t('drivers_hub_sort_id_asc')),
+              ),
+              PopupMenuItem(
+                value: _DriverSort.pending,
+                child: Text(t.t('drivers_hub_sort_pending')),
+              ),
+              PopupMenuItem(
+                value: _DriverSort.approved,
+                child: Text(t.t('drivers_hub_sort_approved')),
+              ),
+              PopupMenuItem(
+                value: _DriverSort.rejected,
+                child: Text(t.t('drivers_hub_sort_rejected')),
               ),
             ],
             child: Row(
@@ -3614,12 +4587,18 @@ class _DriverDocumentsList extends StatelessWidget {
 
     final uri = Uri.parse(url);
     final path = uri.path.toLowerCase();
+    final normalizedFileName = fileName.toLowerCase();
     final isImage =
+        normalizedFileName.endsWith('.png') ||
+        normalizedFileName.endsWith('.jpg') ||
+        normalizedFileName.endsWith('.jpeg') ||
+        normalizedFileName.endsWith('.webp') ||
         path.endsWith('.png') ||
         path.endsWith('.jpg') ||
         path.endsWith('.jpeg') ||
         path.endsWith('.webp');
-    final isPdf = path.endsWith('.pdf');
+    final isPdf =
+        normalizedFileName.endsWith('.pdf') || path.endsWith('.pdf');
 
     if (isImage) {
       await showDialog<void>(
@@ -3720,6 +4699,7 @@ class _DriverDocumentsList extends StatelessWidget {
         await showDialog<void>(
           context: context,
           builder: (ctx) {
+            final t = AppLocalizations.of(ctx);
             return Dialog(
               insetPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
@@ -3746,7 +4726,69 @@ class _DriverDocumentsList extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    SizedBox(height: 520, child: buildWebPdfPreview(url)),
+                    SizedBox(
+                      height: 520,
+                      child: FutureBuilder<Uint8List?>(
+                        future: () async {
+                          try {
+                            final bytes = await fb.FirebaseStorage.instance
+                                .refFromURL(url)
+                                .getData(50 * 1024 * 1024);
+                            if (bytes != null) return bytes;
+                          } catch (_) {
+                            // Fall through to URL fetch.
+                          }
+                          try {
+                            final data = await NetworkAssetBundle(uri).load('');
+                            return data.buffer.asUint8List();
+                          } catch (_) {
+                            return null;
+                          }
+                        }(),
+                        builder: (context, snap) {
+                          if (snap.connectionState == ConnectionState.waiting) {
+                            return const Center(
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            );
+                          }
+                          if (snap.hasError || snap.data == null) {
+                            return Center(
+                              child: Text(
+                                t.t('drivers_hub_failed_load_pdf_preview'),
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF6B7280),
+                                ),
+                              ),
+                            );
+                          }
+                          return SfPdfViewer.memory(
+                            snap.data!,
+                            canShowPaginationDialog: false,
+                            canShowScrollHead: true,
+                            canShowScrollStatus: true,
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        onPressed: () => _downloadDoc(
+                          context: context,
+                          url: url,
+                          fileName: _downloadNameForDoc(
+                            context: context,
+                            docType: docType,
+                            url: url,
+                            fileName: fileName,
+                          ),
+                        ),
+                        icon: const Icon(Icons.download_outlined, size: 16),
+                        label: Text(t.t('drivers_hub_download')),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -3787,10 +4829,22 @@ class _DriverDocumentsList extends StatelessWidget {
                   const SizedBox(height: 8),
                   SizedBox(
                     height: 520,
-                    child: FutureBuilder<Uint8List>(
+                    child: FutureBuilder<Uint8List?>(
                       future: () async {
-                        final data = await NetworkAssetBundle(uri).load('');
-                        return data.buffer.asUint8List();
+                        try {
+                          final bytes = await fb.FirebaseStorage.instance
+                              .refFromURL(url)
+                              .getData(50 * 1024 * 1024);
+                          if (bytes != null) return bytes;
+                        } catch (_) {
+                          // Fall through to URL fetch.
+                        }
+                        try {
+                          final data = await NetworkAssetBundle(uri).load('');
+                          return data.buffer.asUint8List();
+                        } catch (_) {
+                          return null;
+                        }
                       }(),
                       builder: (context, snap) {
                         final t = AppLocalizations.of(context);
@@ -4186,6 +5240,13 @@ DateTime? _probationEndFromStart(DateTime? start) {
   return sixMonthsLater.subtract(const Duration(days: 1));
 }
 
+const int _kProbezeitExpiredGraceDays = 7;
+
+bool _isProbezeitExpiredWithinGrace(DateTime probationEnd, DateTime today) {
+  final daysSinceEnd = today.difference(probationEnd).inDays;
+  return daysSinceEnd >= 1 && daysSinceEnd <= _kProbezeitExpiredGraceDays;
+}
+
 /// Returns 'expired', 'soon', or null
 String? _expiryFlag(String? date1, String? date2) {
   final now = DateTime.now();
@@ -4231,15 +5292,33 @@ Widget _expiryChipFromOnboardingRaw(
   final probationEnd = _probationEndFromStart(
     _parseIsoDate(onboarding['workStartDate']?.toString()),
   );
-
-  final workPermitDate = _parseIsoDate(
-    onboarding['residencePermitExpiry']?.toString(),
+  final workPermitType = _normalizeDriversHubWorkPermitType(
+    onboarding['workPermitType'],
+    fallbackExpiry: onboarding['residencePermitExpiry'],
   );
+  final workVisaDate =
+      _isDriversHubWorkingVisaPermitType(
+        workPermitType,
+        fallbackExpiry: onboarding['residencePermitExpiry'],
+      )
+      ? _parseIsoDate(
+          (onboarding['workVisaExpiry'] ?? onboarding['residencePermitExpiry'])
+              ?.toString(),
+        )
+      : null;
+  final zusatzblattDate =
+      _isDriversHubWorkingVisaPermitType(
+        workPermitType,
+        fallbackExpiry: onboarding['residencePermitExpiry'],
+      )
+      ? _parseIsoDate(onboarding['zusatzblattExpiry']?.toString())
+      : null;
   final licenseDate = _parseIsoDate(onboarding['licenseExpiry']?.toString());
   final idDocDate = _parseIsoDate(onboarding['idDocExpiry']?.toString());
 
   if (contractDate == null &&
-      workPermitDate == null &&
+      workVisaDate == null &&
+      zusatzblattDate == null &&
       licenseDate == null &&
       idDocDate == null &&
       probationEnd == null) {
@@ -4265,15 +5344,16 @@ Widget _expiryChipFromOnboardingRaw(
   }
 
   check(contractDate);
-  check(workPermitDate);
+  check(workVisaDate);
+  check(zusatzblattDate);
   check(licenseDate);
   check(idDocDate);
   if (probationEnd != null) {
     final diff = probationEnd.difference(today).inDays;
-    if (diff < 0) {
+    if (_isProbezeitExpiredWithinGrace(probationEnd, today)) {
       pExpired = true;
       expiredCount++;
-    } else if (diff <= 30) {
+    } else if (diff >= 0 && diff <= 30) {
       pSoon = true;
       soonCount++;
     }
@@ -4342,14 +5422,33 @@ Widget _expiryChipDetailedFromOnboardingRaw(
   final probationEnd = _probationEndFromStart(
     _parseIsoDate(onboarding['workStartDate']?.toString()),
   );
-  final workPermitDate = _parseIsoDate(
-    onboarding['residencePermitExpiry']?.toString(),
+  final workPermitType = _normalizeDriversHubWorkPermitType(
+    onboarding['workPermitType'],
+    fallbackExpiry: onboarding['residencePermitExpiry'],
   );
+  final workVisaDate =
+      _isDriversHubWorkingVisaPermitType(
+        workPermitType,
+        fallbackExpiry: onboarding['residencePermitExpiry'],
+      )
+      ? _parseIsoDate(
+          (onboarding['workVisaExpiry'] ?? onboarding['residencePermitExpiry'])
+              ?.toString(),
+        )
+      : null;
+  final zusatzblattDate =
+      _isDriversHubWorkingVisaPermitType(
+        workPermitType,
+        fallbackExpiry: onboarding['residencePermitExpiry'],
+      )
+      ? _parseIsoDate(onboarding['zusatzblattExpiry']?.toString())
+      : null;
   final licenseDate = _parseIsoDate(onboarding['licenseExpiry']?.toString());
   final idDocDate = _parseIsoDate(onboarding['idDocExpiry']?.toString());
 
   if (contractDate == null &&
-      workPermitDate == null &&
+      workVisaDate == null &&
+      zusatzblattDate == null &&
       licenseDate == null &&
       idDocDate == null &&
       probationEnd == null) {
@@ -4360,7 +5459,8 @@ Widget _expiryChipDetailedFromOnboardingRaw(
   final today = DateTime(now.year, now.month, now.day);
 
   bool cExpired = false, cSoon = false;
-  bool wpExpired = false, wpSoon = false;
+  bool wvExpired = false, wvSoon = false;
+  bool zbExpired = false, zbSoon = false;
   bool licExpired = false, licSoon = false;
   bool idExpired = false, idSoon = false;
   bool pExpired = false, pSoon = false;
@@ -4380,22 +5480,32 @@ Widget _expiryChipDetailedFromOnboardingRaw(
   }
 
   check(contractDate, () => cExpired = true, () => cSoon = true);
-  check(workPermitDate, () => wpExpired = true, () => wpSoon = true);
+  check(workVisaDate, () => wvExpired = true, () => wvSoon = true);
+  check(zusatzblattDate, () => zbExpired = true, () => zbSoon = true);
   check(licenseDate, () => licExpired = true, () => licSoon = true);
   check(idDocDate, () => idExpired = true, () => idSoon = true);
-  check(probationEnd, () => pExpired = true, () => pSoon = true);
+  if (probationEnd != null) {
+    final diff = probationEnd.difference(today).inDays;
+    if (_isProbezeitExpiredWithinGrace(probationEnd, today)) {
+      pExpired = true;
+    } else if (diff >= 0 && diff <= 30) {
+      pSoon = true;
+    }
+  }
 
   final expiredDocs = <String>[];
   final soonDocs = <String>[];
 
   if (cExpired) expiredDocs.add(t.t('drivers_hub_expiry_contract'));
-  if (wpExpired) expiredDocs.add(t.t('drivers_hub_expiry_work_permit'));
+  if (wvExpired) expiredDocs.add(t.t('drivers_hub_expiry_work_visa'));
+  if (zbExpired) expiredDocs.add(t.t('drivers_hub_expiry_zusatzblatt'));
   if (licExpired) expiredDocs.add(t.t('drivers_hub_expiry_driving_license'));
   if (idExpired) expiredDocs.add(t.t('drivers_hub_expiry_id_passport'));
   if (pExpired) expiredDocs.add(t.t('drivers_hub_expiry_probezeit'));
 
   if (!cExpired && cSoon) soonDocs.add(t.t('drivers_hub_expiry_contract'));
-  if (!wpExpired && wpSoon) soonDocs.add(t.t('drivers_hub_expiry_work_permit'));
+  if (!wvExpired && wvSoon) soonDocs.add(t.t('drivers_hub_expiry_work_visa'));
+  if (!zbExpired && zbSoon) soonDocs.add(t.t('drivers_hub_expiry_zusatzblatt'));
   if (!licExpired && licSoon) {
     soonDocs.add(t.t('drivers_hub_expiry_driving_license'));
   }

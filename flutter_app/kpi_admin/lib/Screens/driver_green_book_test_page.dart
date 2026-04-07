@@ -180,8 +180,9 @@ class _DriverGreenBookTestPageState extends State<DriverGreenBookTestPage> {
           fallback: t.t('driver_green_book_test_title'),
         );
         final passPercent = _parsePassPercent(payload.testData['passPercent']);
-
-        final questions = payload.questions;
+        final questions = payload.questions.isNotEmpty
+            ? payload.questions
+            : _builtInFallbackQuestions(t);
 
         if (questions.isEmpty) {
           final baseDetails = payload.testDocExists
@@ -220,6 +221,7 @@ class _DriverGreenBookTestPageState extends State<DriverGreenBookTestPage> {
         final safeIndex = _index.clamp(0, questions.length - 1);
         final current = questions[safeIndex];
         final selectedAnswerId = _answers[current.id];
+        final canAdvance = current.isContentStep || selectedAnswerId != null;
         final progressValue = (safeIndex + 1) / questions.length;
 
         return SingleChildScrollView(
@@ -331,25 +333,59 @@ class _DriverGreenBookTestPageState extends State<DriverGreenBookTestPage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 14),
-              ...current.options.map(
-                (option) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _OptionAnswerCard(
-                    label: option.text,
-                    selected: selectedAnswerId == option.id,
-                    onTap: () =>
-                        setState(() => _answers[current.id] = option.id),
+              if (current.imageUrl.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: Image.network(
+                    current.imageUrl,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: const Color(0xFFDDE3E7),
+                          width: 2,
+                        ),
+                      ),
+                      child: Text(
+                        current.imageUrl,
+                        style: const TextStyle(
+                          color: _kTestSubText,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-              ),
+              ],
+              if (!current.isContentStep) ...[
+                const SizedBox(height: 14),
+                ...current.options.map(
+                  (option) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _OptionAnswerCard(
+                      label: option.text,
+                      selected: selectedAnswerId == option.id,
+                      onTap: () =>
+                          setState(() => _answers[current.id] = option.id),
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 18),
               _ActionButton(
-                label: safeIndex == questions.length - 1
-                    ? t.t('driver_green_book_test_submit')
-                    : t.t('driver_green_book_test_next'),
-                enabled: selectedAnswerId != null,
-                onTap: selectedAnswerId == null
+                label: current.buttonLabel.isNotEmpty
+                    ? current.buttonLabel
+                    : (safeIndex == questions.length - 1
+                          ? t.t('driver_green_book_test_submit')
+                          : t.t('driver_green_book_test_next')),
+                enabled: canAdvance,
+                onTap: !canAdvance
                     ? null
                     : () => _onNextOrSubmit(
                         questions: questions,
@@ -626,12 +662,18 @@ class _DriverGreenBookTestPageState extends State<DriverGreenBookTestPage> {
         'id': doc.id,
         'order': (data['order'] as num?)?.toInt() ?? 0,
         'statement': _stringOrEmpty(data['statement']),
+        'stepType': (data['stepType'] ?? data['type'] ?? 'question')
+            .toString(),
+        'imageUrl': _stringOrEmpty(data['imageUrl']),
+        'buttonLabel': _stringOrEmpty(data['buttonLabel']),
       };
       final options = _normalizeOptions(raw: data['options']);
+      final stepType = (row['stepType'] ?? 'question').toString().trim().toLowerCase();
+      final isContentStep = stepType == 'content';
       if (options.isNotEmpty) {
         row['options'] = options;
         row['correctOptionId'] = (data['correctOptionId'] ?? '').toString();
-      } else {
+      } else if (!isContentStep) {
         final legacyCorrect =
             data['correctAnswer'] == true ||
             data['correct'] == true ||
@@ -641,6 +683,9 @@ class _DriverGreenBookTestPageState extends State<DriverGreenBookTestPage> {
           {'id': 'a', 'order': 1, 'text_en': 'True', 'text': 'True'},
           {'id': 'b', 'order': 2, 'text_en': 'False', 'text': 'False'},
         ];
+      } else {
+        row['correctOptionId'] = '';
+        row['options'] = const <Map<String, dynamic>>[];
       }
       for (final entry in data.entries) {
         if (entry.key.startsWith('statement_') ||
@@ -733,7 +778,7 @@ class _DriverGreenBookTestPageState extends State<DriverGreenBookTestPage> {
   }) async {
     final currentQuestion = questions[currentIndex];
     final selected = _answers[currentQuestion.id];
-    if (selected == null) return;
+    if (!currentQuestion.isContentStep && selected == null) return;
 
     final isLast = currentIndex >= questions.length - 1;
     if (!isLast) {
@@ -742,8 +787,8 @@ class _DriverGreenBookTestPageState extends State<DriverGreenBookTestPage> {
     }
 
     final score = _calculateScore(questions);
-    final total = questions.length;
-    final percent = ((score * 100) / total).round();
+    final total = questions.where((q) => !q.isContentStep).length;
+    final percent = total == 0 ? 100 : ((score * 100) / total).round();
     final passed = percent >= passPercent;
 
     await _saveResult(
@@ -768,6 +813,7 @@ class _DriverGreenBookTestPageState extends State<DriverGreenBookTestPage> {
   int _calculateScore(List<_Question> questions) {
     var score = 0;
     for (final q in questions) {
+      if (q.isContentStep) continue;
       final answer = _answers[q.id];
       if (answer != null && answer == q.correctOptionId) {
         score += 1;
@@ -911,6 +957,65 @@ class _DriverGreenBookTestPageState extends State<DriverGreenBookTestPage> {
         (value as num?)?.toInt() ?? int.tryParse(value?.toString() ?? '') ?? 80;
     return parsed.clamp(1, 100);
   }
+
+  List<_Question> _builtInFallbackQuestions(AppLocalizations t) {
+    final trueLabel = t.t('driver_green_book_test_true');
+    final falseLabel = t.t('driver_green_book_test_false');
+
+    _Question q({
+      required String id,
+      required int order,
+      required String statement,
+      required bool isTrue,
+    }) {
+      return _Question(
+        id: id,
+        order: order,
+        statement: statement,
+        options: [
+          _QuestionOption(id: 'a', order: 1, text: trueLabel),
+          _QuestionOption(id: 'b', order: 2, text: falseLabel),
+        ],
+        correctOptionId: isTrue ? 'a' : 'b',
+        stepType: 'question',
+        imageUrl: '',
+        buttonLabel: '',
+      );
+    }
+
+    return [
+      q(
+        id: 'fallback_1',
+        order: 1,
+        statement: t.t('driver_green_book_test_statement1'),
+        isTrue: true,
+      ),
+      q(
+        id: 'fallback_2',
+        order: 2,
+        statement: t.t('driver_green_book_test_statement2'),
+        isTrue: false,
+      ),
+      q(
+        id: 'fallback_3',
+        order: 3,
+        statement: t.t('driver_green_book_test_statement3'),
+        isTrue: true,
+      ),
+      q(
+        id: 'fallback_4',
+        order: 4,
+        statement: t.t('driver_green_book_test_statement4'),
+        isTrue: true,
+      ),
+      q(
+        id: 'fallback_5',
+        order: 5,
+        statement: t.t('driver_green_book_test_statement5'),
+        isTrue: false,
+      ),
+    ];
+  }
 }
 
 class _RemoteTestPayload {
@@ -949,6 +1054,9 @@ class _Question {
   final String statement;
   final List<_QuestionOption> options;
   final String correctOptionId;
+  final String stepType;
+  final String imageUrl;
+  final String buttonLabel;
 
   const _Question({
     required this.id,
@@ -956,6 +1064,9 @@ class _Question {
     required this.statement,
     required this.options,
     required this.correctOptionId,
+    required this.stepType,
+    required this.imageUrl,
+    required this.buttonLabel,
   });
 
   factory _Question.fromMap(
@@ -989,39 +1100,59 @@ class _Question {
       pick(data['title']),
     ]);
 
+    final stepType = (data['stepType'] ?? data['type'] ?? 'question')
+        .toString()
+        .trim()
+        .toLowerCase();
+    final normalizedStepType = stepType == 'content' ? 'content' : 'question';
+    final imageUrl = pick(data['imageUrl']);
+    final buttonLabel = pick(data['buttonLabel']);
+
     final parsedOptions = <_QuestionOption>[];
-    final rawOptions = data['options'];
-    if (rawOptions is List) {
-      for (var i = 0; i < rawOptions.length; i++) {
-        final rowRaw = rawOptions[i];
-        if (rowRaw is! Map) continue;
-        final row = rowRaw.cast<String, dynamic>();
-        final option = _QuestionOption.fromMap(row, index: i, langCode: code);
-        if (option.text.trim().isEmpty) continue;
-        parsedOptions.add(option);
+    if (normalizedStepType == 'question') {
+      final rawOptions = data['options'];
+      if (rawOptions is List) {
+        for (var i = 0; i < rawOptions.length; i++) {
+          final rowRaw = rawOptions[i];
+          if (rowRaw is! Map) continue;
+          final row = rowRaw.cast<String, dynamic>();
+          final option = _QuestionOption.fromMap(
+            row,
+            index: i,
+            langCode: code,
+          );
+          if (option.text.trim().isEmpty) continue;
+          parsedOptions.add(option);
+        }
       }
     }
     parsedOptions.sort((a, b) => a.order.compareTo(b.order));
 
-    final hasMcqOptions = parsedOptions.isNotEmpty;
+    final hasMcqOptions =
+        normalizedStepType == 'question' && parsedOptions.isNotEmpty;
     final options = hasMcqOptions
         ? parsedOptions
-        : const [
+        : (normalizedStepType == 'question'
+              ? const [
             _QuestionOption(id: 'a', order: 1, text: 'True'),
             _QuestionOption(id: 'b', order: 2, text: 'False'),
-          ];
+          ]
+              : const <_QuestionOption>[]);
 
     final legacyCorrect =
         data['correctAnswer'] == true ||
         data['correct'] == true ||
         data['answer'] == true;
     var correctOptionId = (data['correctOptionId'] ?? '').toString().trim();
-    if (correctOptionId.isEmpty) {
+    if (normalizedStepType != 'question') {
+      correctOptionId = '';
+    } else if (correctOptionId.isEmpty) {
       correctOptionId = hasMcqOptions
           ? options.first.id
           : (legacyCorrect ? options.first.id : options.last.id);
     }
-    if (!options.any((o) => o.id == correctOptionId)) {
+    if (normalizedStepType == 'question' &&
+        !options.any((o) => o.id == correctOptionId)) {
       correctOptionId = options.first.id;
     }
 
@@ -1031,8 +1162,13 @@ class _Question {
       statement: direct.isNotEmpty ? direct : (en.isNotEmpty ? en : generic),
       options: options,
       correctOptionId: correctOptionId,
+      stepType: normalizedStepType,
+      imageUrl: imageUrl,
+      buttonLabel: buttonLabel,
     );
   }
+
+  bool get isContentStep => stepType == 'content';
 
   static String _firstNonEmptyStatic(List<String> values) {
     for (final raw in values) {

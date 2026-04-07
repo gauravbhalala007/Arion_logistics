@@ -144,7 +144,10 @@ class _DriverRouteResolver extends StatelessWidget {
         }
         if (snap.hasError) {
           return _NoProfileFound(
-            message: 'Error loading driver profile: ${snap.error}',
+            message: AppLocalizations.of(context).tf(
+              'auth_gate_driver_profile_error_template',
+              {'error': '${snap.error}'},
+            ),
           );
         }
 
@@ -193,8 +196,8 @@ class _NoProfileFound extends StatelessWidget {
               const SizedBox(height: 16),
               Text(
                 message ??
-                    'Your login is active, but no driver/DSP profile could be found.\n'
-                        'Please contact your DSP or admin.',
+                    '${AppLocalizations.of(context).t('auth_gate_no_profile_found')}\n'
+                        '${AppLocalizations.of(context).t('auth_gate_contact_admin')}',
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
@@ -202,7 +205,7 @@ class _NoProfileFound extends StatelessWidget {
                 onPressed: () async {
                   await FirebaseAuth.instance.signOut();
                 },
-                child: const Text('Sign out'),
+                child: Text(AppLocalizations.of(context).t('button_sign_out')),
               ),
             ],
           ),
@@ -236,20 +239,26 @@ class _AwaitApproval extends StatelessWidget {
             children: [
               const Icon(Icons.mark_email_read_outlined, size: 48),
               const SizedBox(height: 16),
-              const Text(
-                'Your DSP account is awaiting approval.',
+              Text(
+                AppLocalizations.of(context).t(
+                  'auth_gate_awaiting_approval_title',
+                ),
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 12),
-              const Text(
-                'Once an admin approves your account, you can access the dashboard.',
+              Text(
+                AppLocalizations.of(context).t(
+                  'auth_gate_awaiting_approval_body',
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(email, style: const TextStyle(fontWeight: FontWeight.w700)),
               const SizedBox(height: 24),
-              const Text(
-                'You can close this tab; we’ll allow access after approval.',
+              Text(
+                AppLocalizations.of(context).t(
+                  'auth_gate_awaiting_approval_tab_hint',
+                ),
               ),
             ],
           ),

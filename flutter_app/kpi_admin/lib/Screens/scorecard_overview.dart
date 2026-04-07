@@ -25,6 +25,7 @@ final _pct2 = NumberFormat.decimalPattern('de')
   ..maximumFractionDigits = 2;
 
 String _s(dynamic v) => (v == null) ? '' : v.toString();
+String _normTid(dynamic v) => DriverCsvService.normalizeTransporterId(_s(v));
 num _numOr0(dynamic v) {
   if (v == null) return 0;
   if (v is num) return v;
@@ -134,14 +135,6 @@ const _kGreatColor = Color(0xFFF7AA00); // Great
 const _kFairColor = Color(0xFFF47400); // Fair
 const _kPoorColor = Color(0xFFCE4121); // Poor
 
-Color _monthlyBucketColorFromScore(double s) {
-  if (s > 93) return _kFantasticPlusColor; // Fantastic Plus
-  if (s >= 85) return _kFantasticColor; // Fantastic
-  if (s >= 70) return _kGreatColor; // Great
-  if (s >= 50) return _kFairColor; // Fair
-  return _kPoorColor; // Poor
-}
-
 class ScorecardOverviewPage extends StatefulWidget {
   const ScorecardOverviewPage({super.key});
 
@@ -178,8 +171,6 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
   String? _selectedStationCode;
 
   late final Stream<Map<String, String>> _globalNamesStreamCached;
-  final Map<String, Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>>>
-  _scoresStreamCache = {};
 
   @override
   void initState() {
@@ -220,51 +211,34 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
         );
   }
 
-  Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _scoresForReport(
-    DocumentReference<Map<String, dynamic>> reportRef,
-  ) {
-    final uid = FirebaseAuth.instance.currentUser!.uid;
-    return FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .collection('scores')
-        .where('reportRef', isEqualTo: reportRef)
-        .snapshots()
-        .map((s) => s.docs);
-  }
-
-  Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _scoresForReports(
-    List<DocumentReference<Map<String, dynamic>>> reportRefs,
-  ) {
-    if (reportRefs.isEmpty) {
+  Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _scoresForPeriod({
+    required int year,
+    required Set<String> reportIds,
+    required Set<String> reportPaths,
+  }) {
+    if (reportIds.isEmpty && reportPaths.isEmpty) {
       return Stream.value(<QueryDocumentSnapshot<Map<String, dynamic>>>[]);
     }
+
     final uid = FirebaseAuth.instance.currentUser!.uid;
     return FirebaseFirestore.instance
         .collection('users')
         .doc(uid)
         .collection('scores')
-        .where('reportRef', whereIn: reportRefs)
+        .where('year', isEqualTo: year)
         .snapshots()
-        .map((s) => s.docs);
-  }
+        .map((s) {
+          return s.docs.where((doc) {
+            final data = doc.data();
+            final reportId = _s(data['reportId']);
+            if (reportId.isNotEmpty && reportIds.contains(reportId)) {
+              return true;
+            }
 
-  Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _scoresCached(
-    DocumentReference<Map<String, dynamic>> reportRef,
-  ) {
-    return _scoresStreamCache.putIfAbsent(
-      reportRef.path,
-      () => _scoresForReport(reportRef),
-    );
-  }
-
-  Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>>
-  _scoresForReportsCached(
-    List<DocumentReference<Map<String, dynamic>>> reportRefs,
-  ) {
-    final refs = [...reportRefs]..sort((a, b) => a.path.compareTo(b.path));
-    final key = refs.map((r) => r.path).join('|');
-    return _scoresStreamCache.putIfAbsent(key, () => _scoresForReports(refs));
+            final reportPath = _s(data['reportPath']);
+            return reportPath.isNotEmpty && reportPaths.contains(reportPath);
+          }).toList(growable: false);
+        });
   }
 
   Stream<Map<String, String>> _driversNameMapGlobal() {
@@ -278,33 +252,12 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
           final m = <String, String>{};
           for (final d in snap.docs) {
             final data = d.data();
-            final id = _s(data['transporterId']);
+            final id = _normTid(data['transporterId'] ?? d.id);
             final name = _s(data['driverName']);
             if (id.isNotEmpty) m[id] = name;
           }
           return m;
         });
-  }
-
-  bool _isWeek10PolicyActive({int? year, int? weekNumber}) {
-    if (year == null) return false;
-    if (year > 2026) return true;
-    if (year < 2026) return false;
-    return (weekNumber ?? 0) >= 9;
-  }
-
-  double _fantasticPlusCutoff({int? year, int? weekNumber}) {
-    return _isWeek10PolicyActive(year: year, weekNumber: weekNumber) ? 88 : 93;
-  }
-
-  String _statusCodeFromScore(double v, {int? year, int? weekNumber}) {
-    if (v >= _fantasticPlusCutoff(year: year, weekNumber: weekNumber)) {
-      return 'FANTASTIC_PLUS';
-    }
-    if (v >= 85) return 'FANTASTIC';
-    if (v >= 70) return 'GREAT';
-    if (v >= 50) return 'FAIR';
-    return 'POOR';
   }
 
   Color _statusColorFromCode(String code) {
@@ -320,25 +273,35 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
       case 'POOR':
         return _kPoorColor;
       default:
-        return _UI.greenDark;
+        return _UI.textSecondary;
     }
   }
 
   String _prettyStatus(String? raw, AppLocalizations t) {
     switch (_s(raw).trim().toUpperCase()) {
       case 'FANTASTIC_PLUS':
-        return t.t('bucket_fantastic_plus');
+        return 'Fantastic Plus';
       case 'FANTASTIC':
-        return t.t('bucket_fantastic');
+        return 'Fantastic';
       case 'GREAT':
-        return t.t('bucket_great');
+        return 'Great';
       case 'FAIR':
-        return t.t('bucket_fair');
+        return 'Fair';
       case 'POOR':
-        return t.t('bucket_poor');
+        return 'Poor';
       default:
         return _s(raw);
     }
+  }
+
+  String _statusCodeFromScore(double? score) {
+    if (score == null) return '';
+    final s = score;
+    if (s >= 93.0) return 'FANTASTIC_PLUS';
+    if (s >= 86.0) return 'FANTASTIC';
+    if (s >= 70.0) return 'GREAT';
+    if (s >= 50.0) return 'FAIR';
+    return 'POOR';
   }
 
   Widget _buildBestDriversContent({
@@ -396,13 +359,6 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
     for (final r in periodReports) {
       stationByReportPath[r.ref.path] = _s(r.stationCode).toUpperCase();
     }
-    final int? statusPolicyYear = periodReports.isNotEmpty
-        ? periodReports.first.year
-        : null;
-    final int? statusPolicyWeek = periodReports.isNotEmpty
-        ? periodReports.first.week
-        : null;
-
     final stationOptions =
         stationByReportPath.values.where((s) => s.isNotEmpty).toSet().toList()
           ..sort();
@@ -416,9 +372,14 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
           })
         : t.t('scorecard_overview_all_stations');
 
-    final scoreStream = _scoresForReportsCached(
-      periodReports.map((e) => e.ref).toList(),
-    );
+    final scoreStream =
+        (filterYear == null || periodReports.isEmpty)
+        ? Stream.value(<QueryDocumentSnapshot<Map<String, dynamic>>>[])
+        : _scoresForPeriod(
+            year: filterYear,
+            reportIds: periodReports.map((e) => e.ref.id).toSet(),
+            reportPaths: periodReports.map((e) => e.ref.path).toSet(),
+          );
 
     final pillLabel = isYearView
         ? (filterYear ?? latest.year).toString()
@@ -509,15 +470,20 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                 final Map<String, Map<String, _DriverAgg>> stationAgg = {};
                 for (final d in docs) {
                   final data = d.data();
-                  final tid = _s(data['transporterId']).trim();
+                  final tid = _normTid(data['transporterId']);
                   if (tid.isEmpty) continue;
 
                   String station = '';
-                  final reportRef = data['reportRef'];
-                  if (reportRef is DocumentReference) {
-                    station = stationByReportPath[reportRef.path] ?? '';
-                  } else if (reportRef is String) {
-                    station = stationByReportPath[reportRef] ?? '';
+                  final reportPath = _s(data['reportPath']);
+                  if (reportPath.isNotEmpty) {
+                    station = stationByReportPath[reportPath] ?? '';
+                  } else {
+                    final reportRef = data['reportRef'];
+                    if (reportRef is DocumentReference) {
+                      station = stationByReportPath[reportRef.path] ?? '';
+                    } else if (reportRef is String) {
+                      station = stationByReportPath[reportRef] ?? '';
+                    }
                   }
                   station = station.isEmpty ? 'UNKNOWN' : station;
 
@@ -568,8 +534,6 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                           stationAgg[station] ?? const <String, _DriverAgg>{},
                           names,
                           t,
-                          statusPolicyYear: statusPolicyYear,
-                          statusPolicyWeek: statusPolicyWeek,
                         ),
                       ],
                   ],
@@ -585,15 +549,17 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
   Widget _buildStationDriverList(
     Map<String, _DriverAgg> aggMap,
     Map<String, String> names,
-    AppLocalizations t, {
-    int? statusPolicyYear,
-    int? statusPolicyWeek,
-  }) {
+    AppLocalizations t,
+  ) {
     final entries = <_DriverEntry>[];
     aggMap.forEach((tid, agg) {
       if (agg.count == 0) return;
       entries.add(
-        _DriverEntry(transporterId: tid, avgScore: agg.sumScore / agg.count),
+        _DriverEntry(
+          transporterId: tid,
+          avgScore: agg.sumScore / agg.count,
+          statusCode: _statusCodeFromScore(agg.sumScore / agg.count),
+        ),
       );
     });
     entries.sort((a, b) => b.avgScore.compareTo(a.avgScore));
@@ -605,23 +571,18 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
       separatorBuilder: (_, __) => const SizedBox(height: 10),
       itemBuilder: (context, i) {
         final e = entries[i];
-        final name = _s(names[e.transporterId]).isNotEmpty
-            ? _s(names[e.transporterId])
+        final normalizedTid = _normTid(e.transporterId);
+        final name = _s(names[normalizedTid]).isNotEmpty
+            ? _s(names[normalizedTid])
             : t.t('dash_no_name');
-        final bucket = _statusCodeFromScore(
-          e.avgScore,
-          year: statusPolicyYear,
-          weekNumber: statusPolicyWeek,
-        );
-        final statusText = _prettyStatus(bucket, t);
-        final statusColor = _statusColorFromCode(bucket);
+        final statusText = _prettyStatus(e.statusCode, t);
+        final statusColor = _statusColorFromCode(e.statusCode);
         return _BestDriverRow(
           rank: i + 1,
           score: e.avgScore,
           name: name,
           statusText: statusText,
           statusColor: statusColor,
-          backgroundColor: _monthlyBucketColorFromScore(e.avgScore),
         );
       },
     );
@@ -1007,11 +968,22 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
 
       // ✅ NEW: user-scoped update so ALL of this user’s reports/scores get names
       final uid = FirebaseAuth.instance.currentUser!.uid;
-      await DriverCsvService.importForUser(uid: uid, csvBytes: bytes);
+      final result = await DriverCsvService.importForUser(
+        uid: uid,
+        csvBytes: bytes,
+      );
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(t.t('scorecard_overview_csv_updated'))),
+        SnackBar(
+          content: Text(
+            '${t.t('scorecard_overview_csv_updated')} '
+            'Parsed ${result.parsedRows}, '
+            'matched ${result.mappedDrivers}, '
+            'new ${result.newDrivers}, '
+            'score rows updated ${result.updatedScores}.',
+          ),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
@@ -1076,9 +1048,8 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
         }
       }
 
-      await collect(scoresCol.where('reportRef', isEqualTo: reportRef));
-      await collect(scoresCol.where('reportPath', isEqualTo: reportPath));
       await collect(scoresCol.where('reportId', isEqualTo: reportId));
+      await collect(scoresCol.where('reportPath', isEqualTo: reportPath));
 
       if (scoreRefs.isNotEmpty) {
         final refs = scoreRefs.values.toList(growable: false);
@@ -1121,6 +1092,23 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
         ),
       );
     }
+  }
+
+  void _handleReportMenuAction(
+    String action, {
+    required DocumentReference<Map<String, dynamic>> reportRef,
+    required String titleLabel,
+  }) {
+    if (action != 'delete') return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _confirmAndDeleteReport(
+        context,
+        reportRef: reportRef,
+        titleLabel: titleLabel,
+      );
+    });
   }
 
   /* ---------------- Stats helpers ---------------- */
@@ -1687,15 +1675,11 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                                     children: [
                                       PopupMenuButton<String>(
                                         tooltip: t.t('scorecard_overview_more'),
-                                        onSelected: (v) {
-                                          if (v == 'delete') {
-                                            _confirmAndDeleteReport(
-                                              context,
-                                              reportRef: p.ref,
-                                              titleLabel: rowTitle,
-                                            );
-                                          }
-                                        },
+                                        onSelected: (v) => _handleReportMenuAction(
+                                          v,
+                                          reportRef: p.ref,
+                                          titleLabel: rowTitle,
+                                        ),
                                         itemBuilder: (ctx) => [
                                           PopupMenuItem<String>(
                                             value: 'delete',
@@ -1872,8 +1856,13 @@ class _DriverAgg {
 class _DriverEntry {
   final String transporterId;
   final double avgScore;
+  final String statusCode;
 
-  const _DriverEntry({required this.transporterId, required this.avgScore});
+  const _DriverEntry({
+    required this.transporterId,
+    required this.avgScore,
+    required this.statusCode,
+  });
 }
 
 class _BestDriversPeriodRow extends StatelessWidget {
@@ -2126,6 +2115,7 @@ class _StatCard extends StatelessWidget {
     final w = MediaQuery.of(context).size.width;
     final sc = _scaleForWidth(w);
     final isUp = (delta ?? 0) >= 0;
+    final deltaAreaMinHeight = _pad(46, w);
 
     return Container(
       width: double.infinity,
@@ -2171,38 +2161,43 @@ class _StatCard extends StatelessWidget {
             ),
           ),
           SizedBox(height: _pad(8, w)),
-          if (delta != null)
-            Padding(
-              padding: EdgeInsets.only(top: _pad(4, w)),
-              child: Wrap(
-                alignment: WrapAlignment.center,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: _pad(6, w),
-                runSpacing: _pad(2, w),
-                children: [
-                  Icon(
-                    isUp ? Icons.trending_up : Icons.trending_down,
-                    size: _sp(16, w),
-                    color: isUp ? _UI.greenDark : Colors.red,
-                  ),
-                  Text(
-                    '${isUp ? '+' : ''}${_pct2.format(delta!.abs())} %',
-                    style: TextStyle(
-                      fontSize: _sp(13, w),
-                      color: isUp ? _UI.greenDark : Colors.red,
-                      fontWeight: FontWeight.w700,
+          SizedBox(
+            width: double.infinity,
+            height: deltaAreaMinHeight,
+            child: delta == null
+                ? const SizedBox.shrink()
+                : Padding(
+                    padding: EdgeInsets.only(top: _pad(4, w)),
+                    child: Wrap(
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: _pad(6, w),
+                      runSpacing: _pad(2, w),
+                      children: [
+                        Icon(
+                          isUp ? Icons.trending_up : Icons.trending_down,
+                          size: _sp(16, w),
+                          color: isUp ? _UI.greenDark : Colors.red,
+                        ),
+                        Text(
+                          '${isUp ? '+' : ''}${_pct2.format(delta!.abs())} %',
+                          style: TextStyle(
+                            fontSize: _sp(13, w),
+                            color: isUp ? _UI.greenDark : Colors.red,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          deltaCaption,
+                          style: TextStyle(
+                            color: _UI.textSecondary,
+                            fontSize: _sp(12, w),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  Text(
-                    deltaCaption,
-                    style: TextStyle(
-                      color: _UI.textSecondary,
-                      fontSize: _sp(12, w),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          ),
         ],
       ),
     );

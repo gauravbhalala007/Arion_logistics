@@ -2,6 +2,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'driver_csv.dart';
+
 class ReportWriter {
   static String _firstNonEmpty(Map<String, dynamic> m, List<String> keys) {
     for (final key in keys) {
@@ -52,9 +54,8 @@ class ReportWriter {
       }
     }
 
-    await collect(scoresCol.where('reportRef', isEqualTo: reportRef));
-    await collect(scoresCol.where('reportPath', isEqualTo: reportRef.path));
     await collect(scoresCol.where('reportId', isEqualTo: reportId));
+    await collect(scoresCol.where('reportPath', isEqualTo: reportRef.path));
 
     if (refsById.isEmpty) return;
 
@@ -150,6 +151,17 @@ class ReportWriter {
       };
     }
 
+    final complianceAndSafety =
+        (summary['complianceAndSafety'] as Map?)?.map((k, v) => MapEntry(k.toString(), v));
+    final deliveryQualitySwc =
+        (summary['deliveryQualitySwc'] as Map?)?.map((k, v) => MapEntry(k.toString(), v));
+    if (complianceAndSafety != null && complianceAndSafety.isNotEmpty) {
+      summaryUpdate['complianceAndSafety'] = complianceAndSafety;
+    }
+    if (deliveryQualitySwc != null && deliveryQualitySwc.isNotEmpty) {
+      summaryUpdate['deliveryQualitySwc'] = deliveryQualitySwc;
+    }
+
     final reportUpdate = <String, dynamic>{
       'reportName' : storagePath.split('/').last,
       'storagePath': storagePath,
@@ -178,19 +190,23 @@ class ReportWriter {
         .collection('drivers').get();
     final driverDict = <String, String>{
       for (final d in driverDictSnap.docs)
-        (d.data()['transporterId'] ?? d.id).toString(): (d.data()['driverName'] ?? '').toString(),
+        DriverCsvService.normalizeTransporterId(
+          (d.data()['transporterId'] ?? d.id).toString(),
+        ): (d.data()['driverName'] ?? '').toString(),
     };
 
     final batch = db.batch();
 
     for (final m in drivers) {
-      final transporterId = _firstNonEmpty(m, [
+      final transporterId = DriverCsvService.normalizeTransporterId(
+        _firstNonEmpty(m, [
         'Transporter ID',
         'transporterId',
         'transporter_id',
         'TransporterID',
         'transporter id',
-      ]);
+      ]),
+      );
       if (transporterId.isEmpty) continue;
 
       final scoreId = '${reportId}_$transporterId';
@@ -283,8 +299,12 @@ class ReportWriter {
 
         final rank = _numFromAny(m, ['rank', 'Rank'])?.toInt();
 
-        final incomingBucket = _firstNonEmpty(m, ['statusBucket', 'status_bucket', 'status', 'bucket']);
-        final bucket = incomingBucket.isNotEmpty ? incomingBucket : 'Unknown';
+        final incomingBucket = _firstNonEmpty(m, [
+          'statusBucket',
+          'status_bucket',
+          'status',
+          'bucket',
+        ]);
 
         batch.set(scoreRef, {
           'reportRef'    : reportRef,
@@ -298,7 +318,7 @@ class ReportWriter {
           'kpis'         : kpis,
           'comp'         : comp,
           'rank'         : rank,
-          'statusBucket' : bucket,
+          if (incomingBucket.isNotEmpty) 'statusBucket': incomingBucket,
           'computedAt'   : FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
       }

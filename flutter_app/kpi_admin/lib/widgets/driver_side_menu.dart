@@ -134,11 +134,6 @@ class DriverSideMenu extends StatelessWidget {
                           child: TextButton.icon(
                             onPressed: () async {
                               await FirebaseAuth.instance.signOut();
-                              if (!context.mounted) return;
-                              Navigator.of(context).pushNamedAndRemoveUntil(
-                                '/login',
-                                (route) => false,
-                              );
                             },
                             icon: const Icon(Icons.logout, color: Colors.white70),
                             label: const Text(

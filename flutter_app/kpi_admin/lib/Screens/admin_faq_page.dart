@@ -1,10 +1,15 @@
+import 'dart:typed_data';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart' as fb;
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../localization/app_localizations.dart';
 import '../data/driver_faq_keys.dart';
+import '../widgets/web_preview.dart';
 
 const String _localizedFaqCollection = 'faqs_localized';
 const String _insertAtStart = '__start__';
@@ -15,6 +20,48 @@ const Color _kFaqSubText = Color(0xFF4B5563);
 const Color _kFaqMuted = Color(0xFF6B7280);
 const Color _kFaqCardBg = Color(0xFFF9FAFB);
 const Color _kFaqCardBorder = Color(0xFFE5E7EB);
+
+Future<String?> _resolveFaqImageUrl({
+  required String rawUrl,
+  required String rawPath,
+}) async {
+  final pathValue = rawPath.trim();
+  if (pathValue.isNotEmpty) {
+    try {
+      final normalized = pathValue.startsWith('/')
+          ? pathValue.substring(1)
+          : pathValue;
+      return await fb.FirebaseStorage.instance
+          .ref()
+          .child(normalized)
+          .getDownloadURL();
+    } catch (_) {
+      // ignore and fall back to URL resolution
+    }
+  }
+
+  final value = rawUrl.trim();
+  if (value.isEmpty) return null;
+  final lower = value.toLowerCase();
+  if (lower.startsWith('http://') || lower.startsWith('https://')) {
+    return value;
+  }
+  try {
+    if (lower.startsWith('gs://')) {
+      return await fb.FirebaseStorage.instance.refFromURL(value).getDownloadURL();
+    }
+    final normalized = value.startsWith('/') ? value.substring(1) : value;
+    if (normalized.isNotEmpty) {
+      return await fb.FirebaseStorage.instance
+          .ref()
+          .child(normalized)
+          .getDownloadURL();
+    }
+  } catch (_) {
+    // ignore resolution failures
+  }
+  return null;
+}
 
 class AdminFaqPage extends StatefulWidget {
   const AdminFaqPage({super.key});
@@ -127,6 +174,18 @@ class _InsertOption {
   const _InsertOption({required this.key, required this.label});
 }
 
+class _FaqImageUploadResult {
+  final String downloadUrl;
+  final String storagePath;
+  final Uint8List bytes;
+
+  const _FaqImageUploadResult({
+    required this.downloadUrl,
+    required this.storagePath,
+    required this.bytes,
+  });
+}
+
 class _AdminFaqPageState extends State<AdminFaqPage> {
   String? get _uid => FirebaseAuth.instance.currentUser?.uid;
 
@@ -136,7 +195,95 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
     messenger?.showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Future<void> _autoTranslateMissingLocaleFields({
+  Future<_FaqImageUploadResult?> _pickAndUploadFaqImage(String folderKey) async {
+    final uid = _uid;
+    if (uid == null) return null;
+
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) {
+        return null;
+      }
+
+      final file = result.files.first;
+      final bytes = file.bytes;
+      if (bytes == null || bytes.isEmpty) {
+        _showError('Could not read image bytes.');
+        return null;
+      }
+
+      final extension = _faqImageExtension(file.name, file.extension);
+      if (!_isAllowedFaqImageExtension(extension)) {
+        _showError('Unsupported image format. Use JPG, PNG, WEBP, or GIF.');
+        return null;
+      }
+
+      final ref = fb.FirebaseStorage.instance
+          .ref()
+          .child('faq_images')
+          .child(uid)
+          .child(folderKey)
+          .child(
+            '${DateTime.now().millisecondsSinceEpoch}_${_sanitizeFaqImageName(file.name)}',
+          );
+
+      await ref.putData(
+        bytes,
+        fb.SettableMetadata(
+          contentType: _faqImageContentType(extension),
+        ),
+      );
+      return _FaqImageUploadResult(
+        downloadUrl: await ref.getDownloadURL(),
+        storagePath: ref.fullPath,
+        bytes: bytes,
+      );
+    } catch (e) {
+      _showError('Failed to upload image: $e');
+      return null;
+    }
+  }
+
+  String _faqImageExtension(String name, String? extension) {
+    final fromExtension = (extension ?? '').trim().toLowerCase();
+    if (fromExtension.isNotEmpty) {
+      return fromExtension;
+    }
+    final dot = name.lastIndexOf('.');
+    if (dot == -1 || dot >= name.length - 1) {
+      return 'jpg';
+    }
+    return name.substring(dot + 1).toLowerCase();
+  }
+
+  bool _isAllowedFaqImageExtension(String extension) {
+    return const {'jpg', 'jpeg', 'png', 'webp', 'gif'}.contains(extension);
+  }
+
+  String _faqImageContentType(String extension) {
+    switch (extension) {
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      case 'gif':
+        return 'image/gif';
+      case 'jpg':
+      case 'jpeg':
+      default:
+        return 'image/jpeg';
+    }
+  }
+
+  String _sanitizeFaqImageName(String input) {
+    final cleaned = input.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+    return cleaned.isEmpty ? 'faq_image.jpg' : cleaned;
+  }
+
+  Future<int> _autoTranslateMissingLocaleFields({
     required List<Locale> locales,
     required Map<String, TextEditingController> qCtrls,
     required Map<String, TextEditingController> aCtrls,
@@ -154,11 +301,11 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
       }
     }
 
-    if (sourceLang == null) return;
+    if (sourceLang == null) return 0;
 
     final sourceQuestion = qCtrls[sourceLang]?.text.trim() ?? '';
     final sourceAnswer = aCtrls[sourceLang]?.text.trim() ?? '';
-    if (sourceQuestion.isEmpty && sourceAnswer.isEmpty) return;
+    if (sourceQuestion.isEmpty && sourceAnswer.isEmpty) return 0;
 
     final targets = <String>[];
     for (final code in codes) {
@@ -174,7 +321,9 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
       }
     }
 
-    if (targets.isEmpty) return;
+    if (targets.isEmpty) return 0;
+
+    var translatedCount = 0;
 
     try {
       final callable = FirebaseFunctions.instance.httpsCallable(
@@ -208,13 +357,16 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
             qCtrl.text.trim().isEmpty &&
             qTranslated.isNotEmpty) {
           qCtrl.text = qTranslated;
+          translatedCount++;
         }
         if (aCtrl != null &&
             aCtrl.text.trim().isEmpty &&
             aTranslated.isNotEmpty) {
           aCtrl.text = aTranslated;
+          translatedCount++;
         }
       }
+      return translatedCount;
     } on FirebaseFunctionsException catch (e) {
       _showError(
         AppLocalizations.of(
@@ -228,6 +380,7 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
         ).tf('admin_faq_error_auto_translate', {'error': '$e'}),
       );
     }
+    return 0;
   }
 
   CollectionReference<Map<String, dynamic>>? get _faqCol {
@@ -260,6 +413,17 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
     final insertOptions = _buildInsertOptions(t);
     final initialInsertKey = (data?['insertAfterKey'] ?? _insertAtEnd)
         .toString();
+    String imageUrl = (data?['imageUrl'] ?? '').toString().trim();
+    String imagePath = (data?['imagePath'] ?? '').toString().trim();
+    String imagePreviewUrl =
+        await _resolveFaqImageUrl(rawUrl: imageUrl, rawPath: imagePath) ?? '';
+    if (imagePreviewUrl.isEmpty &&
+        (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
+      imagePreviewUrl = imageUrl;
+    }
+    Uint8List? previewBytes;
+    var imageUploading = false;
+    var translating = false;
     String selectedInsertKey =
         insertOptions.any((o) => o.key == initialInsertKey)
         ? initialInsertKey
@@ -273,30 +437,110 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
       aCtrls[code] = TextEditingController(text: aValue);
     }
 
+    var dialogOpen = true;
     final ok = await showDialog<bool>(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          backgroundColor: Colors.white,
-          surfaceTintColor: Colors.white,
-          title: Text(
-            docId == null
-                ? t.t('admin_faq_add_title')
-                : t.t('admin_faq_edit_title'),
-          ),
-          content: SizedBox(
-            width: 520,
-            child: StatefulBuilder(
-              builder: (context, setStateDialog) {
-                return ConstrainedBox(
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            Future<void> uploadImage() async {
+              if (!dialogOpen) return;
+              setStateDialog(() => imageUploading = true);
+              final uploaded = await _pickAndUploadFaqImage('custom');
+              if (!mounted || !dialogOpen) return;
+              setStateDialog(() {
+                imageUploading = false;
+                if (uploaded != null && uploaded.downloadUrl.isNotEmpty) {
+                  imageUrl = uploaded.downloadUrl;
+                  imagePath = uploaded.storagePath;
+                  imagePreviewUrl = uploaded.downloadUrl;
+                  previewBytes = uploaded.bytes;
+                }
+              });
+            }
+
+            Future<void> translateAllLanguages() async {
+              if (!dialogOpen || imageUploading || translating) return;
+              setStateDialog(() => translating = true);
+              final translatedCount = await _autoTranslateMissingLocaleFields(
+                locales: locales,
+                qCtrls: qCtrls,
+                aCtrls: aCtrls,
+              );
+              if (!mounted || !dialogOpen) return;
+              setStateDialog(() => translating = false);
+              final messenger = ScaffoldMessenger.maybeOf(context);
+              messenger?.showSnackBar(
+                SnackBar(
+                  content: Text(
+                    translatedCount > 0
+                        ? t.tf(
+                            'admin_faq_translate_done',
+                            {'count': '$translatedCount'},
+                          )
+                        : t.t('admin_faq_translate_none'),
+                  ),
+                ),
+              );
+            }
+
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              backgroundColor: Colors.white,
+              surfaceTintColor: Colors.white,
+              title: Text(
+                docId == null
+                    ? t.t('admin_faq_add_title')
+                    : t.t('admin_faq_edit_title'),
+              ),
+              content: SizedBox(
+                width: 520,
+                child: ConstrainedBox(
                   constraints: const BoxConstraints(maxHeight: 560),
                   child: ListView(
                     shrinkWrap: true,
                     padding: const EdgeInsets.only(top: 6, bottom: 6),
                     children: [
+                      _FaqImageEditorCard(
+                        imageUrl: imageUrl,
+                        previewUrl: imagePreviewUrl,
+                        previewBytes: previewBytes,
+                        isUploading: imageUploading,
+                        onUpload: uploadImage,
+                        onRemove: imageUrl.isEmpty || imageUploading
+                            ? null
+                            : () => setStateDialog(() {
+                                imageUrl = '';
+                                imagePath = '';
+                                imagePreviewUrl = '';
+                                previewBytes = null;
+                              }),
+                      ),
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton.icon(
+                          onPressed: imageUploading || translating
+                              ? null
+                              : translateAllLanguages,
+                          icon: translating
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.translate),
+                          label: Text(
+                            t.t('admin_faq_translate_all_languages'),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                       Padding(
                         padding: const EdgeInsets.only(top: 6),
                         child: DropdownButtonFormField<String>(
@@ -328,11 +572,14 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
                                 ),
                               )
                               .toList(),
-                          onChanged: (value) {
-                            setStateDialog(
-                              () => selectedInsertKey = value ?? _insertAtEnd,
-                            );
-                          },
+                          onChanged: imageUploading || translating
+                              ? null
+                              : (value) {
+                                  setStateDialog(
+                                    () =>
+                                        selectedInsertKey = value ?? _insertAtEnd,
+                                  );
+                                },
                           decoration: InputDecoration(
                             labelText: t.t('admin_faq_insert_after'),
                             labelStyle: TextStyle(height: 1.2),
@@ -357,24 +604,35 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
                       }),
                     ],
                   ),
-                );
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(t.t('admin_faq_cancel')),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: _kFaqGreen),
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text(t.t('admin_faq_save')),
-            ),
-          ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: imageUploading || translating
+                      ? null
+                      : () {
+                          dialogOpen = false;
+                          Navigator.of(ctx).pop(false);
+                        },
+                  child: Text(t.t('admin_faq_cancel')),
+                ),
+                FilledButton(
+                  style: FilledButton.styleFrom(backgroundColor: _kFaqGreen),
+                  onPressed: imageUploading || translating
+                      ? null
+                      : () {
+                          dialogOpen = false;
+                          Navigator.of(ctx).pop(true);
+                        },
+                  child: Text(t.t('admin_faq_save')),
+                ),
+              ],
+            );
+          },
         );
       },
     );
+    dialogOpen = false;
 
     if (ok != true) {
       for (final ctrl in qCtrls.values) {
@@ -409,6 +667,14 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
       'order': order ?? DateTime.now().millisecondsSinceEpoch,
       'insertAfterKey': selectedInsertKey,
     };
+
+    if (imageUrl.trim().isNotEmpty) {
+      payload['imageUrl'] = imageUrl.trim();
+      payload['imagePath'] = imagePath.trim();
+    } else if (data != null && data.containsKey('imageUrl')) {
+      payload['imageUrl'] = FieldValue.delete();
+      payload['imagePath'] = FieldValue.delete();
+    }
 
     for (final locale in locales) {
       final code = locale.languageCode;
@@ -451,6 +717,17 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
     final locales = AppLocalizations.supportedLocales;
     final qCtrls = <String, TextEditingController>{};
     final aCtrls = <String, TextEditingController>{};
+    String imageUrl = (overrideData?['imageUrl'] ?? '').toString().trim();
+    String imagePath = (overrideData?['imagePath'] ?? '').toString().trim();
+    String imagePreviewUrl =
+        await _resolveFaqImageUrl(rawUrl: imageUrl, rawPath: imagePath) ?? '';
+    if (imagePreviewUrl.isEmpty &&
+        (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
+      imagePreviewUrl = imageUrl;
+    }
+    Uint8List? previewBytes;
+    var imageUploading = false;
+    var translating = false;
 
     for (final locale in locales) {
       final code = locale.languageCode;
@@ -460,58 +737,153 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
       aCtrls[code] = TextEditingController(text: aOverride);
     }
 
+    var dialogOpen = true;
     final ok = await showDialog<bool>(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          backgroundColor: Colors.white,
-          surfaceTintColor: Colors.white,
-          title: Text(t.t('admin_faq_edit_localized_title')),
-          content: SizedBox(
-            width: 600,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 560),
-              child: ListView(
-                shrinkWrap: true,
-                children: [
-                  Text(
-                    t.t('admin_faq_leave_empty_hint'),
-                    style: const TextStyle(color: Color(0xFF6B7280)),
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            Future<void> uploadImage() async {
+              if (!dialogOpen) return;
+              setStateDialog(() => imageUploading = true);
+              final uploaded = await _pickAndUploadFaqImage(node.qKey);
+              if (!mounted || !dialogOpen) return;
+              setStateDialog(() {
+                imageUploading = false;
+                if (uploaded != null && uploaded.downloadUrl.isNotEmpty) {
+                  imageUrl = uploaded.downloadUrl;
+                  imagePath = uploaded.storagePath;
+                  imagePreviewUrl = uploaded.downloadUrl;
+                  previewBytes = uploaded.bytes;
+                }
+              });
+            }
+
+            Future<void> translateAllLanguages() async {
+              if (!dialogOpen || imageUploading || translating) return;
+              setStateDialog(() => translating = true);
+              final translatedCount = await _autoTranslateMissingLocaleFields(
+                locales: locales,
+                qCtrls: qCtrls,
+                aCtrls: aCtrls,
+              );
+              if (!mounted || !dialogOpen) return;
+              setStateDialog(() => translating = false);
+              final messenger = ScaffoldMessenger.maybeOf(context);
+              messenger?.showSnackBar(
+                SnackBar(
+                  content: Text(
+                    translatedCount > 0
+                        ? t.tf(
+                            'admin_faq_translate_done',
+                            {'count': '$translatedCount'},
+                          )
+                        : t.t('admin_faq_translate_none'),
                   ),
-                  const SizedBox(height: 12),
-                  ...locales.map((locale) {
-                    final code = locale.languageCode;
-                    final t = AppLocalizations(locale);
-                    return _LocaleFaqFields(
-                      label: code.toUpperCase(),
-                      questionCtrl: qCtrls[code]!,
-                      answerCtrl: aCtrls[code]!,
-                      initiallyExpanded: code == 'en',
-                      questionHint: t.t(node.qKey),
-                      answerHint: t.t(node.aKey),
-                    );
-                  }),
-                ],
+                ),
+              );
+            }
+
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
               ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(t.t('admin_faq_cancel')),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: _kFaqGreen),
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text(t.t('admin_faq_save')),
-            ),
-          ],
+              backgroundColor: Colors.white,
+              surfaceTintColor: Colors.white,
+              title: Text(t.t('admin_faq_edit_localized_title')),
+              content: SizedBox(
+                width: 600,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 560),
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      Text(
+                        t.t('admin_faq_leave_empty_hint'),
+                        style: const TextStyle(color: Color(0xFF6B7280)),
+                      ),
+                      const SizedBox(height: 12),
+                      _FaqImageEditorCard(
+                        imageUrl: imageUrl,
+                        previewUrl: imagePreviewUrl,
+                        previewBytes: previewBytes,
+                        isUploading: imageUploading,
+                        onUpload: uploadImage,
+                        onRemove: imageUrl.isEmpty || imageUploading
+                            ? null
+                            : () => setStateDialog(() {
+                                imageUrl = '';
+                                imagePath = '';
+                                imagePreviewUrl = '';
+                                previewBytes = null;
+                              }),
+                      ),
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton.icon(
+                          onPressed: imageUploading || translating
+                              ? null
+                              : translateAllLanguages,
+                          icon: translating
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.translate),
+                          label: Text(
+                            t.t('admin_faq_translate_all_languages'),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      ...locales.map((locale) {
+                        final code = locale.languageCode;
+                        final t = AppLocalizations(locale);
+                        return _LocaleFaqFields(
+                          label: code.toUpperCase(),
+                          questionCtrl: qCtrls[code]!,
+                          answerCtrl: aCtrls[code]!,
+                          initiallyExpanded: code == 'en',
+                          questionHint: t.t(node.qKey),
+                          answerHint: t.t(node.aKey),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: imageUploading || translating
+                      ? null
+                      : () {
+                          dialogOpen = false;
+                          Navigator.of(ctx).pop(false);
+                        },
+                  child: Text(t.t('admin_faq_cancel')),
+                ),
+                FilledButton(
+                  style: FilledButton.styleFrom(backgroundColor: _kFaqGreen),
+                  onPressed: imageUploading || translating
+                      ? null
+                      : () {
+                          dialogOpen = false;
+                          Navigator.of(ctx).pop(true);
+                        },
+                  child: Text(t.t('admin_faq_save')),
+                ),
+              ],
+            );
+          },
         );
       },
     );
+    dialogOpen = false;
 
     if (ok != true) {
       for (final ctrl in qCtrls.values) {
@@ -539,6 +911,15 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
     };
 
     var hasOverride = false;
+
+    if (imageUrl.trim().isNotEmpty) {
+      payload['imageUrl'] = imageUrl.trim();
+      payload['imagePath'] = imagePath.trim();
+      hasOverride = true;
+    } else if (overrideData != null && overrideData.containsKey('imageUrl')) {
+      payload['imageUrl'] = FieldValue.delete();
+      payload['imagePath'] = FieldValue.delete();
+    }
 
     for (final locale in locales) {
       final code = locale.languageCode;
@@ -737,6 +1118,7 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
             final t = AppLocalizations.of(context);
             final question = _localizedFaqValue(data, 'question', langCode);
             final answer = _localizedFaqValue(data, 'answer', langCode);
+            final imageUrl = (data['imageUrl'] ?? '').toString().trim();
             final order = (data['order'] as num?)?.toInt();
 
             return Container(
@@ -784,6 +1166,10 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
                           fontSize: 13,
                         ),
                       ),
+                      if (imageUrl.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        _FaqImageBadge(url: imageUrl),
+                      ],
                     ],
                   );
 
@@ -892,6 +1278,9 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
               t: t,
               isQuestion: false,
             );
+            final imageUrl = (overrideData?['imageUrl'] ?? '')
+                .toString()
+                .trim();
 
             return Container(
               margin: EdgeInsets.only(left: item.depth * 10),
@@ -942,6 +1331,10 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
                           fontSize: 13,
                         ),
                       ),
+                      if (imageUrl.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        _FaqImageBadge(url: imageUrl),
+                      ],
                     ],
                   );
 
@@ -1279,6 +1672,207 @@ class _FaqActionButton extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+}
+
+class _FaqImageEditorCard extends StatelessWidget {
+  final String imageUrl;
+  final String previewUrl;
+  final Uint8List? previewBytes;
+  final bool isUploading;
+  final VoidCallback onUpload;
+  final VoidCallback? onRemove;
+
+  const _FaqImageEditorCard({
+    required this.imageUrl,
+    required this.previewUrl,
+    required this.previewBytes,
+    required this.isUploading,
+    required this.onUpload,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9FAFB),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _kFaqCardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Sample image',
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              color: _kFaqText,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Upload one optional image that drivers can view inside this FAQ.',
+            style: TextStyle(
+              color: _kFaqMuted,
+              fontSize: 13,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (imageUrl.isNotEmpty)
+            _FaqPreviewFrame(
+              child: previewBytes != null
+                  ? _FaqZoomableImage(
+                      child: Image.memory(
+                        previewBytes!,
+                        fit: BoxFit.contain,
+                      ),
+                    )
+                  : (previewUrl.isNotEmpty)
+                      ? _FaqZoomableImage(
+                          child: buildWebImagePreview(previewUrl),
+                        )
+                      : (imageUrl.startsWith('http://') ||
+                                imageUrl.startsWith('https://'))
+                          ? _FaqZoomableImage(
+                              child: buildWebImagePreview(imageUrl),
+                            )
+                          : const Center(
+                              child: Text(
+                                'Could not load image preview.',
+                                style: TextStyle(
+                                  color: _kFaqMuted,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+            )
+          else
+            Container(
+              height: 120,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: _kFaqCardBorder),
+              ),
+              alignment: Alignment.center,
+              child: const Text(
+                'No sample image selected.',
+                style: TextStyle(
+                  color: _kFaqMuted,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              FilledButton.icon(
+                onPressed: isUploading ? null : onUpload,
+                style: FilledButton.styleFrom(backgroundColor: _kFaqGreen),
+                icon: isUploading
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.upload_outlined),
+                label: Text(imageUrl.isEmpty ? 'Upload image' : 'Replace image'),
+              ),
+              if (onRemove != null)
+                OutlinedButton.icon(
+                  onPressed: isUploading ? null : onRemove,
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('Remove image'),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FaqPreviewFrame extends StatelessWidget {
+  final Widget child;
+
+  const _FaqPreviewFrame({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 320,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: const Color(0xFFE5E7EB),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: child,
+      ),
+    );
+  }
+}
+
+class _FaqZoomableImage extends StatelessWidget {
+  final Widget child;
+
+  const _FaqZoomableImage({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      color: const Color(0xFFF3F4F6),
+      alignment: Alignment.center,
+      child: child,
+    );
+  }
+}
+
+class _FaqImageBadge extends StatelessWidget {
+  final String url;
+
+  const _FaqImageBadge({required this.url});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: _kFaqCardBorder),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.image_outlined, size: 16, color: _kFaqGreen),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              'Sample image attached',
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: _kFaqMuted,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

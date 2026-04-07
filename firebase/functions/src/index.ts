@@ -37,6 +37,8 @@ type PublishNotificationData = {
   title?: string;
   body?: string;
   requiresConfirmation?: boolean;
+  sourceLang?: string;
+  translations?: unknown;
 };
 
 type DriverNotificationActionData = {
@@ -62,6 +64,11 @@ type TranslateFaqTextData = {
   answer?: string;
 };
 
+type NotificationTranslationRow = {
+  title: string;
+  body: string;
+};
+
 /**
  * Returns true if the caller is authenticated.
  * @param {unknown} authCtx onCall request.auth
@@ -85,6 +92,36 @@ function requireAuthUid(authCtx: unknown): string {
     );
   }
   return authCtx.uid;
+}
+
+/**
+ * Normalizes translated notification payloads to a safe lang->title/body map.
+ * @param {unknown} raw
+ * @return {Record<string, NotificationTranslationRow>}
+ */
+function sanitizeNotificationTranslations(
+  raw: unknown,
+): Record<string, NotificationTranslationRow> {
+  if (!raw || typeof raw !== "object") return {};
+
+  const out: Record<string, NotificationTranslationRow> = {};
+  for (const [langRaw, value] of Object.entries(
+    raw as Record<string, unknown>,
+  )) {
+    const lang = langRaw.trim().toLowerCase();
+    if (!/^[a-z]{2}$/.test(lang) || !value || typeof value !== "object") {
+      continue;
+    }
+
+    const row = value as Record<string, unknown>;
+    const title = (row.title || "").toString().trim();
+    const body = (row.body || "").toString().trim();
+    if (!title && !body) continue;
+
+    out[lang] = {title, body};
+  }
+
+  return out;
 }
 
 /**
@@ -396,6 +433,8 @@ export const createDriverLogin = onCall(async (request) => {
           type: adminData.type || "rule",
           title: adminData.title || "",
           body: adminData.body || "",
+          sourceLang: adminData.sourceLang || "en",
+          translations: adminData.translations || {},
           status: "unread",
           createdAt: adminData.createdAt || FieldValue.serverTimestamp(),
           readAt: null,
@@ -439,6 +478,8 @@ export const publishNotificationToAllDrivers = onCall(async (request) => {
   const type = (data.type || "").trim();
   const title = (data.title || "").trim();
   const body = (data.body || "").trim();
+  const sourceLang = (data.sourceLang || "en").toString().trim().toLowerCase();
+  const translations = sanitizeNotificationTranslations(data.translations);
   const requiresConfirmation = true;
 
 
@@ -461,6 +502,13 @@ export const publishNotificationToAllDrivers = onCall(async (request) => {
     throw new HttpsError(
       "invalid-argument",
       "Invalid notification type.",
+    );
+  }
+
+  if (!/^[a-z]{2}$/.test(sourceLang)) {
+    throw new HttpsError(
+      "invalid-argument",
+      "sourceLang must be 2 letters.",
     );
   }
 
@@ -490,6 +538,8 @@ export const publishNotificationToAllDrivers = onCall(async (request) => {
     type,
     title,
     body,
+    sourceLang,
+    translations,
     createdAt: FieldValue.serverTimestamp(),
     createdBy: callerUid,
     target: "all",
@@ -511,6 +561,8 @@ export const publishNotificationToAllDrivers = onCall(async (request) => {
         type,
         title,
         body,
+        sourceLang,
+        translations,
         status: "unread",
         createdAt: FieldValue.serverTimestamp(),
         readAt: null,

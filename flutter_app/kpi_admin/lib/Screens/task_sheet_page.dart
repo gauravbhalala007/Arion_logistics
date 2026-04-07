@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../localization/app_localizations.dart';
 import '../models/task_sheet_task.dart';
 
+enum _TaskComposerKind { standard, feedbackText, feedbackChoice }
+
 class TaskSheetPage extends StatefulWidget {
   const TaskSheetPage({super.key});
 
@@ -15,11 +17,17 @@ class TaskSheetPage extends StatefulWidget {
 class _TaskSheetPageState extends State<TaskSheetPage> {
   final _titleCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
+  final _composerScrollCtrl = ScrollController();
+  final List<TextEditingController> _feedbackOptionCtrls = [
+    TextEditingController(),
+    TextEditingController(),
+  ];
   bool _creating = false;
   bool _assignToEveryone = false;
   String? _selectedTransporterId;
   String? _selectedDriverName;
   String _driverQuery = '';
+  _TaskComposerKind _taskKind = _TaskComposerKind.standard;
 
   String? get _uid => FirebaseAuth.instance.currentUser?.uid;
 
@@ -41,11 +49,62 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
   void dispose() {
     _titleCtrl.dispose();
     _descCtrl.dispose();
+    _composerScrollCtrl.dispose();
+    for (final controller in _feedbackOptionCtrls) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
   String _newBatchId() {
     return 'all_${DateTime.now().microsecondsSinceEpoch}';
+  }
+
+  List<String> _parsedFeedbackOptions() {
+    return _feedbackOptionCtrls
+        .map((controller) => controller.text.trim())
+        .where((line) => line.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  void _setTaskKind(_TaskComposerKind kind) {
+    setState(() {
+      _taskKind = kind;
+      if (kind != _TaskComposerKind.feedbackChoice) {
+        for (final controller in _feedbackOptionCtrls) {
+          controller.clear();
+        }
+      } else if (_feedbackOptionCtrls.length < 2) {
+        while (_feedbackOptionCtrls.length < 2) {
+          _feedbackOptionCtrls.add(TextEditingController());
+        }
+      }
+    });
+  }
+
+  void _addFeedbackOption() {
+    setState(() {
+      _feedbackOptionCtrls.add(TextEditingController());
+    });
+  }
+
+  void _removeFeedbackOption(int index) {
+    if (_feedbackOptionCtrls.length <= 2) return;
+    setState(() {
+      final controller = _feedbackOptionCtrls.removeAt(index);
+      controller.dispose();
+    });
+  }
+
+  String _taskKindValue() {
+    switch (_taskKind) {
+      case _TaskComposerKind.feedbackText:
+        return 'feedback_text';
+      case _TaskComposerKind.feedbackChoice:
+        return 'feedback_choice';
+      case _TaskComposerKind.standard:
+        return 'standard';
+    }
   }
 
   Future<void> _createTask() async {
@@ -61,6 +120,7 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
     final description = _descCtrl.text.trim();
     final transporterId = (_selectedTransporterId ?? '').trim().toUpperCase();
     final driverName = (_selectedDriverName ?? '').trim();
+    final feedbackOptions = _parsedFeedbackOptions();
 
     if (title.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -74,6 +134,28 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
       );
       return;
     }
+    if (_taskKind == _TaskComposerKind.feedbackChoice &&
+        feedbackOptions.length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.t('task_sheet_feedback_options_required'))),
+      );
+      return;
+    }
+
+    final basePayload = <String, dynamic>{
+      'title': title,
+      'description': description,
+      'taskKind': _taskKindValue(),
+      'feedbackOptions': feedbackOptions,
+      'feedbackText': '',
+      'feedbackSelectedOption': '',
+      'respondedAt': null,
+      'status': 'pending',
+      'completedConfirmed': false,
+      'createdByUid': _uid,
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
 
     setState(() => _creating = true);
     try {
@@ -104,17 +186,11 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
 
           final taskRef = _tasksCol().doc();
           batch.set(taskRef, {
-            'title': title,
-            'description': description,
+            ...basePayload,
             'assignedTransporterId': tid.toUpperCase(),
             'assignedDriverName': name,
             'assignmentScope': 'all',
             'assignmentBatchId': batchId,
-            'status': 'pending',
-            'completedConfirmed': false,
-            'createdByUid': _uid,
-            'createdAt': FieldValue.serverTimestamp(),
-            'updatedAt': FieldValue.serverTimestamp(),
           });
           opCount++;
           if (opCount >= 450) {
@@ -149,17 +225,11 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
         }
       } else {
         await _tasksCol().add({
-          'title': title,
-          'description': description,
+          ...basePayload,
           'assignedTransporterId': transporterId,
           'assignedDriverName': driverName,
           'assignmentScope': 'single',
           'assignmentBatchId': '',
-          'status': 'pending',
-          'completedConfirmed': false,
-          'createdByUid': _uid,
-          'createdAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
         });
         if (mounted) {
           ScaffoldMessenger.of(
@@ -170,7 +240,11 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
 
       _titleCtrl.clear();
       _descCtrl.clear();
+      for (final controller in _feedbackOptionCtrls) {
+        controller.clear();
+      }
       _driverQuery = '';
+      _taskKind = _TaskComposerKind.standard;
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -349,6 +423,88 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
     return '$day/$month/$year $hour:$minute';
   }
 
+  String _taskKindLabel(TaskSheetTask task) {
+    final l10n = AppLocalizations.of(context);
+    if (task.isFeedbackText) return l10n.t('task_sheet_response_feedback_text');
+    if (task.isFeedbackChoice) {
+      return l10n.t('task_sheet_response_feedback_choice');
+    }
+    return l10n.t('task_sheet_response_standard');
+  }
+
+  Widget _responseTypeCard({
+    required String label,
+    required String description,
+    required IconData icon,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    final borderColor = selected
+        ? const Color(0xFF1D7F5A)
+        : const Color(0xFFE5E7EB);
+    final backgroundColor = selected
+        ? const Color(0xFFEFF9F2)
+        : const Color(0xFFF8FAFC);
+    final iconColor = selected
+        ? const Color(0xFF1D7F5A)
+        : const Color(0xFF6B7280);
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: borderColor, width: selected ? 1.6 : 1.0),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: iconColor, size: 20),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: selected
+                          ? const Color(0xFF1D7F5A)
+                          : const Color(0xFF111827),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      height: 1.35,
+                      color: Color(0xFF6B7280),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   InputDecoration _pillField({required String hint}) {
     return InputDecoration(
       hintText: hint,
@@ -439,6 +595,10 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
 
   Widget _buildComposerCard({required bool compactLayout}) {
     final l10n = AppLocalizations.of(context);
+    final responseCardsCompact = MediaQuery.sizeOf(context).width < 1100;
+    final detailsHeight = compactLayout
+        ? 140.0
+        : (_taskKind == _TaskComposerKind.feedbackChoice ? 120.0 : 170.0);
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -453,304 +613,562 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.task_alt_outlined, color: Color(0xFF1D7F5A)),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  l10n.t('task_sheet_new_content_title'),
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.3,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Text(
-            l10n.t('task_sheet_assign_task'),
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              ChoiceChip(
-                label: Text(l10n.t('task_sheet_specific_driver')),
-                selected: !_assignToEveryone,
-                onSelected: (_) {
-                  setState(() {
-                    _assignToEveryone = false;
-                  });
-                },
-                backgroundColor: Colors.white,
-                selectedColor: const Color(0xFFE8F5EE),
-                side: BorderSide(
-                  color: !_assignToEveryone
-                      ? const Color(0xFF1D7F5A)
-                      : const Color(0xFFD1D5DB),
-                ),
-                labelStyle: TextStyle(
-                  color: !_assignToEveryone
-                      ? const Color(0xFF1D7F5A)
-                      : const Color(0xFF374151),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              ChoiceChip(
-                label: Text(l10n.t('task_sheet_everyone')),
-                selected: _assignToEveryone,
-                onSelected: (_) {
-                  setState(() {
-                    _assignToEveryone = true;
-                    _selectedTransporterId = null;
-                    _selectedDriverName = null;
-                    _driverQuery = '';
-                  });
-                },
-                backgroundColor: Colors.white,
-                selectedColor: const Color(0xFFE8F5EE),
-                side: BorderSide(
-                  color: _assignToEveryone
-                      ? const Color(0xFF1D7F5A)
-                      : const Color(0xFFD1D5DB),
-                ),
-                labelStyle: TextStyle(
-                  color: _assignToEveryone
-                      ? const Color(0xFF1D7F5A)
-                      : const Color(0xFF374151),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: _driversCol().snapshots(),
-            builder: (context, snapshot) {
-              final docs = snapshot.data?.docs ?? const [];
-              final options =
-                  docs
-                      .map((d) {
-                        final data = d.data();
-                        final transporterId = (data['transporterId'] ?? d.id)
-                            .toString()
-                            .trim();
-                        final driverName =
-                            (data['driverName'] ?? data['fullName'] ?? d.id)
-                                .toString()
-                                .trim();
-                        return _DriverOption(
-                          transporterId: transporterId.toUpperCase(),
-                          driverName: driverName.isEmpty
-                              ? transporterId
-                              : driverName,
-                        );
-                      })
-                      .where((o) => o.transporterId.isNotEmpty)
-                      .toList()
-                    ..sort(
-                      (a, b) => a.driverName.toLowerCase().compareTo(
-                        b.driverName.toLowerCase(),
-                      ),
-                    );
-
-              if (_selectedTransporterId != null &&
-                  !options.any(
-                    (o) => o.transporterId == _selectedTransporterId,
-                  )) {
-                _selectedTransporterId = null;
-                _selectedDriverName = null;
-              }
-
-              if (_assignToEveryone) {
-                return Align(
-                  alignment: Alignment.centerLeft,
-                  child: _pill(
-                    l10n.t('task_sheet_assigned_to_everyone'),
-                    borderColor: const Color(0xFF1D7F5A),
-                    textColor: const Color(0xFF1D7F5A),
-                  ),
-                );
-              }
-
-              final query = _driverQuery.trim().toLowerCase();
-              final filtered = query.isEmpty
-                  ? options
-                  : options.where((o) {
-                      return o.driverName.toLowerCase().contains(query) ||
-                          o.transporterId.toLowerCase().contains(query);
-                    }).toList();
-
-              return Column(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return Scrollbar(
+            controller: _composerScrollCtrl,
+            thumbVisibility: constraints.maxHeight < 760,
+            child: SingleChildScrollView(
+              controller: _composerScrollCtrl,
+              primary: false,
+              padding: EdgeInsets.zero,
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  TextField(
-                    decoration: InputDecoration(
-                      hintText: l10n.t('task_sheet_search_driver_hint'),
-                      prefixIcon: const Icon(Icons.search),
-                      filled: true,
-                      fillColor: const Color(0xFFF6F7F9),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(18),
-                        borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.task_alt_outlined,
+                        color: Color(0xFF1D7F5A),
                       ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(18),
-                        borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(18),
-                        borderSide: const BorderSide(
-                          color: Color(0xFF1D7F5A),
-                          width: 1.2,
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          l10n.t('task_sheet_new_content_title'),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.3,
+                          ),
                         ),
                       ),
-                    ),
-                    onChanged: (value) {
-                      setState(() => _driverQuery = value);
-                    },
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    l10n.t('task_sheet_assign_task'),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 10),
-                  Container(
-                    width: double.infinity,
-                    constraints: const BoxConstraints(maxHeight: 170),
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFD1D5DB)),
-                    ),
-                    child: filtered.isEmpty
-                        ? Center(
-                            child: Text(
-                              l10n.t('task_sheet_no_drivers_found'),
-                              style: const TextStyle(color: Colors.black54),
-                            ),
-                          )
-                        : SingleChildScrollView(
-                            child: Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: filtered.map((o) {
-                                final selected =
-                                    o.transporterId == _selectedTransporterId;
-                                return ChoiceChip(
-                                  label: Text(
-                                    '${o.driverName} (${o.transporterId})',
-                                  ),
-                                  selected: selected,
-                                  onSelected: (_) {
-                                    setState(() {
-                                      _selectedTransporterId = o.transporterId;
-                                      _selectedDriverName = o.driverName;
-                                    });
-                                  },
-                                  showCheckmark: false,
-                                  backgroundColor: Colors.white,
-                                  selectedColor: const Color(0xFFE8F5EE),
-                                  side: BorderSide(
-                                    color: selected
-                                        ? const Color(0xFF1D7F5A)
-                                        : const Color(0xFFD1D5DB),
-                                  ),
-                                  labelStyle: TextStyle(
-                                    color: selected
-                                        ? const Color(0xFF1D7F5A)
-                                        : const Color(0xFF374151),
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 12,
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                  ),
-                  if ((_selectedDriverName ?? '').isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    _pill(
-                      l10n.tf('task_sheet_selected_driver', {
-                        'name': _selectedDriverName!,
-                        'id': _selectedTransporterId!,
-                      }),
-                      borderColor: const Color(0xFF1D7F5A),
-                      textColor: const Color(0xFF1D7F5A),
-                    ),
-                  ],
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _titleCtrl,
-            decoration: _pillField(hint: l10n.t('task_sheet_title_hint')),
-          ),
-          const SizedBox(height: 12),
-          if (compactLayout)
-            TextField(
-              controller: _descCtrl,
-              minLines: 4,
-              maxLines: 7,
-              textAlignVertical: TextAlignVertical.top,
-              decoration: _pillField(hint: l10n.t('task_sheet_details_hint')),
-            )
-          else
-            Expanded(
-              child: TextField(
-                controller: _descCtrl,
-                expands: true,
-                maxLines: null,
-                minLines: null,
-                textAlignVertical: TextAlignVertical.top,
-                decoration: _pillField(hint: l10n.t('task_sheet_details_hint')),
-              ),
-            ),
-          const SizedBox(height: 14),
-          Align(
-            alignment: Alignment.center,
-            child: SizedBox(
-              height: 44,
-              width: 220,
-              child: ElevatedButton(
-                onPressed: _creating ? null : _createTask,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1D7F5A),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-                child: _creating
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.white,
-                          ),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ChoiceChip(
+                        label: Text(l10n.t('task_sheet_specific_driver')),
+                        selected: !_assignToEveryone,
+                        onSelected: (_) {
+                          setState(() {
+                            _assignToEveryone = false;
+                          });
+                        },
+                        backgroundColor: Colors.white,
+                        selectedColor: const Color(0xFFE8F5EE),
+                        side: BorderSide(
+                          color: !_assignToEveryone
+                              ? const Color(0xFF1D7F5A)
+                              : const Color(0xFFD1D5DB),
                         ),
-                      )
-                    : Text(
-                        l10n.t('task_sheet_publish'),
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 15,
-                          letterSpacing: 0.2,
+                        labelStyle: TextStyle(
+                          color: !_assignToEveryone
+                              ? const Color(0xFF1D7F5A)
+                              : const Color(0xFF374151),
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
+                      ChoiceChip(
+                        label: Text(l10n.t('task_sheet_everyone')),
+                        selected: _assignToEveryone,
+                        onSelected: (_) {
+                          setState(() {
+                            _assignToEveryone = true;
+                            _selectedTransporterId = null;
+                            _selectedDriverName = null;
+                            _driverQuery = '';
+                          });
+                        },
+                        backgroundColor: Colors.white,
+                        selectedColor: const Color(0xFFE8F5EE),
+                        side: BorderSide(
+                          color: _assignToEveryone
+                              ? const Color(0xFF1D7F5A)
+                              : const Color(0xFFD1D5DB),
+                        ),
+                        labelStyle: TextStyle(
+                          color: _assignToEveryone
+                              ? const Color(0xFF1D7F5A)
+                              : const Color(0xFF374151),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                    stream: _driversCol().snapshots(),
+                    builder: (context, snapshot) {
+                      final docs = snapshot.data?.docs ?? const [];
+                      final options =
+                          docs
+                              .map((d) {
+                                final data = d.data();
+                                final transporterId =
+                                    (data['transporterId'] ?? d.id)
+                                        .toString()
+                                        .trim();
+                                final driverName =
+                                    (data['driverName'] ??
+                                            data['fullName'] ??
+                                            d.id)
+                                        .toString()
+                                        .trim();
+                                return _DriverOption(
+                                  transporterId: transporterId.toUpperCase(),
+                                  driverName: driverName.isEmpty
+                                      ? transporterId
+                                      : driverName,
+                                );
+                              })
+                              .where((o) => o.transporterId.isNotEmpty)
+                              .toList()
+                            ..sort(
+                              (a, b) => a.driverName.toLowerCase().compareTo(
+                                b.driverName.toLowerCase(),
+                              ),
+                            );
+
+                      if (_selectedTransporterId != null &&
+                          !options.any(
+                            (o) => o.transporterId == _selectedTransporterId,
+                          )) {
+                        _selectedTransporterId = null;
+                        _selectedDriverName = null;
+                      }
+
+                      if (_assignToEveryone) {
+                        return Align(
+                          alignment: Alignment.centerLeft,
+                          child: _pill(
+                            l10n.t('task_sheet_assigned_to_everyone'),
+                            borderColor: const Color(0xFF1D7F5A),
+                            textColor: const Color(0xFF1D7F5A),
+                          ),
+                        );
+                      }
+
+                      final query = _driverQuery.trim().toLowerCase();
+                      final filtered = query.isEmpty
+                          ? options
+                          : options.where((o) {
+                              return o.driverName.toLowerCase().contains(query) ||
+                                  o.transporterId.toLowerCase().contains(query);
+                            }).toList();
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          TextField(
+                            decoration: InputDecoration(
+                              hintText: l10n.t('task_sheet_search_driver_hint'),
+                              prefixIcon: const Icon(Icons.search),
+                              filled: true,
+                              fillColor: const Color(0xFFF6F7F9),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(18),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFE5E7EB),
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(18),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFE5E7EB),
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(18),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF1D7F5A),
+                                  width: 1.2,
+                                ),
+                              ),
+                            ),
+                            onChanged: (value) {
+                              setState(() => _driverQuery = value);
+                            },
+                          ),
+                          const SizedBox(height: 10),
+                          Container(
+                            width: double.infinity,
+                            constraints: const BoxConstraints(maxHeight: 170),
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFD1D5DB)),
+                            ),
+                            child: filtered.isEmpty
+                                ? Center(
+                                    child: Text(
+                                      l10n.t('task_sheet_no_drivers_found'),
+                                      style: const TextStyle(
+                                        color: Colors.black54,
+                                      ),
+                                    ),
+                                  )
+                                : SingleChildScrollView(
+                                    child: Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
+                                      children: filtered.map((o) {
+                                        final selected =
+                                            o.transporterId ==
+                                            _selectedTransporterId;
+                                        return ChoiceChip(
+                                          label: Text(
+                                            '${o.driverName} (${o.transporterId})',
+                                          ),
+                                          selected: selected,
+                                          onSelected: (_) {
+                                            setState(() {
+                                              _selectedTransporterId =
+                                                  o.transporterId;
+                                              _selectedDriverName = o.driverName;
+                                            });
+                                          },
+                                          showCheckmark: false,
+                                          backgroundColor: Colors.white,
+                                          selectedColor:
+                                              const Color(0xFFE8F5EE),
+                                          side: BorderSide(
+                                            color: selected
+                                                ? const Color(0xFF1D7F5A)
+                                                : const Color(0xFFD1D5DB),
+                                          ),
+                                          labelStyle: TextStyle(
+                                            color: selected
+                                                ? const Color(0xFF1D7F5A)
+                                                : const Color(0xFF374151),
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 12,
+                                          ),
+                                        );
+                                      }).toList(),
+                                    ),
+                                  ),
+                          ),
+                          if ((_selectedDriverName ?? '').isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            _pill(
+                              l10n.tf('task_sheet_selected_driver', {
+                                'name': _selectedDriverName!,
+                                'id': _selectedTransporterId!,
+                              }),
+                              borderColor: const Color(0xFF1D7F5A),
+                              textColor: const Color(0xFF1D7F5A),
+                            ),
+                          ],
+                        ],
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    l10n.t('task_sheet_response_type'),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    l10n.t('task_sheet_response_type_help'),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF6B7280),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  responseCardsCompact
+                      ? Column(
+                          children: [
+                            _responseTypeCard(
+                              label: l10n.t('task_sheet_response_standard'),
+                              description: l10n.t(
+                                'task_sheet_response_standard_help',
+                              ),
+                              icon: Icons.task_alt_rounded,
+                              selected: _taskKind == _TaskComposerKind.standard,
+                              onTap: () =>
+                                  _setTaskKind(_TaskComposerKind.standard),
+                            ),
+                            const SizedBox(height: 10),
+                            _responseTypeCard(
+                              label: l10n.t('task_sheet_response_feedback_text'),
+                              description: l10n.t(
+                                'task_sheet_response_feedback_text_help',
+                              ),
+                              icon: Icons.edit_note_rounded,
+                              selected:
+                                  _taskKind == _TaskComposerKind.feedbackText,
+                              onTap: () =>
+                                  _setTaskKind(_TaskComposerKind.feedbackText),
+                            ),
+                            const SizedBox(height: 10),
+                            _responseTypeCard(
+                              label: l10n.t(
+                                'task_sheet_response_feedback_choice',
+                              ),
+                              description: l10n.t(
+                                'task_sheet_response_feedback_choice_help',
+                              ),
+                              icon: Icons.checklist_rounded,
+                              selected:
+                                  _taskKind == _TaskComposerKind.feedbackChoice,
+                              onTap: () => _setTaskKind(
+                                _TaskComposerKind.feedbackChoice,
+                              ),
+                            ),
+                          ],
+                        )
+                      : Row(
+                          children: [
+                            Expanded(
+                              child: _responseTypeCard(
+                                label: l10n.t('task_sheet_response_standard'),
+                                description: l10n.t(
+                                  'task_sheet_response_standard_help',
+                                ),
+                                icon: Icons.task_alt_rounded,
+                                selected:
+                                    _taskKind == _TaskComposerKind.standard,
+                                onTap: () =>
+                                    _setTaskKind(_TaskComposerKind.standard),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _responseTypeCard(
+                                label: l10n.t(
+                                  'task_sheet_response_feedback_text',
+                                ),
+                                description: l10n.t(
+                                  'task_sheet_response_feedback_text_help',
+                                ),
+                                icon: Icons.edit_note_rounded,
+                                selected:
+                                    _taskKind == _TaskComposerKind.feedbackText,
+                                onTap: () => _setTaskKind(
+                                  _TaskComposerKind.feedbackText,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _responseTypeCard(
+                                label: l10n.t(
+                                  'task_sheet_response_feedback_choice',
+                                ),
+                                description: l10n.t(
+                                  'task_sheet_response_feedback_choice_help',
+                                ),
+                                icon: Icons.checklist_rounded,
+                                selected:
+                                    _taskKind ==
+                                    _TaskComposerKind.feedbackChoice,
+                                onTap: () => _setTaskKind(
+                                  _TaskComposerKind.feedbackChoice,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _titleCtrl,
+                    decoration: _pillField(
+                      hint: l10n.t('task_sheet_title_hint'),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: detailsHeight,
+                    child: TextField(
+                      controller: _descCtrl,
+                      minLines: null,
+                      maxLines: null,
+                      expands: true,
+                      textAlignVertical: TextAlignVertical.top,
+                      decoration: _pillField(
+                        hint: l10n.t('task_sheet_details_hint'),
+                      ),
+                    ),
+                  ),
+                  if (_taskKind == _TaskComposerKind.feedbackChoice) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: const Color(0xFFE5E7EB)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  l10n.t('task_sheet_feedback_options_title'),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF111827),
+                                  ),
+                                ),
+                              ),
+                              TextButton.icon(
+                                onPressed: _feedbackOptionCtrls.length >= 6
+                                    ? null
+                                    : _addFeedbackOption,
+                                icon: const Icon(Icons.add_rounded, size: 18),
+                                label: Text(
+                                  l10n.t('task_sheet_feedback_add_option'),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            l10n.t('task_sheet_feedback_options_hint'),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF6B7280),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxHeight: 260),
+                            child: SingleChildScrollView(
+                              child: Column(
+                                children: List.generate(
+                                  _feedbackOptionCtrls.length,
+                                  (index) {
+                                    final ctrl = _feedbackOptionCtrls[index];
+                                    return Padding(
+                                      padding: EdgeInsets.only(
+                                        bottom:
+                                            index ==
+                                                _feedbackOptionCtrls.length - 1
+                                            ? 0
+                                            : 10,
+                                      ),
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Container(
+                                            width: 28,
+                                            height: 28,
+                                            margin: const EdgeInsets.only(
+                                              top: 10,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFE8F5EE),
+                                              borderRadius:
+                                                  BorderRadius.circular(999),
+                                            ),
+                                            child: Center(
+                                              child: Text(
+                                                '${index + 1}',
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w800,
+                                                  color: Color(0xFF1D7F5A),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: TextField(
+                                              controller: ctrl,
+                                              decoration: _pillField(
+                                                hint: l10n.tf(
+                                                  'task_sheet_feedback_option_label',
+                                                  {'index': '${index + 1}'},
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          IconButton(
+                                            onPressed:
+                                                _feedbackOptionCtrls.length <= 2
+                                                ? null
+                                                : () =>
+                                                      _removeFeedbackOption(
+                                                        index,
+                                                      ),
+                                            icon: const Icon(
+                                              Icons.close_rounded,
+                                            ),
+                                            tooltip: l10n.t(
+                                              'task_sheet_feedback_remove_option',
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 14),
+                  Align(
+                    alignment: Alignment.center,
+                    child: SizedBox(
+                      height: 44,
+                      width: 220,
+                      child: ElevatedButton(
+                        onPressed: _creating ? null : _createTask,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1D7F5A),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                        child: _creating
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                ),
+                              )
+                            : Text(
+                                l10n.t('task_sheet_publish'),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 15,
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -876,6 +1294,15 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
                           style: const TextStyle(
                             fontSize: 11,
                             color: Color(0xFF9CA3AF),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _taskKindLabel(first),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF1D7F5A),
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                         const SizedBox(height: 6),
@@ -1081,6 +1508,15 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
                           color: Color(0xFF9CA3AF),
                         ),
                       ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _taskKindLabel(task),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF1D7F5A),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                       const SizedBox(height: 6),
                       Text(
                         task.description.isEmpty ? '—' : task.description,
@@ -1092,6 +1528,20 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
                           height: 1.25,
                         ),
                       ),
+                      if (task.feedbackResponse.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          '${l10n.t('task_sheet_feedback_response_label')}: ${task.feedbackResponse}',
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF1D7F5A),
+                            height: 1.3,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                     ],
                   );
 
@@ -1265,12 +1715,15 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
     required List<TaskSheetTask> drivers,
   }) async {
     final l10n = AppLocalizations.of(context);
-    final rows = drivers.map((t) {
-      final name = t.assignedDriverName.trim();
-      final id = t.assignedTransporterId.trim();
-      final label = name.isEmpty ? id : '$name ($id)';
-      return label;
-    }).toList()..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    final rows = [...drivers]..sort((a, b) {
+      final aLabel = a.assignedDriverName.isEmpty
+          ? a.assignedTransporterId
+          : a.assignedDriverName;
+      final bLabel = b.assignedDriverName.isEmpty
+          ? b.assignedTransporterId
+          : b.assignedDriverName;
+      return aLabel.toLowerCase().compareTo(bLabel.toLowerCase());
+    });
 
     await showDialog<void>(
       context: context,
@@ -1324,14 +1777,34 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
                           itemCount: rows.length,
                           separatorBuilder: (_, __) => const Divider(height: 1),
                           itemBuilder: (_, i) {
+                            final task = rows[i];
+                            final name = task.assignedDriverName.trim();
+                            final id = task.assignedTransporterId.trim();
+                            final label = name.isEmpty ? id : '$name ($id)';
                             return Padding(
                               padding: const EdgeInsets.symmetric(vertical: 10),
-                              child: Text(
-                                rows[i],
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    label,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  if (task.feedbackResponse.isNotEmpty) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${l10n.t('task_sheet_feedback_response_label')}: ${task.feedbackResponse}',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF1D7F5A),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                             );
                           },
