@@ -78,12 +78,11 @@ class _PodQualityOverviewPageState extends State<PodQualityOverviewPage> {
         .collection('users')
         .doc(uid)
         .collection('reports')
-        .orderBy('year', descending: true)
-        .orderBy('weekNumber', descending: true)
+        .orderBy('reportDate', descending: true)
         .limit(52)
         .snapshots()
         .map((snap) {
-          return snap.docs
+          final rows = snap.docs
               .map((d) {
                 final m = d.data();
                 final summary =
@@ -122,6 +121,12 @@ class _PodQualityOverviewPageState extends State<PodQualityOverviewPage> {
               })
               .where((vm) => vm.hasPod)
               .toList();
+          rows.sort((a, b) {
+            final yearCmp = b.year.compareTo(a.year);
+            if (yearCmp != 0) return yearCmp;
+            return b.week.compareTo(a.week);
+          });
+          return rows;
         });
   }
 

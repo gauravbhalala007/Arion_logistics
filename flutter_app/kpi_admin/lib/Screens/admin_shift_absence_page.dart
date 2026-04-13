@@ -24,6 +24,7 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
   bool _loadingScope = true;
   String _search = '';
   final TextEditingController _searchCtrl = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
 
   @override
   void initState() {
@@ -34,6 +35,7 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
   @override
   void dispose() {
     _searchCtrl.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -127,6 +129,390 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
     } catch (e) {
       _showSnack('Failed to update request: $e', error: true);
     }
+  }
+
+  Future<List<_DriverOption>> _loadDriverOptions() async {
+    final scope = _scopeUid;
+    if (scope == null) return const [];
+
+    final snap = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(scope)
+        .collection('drivers')
+        .get();
+
+    final items = <_DriverOption>[];
+    for (final doc in snap.docs) {
+      final data = doc.data();
+      final transporterId = ((data['transporterId'] ?? doc.id).toString())
+          .trim()
+          .toUpperCase();
+      if (transporterId.isEmpty) continue;
+      final driverName = _AbsenceAdminItem._firstNonEmpty([
+        (data['driverName'] ?? '').toString(),
+        (data['name'] ?? '').toString(),
+        (data['fullName'] ?? '').toString(),
+        transporterId,
+      ]);
+      items.add(
+        _DriverOption(
+          driverId: transporterId,
+          driverName: driverName,
+        ),
+      );
+    }
+    items.sort((a, b) => a.driverName.toLowerCase().compareTo(b.driverName.toLowerCase()));
+    return items;
+  }
+
+  Future<void> _addManualPastLeave({
+    required _DriverOption driver,
+    required String type,
+    required DateTime fromDate,
+    required DateTime toDate,
+    required String reason,
+  }) async {
+    final scope = _scopeUid;
+    if (scope == null) {
+      _showSnack('Missing DSP scope.', error: true);
+      return;
+    }
+
+    final db = FirebaseFirestore.instance;
+    final rootRef = db
+        .collection('users')
+        .doc(scope)
+        .collection('absence_requests')
+        .doc();
+    final requestId = rootRef.id;
+    final driverRef = db
+        .collection('users')
+        .doc(scope)
+        .collection('drivers')
+        .doc(driver.driverId)
+        .collection('absence_requests')
+        .doc(requestId);
+
+    final now = FieldValue.serverTimestamp();
+    final payload = <String, dynamic>{
+      'requestId': requestId,
+      'dspUid': scope,
+      'driverUid': '',
+      'driverTransporterId': driver.driverId,
+      'driverName': driver.driverName,
+      'type': type,
+      'fromDate': Timestamp.fromDate(_dateOnly(fromDate)),
+      'toDate': Timestamp.fromDate(_dateOnly(toDate)),
+      'reason': reason.trim(),
+      'status': 'approved',
+      'submittedAt': now,
+      'updatedAt': now,
+      'reviewedAt': now,
+      'reviewedBy': _uid,
+      'source': 'admin_manual',
+    };
+
+    final batch = db.batch();
+    batch.set(rootRef, payload, SetOptions(merge: true));
+    batch.set(driverRef, payload, SetOptions(merge: true));
+    await batch.commit();
+  }
+
+  Future<void> _openAddPastLeaveDialog() async {
+    final driverOptions = await _loadDriverOptions();
+    if (!mounted) return;
+    if (driverOptions.isEmpty) {
+      _showSnack('No drivers available yet.', error: true);
+      return;
+    }
+
+    _DriverOption? selectedDriver = driverOptions.first;
+    String type = 'vacation';
+    DateTime? fromDate;
+    DateTime? toDate;
+    final reasonCtrl = TextEditingController();
+    var saving = false;
+
+    Future<void> pickDate(
+      BuildContext dialogContext,
+      void Function(void Function()) setLocal, {
+      required bool isFrom,
+    }) async {
+      final initialDate = isFrom
+          ? (fromDate ?? DateTime.now())
+          : (toDate ?? fromDate ?? DateTime.now());
+      final picked = await showDatePicker(
+        context: dialogContext,
+        firstDate: DateTime(2020),
+        lastDate: DateTime.now(),
+        initialDate: initialDate,
+      );
+      if (picked == null) return;
+      setLocal(() {
+        if (isFrom) {
+          fromDate = picked;
+          if (toDate != null && toDate!.isBefore(picked)) {
+            toDate = picked;
+          }
+        } else {
+          toDate = picked;
+        }
+      });
+    }
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: !saving,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setLocal) {
+            return Dialog(
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 24,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE7F5EE),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Icon(
+                              Icons.event_available_outlined,
+                              color: _kGreen,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Add past leave',
+                                  style: TextStyle(
+                                    color: _kText,
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Record vacation or leave that happened before CoDriver was introduced.',
+                                  style: TextStyle(
+                                    color: _kMuted,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      DropdownButtonFormField<_DriverOption>(
+                        initialValue: selectedDriver,
+                        decoration: InputDecoration(
+                          labelText: 'Driver',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        items: [
+                          for (final item in driverOptions)
+                            DropdownMenuItem<_DriverOption>(
+                              value: item,
+                              child: Text('${item.driverName} (${item.driverId})'),
+                            ),
+                        ],
+                        onChanged: saving
+                            ? null
+                            : (value) => setLocal(() => selectedDriver = value),
+                      ),
+                      const SizedBox(height: 14),
+                      DropdownButtonFormField<String>(
+                        initialValue: type,
+                        decoration: InputDecoration(
+                          labelText: 'Type',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'vacation',
+                            child: Text('Vacation'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'sick_leave',
+                            child: Text('Sick leave'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'special_leave',
+                            child: Text('Special leave'),
+                          ),
+                        ],
+                        onChanged: saving
+                            ? null
+                            : (value) {
+                                if (value == null) return;
+                                setLocal(() => type = value);
+                              },
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: saving
+                                  ? null
+                                  : () => pickDate(
+                                        dialogContext,
+                                        setLocal,
+                                        isFrom: true,
+                                      ),
+                              icon: const Icon(Icons.calendar_today_outlined),
+                              label: Text(
+                                fromDate == null
+                                    ? 'From'
+                                    : DateFormat('dd.MM.yyyy').format(fromDate!),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size.fromHeight(52),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: saving
+                                  ? null
+                                  : () => pickDate(
+                                        dialogContext,
+                                        setLocal,
+                                        isFrom: false,
+                                      ),
+                              icon: const Icon(Icons.event_outlined),
+                              label: Text(
+                                toDate == null
+                                    ? 'To'
+                                    : DateFormat('dd.MM.yyyy').format(toDate!),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size.fromHeight(52),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: reasonCtrl,
+                        enabled: !saving,
+                        decoration: InputDecoration(
+                          labelText: 'Reason',
+                          hintText: 'Optional note',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        maxLines: 3,
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          TextButton(
+                            onPressed: saving
+                                ? null
+                                : () => Navigator.of(dialogContext).pop(),
+                            child: const Text('Cancel'),
+                          ),
+                          const Spacer(),
+                          FilledButton.icon(
+                            onPressed: saving
+                                ? null
+                                : () async {
+                                    if (selectedDriver == null) {
+                                      _showSnack('Please choose a driver.', error: true);
+                                      return;
+                                    }
+                                    if (fromDate == null || toDate == null) {
+                                      _showSnack('Please select both dates.', error: true);
+                                      return;
+                                    }
+                                    if (toDate!.isBefore(fromDate!)) {
+                                      _showSnack('End date cannot be before start date.', error: true);
+                                      return;
+                                    }
+                                    setLocal(() => saving = true);
+                                    try {
+                                      await _addManualPastLeave(
+                                        driver: selectedDriver!,
+                                        type: type,
+                                        fromDate: fromDate!,
+                                        toDate: toDate!,
+                                        reason: reasonCtrl.text,
+                                      );
+                                      if (!dialogContext.mounted) return;
+                                      Navigator.of(dialogContext).pop();
+                                      _showSnack('Past leave added successfully.');
+                                    } catch (e) {
+                                      if (dialogContext.mounted) {
+                                        setLocal(() => saving = false);
+                                      }
+                                      _showSnack('Failed to add past leave: $e', error: true);
+                                    }
+                                  },
+                            icon: saving
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                : const Icon(Icons.add_circle_outline),
+                            label: Text(saving ? 'Saving...' : 'Add leave'),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: _kGreen,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    reasonCtrl.dispose();
   }
 
   @override
@@ -302,6 +688,12 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
             ],
           ),
         ),
+        const SizedBox(width: 12),
+        FilledButton.icon(
+          onPressed: _openAddPastLeaveDialog,
+          icon: const Icon(Icons.add_circle_outline),
+          label: const Text('Add past leave'),
+        ),
       ],
     );
   }
@@ -359,8 +751,13 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
 
   Widget _buildSearchBar() {
     return TextField(
+      key: const ValueKey('admin-absence-search'),
       controller: _searchCtrl,
-      onChanged: (value) => setState(() => _search = value),
+      focusNode: _searchFocusNode,
+      onChanged: (value) {
+        if (_search == value) return;
+        setState(() => _search = value);
+      },
       decoration: InputDecoration(
         hintText: 'Search by driver name, ID, or reason',
         prefixIcon: const Icon(Icons.search_rounded),
@@ -1102,4 +1499,14 @@ class _AbsenceAdminItem {
     }
     return '';
   }
+}
+
+class _DriverOption {
+  final String driverId;
+  final String driverName;
+
+  const _DriverOption({
+    required this.driverId,
+    required this.driverName,
+  });
 }

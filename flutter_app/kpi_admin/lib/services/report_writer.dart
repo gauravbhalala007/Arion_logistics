@@ -80,7 +80,7 @@ class ReportWriter {
     final year = _numFromAny(summary, ['year', 'Year'])?.toInt() ?? now.year;
     final week = _numFromAny(summary, ['weekNumber', 'week_number', 'week'])?.toInt() ?? _isoWeekOfYear(now);
     final station = _normStation(summary['stationCode']?.toString());
-    return '${station}_${year}-W$week';
+    return '${station}_$year-W$week';
   }
 
   static int _isoWeekOfYear(DateTime date) {
@@ -116,11 +116,15 @@ class ReportWriter {
         podRejects != null ||
         drivers.any((d) => d.containsKey('POD_Q_Opportunities'));
 
+    final now = DateTime.now();
     final reportId = makeReportId(summary);
     final reportRef = db.collection('users').doc(uid).collection('reports').doc(reportId);
 
-    final year = _numFromAny(summary, ['year', 'Year'])?.toInt();
-    final week = _numFromAny(summary, ['weekNumber', 'week_number', 'week'])?.toInt();
+    final year =
+        _numFromAny(summary, ['year', 'Year'])?.toInt() ?? now.year;
+    final week =
+        _numFromAny(summary, ['weekNumber', 'week_number', 'week'])?.toInt() ??
+        _isoWeekOfYear(now);
     final station = _normStation(summary['stationCode']?.toString());
 
     final summaryUpdate = <String, dynamic>{};
@@ -171,18 +175,12 @@ class ReportWriter {
       'updatedAt'  : FieldValue.serverTimestamp(),
     };
 
-    if (year != null) reportUpdate['year'] = year;
-    if (week != null) reportUpdate['weekNumber'] = week;
+    reportUpdate['year'] = year;
+    reportUpdate['weekNumber'] = week;
     if (station.isNotEmpty) reportUpdate['stationCode'] = station;
     if (summaryUpdate.isNotEmpty) reportUpdate['summary'] = summaryUpdate;
 
     await reportRef.set(reportUpdate, SetOptions(merge: true));
-    await _deleteExistingScoresForWeek(
-      db: db,
-      uid: uid,
-      reportRef: reportRef,
-      reportId: reportId,
-    );
 
     // NEW: load user driver dictionary once
     final driverDictSnap = await db
@@ -194,6 +192,40 @@ class ReportWriter {
           (d.data()['transporterId'] ?? d.id).toString(),
         ): (d.data()['driverName'] ?? '').toString(),
     };
+
+    final hasAnyDspRows = drivers.any(
+      (m) => _hasAnyValue(m, const [
+        'FinalScore',
+        'POD_Score',
+        'CC_Score',
+        'DCR_Score',
+        'CE_Score',
+        'LoR_Score',
+        'DNR_Score',
+        'CDF_Score',
+        'Delivered',
+        'DELIVERED',
+        'delivered',
+        'LoR DPMO',
+        'DNR DPMO',
+        'CDF DPMO',
+        'rank',
+        'Rank',
+        'statusBucket',
+        'status_bucket',
+      ]),
+    );
+
+    // Only full DSP scorecard uploads should replace the week's score docs.
+    // POD Quality uploads should merge POD data onto existing driver scores.
+    if (hasAnyDspRows) {
+      await _deleteExistingScoresForWeek(
+        db: db,
+        uid: uid,
+        reportRef: reportRef,
+        reportId: reportId,
+      );
+    }
 
     final batch = db.batch();
 
@@ -266,8 +298,8 @@ class ReportWriter {
           'reportId'     : reportId,
           'transporterId': transporterId,
           'driverName'   : driverName,
-          if (year != null) 'year': year,
-          if (week != null) 'weekNumber': week,
+          'year': year,
+          'weekNumber': week,
           'reportDate'   : FieldValue.serverTimestamp(),
           'podQuality'   : podQuality,
           'computedAt'   : FieldValue.serverTimestamp(),
@@ -312,8 +344,8 @@ class ReportWriter {
           'reportId'     : reportId,
           'transporterId': transporterId,
           'driverName'   : driverName, // <-- attach if known
-          if (year != null) 'year': year,
-          if (week != null) 'weekNumber': week,
+          'year': year,
+          'weekNumber': week,
           'reportDate'   : FieldValue.serverTimestamp(),
           'kpis'         : kpis,
           'comp'         : comp,
