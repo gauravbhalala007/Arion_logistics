@@ -15,8 +15,6 @@ import 'package:file_picker/file_picker.dart';
 import 'scorecard_week.dart';
 
 import 'package:firebase_auth/firebase_auth.dart';
-import '../widgets/app_shell.dart';
-import '../widgets/app_side_menu.dart';
 import '../localization/app_localizations.dart';
 
 /// Simple German-style number formatting
@@ -150,13 +148,18 @@ class ScorecardWeekShellPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    return AppShell(
-      menuWidth: 300,
-      sideMenu: const AppSideMenu(width: 300, active: AppNav.dashboard),
-      body: ScorecardWeekPage(reportRef: reportRef),
-      title: Text(
-        '${t.t('nav_scorecard').toUpperCase()} ${t.t('dash_week').toUpperCase()}',
+    return Scaffold(
+      backgroundColor: _UI.bg,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: _UI.textPrimary,
+        elevation: 0,
+        title: Text(
+          '${t.t('nav_scorecard').toUpperCase()} ${t.t('dash_week').toUpperCase()}',
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ),
       ),
+      body: ScorecardWeekPage(reportRef: reportRef),
     );
   }
 }
@@ -228,16 +231,19 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
         .where('year', isEqualTo: year)
         .snapshots()
         .map((s) {
-          return s.docs.where((doc) {
-            final data = doc.data();
-            final reportId = _s(data['reportId']);
-            if (reportId.isNotEmpty && reportIds.contains(reportId)) {
-              return true;
-            }
+          return s.docs
+              .where((doc) {
+                final data = doc.data();
+                final reportId = _s(data['reportId']);
+                if (reportId.isNotEmpty && reportIds.contains(reportId)) {
+                  return true;
+                }
 
-            final reportPath = _s(data['reportPath']);
-            return reportPath.isNotEmpty && reportPaths.contains(reportPath);
-          }).toList(growable: false);
+                final reportPath = _s(data['reportPath']);
+                return reportPath.isNotEmpty &&
+                    reportPaths.contains(reportPath);
+              })
+              .toList(growable: false);
         });
   }
 
@@ -372,8 +378,7 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
           })
         : t.t('scorecard_overview_all_stations');
 
-    final scoreStream =
-        (filterYear == null || periodReports.isEmpty)
+    final scoreStream = (filterYear == null || periodReports.isEmpty)
         ? Stream.value(<QueryDocumentSnapshot<Map<String, dynamic>>>[])
         : _scoresForPeriod(
             year: filterYear,
@@ -1675,11 +1680,12 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                                     children: [
                                       PopupMenuButton<String>(
                                         tooltip: t.t('scorecard_overview_more'),
-                                        onSelected: (v) => _handleReportMenuAction(
-                                          v,
-                                          reportRef: p.ref,
-                                          titleLabel: rowTitle,
-                                        ),
+                                        onSelected: (v) =>
+                                            _handleReportMenuAction(
+                                              v,
+                                              reportRef: p.ref,
+                                              titleLabel: rowTitle,
+                                            ),
                                         itemBuilder: (ctx) => [
                                           PopupMenuItem<String>(
                                             value: 'delete',

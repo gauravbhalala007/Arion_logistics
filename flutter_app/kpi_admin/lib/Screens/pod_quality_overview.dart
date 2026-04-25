@@ -9,8 +9,6 @@ import 'package:intl/intl.dart';
 import '../services/parser_api.dart';
 import '../services/report_writer.dart';
 import '../localization/app_localizations.dart';
-import '../widgets/app_shell.dart';
-import '../widgets/app_side_menu.dart';
 import 'pod_quality_week.dart';
 
 final _pct = NumberFormat.decimalPattern('de');
@@ -52,11 +50,18 @@ class PodQualityWeekShellPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    return AppShell(
-      menuWidth: 300,
-      sideMenu: const AppSideMenu(width: 300, active: AppNav.podQuality),
+    return Scaffold(
+      backgroundColor: const Color(0xFFF6F7F5),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF0F172A),
+        elevation: 0,
+        title: Text(
+          t.t('pod_quality_shell_week_title'),
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ),
+      ),
       body: PodQualityWeekPage(reportRef: reportRef),
-      title: Text(t.t('pod_quality_shell_week_title')),
     );
   }
 }

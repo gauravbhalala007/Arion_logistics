@@ -16,6 +16,7 @@ enum AppNav {
   academy,
   dispatcherPill,
   notifications,
+  feedback,
   faqs,
   comingSoon,
   adminApprovals,
@@ -128,6 +129,14 @@ class AppSideMenu extends StatelessWidget {
         label: 'FAQs',
         active: active == AppNav.faqs,
         onTap: () => _handleNav(context, AppNav.faqs, '/faqs'),
+      ),
+      _MenuItem(
+        // `feedback_outlined` may render as blank on some older icon fonts;
+        // use the more widely supported filled icon.
+        icon: Icons.feedback,
+        label: 'Feedback',
+        active: active == AppNav.feedback,
+        onTap: () => _handleNav(context, AppNav.feedback, '/feedback'),
       ),
 
       // ---- Admin-only item (auto-detect from Firestore user role) ----
@@ -247,6 +256,11 @@ class AppSideMenu extends StatelessWidget {
                             child: TextButton.icon(
                               onPressed: () async {
                                 await AuthService.signOut();
+                                if (!context.mounted) return;
+                                Navigator.of(context).pushNamedAndRemoveUntil(
+                                  '/login',
+                                  (r) => false,
+                                );
                               },
                               icon: const Icon(
                                 Icons.logout,

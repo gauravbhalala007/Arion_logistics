@@ -2,11 +2,12 @@
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../services/auth_service.dart'; // Ensure this path is correct
 
 // Define the custom colors used in the mockup
-const Color primaryTeal = Color(0xFF50B39E); 
-const Color backgroundLight = Color(0xFFF5F5F5); 
+const Color primaryTeal = Color(0xFF50B39E);
+const Color backgroundLight = Color(0xFFF5F5F5);
 const Color coColor = Color(0xFF3B5B53); // Darker green for 'CO'
 
 class LoginPage extends StatefulWidget {
@@ -45,10 +46,11 @@ class _LoginPageState extends State<LoginPage> {
 
     setState(() => _busy = true);
     try {
-      await AuthService.signIn(
-        email: email,
-        password: password,
-      );
+      await AuthService.signIn(email: email, password: password);
+
+      // Helps OS/browser password managers decide to save credentials.
+      // (On Flutter web, prompts can still be browser-dependent.)
+      TextInput.finishAutofillContext(shouldSave: true);
 
       if (!mounted) return;
       _clearMessages();
@@ -149,10 +151,14 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     final isError = _errorMessage != null;
-    final borderColor = isError ? const Color(0xFFF3B0B0) : const Color(0xFF9ED9C8);
+    final borderColor = isError
+        ? const Color(0xFFF3B0B0)
+        : const Color(0xFF9ED9C8);
     final bgColor = isError ? const Color(0xFFFFF4F4) : const Color(0xFFF2FBF7);
     final iconColor = isError ? const Color(0xFFC24141) : primaryTeal;
-    final icon = isError ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded;
+    final icon = isError
+        ? Icons.error_outline_rounded
+        : Icons.check_circle_outline_rounded;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
@@ -171,7 +177,9 @@ class _LoginPageState extends State<LoginPage> {
             child: Text(
               message,
               style: TextStyle(
-                color: isError ? const Color(0xFF7F1D1D) : const Color(0xFF155E4B),
+                color: isError
+                    ? const Color(0xFF7F1D1D)
+                    : const Color(0xFF155E4B),
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
                 height: 1.35,
@@ -188,7 +196,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     // The theme object is still required for the form styling helper
-    // final theme = Theme.of(context); 
+    // final theme = Theme.of(context);
 
     return Scaffold(
       backgroundColor: backgroundLight,
@@ -208,17 +216,17 @@ class _LoginPageState extends State<LoginPage> {
                       // *** IMAGE ASSET LOGO ***
                       // Replace 'assets/codriver_logo.png' with your actual image path.
                       Image.asset(
-                        'assets/codriver_logo.png', 
-                        width: 350, // Adjust size as needed for your full logo image
-                        height: 200, 
+                        'assets/codriver_logo.png',
+                        width:
+                            350, // Adjust size as needed for your full logo image
+                        height: 200,
                         fit: BoxFit.contain,
                       ),
                     ],
                   ),
                 ),
-                
-                const SizedBox(height: 60), // Space before the card
 
+                const SizedBox(height: 60), // Space before the card
                 // 2. Login Form Card (Remains the same)
                 Card(
                   elevation: 0,
@@ -228,96 +236,112 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(32),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const Text(
-                          'Welcome back!',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
-                        ),
-                        const SizedBox(height: 24),
-                        _buildStatusCard(),
-                        
-                        // Email Input Field
-                        TextField(
-                          controller: _email,
-                          keyboardType: TextInputType.emailAddress,
-                          onChanged: (_) {
-                            if (_errorMessage != null || _infoMessage != null) {
-                              _clearMessages();
-                            }
-                          },
-                          decoration: _getInputDecoration('Your email'), 
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Password Input Field
-                        TextField(
-                          controller: _password,
-                          obscureText: true,
-                          onChanged: (_) {
-                            if (_errorMessage != null || _infoMessage != null) {
-                              _clearMessages();
-                            }
-                          },
-                          onSubmitted: (_) => _submit(),
-                          decoration: _getInputDecoration('Your password'), 
-                        ),
-                        const SizedBox(height: 32),
-
-                        // Login Button ("Continue")
-                        ElevatedButton(
-                          onPressed: _busy ? null : _submit,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryTeal,
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size(double.infinity, 56),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(28),
-                            ),
-                            elevation: 0,
-                            textStyle: const TextStyle(
-                              fontSize: 18, 
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          child: Text(_busy ? 'Please wait…' : 'Continue'),
-                        ),
-
-                        const SizedBox(height: 16),
-                        
-                        // Forgot Password Link
-                        TextButton(
-                  onPressed: () => Navigator.of(context).pushReplacementNamed('/signup'),
-                  child: const Text('New here?? SignUp.'),
-                ),
-                        TextButton(
-                          onPressed: _reset,
-                          child: Text(
-                            'Forgot password?', 
+                    child: AutofillGroup(
+                      onDisposeAction: AutofillContextAction.commit,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Text(
+                            'Welcome back!',
+                            textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: Colors.grey.shade600,
-                              fontWeight: FontWeight.w500,
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
                             ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 24),
+                          _buildStatusCard(),
+
+                          // Email Input Field
+                          TextField(
+                            controller: _email,
+                            keyboardType: TextInputType.emailAddress,
+                            autofillHints: const [AutofillHints.username],
+                            textInputAction: TextInputAction.next,
+                            onChanged: (_) {
+                              if (_errorMessage != null ||
+                                  _infoMessage != null) {
+                                _clearMessages();
+                              }
+                            },
+                            decoration: _getInputDecoration('Your email'),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Password Input Field
+                          TextField(
+                            controller: _password,
+                            obscureText: true,
+                            enableSuggestions: false,
+                            autocorrect: false,
+                            autofillHints: const [AutofillHints.password],
+                            textInputAction: TextInputAction.done,
+                            onChanged: (_) {
+                              if (_errorMessage != null ||
+                                  _infoMessage != null) {
+                                _clearMessages();
+                              }
+                            },
+                            onSubmitted: (_) => _submit(),
+                            decoration: _getInputDecoration('Your password'),
+                          ),
+                          const SizedBox(height: 32),
+
+                          // Login Button ("Continue")
+                          ElevatedButton(
+                            onPressed: _busy ? null : _submit,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryTeal,
+                              foregroundColor: Colors.white,
+                              minimumSize: const Size(double.infinity, 56),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(28),
+                              ),
+                              elevation: 0,
+                              textStyle: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            child: Text(_busy ? 'Please wait…' : 'Continue'),
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          // Forgot Password Link
+                          TextButton(
+                            onPressed: () => Navigator.of(
+                              context,
+                            ).pushReplacementNamed('/signup'),
+                            child: const Text('New here?? SignUp.'),
+                          ),
+                          TextButton(
+                            onPressed: _reset,
+                            child: Text(
+                              'Forgot password?',
+                              style: TextStyle(
+                                color: Colors.grey.shade600,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-                
+
                 const SizedBox(height: 40),
 
                 // 3. Footer Branding (English company name)
                 Align(
                   alignment: Alignment.center,
                   child: Text(
-                    'Kreativvwerk', 
+                    'Kreativvwerk',
                     style: TextStyle(
                       color: Colors.grey.shade500,
                       fontWeight: FontWeight.bold,
-                      fontSize: 14
+                      fontSize: 14,
                     ),
                   ),
                 ),

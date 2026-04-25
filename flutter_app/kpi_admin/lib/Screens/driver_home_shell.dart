@@ -31,6 +31,7 @@ import '../widgets/notification_pin_dialogs.dart';
 import 'driver_profile_page.dart';
 import 'driver_faq_page.dart';
 import 'driver_incident_report_page.dart';
+import 'login_page.dart';
 
 // same colors as in dashboard
 const _kBg = Color(0xFFF3F6F7);
@@ -89,6 +90,7 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
   int _unreadCount = 0;
   int _unconfirmedRulesCount = 0;
   int _pendingTasksCount = 0;
+  bool _redirectingToLogin = false;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _notifSub;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _tasksSub;
 
@@ -278,13 +280,18 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
 
   @override
   Widget build(BuildContext context) {
-    final loc = AppLocalizations.of(context);
-
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) {
-      return Scaffold(
-        body: Center(child: Text(loc.t('error_must_be_logged_in_driver'))),
-      );
+      if (!_redirectingToLogin) {
+        _redirectingToLogin = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          Navigator.of(context).pushNamedAndRemoveUntil('/login', (r) => false);
+        });
+      }
+      return const LoginPage();
+    } else {
+      _redirectingToLogin = false;
     }
 
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
@@ -1055,6 +1062,10 @@ class _HeaderBar extends StatelessWidget {
                         onPressed: () async {
                           Navigator.of(ctx).pop();
                           await FirebaseAuth.instance.signOut();
+                          if (!context.mounted) return;
+                          Navigator.of(
+                            context,
+                          ).pushNamedAndRemoveUntil('/login', (r) => false);
                         },
                         child: Text(
                           loc.t('profile_logout'),

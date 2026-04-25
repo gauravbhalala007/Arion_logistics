@@ -127,6 +127,9 @@ class App extends StatelessWidget {
             '/notifications': (_) => _wrapSelectable(
               const AdminShellPage(initialNav: AppNav.notifications),
             ),
+            '/feedback': (_) => _wrapSelectable(
+              const AdminShellPage(initialNav: AppNav.feedback),
+            ),
             '/faqs': (_) =>
                 _wrapSelectable(const AdminShellPage(initialNav: AppNav.faqs)),
             '/admin-approvals': (_) => _wrapSelectable(

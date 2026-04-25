@@ -85,7 +85,8 @@ class DriverSideMenu extends StatelessWidget {
                     return u?.displayName ?? 'Driver';
                   })();
 
-                  final email = u?.email ?? (profile?['email'] ?? '—').toString();
+                  final email =
+                      u?.email ?? (profile?['email'] ?? '—').toString();
 
                   // Load avatar from users/{uid}.profilePhotoBase64
                   final img = _profileImageFromUserData(
@@ -113,18 +114,20 @@ class DriverSideMenu extends StatelessWidget {
                                 backgroundColor: Colors.white24,
                                 backgroundImage: img,
                                 child: img == null
-                                    ? const Icon(Icons.person, color: Colors.white)
+                                    ? const Icon(
+                                        Icons.person,
+                                        color: Colors.white,
+                                      )
                                     : null,
                               ),
                               const SizedBox(width: 10),
                               Expanded(
-                                child: _ProfileText(
-                                  name: name,
-                                  email: email,
-                                ),
+                                child: _ProfileText(name: name, email: email),
                               ),
-                              const Icon(Icons.chevron_right,
-                                  color: Colors.white70),
+                              const Icon(
+                                Icons.chevron_right,
+                                color: Colors.white70,
+                              ),
                             ],
                           ),
                         ),
@@ -134,8 +137,15 @@ class DriverSideMenu extends StatelessWidget {
                           child: TextButton.icon(
                             onPressed: () async {
                               await FirebaseAuth.instance.signOut();
+                              if (!context.mounted) return;
+                              Navigator.of(
+                                context,
+                              ).pushNamedAndRemoveUntil('/login', (r) => false);
                             },
-                            icon: const Icon(Icons.logout, color: Colors.white70),
+                            icon: const Icon(
+                              Icons.logout,
+                              color: Colors.white70,
+                            ),
                             label: const Text(
                               'Sign out',
                               style: TextStyle(color: Colors.white70),
@@ -242,9 +252,7 @@ class _ProfileText extends StatelessWidget {
 }
 
 /// Decode profile photo from base64 stored directly on users/{uid}.profilePhotoBase64
-ImageProvider? _profileImageFromUserData({
-  dynamic directBase64,
-}) {
+ImageProvider? _profileImageFromUserData({dynamic directBase64}) {
   String? base64String;
 
   if (directBase64 != null && directBase64.toString().isNotEmpty) {
