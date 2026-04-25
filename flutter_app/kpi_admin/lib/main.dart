@@ -10,7 +10,7 @@ import 'Screens/login_page.dart';
 import 'Screens/signup_page.dart';
 import 'Screens/verify_email_page.dart';
 import 'Screens/driver_dashboard_page.dart';
-import 'screens/admin_shell_page.dart';
+import 'Screens/admin_shell_page.dart';
 import 'widgets/app_side_menu.dart'; // for AppNav
 
 import 'package:flutter_localizations/flutter_localizations.dart';

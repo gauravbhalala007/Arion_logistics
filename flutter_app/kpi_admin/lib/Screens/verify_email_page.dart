@@ -1,7 +1,51 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../localization/app_localizations.dart';
-import '../services/auth_service.dart';
+
+// --- Codriver Design Tokens (from CODRIVER_STYLEGUIDE.md) ---
+const Color _codriverGreen = Color(0xFF00B287);
+const Color _codriverDeep = Color(0xFF006047);
+const Color _green50 = Color(0xFFE6F8F2);
+
+const Color _background = Color(0xFFFFFFFF);
+const Color _surfaceElevated = Color(0xFFFFFFFF);
+const Color _label = Color(0xFF000000);
+const Color _labelSecondary = Color(0x993C3C43);
+
+const double _spXs = 8;
+const double _spSm = 12;
+const double _spMd = 16;
+const double _spLg = 20;
+const double _spXl = 24;
+const double _spXxl = 32;
+const double _spXxxl = 48;
+
+const String _fontFamily = 'SF Pro Display';
+
+const TextStyle _title1 = TextStyle(
+  fontFamily: _fontFamily,
+  fontSize: 28,
+  height: 34 / 28,
+  fontWeight: FontWeight.w700,
+  letterSpacing: 0.36,
+  color: _label,
+);
+
+const TextStyle _headline = TextStyle(
+  fontFamily: _fontFamily,
+  fontSize: 17,
+  height: 22 / 17,
+  fontWeight: FontWeight.w600,
+  letterSpacing: -0.43,
+);
+
+const TextStyle _body = TextStyle(
+  fontFamily: _fontFamily,
+  fontSize: 17,
+  height: 22 / 17,
+  fontWeight: FontWeight.w400,
+  letterSpacing: -0.43,
+  color: _label,
+);
 
 class VerifyEmailPage extends StatefulWidget {
   const VerifyEmailPage({super.key});
@@ -11,88 +55,189 @@ class VerifyEmailPage extends StatefulWidget {
 }
 
 class _VerifyEmailPageState extends State<VerifyEmailPage> {
-  bool _busy = false;
-
-  Future<void> _resend() async {
-    if (_busy) return;
-    setState(() => _busy = true);
+  Future<void> _backToLogin() async {
     try {
-      await AuthService.resendVerificationEmail();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppLocalizations.of(context).t('verify_email_sent')),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      final t = AppLocalizations.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            t.tf('verify_email_failed_template', {'error': e.toString()}),
-          ),
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _iVerifiedReload() async {
-    await FirebaseAuth.instance.currentUser?.reload();
-    setState(() {});
+      await FirebaseAuth.instance.signOut();
+    } catch (_) {}
+    if (!mounted) return;
+    Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
   }
 
   @override
   Widget build(BuildContext context) {
-    final t = AppLocalizations.of(context);
-    final email = FirebaseAuth.instance.currentUser?.email ?? '';
     return Scaffold(
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.mark_email_read_outlined, size: 48),
-              const SizedBox(height: 12),
-              Text(
-                t.t('verify_email_title'),
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                ),
+      backgroundColor: _background,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: ListView(
+              padding: const EdgeInsets.symmetric(
+                horizontal: _spXl,
+                vertical: _spXxl,
               ),
-              const SizedBox(height: 8),
-              Text(
-                t.t('verify_email_intro'),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 4),
-              Text(email, style: const TextStyle(fontWeight: FontWeight.w700)),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: _busy ? null : _resend,
-                child: Text(
-                  _busy
-                      ? t.t('verify_email_sending')
-                      : t.t('verify_email_resend'),
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed: _iVerifiedReload,
-                child: Text(t.t('verify_email_reload')),
-              ),
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: () => Navigator.of(context).pushReplacementNamed('/login'),
-                child: Text(t.t('verify_email_back_to_login')),
-              ),
-            ],
+              shrinkWrap: true,
+              children: [
+                const SizedBox(height: _spXxl),
+                _buildLogo(),
+                const SizedBox(height: _spXxxl),
+                _buildBetaCard(),
+                const SizedBox(height: _spXl),
+              ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildLogo() {
+    return Center(
+      child: Image.asset(
+        'assets/login_codriver_logo.png',
+        width: 240,
+        height: 140,
+        fit: BoxFit.contain,
+      ),
+    );
+  }
+
+  Widget _buildBetaCard() {
+    return Container(
+      padding: const EdgeInsets.all(_spXl),
+      decoration: const BoxDecoration(
+        color: _surfaceElevated,
+        borderRadius: BorderRadius.all(Radius.circular(18)),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x0A000000),
+            offset: Offset(0, 1),
+            blurRadius: 2,
+          ),
+          BoxShadow(
+            color: Color(0x0F000000),
+            offset: Offset(0, 4),
+            blurRadius: 12,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              width: 64,
+              height: 64,
+              decoration: const BoxDecoration(
+                color: _green50,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.rocket_launch_rounded,
+                size: 32,
+                color: _codriverDeep,
+              ),
+            ),
+          ),
+          const SizedBox(height: _spLg),
+          const Text(
+            'Beta-Phase',
+            textAlign: TextAlign.center,
+            style: _title1,
+          ),
+          const SizedBox(height: _spXs),
+          Text(
+            'Vielen Dank für dein Interesse an CODRIVER.',
+            textAlign: TextAlign.center,
+            style: _headline.copyWith(color: _codriverDeep),
+          ),
+          const SizedBox(height: _spLg),
+          Text(
+            'Aktuell befinden wir uns in der Beta-Phase.',
+            textAlign: TextAlign.center,
+            style: _body.copyWith(color: _labelSecondary, height: 1.45),
+          ),
+          const SizedBox(height: _spSm),
+          Text(
+            'Wenn du die Codriver App testen möchtest, melde dich bitte per E-Mail bei uns:',
+            textAlign: TextAlign.center,
+            style: _body.copyWith(color: _labelSecondary, height: 1.45),
+          ),
+          const SizedBox(height: _spMd),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: _spMd,
+              vertical: _spSm,
+            ),
+            decoration: BoxDecoration(
+              color: _green50,
+              borderRadius: const BorderRadius.all(Radius.circular(999)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.mail_outline_rounded,
+                  size: 18,
+                  color: _codriverDeep,
+                ),
+                const SizedBox(width: _spXs),
+                SelectableText(
+                  'info@kw-agentur.de',
+                  style: _headline.copyWith(
+                    color: _codriverDeep,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: _spLg),
+          Text(
+            'Vielen Dank für dein Verständnis!',
+            textAlign: TextAlign.center,
+            style: _body.copyWith(color: _labelSecondary, height: 1.45),
+          ),
+          const SizedBox(height: _spXxl),
+          SizedBox(
+            height: 50,
+            child: ElevatedButton(
+              onPressed: _backToLogin,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _codriverGreen,
+                foregroundColor: Colors.white,
+                shape: const StadiumBorder(),
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: _spXxl),
+                textStyle: _headline,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+                  SizedBox(width: _spXs),
+                  Text('Zurück zum Login', style: _headline),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: _spSm),
+          const Center(
+            child: Text(
+              'Kreativwerk | www.kw-agentur.de',
+              style: TextStyle(
+                fontFamily: _fontFamily,
+                fontSize: 13,
+                height: 18 / 13,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.3,
+                color: Color(0x4D3C3C43),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

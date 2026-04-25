@@ -598,211 +598,218 @@ class AppLocalizations {
       'faq_green_book_video_open_failed':
           'Could not open Green Book video link.',
 
-      'faq_q1': 'What is the most important aspect of your daily work?',
-      'faq_a1':
-          'Delivering every package with care and conducting yourself professionally at all times.',
+      'faq_q1': 'What is most important about your daily task?',
+      'faq_a1': 'Delivering packages in quality and in good behavior.',
 
-      'faq_q2':
-          'What should you avoid doing if a problem arises with a customer?',
+      'faq_q2': 'What should you not do in case of problems with the costumer?',
       'faq_a2':
-          'Please do not attempt to resolve the situation on your own. Instead, notify the dispatcher on duty immediately. We will communicate with the customer on your behalf to prevent the issue from escalating and to avoid any negative consequences from Amazon. We are here to support you.',
+          'DO NOT try to handle the situation yourself and inform a dispatcher onduty instead. We will try to talk to the costumer for you and avoid any bad consequences from Amazon due to costumer complaints. We are here for you!',
 
       'faq_q3':
-          'What should I do if a situation with a customer has already escalated?',
+          'What if the situation has already escalated and the costumer is not happy for whatever happened?',
       'faq_a3':
-          'It is never too late to address a mistake. Please contact us and we will do our best to resolve the issue directly with the customer.',
+          'It is never too late to fix any mistakes. Still call us and we will try to fix the mistake with the costumer. Better late than ever.',
 
       'faq_q4':
-          'Which matters more: quantity (completing as many stops as quickly as possible) or quality?',
+          'What is more important, Quantity (speed of delivering as many stops as possible) or Quality?',
       'faq_a4':
-          'Quality always comes first. Follow the customer\'s delivery instructions carefully and never leave a package in an unsafe location simply because you are behind schedule.',
+          'Quality! Always quality! Follow costumers instructions and DO NOT leave the package in unsafe locations, just because you are behind with your stops.',
 
       'faq_q5':
-          'What if I focus on quality but then fall behind on my stops?',
+          'What if I focus on quality but then I get behind with my stops?',
       'faq_a5':
-          'You will complete your route one way or another. We will arrange support when it is reasonable and necessary.',
+          'You will finish your stops, in one way or another. We will try to send help but only if we see it reasonable.',
+
+      'faq_q6': 'What is scorecard and a DNR?',
+      'faq_a6': 'Glad you asked.',
 
       'faq_q7': 'Weekly Scorecard',
       'faq_a7':
-          'The weekly scorecard provides a concise overview of the team\'s performance against our key objectives. It highlights our strengths, identifies areas that need improvement, and helps determine our focus for the week ahead. Overall performance tiers are as follows:\n'
+          'The weekly scorecard gives us a quick, clear overview of how the team is doing on our key goals. It helps us spot what’s going well, where we’re falling behind, and what we need to focus on for the week ahead The overall scores are as follows:\n'
           '• Fantastic Plus: >93% (exceptional performance)\n'
           '• Fantastic: 85% – 92.9%\n'
           '• Great: 70% – 84.9%\n'
           '• Fair: 50% – 69.9%\n'
           '• Poor: <50%',
 
-      'faq_q7_1': 'DNR Tab — Delivered Not Received',
+      'faq_q7_1': 'DNR Tab\nDelivered Not Received',
       'faq_a7_1':
-          'A DNR is recorded when you have marked a package as delivered using the "Swipe to finish" button, but the customer did not actually receive it. Common causes include package theft, an empty parcel upon arrival, or delivery to an incorrect address.\n'
-          'Every Tuesday you will receive photos of each DNR logged against you during the previous week.',
+          'Is when you have delivered a package, and clicked "Swipe to finish" button confirming you have delivered the package but the costumer has not received the package due to number of reasons: Package theft, box being empty of the package items and also wrong delivery to the wrong address.\n'
+          'Every Tuesday you will receive pictures of every DNR you have received during the week.',
 
       'faq_q7_1_1':
-          'How can I avoid DNRs, and how significantly do they affect my weekly scorecard?',
+          'How should I avoid this and how important it is to the weekly scorecard?',
       'faq_a7_1_1':
-          'DNRs have a major impact on your score. To prevent them, notify the customer in advance that you are on your way, and only ring the bell that clearly displays the customer\'s name.',
+          'It is very important and to avoid this you simply should inform the costumer beforehand that you are soon going to their house/business and ONLY ring the bell with their nameplate on it.',
 
-      'faq_q7_1_2': 'How can I prevent package losses?',
+      'faq_q7_1_2': 'How do I avoid package losses?',
       'faq_a7_1_2':
-          'Whenever possible, hand the package directly to the customer. If that is not possible, send a message to the customer stating exactly where the package was left — for example, in the garage, under the stairs, in the shed, or behind a flower pot.\n'
-          'If you believe it is unsafe to leave the package unattended, do not leave it. Take it with you and reattempt delivery later. This is extremely important.',
+          'Always try to give the packages on hand to the costumer and if this is not possible, send a message informing them as to where the package was left, for example, in the garage, under the stairs, in the shed, behind the flower vase, etc..\n'
+          'If you do not think it is safe to leave the package unattended, please, it is always best to just take the package and try again later. This is VERY important.',
 
-      'faq_q7_1_3': 'How do I determine whether a location is safe?',
+      'faq_q7_1_3': 'How do I know what place is safe or not?',
       'faq_a7_1_3':
-          'Use your judgement and common sense. For example, a package left by the mailboxes in a building with 20 to 30 floors is far more likely to be stolen than one left at a private residence.\n'
-          'To support you, we post a daily list each morning of addresses that carry a high risk of theft or customer complaints, based on historical delivery data and statistics.',
+          'Instinct and also common sense. If a building consist of 20 - 30 floors and you leave it by the mailboxes, chances for it to be stolen are higher and higher compared to those in a private house.\n'
+          'Also, to help you on your daily deliveries and to avoid getting hit by a DNR, everyday morning we will post a picture with addresses that consist with a high chance of packages to be stolen and costumers complaining, based on previous results deliveries and statistics.',
 
       'faq_q7_1_4':
-          'How does a lost or stolen package affect my score?',
+          'What if a package is lost or stolen, how will that affect my score?',
       'faq_a7_1_4':
-          'The impact is significant. A single lost package can reduce your score by at least 30% and costs you a minimum of 600 points. Note that the higher the number of points displayed under your name on the scorecard, the worse your performance is considered. The more packages you deliver per week, the fewer points you lose per incident, and the value of the missing item also factors in — more expensive items result in greater point loss. We should keep this metric as low as possible.\n'
-          'Equally important: if you consistently record a high number of lost packages, we will be required to terminate your employment, as Amazon may eventually suspect theft. This is a serious risk and cannot be ignored.',
+          'Badly. This will affect you by at least 30% and that is only with one package which loses you at least 600 points. The more points you see in the scorecard under your name, the worse it is. The more packages you deliver per work-week, the less points you lose. The points you lose also varies by the price of the item lost, the more expensive, more points lost. We should keep this score section as low as possible.\n'
+          'Not to be ignored is the fact that if you regurlarly have a high number of lost packages, we will have to release you due to the fact that sooner or later, Amazon may suspect of package theft, and therefore this is very dangerous.',
 
       'faq_q7_2':
-          'CC Tab — Contact Compliance',
+          'CC Tab\n'
+          'Contact Compliance',
       'faq_a7_2':
-          'This metric measures how often you contact the customer about their delivery, whether by text message or phone call. The less you communicate with the customer, the lower your score in this category will be. We should keep this metric as high as possible, as it is one of the easiest categories in which to perform well, and it contributes significantly to your overall score.',
+          'Meaning how many times you have reached out to the costumer about their delivery, be it via message or a phone call. The less you interact with the costumer, the less scores you will get in the scorecard and we should keep this section as high as possible because it is actually one of the the easiest categories and it helps a lot in your overall score.',
 
-      'faq_q7_2_1': 'Why is customer contact important?',
+      'faq_q7_2_1': 'Why should I do this?',
       'faq_a7_2_1':
-          'Delivering packages is not simply a drop-and-go operation. You should notify the customer in advance and, when appropriate, ask where they would like their package to be delivered.',
+          'Delivering packages is not just Drop&Go, you should also inform the costumer beforehand and ask them as to where would they like to have the package delivered.',
 
-      'faq_q7_2_2': 'How do I improve my CC score?',
+      'faq_q7_2_2': 'How do I improve my CC Scores?',
       'faq_a7_2_2':
-          'It is straightforward: call — and especially text — the customer at every stop.',
+          'Thank you for asking. Simple, by calling and especially by texting costumers in every stop.',
 
-      'faq_q7_3': 'CE Tab — Customer Escalation',
+      'faq_q7_3': 'CE Tab\nCostumer Escalation',
       'faq_a7_3':
-          'Recall the impact a DNR has on your score — a customer escalation is at least twice as damaging. Depending on the severity of the incident, it can even result in the loss of your position.',
+          'Remember how bad DNR affected your scores? Well, this is at least 2 times worse, and you also risk losing your job because it depends on how bad the situation was.',
 
-      'faq_q7_3_1': 'How can I avoid customer escalations?',
+      'faq_q7_3_1': 'How do I avoid this?',
       'faq_a7_3_1':
-          'Always follow the customer\'s delivery instructions carefully. If a mistake occurs, apologize first. If the customer is upset, ask for a moment of their time so they can speak with us directly — you should already be on the line with us. As noted in Section 2, it is always best to let us handle such situations.',
+          'By always following costumers delivery instructions and in case of a mistake, first please apologize and if the costumer is angry, please ask them for a minute of their time to talk to us, as you are already calling us. By reading Section 2, you should know by now that it is best to just leave it to us to handle such issues.',
 
-      'faq_q7_4': 'POD Tab — Picture on Delivery',
+      'faq_q7_4': 'POD Tab\nPicture on Delivery',
       'faq_a7_4':
-          'This column lists packages eligible for a Picture on Delivery (POD) where the submitted photo was marked Invalid or Not Sure. Common reasons for rejection include:\n'
-          '1. The package label showing customer details is visible in the photo. The package should be turned so the label faces away before the picture is taken.\n'
-          '2. The photo is blurred.\n'
-          '3. A person is visible in the photo.\n'
-          '4. No parcel is detected in the photo.\n'
-          '5. The parcel is inside the vehicle.\n'
-          '6. The parcel is in hand.\n'
-          '7. The parcel is placed inside the letterbox.\n'
-          '8. The parcel is too close to the camera.\n'
-          '9. The photo is too dark.\n'
-          'This category should be the easiest in which to achieve a 100% score, and doing so improves your overall performance.',
+          'This column shows the list of package eligible for PODs, for which photos have been taken but which have been either Invalid or Not Sure. Reason for rejecting a POD, which may include:\n'
+          '1- Package label on photo with costumers details. Package should be turned backwards before the picture is taken.\n'
+          '2- Blurred photo\n'
+          '3- Person apparent in photo\n'
+          '4- No parcel detected in photo\n'
+          '5- Parcel in car\n'
+          '6- Parcel in hand\n'
+          '7- Parcel in letterbox\n'
+          '8- Parcel too close\n'
+          '9- Photo too dark.\n'
+          'This one should always be the easiest where you should get a score of 100% and it improves your overall score',
 
-      'faq_q7_5': 'LoR Tab — Lost on Road',
+      'faq_q7_5': 'LoR Tab\nLost on Road',
       'faq_a7_5':
-          'This metric penalizes you when a package you scanned at loading is neither delivered nor returned at the end of your shift following an unsuccessful delivery attempt. In such cases the package is considered lost, and the penalty is equivalent to a DNR. Please count the packages you bring back carefully and ensure they match the list shown on your scanner under: Today\'s Itinerary → Summary → Problems. If the counts do not match, notify the on-duty dispatcher before ending your shift in the Amazon app.',
+          'Penalizes you when you have a scanned a package from your loading and have not returned it at the end of the shift in case of a unsuccesful delivery. So the package has been lost and you will lose as much points as you would in a DNR, so please count well the packages you bring back and make sure they match with the packages shown in scanner. You can find them on: Todays Itinerary - Summary - Problems. If they dont match, please inform the dispatcher on-duty before ending work in the Amazon app.',
 
-      'faq_q7_6': 'DCR Tab — Delivery Completion Rate',
+      'faq_q7_6': 'DCR Tab\nDelivery Completion Rate',
       'faq_a7_6':
-          'This metric reflects your delivery performance by tracking the percentage of deliveries completed as planned. It helps us assess the efficiency and reliability of our service and surfaces issues such as delays, failed attempts, or routing problems. Your DCR should always be as high as possible. To achieve this, carry out reattempts whenever feasible and minimize the number of returned packages.',
+          'YShows your capabilities on delivering packages. It tracks the percentage of deliveries completed as planned, helping us measure the efficiency and reliability of our deliveries. It highlights issues like delays, failed attempts, or routing problems. This should always be as high as possible. To make that possible you should every day do reattempts and avoid as much you can returning packages.',
 
-      'faq_q7_7': 'CDF Tab (formerly DEX) — Customer Delivery Feedback',
+      'faq_q7_7': 'CDF Tab (Previously, DEX)\nCostumer Delivery Feedback',
       'faq_a7_7':
-          'This metric captures the recipient\'s experience with the delivery, including punctuality, condition of the goods, and driver professionalism. It helps us identify our service strengths and areas for improvement. After delivery, the customer receives a survey email from Amazon with questions such as:\n'
-          '1) Was your package delivered on time? (Yes / No)\n'
-          '2) Was the package left in a secure location? (Yes / No)\n'
-          '3) Was the package in good condition when it arrived? (Yes / No)\n'
-          '4) How satisfied are you with the delivery overall? (Very satisfied / Satisfied / Neutral / Dissatisfied / Very dissatisfied)\n'
-          '5) How would you rate the communication and tracking updates for this delivery? (Excellent / Good / Fair / Poor)\n'
-          '6) Was the delivery person courteous and professional? (Yes / No / Not applicable — contactless delivery)\n'
-          '7) Do you have any comments about your delivery experience? (Additional customer comments)',
+          'Captures the recipient’s experience with the delivery process, including punctuality, condition of goods, and driver professionalism. It helps us identify service strengths and areas for improvement. At the end of the delivery, costumer gets an email from Amazon about the delivery experience, with questions such as:\n'
+          '1) Was your package delivered on time?\n'
+          'Yes / No\n'
+          '2) Was the package left in a secure location?\n'
+          'Yes / No\n'
+          '3) Was the package in good condition when it arrived?\n'
+          'Yes / No\n'
+          '4) How satisfied are you with the delivery overall?\n'
+          'Very satisfied / Satisfied / Neutral / Dissatisfied / Very Dissatisfied\n'
+          '5) How would you rate the communication and tracking updates for thisdelivery?\n'
+          'Excellent / Good / Fair / Poor\n'
+          '6) Was the delivery person courteous and professional?\n'
+          'Yes / No / Not Applicable (Contactless Delivery)\n'
+          '7) Do you have any comments about your delivery experience?\n'
+          '(Costumer additional comments)',
 
-      'faq_q7_8': 'What should I keep in mind about the scorecard overall?',
+      'faq_q7_8': 'What should I keep in mind about the scorecard?',
       'faq_a7_8':
-          'Quality and efficiency make a significant difference. Strong scores benefit you, the company, and the entire team. Customer satisfaction is our top priority, and outstanding scores are rewarded with a bonus from the company.\n'
-          'Give your best, and you will be rewarded accordingly.',
+          'Quality and efficency go a long way. Good scores are good for you, for the company and good for the whole team. Costumer satisfaction is very important and good scores are accompanied with a bonus from the company.\n'
+          'Give your best, get the best.',
 
-      'faq_q8': 'What other areas require my attention?',
+      'faq_q8': 'What other areas should I be careful about?',
       'faq_a8':
-          'Prioritize your personal safety by driving responsibly, preventing injuries, and exercising caution around dogs to avoid bites. Treat all work equipment — including the daily vehicle and the work scanner or phone — with care. Always come to work wearing your safety shoes, safety vest, and the appropriate Amazon-branded jacket or t-shirt for the weather conditions.',
+          'Taking care of yourself in driving safely, avoiding injuries and avoiding dogs and dog bites. Being careful with work equipment such as the daily vehicle, the work scanner/phone and coming to work wearing your safety shoes & safety vest, Amazon-branded jacket or t-shirt (depending on the weather).',
 
       'faq_q9':
-          'What should I do if I am involved in an accident or damage the work vehicle?',
+          'What happens if I do a car accident or damage the work vehicle?',
       'faq_a9':
-          'First, ensure that you are safe and not seriously injured. Regarding vehicle damage: if we determine that the accident was caused by negligence — for example, distraction from mobile phone use while driving — you will be held personally liable for the full cost of the damage. In addition, the police report that follows may result in license suspension, and such an incident is grounds for immediate dismissal. In less severe cases, you will be excluded from Weekly Scorecard Bonuses for two months. You are obligated to notify us immediately after any incident and provide the following details: the time and location of the incident, information on any damage to private or public property (walls, fences, lamp posts, people, or pets), and clear photos of the vehicle damage.',
+          'First, make sure you are okay and you are not badly injured. As about the car damage, if we determine that accidents occur due to negligence – for example, distractions such as mobile phone use while driving – you will be personally liable for the full damage. Additionally, you will receive a report from the police, which could even result in license suspension. Of course, this is also a reason for immediate dismissal. Otherwise you are only expelled from taking Weekly Scorecard Bonuses for 2 months. In case of an incident, you ARE obliged to inform us immediately and provide us with the time of the incident, location, if there is damages to private or public properties (such as wall, fences, lamp posts, people and/or pets), location and pictures of the car damages.',
 
-      'faq_q10': 'What should I do if a package is damaged or missing?',
+      'faq_q10': 'What do I do when I have packages damaged and/or missing.',
       'faq_a10':
-          'If a package is damaged, mark it as damaged in the system and return it to the station. If the damaged package contains liquid and has affected other packages, take a photo of all affected packages and send it to the on-duty dispatcher. We will report the incident to Amazon on your behalf.\n'
-          'If a package is missing, you may mark it as missing — unless it is an OTP package, in which case you must contact us first before marking it. This is critical.',
+          'When a package is damaged, feel free to book it as damaged and return it to station. If that damaged package was a liquid package and has damaged other packages with it, please make a picture of all damaged packages and send it to the dispatcher on duty and we will report it to Amazon for you.\n'
+          'When a package is missing, feel free to mark/book it as missing unless it has an OTP for which YOU HAVE to report it to us first before marking it as missing. This is VERY IMPORTANT.',
 
-      'faq_q11': 'What is an OTP (One-Time Password) package?',
+      'faq_q11': 'What is an OTP (One-Time Password) Package?',
       'faq_a11':
-          'An OTP package contains a high-value item for which Amazon requires the customer to provide the driver with a one-time password before delivery. This ensures the package reaches the correct recipient. You must handle OTP packages with great care, never leave them unattended, and only hand them over to the customer who has provided the correct password.',
+          'It is an expensive item that Amazon requires costumer to provide the driver with a One Time Password before delivering the package, to ensure the package is delivered to the right person/costumer. You have to take extensive care for such packages and not to leave them unattended and only hand the packages to the costumer that has provided you with the password.',
 
       'faq_q12':
-          'Why do we keep asking you to slow down rather than work faster?',
+          'Why do we keep bothering you to slow down and not go any faster?',
       'faq_a12':
-          'We understand this may feel repetitive, but it is required by the system. We must follow the algorithm\'s predefined stops-per-hour target so we can secure additional routes in the future and ensure you continue to receive work.\n'
-          'Moreover, working too quickly increases the risk of a DNR, which costs both you and the company points on the weekly scorecard.',
+          'We do not like that either but that is how the system is. We need to follow systems algorithm and do as many stops per-hour as predetermined so we can get more routes in the future and you get to work more and not be free.\n'
+          'Also by going faster, you risk getting a DNR and risk losing points for both, yourself and the company in the weekly scorecard.',
 
       'faq_q13':
-          'Why do dispatchers sometimes ask whether I am running behind, or whether something is wrong?',
+          'Then why do the dispatchers sometimes ask me as to why you are behind and if there is something wrong?',
       'faq_a13':
-          'We understand these check-ins are not always convenient, but we rely on your feedback to understand what may have occurred on the road that caused the delay. Amazon requires this information because each stop has a scheduled delivery window. When a route falls behind, Amazon needs to know why, so that future delivery efficiency can be improved based on this data.',
+          'We know this is not pleasant but we need some feedback as to what might have happened on the road that caused you to be behind with your stops. Amazon asks us for this feedback because there is also a timelimit of which you should have delivered X stop, therefore Amazon needs to know why the remaining stops are behind the delivery schedule and with this information, improve future delivery efficiency.',
 
-      'faq_q14': 'Why are you sometimes asked to assist a colleague?',
+      'faq_q14': 'Why do we sometimes ask you to go help a fellow colleague?',
       'faq_a14':
-          'A colleague\'s delay can result from a variety of factors: poor internet coverage in the area, heavy traffic, or streets blocked due to construction. In such cases, your support is needed to help them complete their route on time.',
+          'Because many factors play a role in the colleagues delay such as bad internet connection in the area, traffic, blocked streets due to construction in the area which has made it difficult for the other driver to deliver on time, therefore your help is needed.',
 
       'faq_q15':
-          'Will I deliver standard routes from my first day, like more experienced drivers?',
+          'Do I immediately in my first day, start to deliver standart-route packages as other, more experienced delivery drivers?',
       'faq_a15':
-          'No. You will begin with a 14-workday onboarding period during which you can apply what you learned on your ride-along days with your trainer and familiarize yourself with the area, the vehicle, the scanner, and the overall workflow.\n'
-          'During these 14 days, Amazon will reduce your daily package and stop count by up to 50% compared to a standard route.',
+          'No, obviously not that is not the case for you. At the beginning you will have a period of 14 work-days to put in practice what you have learned in the ride-along days with your trainer and adjust with the area, with the car, with the scanner and to learn the workflow proccess.\n'
+          'With that said, for that time period of 14 days, Amazon will give you up to 50% less than normal packages and stops in your schedule.',
 
       'faq_q16':
-          'What should I do if an address is incorrect or the map pin is inaccurate?',
+          'What to do when an address is wrong and/or the location pin is not correct on the map?',
       'faq_a16':
-          'First, verify the pin by searching for the address in Google Maps, which is more accurate and already installed on your scanner. If the location does not match, report the discrepancy to the on-duty dispatcher.',
+          'First confirm that the pin is not correct by searching the address in google maps (is more accurate and is already installed on your scanner) and if it does not match, inform a dispatcher on duty with the errors.',
 
-      'faq_q17':
-          'What are my daily tasks before starting and after ending work?',
+      'faq_q17': 'What are my daily tasks before I begin and after I end work?',
       'faq_a17':
-          '1. Upon arriving at the parking lot, ensure you are wearing your safety shoes, safety vest, and Amazon uniform.\n'
-          '2. Check that your scanner is fully charged. If it is not, notify a dispatcher on site.\n'
-          '3. Inspect the vehicle for any issues.\n'
-          '4. Start the trip in the Mentor app on your scanner.\n'
-          '5. Take a photo of the car dashboard showing the current mileage, and reset the daily trip counter to zero.\n'
-          '6. Prepare to proceed to the Waiting Area only 10 minutes before your scheduled loading time — not earlier.\n'
-          '7. Once in the Waiting Area, turn off the engine and launch the Flex app and Timesheet. Do not open the Flex app earlier than 10 minutes before loading; this 10-minute timestamp is required.\n'
-          '8. Proceed to the Loading Area according to the Yard Marshall\'s instructions. In the Loading Area, turn off the engine and only exit the vehicle after hearing the whistle from the Yard Marshall.\n'
-          '9. Once loading is complete, start the vehicle and begin driving only when instructed by the Yard Marshall.\n'
-          '10. After completing all of your stops, check the fuel tank. If less than half remains, refuel the vehicle.\n'
-          '11. Upon returning to the station, drop off all remaining packages in the areas designated by Amazon, and return the bags promptly.\n'
-          '12. Back in the parking lot, turn off the vehicle and complete the Green Book (Tageskontrollblatt). Submit a photo of the daily mileage driven, along with a photo of the Green Book.\n'
-          '13. Turn off the vehicle and return your work bag to the designated area or van.',
+          '1- When you come into the parking, first you make sure you are wearing the safety shoes and safety vest and Amazon uniform.\n'
+          '2- Check if your scanner is fully charged and inform a dispatcher present in the moment if it is not charged.\n'
+          '3- Check if there is anything wrong with the car.\n'
+          '4- Start trip on Mentor app on your scanner.\n'
+          '5- Post the picture of the car doashboard showing the current car mileage and daily trip (in the car) reset to 0.\n'
+          '6- Get ready to start going down in the Waiting Area only 10 minutes before the planned hour of loading time, not any sooner.\n'
+          '7- When in the Waiting area, turn off your car, start the Flex App and Timesheet. Please, not a minute earlier, especially the flex app. Do not forget the 10 minute timestamp.\n'
+          '8- The lastly go to Loading Area with the Yard Marshall instructions. When you are in the Loading area, turn off your car and only leave the car AFTER you have heard the whistle from the Yard Marshall.\n'
+          '9- After you have finished loading your car, start your car and start driving but only when the Yard Marshall instructs you to.\n'
+          '10- After you have finished all of your stops, check the car fuel tank and if it is less than half remaining, please refill it.\n'
+          '11- When you are at the station, please drop all of your remaining packages in the areas designated by Amazon, drop the bags in a timely manner\n'
+          '12- When in parking, shut down the car and complete the Green Book (Tageskontrollblat), post the picture of the daily mileage you did during the day delivering, along with a picture of the Green Book.\n'
+          '13- Shut down your car and please return your work bag to the designated area/van',
 
       'faq_q18':
-          'Is there anything I need to do when I use a different van than my usual one?',
+          'Do I have to do anything when I change the van and take another van rather than the one I usually take?',
       'faq_a18':
-          'Yes. Before starting your route, record a detailed video of the vehicle, capturing every existing damage — including small scratches and dents — so that you are not held responsible for pre-existing damage during the next inspection.',
+          'You should make a video of it, capturing in detail every small damage the previous driver/s might have done, so it is not your fault in the next inspection of the car.',
 
       'faq_q19':
-          'What should I do if the Flex app is constantly loading and slowing down my workflow?',
+          'What should I do if the Flex app is constantly loading and slowing down my work flow?',
       'faq_a19':
-          'First, confirm that you have an active internet connection. You can verify this by sending a message to the current stop\'s customer — if it goes through, the connection is active. Alternatively, open another app on the scanner, such as the browser, and attempt a search.\n'
-          'If there is no active internet connection, follow these steps in order:\n'
-          '1. Restart the scanner. Always try this first.\n'
-          '2. Toggle airplane mode off and on. This often works without needing a full restart.\n'
-          '3. As a last resort, share a mobile hotspot from your personal phone for up to 10 minutes to allow the system to refresh.\n'
-          'You may also work offline, but you must reconnect to the internet at some point during your shift. To enable offline mode, first download offline maps within the Flex app: go to Settings → Offline Maps (last option) → Download DBY5 → Allow downloads over mobile connection.\n',
+          'First check if you have an active internet connection. To do so you can try to send a message to the current stop costumer and if it goes through then that means the internet connection is active. You can also check by opening another app in the scanner such as the browser and searching something on it.\n'
+          'Steps you should follow if there isn ot an active internet connection:\n'
+          '1- Restart your scanner. This should always be the first thing you try.\n'
+          '2- Turn on/off airplane mode. This works most of the time without having to wait for the scanner to restart.\n'
+          '3- As a very last resort, please try to share some hotspot from your personal phone for just 10 minutes max just for the system to refresh itself.\n'
+          'You can also work offline but at some point you have to connect to the internet and be active. To work offline you must first download offline maps in the Flex app. To do so, you go to Settings - Offline Maps (last option) - Download DBY5 - Allow downloads with mobile connection.\n',
 
       'faq_q20':
-          'What should I do if the internet connection is active but the Flex app is still not functioning correctly?',
+          'What if the internet connection is active and the Flex app is still not working as it should?',
       'faq_a20':
-          'Try the following steps in order:\n'
-          '1. Restart the scanner.\n'
-          '2. Toggle airplane mode off and on.\n'
-          '3. Exit and reopen the app.\n'
-          '4. Toggle Location Services (GPS) off and on.\n'
-          '5. Log out of the Flex app and log back in using the credentials you use for the Mentor app.\n'
-          '6. Check whether the app requires an update.\n'
-          'Work through these steps one at a time. If one does not resolve the issue, move on to the next.',
+          '1- Restart the scanner.\n'
+          '2- Turn on/off airplane mode\n'
+          '3- Exit from the app\n'
+          '4- Turn off/on Location Services (GPS)\n'
+          '5- Log out from Flex app and log-in again with the Credentials you use for the Mentor App.\n'
+          '6- Check if the app needs to be updated.\n'
+          'You should try these stepse one by one. If one does not work, please try the next down after it.',
     },
 
     // =========================
@@ -1327,220 +1334,239 @@ class AppLocalizations {
       'faq_green_book_video_open_failed':
           'Der Green-Book-Videolink konnte nicht geöffnet werden.',
 
-      'faq_q1': 'Was ist der wichtigste Aspekt deiner täglichen Arbeit?',
-      'faq_a1':
-          'Jedes Paket sorgfältig zuzustellen und sich dabei jederzeit professionell zu verhalten.',
+      'faq_q1': 'Was ist bei deiner täglichen Arbeit am wichtigsten?',
+      'faq_a1': 'Pakete mit Qualität und gutem Verhalten zuzustellen.',
 
-      'faq_q2':
-          'Was solltest du vermeiden, wenn ein Problem mit einem Kunden auftritt?',
+      'faq_q2': 'Was solltest du bei Problemen mit dem Kunden NICHT tun?',
       'faq_a2':
-          'Bitte versuche nicht, die Situation selbst zu lösen. Informiere stattdessen umgehend den diensthabenden Dispatcher. Wir nehmen die Kommunikation mit dem Kunden für dich in die Hand, um eine Eskalation zu verhindern und negative Folgen seitens Amazon zu vermeiden. Wir unterstützen dich.',
+          'Versuche NICHT, die Situation selbst zu lösen, sondern informiere stattdessen den Dispatcher im Dienst. Wir sprechen mit dem Kunden für dich und versuchen, negative Folgen von Amazon durch Kundenbeschwerden zu vermeiden. Wir sind für dich da!',
 
       'faq_q3':
-          'Was soll ich tun, wenn eine Situation mit einem Kunden bereits eskaliert ist?',
+          'Was, wenn die Situation bereits eskaliert ist und der Kunde aus irgendeinem Grund unzufrieden ist?',
       'faq_a3':
-          'Es ist nie zu spät, einen Fehler zu beheben. Bitte kontaktiere uns, und wir bemühen uns, das Problem direkt mit dem Kunden zu klären.',
+          'Es ist nie zu spät, Fehler zu korrigieren. Ruf uns trotzdem an und wir versuchen, den Fehler mit dem Kunden zu klären. Besser spät als nie.',
 
       'faq_q4':
-          'Was zählt mehr: Quantität (möglichst viele Stopps in kurzer Zeit) oder Qualität?',
+          'Was ist wichtiger: Quantität (so schnell wie möglich viele Stopps) oder Qualität?',
       'faq_a4':
-          'Qualität hat immer Vorrang. Befolge die Zustellanweisungen des Kunden sorgfältig und lege ein Paket niemals an einem unsicheren Ort ab, nur weil du im Zeitverzug bist.',
+          'Qualität! Immer Qualität! Folge den Kundenanweisungen und lege das Paket NICHT an unsicheren Orten ab, nur weil du mit den Stopps im Rückstand bist.',
 
       'faq_q5':
-          'Was passiert, wenn ich mich auf Qualität konzentriere und dadurch mit meinen Stopps in Rückstand gerate?',
+          'Was ist, wenn ich mich auf Qualität konzentriere und dadurch mit meinen Stopps in Rückstand gerate?',
       'faq_a5':
-          'Du wirst deine Route auf die eine oder andere Weise abschließen. Wir organisieren Unterstützung, wenn es sinnvoll und erforderlich ist.',
+          'Du wirst deine Stopps beenden – so oder so. Wir versuchen, Hilfe zu schicken, aber nur, wenn wir es für sinnvoll halten.',
+
+      'faq_q6': 'Was ist eine Scorecard und was ist ein DNR?',
+      'faq_a6': 'Gut, dass du fragst.',
 
       // 7 – Weekly scorecard
       'faq_q7': 'Wöchentliche Scorecard',
       'faq_a7':
-          'Die wöchentliche Scorecard bietet einen kompakten Überblick über die Leistung des Teams in Bezug auf unsere wichtigsten Ziele. Sie zeigt unsere Stärken auf, identifiziert Bereiche mit Verbesserungsbedarf und hilft uns, den Fokus für die kommende Woche festzulegen. Die Gesamtbewertungen gliedern sich wie folgt:\n'
+          'Die wöchentliche Scorecard gibt uns einen schnellen, klaren Überblick, wie das Team bei unseren wichtigsten Zielen abschneidet. '
+          'Sie hilft uns zu erkennen, was gut läuft, wo wir zurückliegen und worauf wir uns in der kommenden Woche konzentrieren müssen.\n\n'
+          'Die Gesamtbewertungen sind wie folgt:\n'
           '• Fantastic Plus: >93% (außergewöhnliche Leistung)\n'
           '• Fantastic: 85% – 92,9%\n'
           '• Great: 70% – 84,9%\n'
           '• Fair: 50% – 69,9%\n'
           '• Poor: <50%',
 
-      'faq_q7_1': 'DNR-Tab — Delivered Not Received',
+      'faq_q7_1': 'DNR-Tab\nDelivered Not Received',
       'faq_a7_1':
-          'Ein DNR wird erfasst, wenn du ein Paket mit der Schaltfläche „Swipe to finish“ als zugestellt markiert hast, der Kunde es jedoch tatsächlich nicht erhalten hat. Häufige Ursachen sind Paketdiebstahl, eine leere Verpackung bei Ankunft oder Zustellung an eine falsche Adresse.\n'
-          'Jeden Dienstag erhältst du Fotos zu jedem DNR, der in der Vorwoche gegen dich erfasst wurde.',
+          'Das passiert, wenn du ein Paket zugestellt und mit „Swipe to finish“ bestätigt hast, der Kunde das Paket aber nicht erhalten hat – aus verschiedenen Gründen: '
+          'Paketdiebstahl, leere Verpackung oder Zustellung an die falsche Adresse.\n'
+          'Jeden Dienstag erhältst du Fotos zu jedem DNR, den du in der Woche hattest.',
 
       'faq_q7_1_1':
-          'Wie kann ich DNRs vermeiden, und wie stark wirken sie sich auf meine wöchentliche Scorecard aus?',
+          'Wie kann ich das vermeiden und wie wichtig ist das für die wöchentliche Scorecard?',
       'faq_a7_1_1':
-          'DNRs haben einen erheblichen Einfluss auf deinen Score. Um sie zu vermeiden, informiere den Kunden vorab, dass du dich auf dem Weg befindest, und klingele ausschließlich an dem Klingelschild, auf dem der Name des Kunden deutlich erkennbar ist.',
+          'Das ist sehr wichtig. Um es zu vermeiden, informiere den Kunden vorher, dass du bald ankommst, und klingele NUR bei dem Klingelschild mit seinem Namen.',
 
-      'faq_q7_1_2': 'Wie kann ich Paketverluste verhindern?',
+      'faq_q7_1_2': 'Wie vermeide ich Paketverluste?',
       'faq_a7_1_2':
-          'Übergib das Paket nach Möglichkeit immer direkt an den Kunden. Ist das nicht möglich, sende dem Kunden eine Nachricht und teile ihm präzise mit, wo das Paket abgelegt wurde — zum Beispiel in der Garage, unter der Treppe, im Schuppen oder hinter einem Blumentopf.\n'
-          'Wenn du den Eindruck hast, dass es nicht sicher ist, das Paket unbeaufsichtigt zu lassen, lege es nicht ab. Nimm es mit und versuche die Zustellung später erneut. Dies ist äußerst wichtig.',
+          'Versuche immer, die Pakete dem Kunden persönlich zu übergeben. Wenn das nicht möglich ist, sende eine Nachricht und informiere ihn, wo das Paket abgelegt wurde, z. B. in der Garage, unter der Treppe, im Schuppen, hinter der Blumenvase usw.\n'
+          'Wenn du nicht glaubst, dass es sicher ist, das Paket unbeaufsichtigt zu lassen, nimm es bitte lieber wieder mit und versuche es später erneut. Das ist SEHR wichtig.',
 
-      'faq_q7_1_3': 'Wie erkenne ich, ob ein Ablageort sicher ist?',
+      'faq_q7_1_3': 'Woran erkenne ich, ob ein Ort sicher ist oder nicht?',
       'faq_a7_1_3':
-          'Vertraue auf dein Urteilsvermögen und gesunden Menschenverstand. Ein Paket, das bei den Briefkästen eines Gebäudes mit 20 bis 30 Stockwerken abgelegt wird, hat beispielsweise ein deutlich höheres Diebstahlrisiko als eines an einem Einfamilienhaus.\n'
-          'Als Unterstützung veröffentlichen wir jeden Morgen eine Liste mit Adressen, die — basierend auf historischen Zustelldaten und Statistiken — ein hohes Risiko für Diebstahl oder Kundenbeschwerden aufweisen.',
+          'Instinkt und gesunder Menschenverstand. Wenn ein Gebäude 20–30 Stockwerke hat und du das Paket bei den Briefkästen ablegst, ist die Wahrscheinlichkeit für Diebstahl deutlich höher als bei einem Einfamilienhaus.\n'
+          'Außerdem posten wir jeden Morgen ein Bild mit Adressen, bei denen eine hohe Wahrscheinlichkeit für Diebstahl und Kundenbeschwerden besteht – basierend auf bisherigen Zustellungen und Statistiken.',
 
       'faq_q7_1_4':
-          'Wie wirkt sich ein verlorenes oder gestohlenes Paket auf meinen Score aus?',
+          'Was passiert, wenn ein Paket verloren geht oder gestohlen wird – wie wirkt sich das auf meinen Score aus?',
       'faq_a7_1_4':
-          'Der Einfluss ist erheblich. Ein einzelnes verlorenes Paket kann deinen Score um mindestens 30% reduzieren und mindestens 600 Punkte kosten. Bitte beachte: Je höher die Punktzahl unter deinem Namen in der Scorecard, desto schlechter die Bewertung. Je mehr Pakete du pro Woche zustellst, desto weniger Punkte verlierst du pro Vorfall. Zusätzlich fließt der Wert des fehlenden Artikels ein — je teurer, desto größer der Punkteverlust. Wir müssen diesen Wert so niedrig wie möglich halten.\n'
-          'Ebenso wichtig: Wenn wiederholt eine hohe Anzahl verlorener Pakete auf dich entfällt, sind wir gezwungen, das Arbeitsverhältnis zu beenden, da Amazon andernfalls einen Paketdiebstahl vermuten könnte. Das stellt ein erhebliches Risiko dar und darf nicht ignoriert werden.',
+          'Sehr negativ. Das kann dich mit mindestens 30% treffen – und schon ein einziges Paket kann dir mindestens 600 Punkte kosten. Je mehr Punkte du in der Scorecard unter deinem Namen siehst, desto schlechter ist es. Je mehr Pakete du pro Arbeitswoche zustellst, desto weniger Punkte verlierst du pro Vorfall. Die verlorenen Punkte variieren auch je nach Preis des Artikels: Je teurer, desto mehr Punkteverlust.\n'
+          'Wichtig ist außerdem: Wenn du regelmäßig eine hohe Anzahl verlorener Pakete hast, müssen wir dich ggf. freistellen, weil Amazon früher oder später Paketdiebstahl vermuten könnte. Das ist sehr gefährlich.',
 
       // CC
-      'faq_q7_2': 'CC-Tab — Contact Compliance',
+      'faq_q7_2': 'CC-Tab\nContact Compliance',
       'faq_a7_2':
-          'Diese Kennzahl misst, wie häufig du den Kunden zu seiner Zustellung kontaktierst — per Textnachricht oder Anruf. Je seltener du mit dem Kunden kommunizierst, desto niedriger fällt dein Score in dieser Kategorie aus. Wir sollten diesen Wert so hoch wie möglich halten, da er zu den einfachsten Kategorien gehört und einen wesentlichen Beitrag zu deinem Gesamtscore leistet.',
+          'Das bedeutet, wie oft du den Kunden wegen seiner Lieferung kontaktierst – per Nachricht oder Anruf. Je weniger du den Kunden kontaktierst, desto weniger Score bekommst du in der Scorecard. Wir sollten diesen Bereich so hoch wie möglich halten, weil er zu den einfachsten Kategorien gehört und dir beim Gesamtscore sehr hilft.',
 
-      'faq_q7_2_1': 'Warum ist der Kundenkontakt wichtig?',
+      'faq_q7_2_1': 'Warum sollte ich das machen?',
       'faq_a7_2_1':
-          'Die Zustellung von Paketen ist mehr als „Drop & Go“. Informiere den Kunden vorab und frage gegebenenfalls, wo er die Zustellung bevorzugt.',
+          'Pakete zuzustellen ist nicht nur „Drop & Go“. Du solltest den Kunden vorher informieren und fragen, wo er das Paket gerne zugestellt haben möchte.',
 
       'faq_q7_2_2': 'Wie verbessere ich meinen CC-Score?',
       'faq_a7_2_2':
-          'Ganz einfach: durch Anrufe — und insbesondere durch Textnachrichten — an den Kunden bei jedem Stopp.',
+          'Danke für die Frage. Ganz einfach: durch Anrufe und vor allem durch Nachrichten an den Kunden bei jedem Stopp.',
 
       // CE
-      'faq_q7_3': 'CE-Tab — Kundeneskalation',
+      'faq_q7_3': 'CE-Tab\nKundeneskalation',
       'faq_a7_3':
-          'Erinnere dich daran, wie stark sich ein DNR auf deinen Score auswirkt — eine Kundeneskalation ist mindestens doppelt so gravierend. Je nach Schwere des Vorfalls kann sie sogar zum Verlust deiner Stelle führen.',
+          'Du erinnerst dich, wie stark DNR deine Scores beeinflusst? Das hier ist mindestens doppelt so schlimm, und du riskierst auch deinen Job – je nachdem, wie schlimm die Situation war.',
 
-      'faq_q7_3_1': 'Wie kann ich Kundeneskalationen vermeiden?',
+      'faq_q7_3_1': 'Wie kann ich das vermeiden?',
       'faq_a7_3_1':
-          'Befolge stets die Zustellanweisungen des Kunden sorgfältig. Sollte dennoch ein Fehler passieren, entschuldige dich zuerst. Ist der Kunde verärgert, bitte ihn um einen kurzen Moment, damit er direkt mit uns sprechen kann — du solltest uns in diesem Moment ohnehin bereits telefonisch erreichen. Wie in Abschnitt 2 beschrieben, ist es stets am besten, solche Situationen von uns klären zu lassen.',
+          'Indem du immer die Kundenanweisungen befolgst. Wenn ein Fehler passiert, entschuldige dich bitte zuerst. Wenn der Kunde wütend ist, bitte ihn um eine Minute Zeit, damit er mit uns sprechen kann, während du uns anrufst. '
+          'Nach Abschnitt 2 solltest du inzwischen wissen, dass es am besten ist, solche Fälle von uns klären zu lassen.',
 
       // POD
-      'faq_q7_4': 'POD-Tab — Foto bei Zustellung',
+      'faq_q7_4': 'POD-Tab\nFoto bei Zustellung',
       'faq_a7_4':
-          'Diese Spalte listet Pakete auf, die für ein Picture on Delivery (POD) geeignet sind, bei denen das eingereichte Foto jedoch als „Ungültig“ oder „Nicht sicher“ markiert wurde. Häufige Ablehnungsgründe sind:\n'
-          '1. Das Paketlabel mit Kundendaten ist auf dem Foto sichtbar. Das Paket sollte vor dem Foto so gedreht werden, dass das Label nicht zu sehen ist.\n'
-          '2. Das Foto ist unscharf.\n'
-          '3. Eine Person ist auf dem Foto erkennbar.\n'
-          '4. Es ist kein Paket auf dem Foto erkennbar.\n'
-          '5. Das Paket befindet sich im Fahrzeug.\n'
-          '6. Das Paket befindet sich in der Hand.\n'
-          '7. Das Paket liegt im Briefkasten.\n'
-          '8. Das Paket ist zu nah an der Kamera.\n'
-          '9. Das Foto ist zu dunkel.\n'
-          'Diese Kategorie sollte am leichtesten 100% erreichen und verbessert deinen Gesamtscore spürbar.',
+          'Diese Spalte zeigt eine Liste von Paketen, die für POD-Fotos geeignet sind, bei denen Fotos gemacht wurden, die jedoch entweder „Ungültig“ oder „Nicht sicher“ waren. Gründe für die Ablehnung können sein:\n'
+          '1- Paketlabel mit Kundendaten ist auf dem Foto sichtbar. Das Paket muss vor dem Foto umgedreht werden.\n'
+          '2- Unscharfes Foto\n'
+          '3- Person auf dem Foto sichtbar\n'
+          '4- Kein Paket auf dem Foto erkennbar\n'
+          '5- Paket im Auto\n'
+          '6- Paket in der Hand\n'
+          '7- Paket im Briefkasten\n'
+          '8- Foto zu nah\n'
+          '9- Foto zu dunkel.\n'
+          'Das sollte immer der einfachste Bereich sein, in dem du 100% erreichen solltest – und es verbessert deinen Gesamtscore.',
 
       // LoR
-      'faq_q7_5': 'LoR-Tab — Lost on Road',
+      'faq_q7_5': 'LoR-Tab\nLost on Road',
       'faq_a7_5':
-          'Diese Kennzahl bestraft dich, wenn ein Paket, das du beim Laden gescannt hast, nach einem fehlgeschlagenen Zustellversuch weder zugestellt noch am Ende der Schicht zurückgebracht wurde. In diesem Fall gilt das Paket als verloren, und die Strafe entspricht einem DNR. Zähle die zurückgebrachten Pakete daher sorgfältig und stelle sicher, dass sie mit der im Scanner angezeigten Liste übereinstimmen — zu finden unter: Today’s Itinerary → Summary → Problems. Bei Abweichungen informiere den diensthabenden Dispatcher, bevor du die Schicht in der Amazon-App beendest.',
+          'Du wirst bestraft, wenn du ein Paket beim Laden gescannt hast und es am Ende der Schicht bei einer nicht erfolgreichen Zustellung nicht zurückgegeben wird. Dann gilt das Paket als verloren und du verlierst ähnlich viele Punkte wie bei einem DNR. '
+          'Zähle daher die zurückgebrachten Pakete sorgfältig und stelle sicher, dass sie mit den Paketen im Scanner übereinstimmen. Du findest das unter: Today’s Itinerary – Summary – Problems. '
+          'Wenn es nicht übereinstimmt, informiere bitte den Dispatcher im Dienst, bevor du die Arbeit in der Amazon-App beendest.',
 
       // DCR
-      'faq_q7_6': 'DCR-Tab — Delivery Completion Rate',
+      'faq_q7_6': 'DCR-Tab\nDelivery Completion Rate',
       'faq_a7_6':
-          'Diese Kennzahl spiegelt deine Zustellleistung wider, indem sie den Anteil der planmäßig abgeschlossenen Zustellungen misst. Sie hilft uns, Effizienz und Zuverlässigkeit unseres Service zu bewerten, und macht Probleme wie Verspätungen, fehlgeschlagene Zustellversuche oder Routing-Probleme sichtbar. Deine DCR sollte stets so hoch wie möglich sein. Führe dazu, wann immer möglich, Reattempts durch und halte die Zahl der zurückgebrachten Pakete möglichst gering.',
+          'Zeigt deine Fähigkeit, Pakete zuzustellen. Es verfolgt den Prozentsatz der Zustellungen, die wie geplant abgeschlossen wurden, und hilft uns, die Effizienz und Zuverlässigkeit unserer Zustellungen zu messen. '
+          'Es macht Probleme sichtbar wie Verspätungen, fehlgeschlagene Zustellversuche oder Routing-Probleme. Dieser Wert sollte immer so hoch wie möglich sein. '
+          'Dazu solltest du jeden Tag Reattempts machen und Rückgaben so weit wie möglich vermeiden.',
 
       // CDF
-      'faq_q7_7': 'CDF-Tab (früher DEX) — Kunden-Lieferfeedback',
+      'faq_q7_7': 'CDF-Tab (früher: DEX)\nKunden-Lieferfeedback',
       'faq_a7_7':
-          'Diese Kennzahl erfasst die Erfahrung des Empfängers mit der Zustellung, einschließlich Pünktlichkeit, Zustand der Ware und Professionalität des Fahrers. Sie hilft uns, unsere Stärken zu identifizieren und Verbesserungspotenziale zu erkennen. Nach der Zustellung erhält der Kunde eine Umfrage-E-Mail von Amazon mit folgenden Fragen:\n'
-          '1) Wurde dein Paket pünktlich zugestellt? (Ja / Nein)\n'
-          '2) Wurde das Paket an einem sicheren Ort abgelegt? (Ja / Nein)\n'
-          '3) War das Paket bei Ankunft in einwandfreiem Zustand? (Ja / Nein)\n'
-          '4) Wie zufrieden bist du insgesamt mit der Zustellung? (Sehr zufrieden / Zufrieden / Neutral / Unzufrieden / Sehr unzufrieden)\n'
-          '5) Wie bewertest du die Kommunikation und die Tracking-Updates für diese Zustellung? (Ausgezeichnet / Gut / Mittel / Schlecht)\n'
-          '6) War der Zusteller höflich und professionell? (Ja / Nein / Nicht zutreffend — kontaktlose Zustellung)\n'
-          '7) Hast du Kommentare zu deiner Liefererfahrung? (Zusätzliche Kundenkommentare)',
+          'Erfasst die Erfahrung des Empfängers mit dem Zustellprozess, einschließlich Pünktlichkeit, Zustand der Ware und Professionalität des Fahrers. '
+          'Es hilft uns, Stärken und Verbesserungsmöglichkeiten zu erkennen. Am Ende der Zustellung erhält der Kunde eine E-Mail von Amazon zur Liefererfahrung mit Fragen wie:\n'
+          '1) Wurde dein Paket pünktlich zugestellt?\n'
+          'Ja / Nein\n'
+          '2) Wurde das Paket an einem sicheren Ort abgelegt?\n'
+          'Ja / Nein\n'
+          '3) War das Paket bei Ankunft in gutem Zustand?\n'
+          'Ja / Nein\n'
+          '4) Wie zufrieden bist du insgesamt mit der Lieferung?\n'
+          'Sehr zufrieden / Zufrieden / Neutral / Unzufrieden / Sehr unzufrieden\n'
+          '5) Wie bewertest du Kommunikation und Tracking-Updates für diese Lieferung?\n'
+          'Ausgezeichnet / Gut / Mittel / Schlecht\n'
+          '6) War die Zustellperson höflich und professionell?\n'
+          'Ja / Nein / Nicht zutreffend (kontaktlose Zustellung)\n'
+          '7) Hast du Kommentare zu deiner Liefererfahrung?\n'
+          '(Zusätzliche Kundenkommentare)',
 
       'faq_q7_8':
-          'Was sollte ich in Bezug auf die Scorecard grundsätzlich beachten?',
+          'Was sollte ich bezüglich der Scorecard im Hinterkopf behalten?',
       'faq_a7_8':
-          'Qualität und Effizienz machen einen entscheidenden Unterschied. Gute Scores nützen dir, dem Unternehmen und dem gesamten Team. Kundenzufriedenheit hat höchste Priorität, und herausragende Ergebnisse werden mit einem Bonus des Unternehmens belohnt.\n'
-          'Gib dein Bestes — und du wirst entsprechend belohnt.',
+          'Qualität und Effizienz bringen dich weit. Gute Scores sind gut für dich, für die Firma und für das gesamte Team. Kundenzufriedenheit ist sehr wichtig, und gute Scores werden mit einem Bonus der Firma belohnt.\n'
+          'Gib dein Bestes, bekomme das Beste.',
 
       // 8+
-      'faq_q8': 'Welche weiteren Bereiche erfordern meine Aufmerksamkeit?',
+      'faq_q8': 'In welchen anderen Bereichen sollte ich vorsichtig sein?',
       'faq_a8':
-          'Priorisiere deine persönliche Sicherheit: Fahre verantwortungsbewusst, vermeide Verletzungen und sei vorsichtig im Umgang mit Hunden, um Bisse zu vermeiden. Gehe mit der gesamten Arbeitsausrüstung — einschließlich des Tagesfahrzeugs und des Arbeitsscanners bzw. -telefons — sorgfältig um. Erscheine stets mit Sicherheitsschuhen, Sicherheitsweste und der wetterangemessenen Amazon-Jacke bzw. dem T-Shirt zur Arbeit.',
+          'Achte auf dich selbst: Fahre sicher, vermeide Verletzungen und vermeide Hunde bzw. Hundebisse. Sei vorsichtig mit Arbeitsausrüstung wie dem täglichen Fahrzeug, dem Arbeitsscanner/Telefon und komme zur Arbeit mit Sicherheitsschuhen und Sicherheitsweste sowie Amazon-Jacke oder T-Shirt (je nach Wetter).',
 
       'faq_q9':
-          'Was soll ich tun, wenn ich in einen Unfall verwickelt bin oder das Arbeitsfahrzeug beschädige?',
+          'Was passiert, wenn ich einen Unfall habe oder das Arbeitsfahrzeug beschädige?',
       'faq_a9':
-          'Stelle zunächst sicher, dass du unverletzt bist und dir keine schwerwiegenden Verletzungen zugezogen hast. Zum Fahrzeugschaden: Wenn wir feststellen, dass der Unfall durch Fahrlässigkeit verursacht wurde — beispielsweise durch Ablenkung infolge Handynutzung während der Fahrt —, haftest du persönlich für den gesamten Schaden. Zusätzlich kann der anschließende Polizeibericht einen Führerscheinentzug nach sich ziehen, und ein solcher Vorfall stellt einen Grund zur sofortigen Kündigung dar. In weniger schwerwiegenden Fällen wirst du für zwei Monate von den wöchentlichen Scorecard-Boni ausgeschlossen. Du bist verpflichtet, uns unmittelbar nach jedem Vorfall zu informieren und uns folgende Angaben zu übermitteln: Uhrzeit und Ort des Vorfalls, Informationen zu Schäden an privatem oder öffentlichem Eigentum (Mauern, Zäune, Laternenmasten, Menschen oder Tiere) sowie aussagekräftige Fotos der Fahrzeugschäden.',
+          'Zuerst stelle sicher, dass du in Ordnung bist und nicht schwer verletzt wurdest. '
+          'Wenn wir feststellen, dass Unfälle durch Fahrlässigkeit passieren – z. B. Ablenkungen wie Handynutzung während der Fahrt – haftest du persönlich für den gesamten Schaden. Außerdem erhältst du einen Polizeibericht, was sogar zu einem Führerscheinentzug führen kann. Das kann auch ein Grund für eine sofortige Kündigung sein. '
+          'Andernfalls wirst du „nur“ für 2 Monate von den wöchentlichen Scorecard-Boni ausgeschlossen. '
+          'Im Falle eines Vorfalls bist du verpflichtet, uns sofort zu informieren und uns Uhrzeit, Ort, ob private oder öffentliche Sachen beschädigt wurden (z. B. Wände, Zäune, Laternen, Menschen und/oder Tiere), sowie Fotos der Fahrzeugschäden zu senden.',
 
-      'faq_q10':
-          'Was soll ich tun, wenn ein Paket beschädigt oder nicht auffindbar ist?',
+      'faq_q10': 'Was mache ich, wenn Pakete beschädigt und/oder fehlend sind?',
       'faq_a10':
-          'Ist ein Paket beschädigt, markiere es im System als beschädigt und bringe es zur Station zurück. Enthält das beschädigte Paket Flüssigkeit und hat es weitere Pakete in Mitleidenschaft gezogen, fertige ein Foto aller betroffenen Pakete an und sende es dem diensthabenden Dispatcher. Wir melden den Vorfall anschließend für dich an Amazon.\n'
-          'Ist ein Paket nicht auffindbar, kannst du es als fehlend markieren — es sei denn, es handelt sich um ein OTP-Paket. In diesem Fall musst du dich zwingend zuerst bei uns melden, bevor du es als fehlend markierst. Das ist zwingend zu beachten.',
+          'Wenn ein Paket beschädigt ist, kannst du es als beschädigt buchen und zur Station zurückbringen. Wenn es sich um ein Flüssigkeitspaket handelt, das andere Pakete beschädigt hat, mache bitte ein Foto von allen beschädigten Paketen und sende es dem Dispatcher im Dienst. Wir melden es dann für dich an Amazon.\n'
+          'Wenn ein Paket fehlt, kannst du es als fehlend markieren/buchen – außer es hat ein OTP. Dann musst du es ZUERST bei uns melden, bevor du es als fehlend markierst. Das ist SEHR wichtig.',
 
-      'faq_q11': 'Was ist ein OTP-Paket (One-Time Password)?',
+      'faq_q11': 'Was ist ein OTP (One-Time Password) Paket?',
       'faq_a11':
-          'Ein OTP-Paket enthält einen hochwertigen Artikel, für den Amazon vorschreibt, dass der Kunde dem Fahrer vor der Zustellung ein Einmalpasswort nennt. Dadurch wird sichergestellt, dass das Paket den richtigen Empfänger erreicht. Behandle OTP-Pakete mit größter Sorgfalt, lasse sie niemals unbeaufsichtigt und übergib sie ausschließlich an denjenigen Kunden, der das korrekte Passwort genannt hat.',
+          'Das ist ein teurer Artikel, bei dem Amazon verlangt, dass der Kunde dem Fahrer ein Einmalpasswort (OTP) gibt, bevor das Paket zugestellt wird – um sicherzustellen, dass es an die richtige Person zugestellt wird. '
+          'Du musst bei solchen Paketen besonders sorgfältig sein, sie nicht unbeaufsichtigt lassen und sie nur dem Kunden übergeben, der dir das Passwort gegeben hat.',
 
       'faq_q12':
-          'Warum werden wir dich immer wieder bitten, langsamer statt schneller zu arbeiten?',
+          'Warum sagen wir dir immer wieder, du sollst langsamer machen und nicht schneller fahren?',
       'faq_a12':
-          'Wir wissen, dass sich das wiederholen mag, aber es ist systembedingt erforderlich. Wir müssen die vom Algorithmus vorgegebene Stopps-pro-Stunde-Quote einhalten, damit wir in Zukunft zusätzliche Routen erhalten und du weiterhin Einsätze bekommst.\n'
-          'Darüber hinaus erhöht zu schnelles Arbeiten das Risiko eines DNR, was dich und das Unternehmen Punkte in der wöchentlichen Scorecard kostet.',
+          'Uns gefällt das auch nicht, aber so funktioniert das System. Wir müssen dem Algorithmus folgen und eine vorgegebene Anzahl Stopps pro Stunde einhalten, damit wir in Zukunft mehr Routen bekommen und du mehr arbeiten kannst statt frei zu haben.\n'
+          'Außerdem riskierst du durch zu schnelles Arbeiten einen DNR und verlierst Punkte – sowohl für dich als auch für die Firma – in der wöchentlichen Scorecard.',
 
       'faq_q13':
-          'Warum fragen die Dispatcher manchmal nach, ob ich im Verzug bin oder ob etwas nicht stimmt?',
+          'Warum fragen dich die Dispatcher manchmal, warum du zurückliegst und ob etwas nicht stimmt?',
       'faq_a13':
-          'Wir wissen, dass diese Nachfragen nicht immer angenehm sind, aber wir sind auf deine Rückmeldung angewiesen, um zu verstehen, was auf der Route zu einer Verzögerung geführt hat. Amazon verlangt diese Informationen, weil für jeden Stopp ein Zustellfenster vorgesehen ist. Gerät eine Route in Verzug, muss Amazon die Ursache kennen, um auf Basis dieser Daten die zukünftige Zustelleffizienz zu verbessern.',
+          'Wir wissen, dass das unangenehm ist, aber wir brauchen Feedback, was auf der Straße passiert ist, sodass du mit deinen Stopps in Rückstand geraten bist. Amazon fragt uns nach diesem Feedback, weil es auch ein Zeitlimit gibt, bis zu dem du X Stopps erledigt haben solltest. Mit diesen Informationen kann Amazon zukünftige Zustelleffizienz verbessern.',
 
-      'faq_q14': 'Warum wirst du manchmal gebeten, einem Kollegen zu helfen?',
+      'faq_q14': 'Warum bitten wir dich manchmal, einem Kollegen zu helfen?',
       'faq_a14':
-          'Die Verzögerung eines Kollegen kann durch verschiedene Faktoren verursacht sein: schlechte Internetabdeckung im Gebiet, starkes Verkehrsaufkommen oder durch Baustellen gesperrte Straßen. In solchen Fällen wird deine Unterstützung benötigt, damit er seine Route rechtzeitig abschließen kann.',
+          'Weil viele Faktoren eine Rolle spielen können, warum ein Kollege zurückliegt – z. B. schlechte Internetverbindung, Verkehr, gesperrte Straßen durch Baustellen. Dann wird deine Hilfe benötigt.',
 
       'faq_q15':
-          'Fahre ich vom ersten Tag an Standardrouten wie erfahrenere Fahrer?',
+          'Beginne ich am ersten Tag sofort mit Standard-Routen wie erfahrene Fahrer?',
       'faq_a15':
-          'Nein. Du beginnst mit einer Einarbeitungsphase von 14 Arbeitstagen, in der du das aus den Ride-Along-Tagen mit deinem Trainer Gelernte anwendest und dich mit Gebiet, Fahrzeug, Scanner und dem gesamten Arbeitsablauf vertraut machst.\n'
-          'Während dieser 14 Tage reduziert Amazon deine tägliche Paket- und Stoppanzahl um bis zu 50% im Vergleich zu einer regulären Route.',
+          'Nein, natürlich nicht. Am Anfang hast du eine Phase von 14 Arbeitstagen, um das Gelernte aus den Ride-Along-Tagen mit deinem Trainer umzusetzen und dich an Gebiet, Fahrzeug, Scanner und Workflow zu gewöhnen.\n'
+          'In dieser Zeit gibt Amazon dir bis zu 50% weniger Pakete und Stopps als normal.',
 
       'faq_q16':
-          'Was soll ich tun, wenn eine Adresse falsch oder der Kartenpin ungenau ist?',
+          'Was tun, wenn eine Adresse falsch ist und/oder der Standort-Pin auf der Karte nicht stimmt?',
       'faq_a16':
-          'Überprüfe zunächst den Pin, indem du die Adresse in Google Maps suchst — die App ist genauer und auf deinem Scanner bereits installiert. Stimmt der Standort nicht überein, melde die Abweichung dem diensthabenden Dispatcher.',
+          'Bestätige zuerst, dass der Pin nicht stimmt, indem du die Adresse in Google Maps suchst (ist genauer und auf deinem Scanner installiert). Wenn es nicht passt, informiere den Dispatcher im Dienst über die Fehler.',
 
       'faq_q17':
-          'Was sind meine täglichen Aufgaben vor Arbeitsbeginn und nach Arbeitsende?',
+          'Was sind meine täglichen Aufgaben, bevor ich starte und nachdem ich die Arbeit beende?',
       'faq_a17':
-          '1. Stelle bei der Ankunft auf dem Parkplatz sicher, dass du Sicherheitsschuhe, Sicherheitsweste und Amazon-Uniform trägst.\n'
-          '2. Prüfe, ob dein Scanner vollständig geladen ist. Ist das nicht der Fall, informiere einen Dispatcher vor Ort.\n'
-          '3. Überprüfe das Fahrzeug auf mögliche Mängel.\n'
-          '4. Starte die Fahrt in der Mentor-App auf deinem Scanner.\n'
-          '5. Fertige ein Foto des Armaturenbretts mit dem aktuellen Kilometerstand an und setze den Tages-Trip-Zähler auf null zurück.\n'
-          '6. Begib dich frühestens 10 Minuten vor deiner geplanten Ladezeit in den Waiting Area — nicht früher.\n'
-          '7. Schalte im Waiting Area den Motor aus und starte die Flex-App sowie den Timesheet. Öffne die Flex-App keinesfalls früher als 10 Minuten vor dem Laden; dieser 10-Minuten-Zeitstempel ist erforderlich.\n'
-          '8. Fahre anschließend nach den Anweisungen des Yard Marshalls in den Loading Area. Schalte dort den Motor aus und verlasse das Fahrzeug erst, nachdem du den Pfiff des Yard Marshalls gehört hast.\n'
-          '9. Starte nach Abschluss des Ladevorgangs den Motor und fahre erst los, wenn der Yard Marshall die entsprechende Anweisung gibt.\n'
-          '10. Überprüfe nach Abschluss aller Stopps den Tankstand. Liegt er unter der Hälfte, betanke das Fahrzeug.\n'
-          '11. Gib bei Rückkehr zur Station alle verbleibenden Pakete in den von Amazon ausgewiesenen Bereichen ab und bringe die Taschen zügig zurück.\n'
-          '12. Schalte auf dem Parkplatz den Motor aus und fülle das Green Book (Tageskontrollblatt) aus. Reiche ein Foto der an diesem Tag gefahrenen Kilometer sowie ein Foto des Green Books ein.\n'
-          '13. Schalte den Motor aus und lege deine Arbeitstasche in den dafür vorgesehenen Bereich bzw. das Fahrzeug zurück.',
+          '1- Wenn du auf den Parkplatz kommst, stelle zuerst sicher, dass du Sicherheitsschuhe, Sicherheitsweste und Amazon-Uniform trägst.\n'
+          '2- Prüfe, ob dein Scanner vollständig geladen ist, und informiere einen Dispatcher vor Ort, wenn er nicht geladen ist.\n'
+          '3- Prüfe, ob am Fahrzeug etwas nicht stimmt.\n'
+          '4- Starte die Fahrt in der Mentor-App auf deinem Scanner.\n'
+          '5- Poste ein Foto vom Armaturenbrett mit aktuellem Kilometerstand und dem Tages-Trip (im Auto) auf 0 zurückgesetzt.\n'
+          '6- Gehe erst 10 Minuten vor der geplanten Ladezeit in den Waiting Area – nicht früher.\n'
+          '7- Im Waiting Area: Motor aus, Flex App und Timesheet starten. Bitte keine Minute früher, besonders die Flex App. Den 10-Minuten-Zeitstempel nicht vergessen.\n'
+          '8- Dann in den Loading Area nach Anweisung des Yard Marshalls. Im Loading Area Motor aus und das Auto erst verlassen, NACHDEM du den Pfiff des Yard Marshalls gehört hast.\n'
+          '9- Nach dem Laden: Motor starten und erst losfahren, wenn der Yard Marshall es anweist.\n'
+          '10- Nach allen Stopps: Tank prüfen. Wenn weniger als halb voll, bitte nachtanken.\n'
+          '11- An der Station: verbleibende Pakete in die von Amazon vorgesehenen Bereiche ablegen, Taschen rechtzeitig abgeben.\n'
+          '12- Auf dem Parkplatz: Motor aus, Green Book (Tageskontrollblatt) ausfüllen, Foto vom Tageskilometerstand posten sowie ein Foto vom Green Book.\n'
+          '13- Motor aus und die Arbeits-Tasche bitte in den dafür vorgesehenen Bereich zurücklegen.',
 
       'faq_q18':
-          'Muss ich etwas beachten, wenn ich ein anderes als mein gewohntes Fahrzeug nutze?',
+          'Muss ich etwas beachten, wenn ich das Fahrzeug wechsle und ein anderes nehme als sonst?',
       'faq_a18':
-          'Ja. Nimm vor Fahrtbeginn ein detailliertes Video des Fahrzeugs auf, in dem jeder vorhandene Schaden — einschließlich kleiner Kratzer und Dellen — erkennbar ist, damit dir bei der nächsten Inspektion keine vorhandenen Schäden angelastet werden.',
+          'Du solltest ein Video machen, das jeden kleinen Schaden im Detail zeigt, den der/die Fahrer vor dir verursacht haben könnten, damit es bei der nächsten Kontrolle nicht als dein Fehler gilt.',
 
       'faq_q19':
-          'Was soll ich tun, wenn die Flex-App ständig lädt und meinen Arbeitsablauf verlangsamt?',
+          'Was tun, wenn die Flex-App ständig lädt und meinen Workflow verlangsamt?',
       'faq_a19':
-          'Prüfe zunächst, ob eine aktive Internetverbindung besteht. Du kannst dies überprüfen, indem du dem Kunden am aktuellen Stopp eine Nachricht sendest — kommt sie an, ist die Verbindung aktiv. Alternativ öffnest du eine andere App auf dem Scanner, etwa den Browser, und versuchst eine Suche.\n'
-          'Falls keine aktive Internetverbindung besteht, gehe in folgender Reihenfolge vor:\n'
-          '1. Starte den Scanner neu. Dies sollte stets der erste Schritt sein.\n'
-          '2. Schalte den Flugmodus aus und wieder ein. Dies funktioniert häufig, ohne dass ein vollständiger Neustart erforderlich ist.\n'
-          '3. Als letzte Option: Gib für maximal 10 Minuten einen mobilen Hotspot von deinem privaten Telefon frei, damit sich das System aktualisieren kann.\n'
-          'Du kannst auch offline arbeiten, musst dich jedoch im Verlauf deiner Schicht erneut mit dem Internet verbinden. Um den Offline-Modus zu nutzen, lade zunächst die Offline-Karten in der Flex-App herunter: Settings → Offline Maps (letzte Option) → Download DBY5 → Allow downloads with mobile connection.\n',
+          'Prüfe zuerst, ob du eine aktive Internetverbindung hast. Das kannst du testen, indem du dem Kunden am aktuellen Stopp eine Nachricht schickst. Wenn sie durchgeht, ist das Internet aktiv. Du kannst auch eine andere App öffnen (z. B. Browser) und etwas suchen.\n'
+          'Schritte, wenn keine aktive Internetverbindung besteht:\n'
+          '1- Scanner neu starten. Das sollte immer das Erste sein.\n'
+          '2- Flugmodus ein/aus. Das funktioniert oft, ohne auf einen Neustart zu warten.\n'
+          '3- Als allerletzte Option: Teile maximal 10 Minuten Hotspot von deinem privaten Handy, damit sich das System aktualisieren kann.\n'
+          'Du kannst auch offline arbeiten, aber irgendwann musst du wieder online sein. Um offline zu arbeiten, musst du zuerst Offline-Karten in der Flex App herunterladen: Settings – Offline Maps (letzte Option) – Download DBY5 – Allow downloads with mobile connection.\n',
 
       'faq_q20':
-          'Was soll ich tun, wenn die Internetverbindung aktiv ist, die Flex-App aber dennoch nicht einwandfrei funktioniert?',
+          'Was, wenn die Internetverbindung aktiv ist, die Flex-App aber trotzdem nicht richtig funktioniert?',
       'faq_a20':
-          'Arbeite die folgenden Schritte der Reihe nach ab:\n'
-          '1. Starte den Scanner neu.\n'
-          '2. Schalte den Flugmodus aus und wieder ein.\n'
-          '3. Beende die App und öffne sie erneut.\n'
-          '4. Schalte die Standortdienste (GPS) aus und wieder ein.\n'
-          '5. Melde dich aus der Flex-App ab und wieder an — mit denselben Zugangsdaten wie in der Mentor-App.\n'
-          '6. Prüfe, ob ein App-Update verfügbar ist.\n'
-          'Arbeite die Schritte einzeln durch. Führt einer nicht zum Erfolg, gehe zum nächsten über.',
+          '1- Scanner neu starten.\n'
+          '2- Flugmodus ein/aus\n'
+          '3- App schließen\n'
+          '4- Standortdienste (GPS) aus/an\n'
+          '5- Aus der Flex App ausloggen und wieder einloggen (mit denselben Zugangsdaten wie in der Mentor App).\n'
+          '6- Prüfen, ob ein Update verfügbar ist.\n'
+          'Probiere diese Schritte nacheinander. Wenn einer nicht funktioniert, gehe zum nächsten über.',
     },
 
     // =========================
@@ -2051,218 +2077,243 @@ class AppLocalizations {
           'Nuk u hap linku i videos së Green Book.',
 
       'faq_q1':
-          'Cili është aspekti më i rëndësishëm i punës tënde të përditshme?',
-      'faq_a1':
-          'Dorëzimi i çdo pakete me kujdes dhe ruajtja e një sjelljeje profesionale në çdo kohë.',
+          'Cila është gjëja më e rëndësishme në detyrën tënde të përditshme?',
+      'faq_a1': 'Dërgimi i paketave me cilësi dhe me sjellje të mirë.',
 
-      'faq_q2':
-          'Çfarë duhet të shmangësh nëse lind një problem me një klient?',
+      'faq_q2': 'Çfarë nuk duhet të bësh në rast problemesh me klientin?',
       'faq_a2':
-          'Të lutemi, mos u përpiq ta zgjidhësh situatën vetë. Në vend të kësaj, njofto menjëherë dispatcher-in në detyrë. Ne do të komunikojmë me klientin në emrin tënd për të parandaluar përshkallëzimin dhe për të shmangur pasoja negative nga Amazon. Ne jemi këtu për të të mbështetur.',
+          'MOS u përpiq ta zgjidhësh situatën vetë; informo dispatcher-in në detyrë. Ne do të flasim me klientin për ty dhe do të përpiqemi të shmangim pasojat negative nga Amazon për shkak të ankesave. Jemi këtu për ty!',
 
       'faq_q3':
-          'Çfarë duhet të bëj nëse situata me një klient ka përshkallëzuar tashmë?',
+          'Po nëse situata tashmë ka eskaluar dhe klienti nuk është i kënaqur për çfarëdo që ka ndodhur?',
       'faq_a3':
-          'Nuk është kurrë vonë për të trajtuar një gabim. Të lutemi na kontakto dhe do të bëjmë më të mirën për ta zgjidhur çështjen drejtpërdrejt me klientin.',
+          'Nuk është kurrë vonë për të rregulluar gabimet. Na telefono gjithsesi dhe do të përpiqemi ta rregullojmë me klientin. Më mirë vonë se kurrë.',
 
       'faq_q4':
-          'Çfarë ka më shumë rëndësi: sasia (përfundimi i sa më shumë ndalesave sa më shpejt) apo cilësia?',
+          'Çfarë është më e rëndësishme: Sasia (shpejtësia për të dorëzuar sa më shumë ndalesa) apo Cilësia?',
       'faq_a4':
-          'Cilësia ka gjithmonë përparësi. Ndiq me kujdes udhëzimet e dorëzimit të klientit dhe mos e lër kurrë një paketë në një vend të pasigurt vetëm sepse je prapa orarit.',
+          'Cilësia! Gjithmonë cilësia! Ndiq udhëzimet e klientit dhe MOS e lër paketën në vende të pasigurta vetëm sepse je mbrapa me ndalesat.',
 
       'faq_q5':
-          'Çfarë ndodh nëse fokusohem te cilësia, por mbetem prapa me ndalesat?',
+          'Po nëse fokusohem te cilësia, por pastaj mbetem mbrapa me ndalesat?',
       'faq_a5':
-          'Do ta përfundosh rrugëtimin tënd në një mënyrë apo në një tjetër. Ne do të organizojmë mbështetje kur kjo të jetë e arsyeshme dhe e nevojshme.',
+          'Do t’i përfundosh ndalesat, në një mënyrë ose në një tjetër. Do të përpiqemi të dërgojmë ndihmë, por vetëm nëse e shohim të arsyeshme.',
+
+      'faq_q6': 'Çfarë është scorecard dhe çfarë është një DNR?',
+      'faq_a6': 'Mirë që pyete.',
 
       // 7 – Weekly scorecard
       'faq_q7': 'Scorecard Javore',
       'faq_a7':
-          'Scorecard-i javor ofron një pasqyrë të përmbledhur të performancës së ekipit kundrejt objektivave tona kryesore. Ajo nxjerr në pah pikat tona të forta, identifikon fushat që kanë nevojë për përmirësim dhe na ndihmon të përcaktojmë fokusin për javën në vijim. Nivelet e përgjithshme të performancës janë si më poshtë:\n'
+          'Scorecard-i javor na jep një pasqyrë të shpejtë dhe të qartë se si po ecën ekipi në objektivat kryesore. '
+          'Na ndihmon të shohim çfarë po shkon mirë, ku po mbetemi pas dhe ku duhet të fokusohemi për javën në vijim.\n\n'
+          'Rezultatet e përgjithshme janë si më poshtë:\n'
           '• Fantastic Plus: >93% (performancë e jashtëzakonshme)\n'
           '• Fantastic: 85% – 92.9%\n'
           '• Great: 70% – 84.9%\n'
           '• Fair: 50% – 69.9%\n'
           '• Poor: <50%',
 
-      'faq_q7_1': 'Skeda DNR — Delivered Not Received',
+      'faq_q7_1': 'Skeda DNR\nDelivered Not Received',
       'faq_a7_1':
-          'Një DNR regjistrohet kur ti e ke shënuar një paketë si të dorëzuar duke përdorur butonin "Swipe to finish", por klienti në fakt nuk e ka marrë atë. Shkaqet e zakonshme përfshijnë vjedhjen e paketës, një kuti bosh në mbërritje ose dorëzimin në një adresë të gabuar.\n'
-          'Çdo të martë do të marrësh fotografi të çdo DNR-je të regjistruar ndaj teje gjatë javës së mëparshme.',
+          'Është kur ti e ke dorëzuar paketën dhe ke shtypur butonin “Swipe to finish” duke konfirmuar dorëzimin, '
+          'por klienti nuk e ka marrë paketën për arsye të ndryshme: vjedhje, kuti bosh ose dorëzim në adresë të gabuar.\n'
+          'Çdo të martë do të marrësh fotografi për çdo DNR që ke pasur gjatë javës.',
 
       'faq_q7_1_1':
-          'Si mund t’i shmang DNR-të dhe sa ndikojnë ato në scorecard-in tim javor?',
+          'Si ta shmang këtë dhe sa e rëndësishme është për scorecard-in javor?',
       'faq_a7_1_1':
-          'DNR-të kanë një ndikim të madh në rezultatin tënd. Për t’i parandaluar, njofto klientin paraprakisht se po vjen dhe bjeri vetëm ziles që tregon qartë emrin e klientit.',
+          'Është shumë e rëndësishme. Për ta shmangur, thjesht njofto klientin paraprakisht që po afrohesh dhe bjeri ziles VETËM te emri i tij në zile.',
 
-      'faq_q7_1_2': 'Si mund t’i parandaloj humbjet e paketave?',
+      'faq_q7_1_2': 'Si t’i shmang humbjet e paketave?',
       'faq_a7_1_2':
-          'Kurdoherë që është e mundur, dorëzoja paketën drejtpërdrejt klientit. Nëse nuk është e mundur, dërgo një mesazh klientit duke shpjeguar saktësisht se ku është lënë paketa — për shembull, në garazh, nën shkallë, në kasolle ose pas një vazoje lulesh.\n'
-          'Nëse beson se nuk është e sigurt ta lësh paketën pa mbikëqyrje, mos e lër. Merre me vete dhe provo përsëri më vonë. Kjo është jashtëzakonisht e rëndësishme.',
+          'Gjithmonë përpiqu t’ia dorëzosh paketat në dorë klientit. Nëse kjo nuk është e mundur, dërgo një mesazh duke e informuar se ku u la paketa, p.sh. në garazh, nën shkallë, në kasolle, pas vazos së luleve, etj.\n'
+          'Nëse mendon se nuk është e sigurt ta lësh paketën pa mbikëqyrje, më mirë merre dhe provo përsëri më vonë. Kjo është SHUMË e rëndësishme.',
 
-      'faq_q7_1_3': 'Si ta përcaktoj nëse një vendndodhje është e sigurt?',
+      'faq_q7_1_3': 'Si ta di nëse një vend është i sigurt apo jo?',
       'faq_a7_1_3':
-          'Përdor gjykimin tënd dhe logjikën e shëndetshme. Për shembull, një paketë e lënë pranë kutive postare në një ndërtesë me 20 deri në 30 kate është shumë më e prirur të vidhet sesa një e lënë në një rezidencë private.\n'
-          'Për të të ndihmuar, çdo mëngjes publikojmë një listë adresash me rrezik të lartë për vjedhje ose ankesa nga klientët, bazuar në të dhënat dhe statistikat historike të dorëzimeve.',
+          'Instinkti dhe logjika. Nëse një ndërtesë ka 20–30 kate dhe ti e lë paketën te kutitë postare, shanset për vjedhje janë shumë më të larta krahasuar me një shtëpi private.\n'
+          'Gjithashtu, për të të ndihmuar në dorëzimet e përditshme dhe për të shmangur DNR, çdo mëngjes do të postojmë një foto me adresa ku ka rrezik të lartë për vjedhje dhe ankesa, bazuar në rezultatet dhe statistikat e mëparshme.',
 
       'faq_q7_1_4':
-          'Si ndikon një paketë e humbur ose e vjedhur në rezultatin tim?',
+          'Po nëse një paketë humbet ose vidhet, si ndikon kjo në rezultatin tim?',
       'faq_a7_1_4':
-          'Ndikimi është i konsiderueshëm. Një paketë e vetme e humbur mund të ta reduktojë rezultatin me të paktën 30% dhe të kushton minimumi 600 pikë. Ki parasysh: sa më e lartë të jetë pikët e shfaqura nën emrin tënd në scorecard, aq më e keqe është performanca. Sa më shumë paketa dorëzon në javë, aq më pak pikë humbet për rast, dhe çmimi i artikullit që mungon ndikon gjithashtu — artikujt më të shtrenjtë rezultojnë në humbje më të madhe pikësh. Duhet ta mbajmë këtë tregues sa më të ulët të jetë e mundur.\n'
-          'Po aq e rëndësishme: nëse regjistron vazhdimisht një numër të lartë paketash të humbura, do të jemi të detyruar të ndërpresim marrëdhënien e punës, pasi Amazon mund të dyshojë përfundimisht për vjedhje. Kjo është një rrezik serioz dhe nuk mund të injorohet.',
+          'Shumë keq. Kjo të ndikon të paktën me 30% dhe edhe vetëm një paketë mund të të kushtojë të paktën 600 pikë. '
+          'Sa më shumë pikë të shohësh në scorecard nën emrin tënd, aq më keq është. Sa më shumë paketa dorëzon në javë, aq më pak pikë humbet për rast. '
+          'Pikët e humbura ndryshojnë edhe sipas çmimit të artikullit: sa më i shtrenjtë, aq më shumë pikë humben.\n'
+          'Gjithashtu, nëse rregullisht ke numër të lartë paketash të humbura, do të duhet të të largojmë, sepse herët a vonë Amazon mund të dyshojë për vjedhje paketash. Kjo është shumë e rrezikshme.',
 
       // CC
-      'faq_q7_2': 'Skeda CC — Contact Compliance',
+      'faq_q7_2': 'Skeda CC\nContact Compliance',
       'faq_a7_2':
-          'Ky tregues mat sa shpesh e kontakton klientin për dorëzimin e tij, qoftë përmes mesazhit apo telefonatës. Sa më pak të komunikosh me klientin, aq më i ulët do të jetë rezultati yt në këtë kategori. Duhet ta mbajmë këtë tregues sa më të lartë të jetë e mundur, pasi është një nga kategoritë më të lehta për të performuar mirë dhe kontribuon ndjeshëm në rezultatin tënd të përgjithshëm.',
+          'Do të thotë sa herë ke kontaktuar klientin për dorëzimin e tij, qoftë me mesazh apo telefonatë. '
+          'Sa më pak të komunikosh me klientin, aq më i ulët do të jetë rezultati në scorecard. '
+          'Këtë seksion duhet ta mbajmë sa më të lartë që të jetë e mundur, sepse është një nga kategoritë më të lehta dhe ndihmon shumë në rezultatin e përgjithshëm.',
 
-      'faq_q7_2_1': 'Pse është i rëndësishëm kontakti me klientin?',
+      'faq_q7_2_1': 'Pse duhet ta bëj këtë?',
       'faq_a7_2_1':
-          'Dorëzimi i paketave nuk është thjesht një operacion "drop-and-go". Ti duhet ta njoftosh klientin paraprakisht dhe, kur është e përshtatshme, ta pyesësh ku do të donte të dorëzohej paketa.',
+          'Dorëzimi i paketave nuk është vetëm “Drop&Go”. Duhet ta njoftosh klientin paraprakisht dhe ta pyesësh se ku do të donte të dorëzohej paketa.',
 
-      'faq_q7_2_2': 'Si mund ta përmirësoj rezultatin tim CC?',
+      'faq_q7_2_2': 'Si ta përmirësoj rezultatin tim CC?',
       'faq_a7_2_2':
-          'Është thjesht: telefono — dhe sidomos dërgo mesazh — klientit në çdo ndalesë.',
+          'Faleminderit që pyete. Shumë thjesht: duke telefonuar dhe sidomos duke dërguar mesazhe klientëve në çdo ndalesë.',
 
       // CE
-      'faq_q7_3': 'Skeda CE — Customer Escalation',
+      'faq_q7_3': 'Skeda CE\nCustomer Escalation',
       'faq_a7_3':
-          'Kujto ndikimin që ka një DNR te rezultati yt — një përshkallëzim me klientin është të paktën dy herë më dëmtues. Në varësi të ashpërsisë së incidentit, mund të çojë madje edhe në humbjen e vendit të punës.',
+          'Të kujtohet sa keq ndikoi DNR në rezultatet? Kjo është të paktën 2 herë më e keqe dhe rrezikon edhe vendin e punës, sepse varet sa e rëndë ishte situata.',
 
-      'faq_q7_3_1': 'Si mund t’i shmang përshkallëzimet me klientin?',
+      'faq_q7_3_1': 'Si ta shmang këtë?',
       'faq_a7_3_1':
-          'Ndiq gjithmonë me kujdes udhëzimet e dorëzimit të klientit. Nëse ndodh një gabim, kërko falje së pari. Nëse klienti është i zemëruar, kërkoji një moment kohë që të flasë drejtpërdrejt me ne — ti duhet të jesh tashmë në linjë me ne. Siç theksohet në Seksionin 2, është gjithmonë më mirë t’i lësh këto situata në dorën tonë.',
+          'Duke ndjekur gjithmonë udhëzimet e dorëzimit të klientit. Në rast gabimi, kërko falje menjëherë. '
+          'Nëse klienti është i zemëruar, kërkoji një minutë kohë që të flasë me ne, ndërsa ti po na telefonon. '
+          'Duke lexuar Seksionin 2, tani duhet ta dish që është më mirë ta lëmë ne t’i trajtojmë këto situata.',
 
       // POD
-      'faq_q7_4': 'Skeda POD — Picture on Delivery',
+      'faq_q7_4': 'Skeda POD\nPicture on Delivery',
       'faq_a7_4':
-          'Kjo kolonë liston paketat e pranueshme për një Picture on Delivery (POD), ku fotoja e dorëzuar është shënuar si "Invalid" ose "Not Sure". Arsyet e zakonshme të refuzimit përfshijnë:\n'
-          '1. Etiketa e paketës me të dhënat e klientit është e dukshme në foto. Paketa duhet kthyer në mënyrë që etiketa të mos duket para se të bëhet fotoja.\n'
-          '2. Fotoja është e paqartë.\n'
-          '3. Një person është i dukshëm në foto.\n'
-          '4. Në foto nuk dallohet asnjë paketë.\n'
-          '5. Paketa është brenda automjetit.\n'
-          '6. Paketa është në dorë.\n'
-          '7. Paketa është vendosur brenda kutisë postare.\n'
-          '8. Paketa është shumë afër kamerës.\n'
-          '9. Fotoja është shumë e errët.\n'
-          'Kjo kategori duhet të jetë më e lehta për të arritur 100% dhe bërja e saj e përmirëson rezultatin tënd të përgjithshëm.',
+          'Kjo kolonë tregon listën e paketave të përshtatshme për POD, për të cilat janë bërë foto, por që janë shënuar si “Invalid” ose “Not Sure”. Arsyet e refuzimit mund të përfshijnë:\n'
+          '1- Etiketa e paketës me të dhënat e klientit duket në foto. Paketa duhet të kthehet mbrapsht para se të bëhet foto.\n'
+          '2- Foto e paqartë\n'
+          '3- Person i dukshëm në foto\n'
+          '4- Nuk dallohet paketë në foto\n'
+          '5- Paketë në makinë\n'
+          '6- Paketë në dorë\n'
+          '7- Paketë në kuti poste\n'
+          '8- Paketë shumë afër\n'
+          '9- Foto shumë e errët.\n'
+          'Kjo duhet të jetë gjithmonë pjesa më e lehtë ku duhet të marrësh 100% dhe përmirëson rezultatin tënd të përgjithshëm.',
 
       // LoR
-      'faq_q7_5': 'Skeda LoR — Lost on Road',
+      'faq_q7_5': 'Skeda LoR\nLost on Road',
       'faq_a7_5':
-          'Ky tregues të penalizon kur një paketë që e ke skanuar gjatë ngarkimit as nuk është dorëzuar as nuk është kthyer në fund të turnit pas një përpjekjeje të dështuar për dorëzim. Në raste të tilla paketa konsiderohet e humbur dhe penaliteti është i barabartë me një DNR. Të lutemi numëro me kujdes paketat që kthen dhe sigurohu që ato përputhen me listën e shfaqur në scanner te: Today’s Itinerary → Summary → Problems. Nëse numrat nuk përputhen, njofto dispatcher-in në detyrë para se ta mbyllësh turnin në aplikacionin Amazon.',
+          'Të penalizon kur ke skanuar një paketë gjatë ngarkimit dhe nuk e kthen në fund të turnit në rast dorëzimi të pasuksesshëm. '
+          'Pra paketa konsiderohet e humbur dhe humb po aq pikë sa në një DNR. '
+          'Prandaj numëro mirë paketat që kthen dhe sigurohu që përputhen me paketat e shfaqura në scanner. '
+          'Mund t’i gjesh te: Today’s Itinerary – Summary – Problems. Nëse nuk përputhen, informo dispatcher-in në detyrë para se ta mbyllësh punën në aplikacionin Amazon.',
 
       // DCR
-      'faq_q7_6': 'Skeda DCR — Delivery Completion Rate',
+      'faq_q7_6': 'Skeda DCR\nDelivery Completion Rate',
       'faq_a7_6':
-          'Ky tregues pasqyron performancën tënde të dorëzimit duke ndjekur përqindjen e dorëzimeve të përfunduara sipas planit. Ai na ndihmon të vlerësojmë efikasitetin dhe besueshmërinë e shërbimit tonë dhe sjell në pah çështje si vonesat, tentativat e dështuara ose problemet e rrugëtimit. DCR-ja jote duhet të jetë gjithmonë sa më e lartë e mundur. Për ta arritur këtë, kryej reattempts kurdo që është e realizueshme dhe minimizo numrin e paketave të kthyera.',
+          'Tregon aftësinë tënde për të dorëzuar paketa. Ndjek përqindjen e dorëzimeve të përfunduara sipas planit dhe na ndihmon të masim efikasitetin dhe besueshmërinë. '
+          'Thekson probleme si vonesa, tentativa të dështuara ose probleme me rrugëtimin. Ky duhet të jetë sa më i lartë që të jetë e mundur. '
+          'Për ta arritur këtë, bëj çdo ditë reattempts dhe shmang sa të mundesh kthimin e paketave.',
 
       // CDF
-      'faq_q7_7': 'Skeda CDF (më parë DEX) — Customer Delivery Feedback',
+      'faq_q7_7': 'Skeda CDF (më parë: DEX)\nCustomer Delivery Feedback',
       'faq_a7_7':
-          'Ky tregues kap përvojën e marrësit me dorëzimin, përfshirë përpikmërinë, gjendjen e mallit dhe profesionalizmin e shoferit. Ai na ndihmon të identifikojmë pikat tona të forta dhe fushat për përmirësim. Pas dorëzimit, klienti merr një email anketues nga Amazon me pyetje si:\n'
-          '1) A u dorëzua paketa jote në kohë? (Po / Jo)\n'
-          '2) A u la paketa në një vend të sigurt? (Po / Jo)\n'
-          '3) A ishte paketa në gjendje të mirë kur mbërriti? (Po / Jo)\n'
-          '4) Sa i kënaqur je me dorëzimin në përgjithësi? (Shumë i kënaqur / I kënaqur / Neutral / I pakënaqur / Shumë i pakënaqur)\n'
-          '5) Si e vlerëson komunikimin dhe përditësimet e ndjekjes për këtë dorëzim? (Shkëlqyeshëm / Mirë / Mesatar / Dobët)\n'
-          '6) A ishte personi i dorëzimit i sjellshëm dhe profesional? (Po / Jo / Nuk aplikohet — dorëzim pa kontakt)\n'
-          '7) Ke ndonjë koment për përvojën tënde të dorëzimit? (Komente shtesë të klientit)',
+          'Kap përvojën e marrësit me procesin e dorëzimit, duke përfshirë përpikmërinë, gjendjen e mallrave dhe profesionalizmin e shoferit. '
+          'Na ndihmon të identifikojmë pikat e forta dhe fushat për përmirësim. Në fund të dorëzimit, klienti merr një email nga Amazon për përvojën e dorëzimit me pyetje si:\n'
+          '1) A u dorëzua paketa në kohë?\n'
+          'Po / Jo\n'
+          '2) A u la paketa në një vend të sigurt?\n'
+          'Po / Jo\n'
+          '3) A ishte paketa në gjendje të mirë kur mbërriti?\n'
+          'Po / Jo\n'
+          '4) Sa i kënaqur je me dorëzimin në përgjithësi?\n'
+          'Shumë i kënaqur / I kënaqur / Neutral / I pakënaqur / Shumë i pakënaqur\n'
+          '5) Si e vlerëson komunikimin dhe përditësimet e ndjekjes për këtë dorëzim?\n'
+          'Shkëlqyeshëm / Mirë / Mesatar / Dobët\n'
+          '6) A ishte personi i dorëzimit i sjellshëm dhe profesional?\n'
+          'Po / Jo / Jo e aplikueshme (dorëzim pa kontakt)\n'
+          '7) A ke ndonjë koment për përvojën tënde të dorëzimit?\n'
+          '(Komente shtesë të klientit)',
 
-      'faq_q7_8':
-          'Çfarë duhet të kem parasysh në lidhje me scorecard-in në përgjithësi?',
+      'faq_q7_8': 'Çfarë duhet të kem parasysh për scorecard-in?',
       'faq_a7_8':
-          'Cilësia dhe efikasiteti bëjnë një ndryshim thelbësor. Rezultatet e larta përfitojnë ty, kompaninë dhe të gjithë ekipin. Kënaqësia e klientit është prioriteti ynë më i lartë, dhe rezultatet e shkëlqyera shpërblehen me një bonus nga kompania.\n'
-          'Jep më të mirën tënde dhe do të shpërblehesh në përputhje me rrethanat.',
+          'Cilësia dhe efikasiteti të çojnë larg. Rezultatet e mira janë të mira për ty, për kompaninë dhe për të gjithë ekipin. Kënaqësia e klientit është shumë e rëndësishme dhe rezultatet e mira shoqërohen me bonus nga kompania.\n'
+          'Jep maksimumin, merr maksimumin.',
 
-      'faq_q8': 'Cilat fusha të tjera kërkojnë vëmendjen time?',
+      'faq_q8': 'Në cilat fusha të tjera duhet të jem i kujdesshëm?',
       'faq_a8':
-          'Prioritizo sigurinë tënde personale duke ngarë me përgjegjësi, duke parandaluar lëndimet dhe duke qenë i kujdesshëm pranë qenve për të shmangur kafshimet. Trajto të gjitha pajisjet e punës — përfshirë automjetin ditor dhe scanner-in ose telefonin e punës — me kujdes. Paraqitu gjithmonë në punë me këpucë sigurie, jelek sigurie dhe xhaketën ose bluzën e Amazon-it të përshtatshme për kushtet e motit.',
+          'Kujdesu për veten: vozit në mënyrë të sigurt, shmang dëmtimet dhe shmang qentë dhe kafshimet. '
+          'Kujdes me pajisjet e punës si furgoni i ditës, scanner/telefoni i punës dhe eja në punë me këpucë sigurie dhe jelek sigurie, si edhe xhaketë ose bluzë me markën Amazon (në varësi të motit).',
 
-      'faq_q9':
-          'Çfarë duhet të bëj nëse përfshihem në një aksident ose dëmtoj automjetin e punës?',
+      'faq_q9': 'Çfarë ndodh nëse bëj aksident ose dëmtoj furgonin e punës?',
       'faq_a9':
-          'Së pari, sigurohu që je në rregull dhe pa lëndime të rënda. Sa i përket dëmit të automjetit: nëse përcaktojmë se aksidenti u shkaktua nga neglizhenca — për shembull, shpërqendrimi nga përdorimi i telefonit gjatë vozitjes — do të mbash personalisht përgjegjësi për koston e plotë të dëmit. Për më tepër, raporti i policisë që pason mund të rezultojë në pezullimin e patentës, dhe një incident i tillë është bazë për largim të menjëhershëm. Në raste më pak të rënda, do të përjashtohesh nga Bonuset Javore të Scorecard-it për dy muaj. Ti je i detyruar të na njoftosh menjëherë pas çdo incidenti dhe të ofrosh sa vijon: kohën dhe vendndodhjen e incidentit, informacion për çdo dëm të pronës private ose publike (mure, gardhe, shtylla ndriçimi, njerëz ose kafshë), si dhe foto të qarta të dëmeve të automjetit.',
+          'Së pari, sigurohu që je mirë dhe nuk je i lënduar rëndë. Sa i përket dëmit të makinës, nëse përcaktojmë se aksidenti ka ndodhur për shkak të neglizhencës – p.sh. shpërqendrime si përdorimi i telefonit gjatë vozitjes – do të jesh personalisht përgjegjës për të gjithë dëmin. '
+          'Përveç kësaj, do të marrësh raport nga policia, që mund të çojë edhe në pezullim patente. Kjo mund të jetë edhe arsye për largim të menjëhershëm. '
+          'Përndryshe, thjesht përjashtohesh nga bonuset javore të Scorecard për 2 muaj. '
+          'Në rast incidenti, je i detyruar të na njoftosh menjëherë dhe të na japësh kohën e incidentit, vendndodhjen, nëse ka dëme në prona private ose publike (si mure, gardhe, shtylla ndriçimi, njerëz dhe/ose kafshë), si dhe foto të dëmeve të makinës.',
 
-      'faq_q10': 'Çfarë duhet të bëj nëse një paketë është e dëmtuar ose mungon?',
+      'faq_q10': 'Çfarë të bëj kur kam paketa të dëmtuara dhe/ose që mungojnë?',
       'faq_a10':
-          'Nëse një paketë është e dëmtuar, shënoje si të dëmtuar në sistem dhe ktheje në stacion. Nëse paketa e dëmtuar përmban lëng dhe ka prekur paketa të tjera, bëj një foto të të gjitha paketave të prekura dhe dërgoje te dispatcher-i në detyrë. Ne do ta raportojmë incidentin në emrin tënd në Amazon.\n'
-          'Nëse një paketë mungon, mund ta shënosh si të munguar — përveç rastit kur është një paketë OTP, në të cilin rast duhet të na kontaktosh së pari para se ta shënosh. Kjo është thelbësore.',
+          'Kur një paketë është e dëmtuar, mund ta shënosh si të dëmtuar dhe ta kthesh në stacion. Nëse ajo paketë ishte me lëng dhe ka dëmtuar edhe paketa të tjera, bëj një foto të të gjitha paketave të dëmtuara dhe dërgoje dispatcher-it në detyrë; ne do ta raportojmë në Amazon për ty.\n'
+          'Kur një paketë mungon, mund ta shënosh si missing – përveç nëse ka OTP, ku DUHET ta raportosh fillimisht tek ne para se ta shënosh si missing. Kjo është SHUMË e rëndësishme.',
 
       'faq_q11': 'Çfarë është një paketë OTP (One-Time Password)?',
       'faq_a11':
-          'Një paketë OTP përmban një artikull me vlerë të lartë për të cilin Amazon kërkon që klienti t’i japë shoferit një fjalëkalim njëpërdorimësh para dorëzimit. Kjo siguron që paketa të arrijë marrësin e duhur. Duhet t’i trajtosh paketat OTP me kujdesin maksimal, të mos i lësh kurrë pa mbikëqyrje dhe t’ia dorëzosh vetëm klientit që ka dhënë fjalëkalimin e saktë.',
+          'Është një artikull i shtrenjtë që Amazon kërkon që klienti t’i japë shoferit një fjalëkalim njëpërdorimësh (OTP) para dorëzimit, për të siguruar që paketa i dorëzohet personit/klientit të duhur. '
+          'Duhet të kesh kujdes të shtuar për këto paketa, të mos i lësh pa mbikëqyrje dhe t’ia dorëzosh paketën vetëm klientit që të ka dhënë fjalëkalimin.',
 
       'faq_q12':
-          'Pse vazhdojmë të të kërkojmë të ngadalësosh në vend që të punosh më shpejt?',
+          'Pse vazhdojmë të të themi të ngadalësosh dhe të mos shkosh më shpejt?',
       'faq_a12':
-          'E kuptojmë që kjo mund të duket e përsëritur, por është kërkesë e sistemit. Ne duhet të ndjekim objektivin e paracaktuar të ndalesave-për-orë të algoritmit, që të mund të sigurojmë rrugë shtesë në të ardhmen dhe të garantojmë që ti të vazhdosh të marrësh punë.\n'
-          'Gjithashtu, puna shumë e shpejtë rrit rrezikun e një DNR-je, e cila të kushton pikë ty dhe kompanisë në scorecard-in javor.',
+          'As neve nuk na pëlqen, por kështu funksionon sistemi. Duhet të ndjekim algoritmin dhe të bëjmë një numër ndalesash për orë siç është paracaktuar, që të marrim më shumë rrugë në të ardhmen dhe ti të kesh më shumë punë e jo të jesh i lirë.\n'
+          'Gjithashtu, duke shkuar më shpejt rrezikon të marrësh DNR dhe të humbësh pikë si për veten, ashtu edhe për kompaninë në scorecard-in javor.',
 
       'faq_q13':
-          'Pse dispatcher-at ndonjëherë më pyesin nëse jam prapa apo nëse diçka nuk shkon?',
+          'Atëherë pse dispatcher-at ndonjëherë më pyesin pse je mbrapa dhe nëse ka diçka që nuk shkon?',
       'faq_a13':
-          'E kuptojmë se këto kontrolle nuk janë gjithmonë të përshtatshme, por ne varemi nga feedback-u yt për të kuptuar se çfarë mund të ketë ndodhur rrugës që ka shkaktuar vonesën. Amazon kërkon këtë informacion sepse çdo ndalesë ka një dritare të planifikuar dorëzimi. Kur një rrugë bie prapa, Amazon ka nevojë të dijë arsyen, në mënyrë që efikasiteti i dorëzimit në të ardhmen të përmirësohet bazuar në këto të dhëna.',
+          'E dimë që nuk është e këndshme, por na duhet feedback se çfarë mund të ketë ndodhur rrugës që të ka bërë të mbetesh mbrapa me ndalesat. Amazon na e kërkon këtë feedback sepse ka edhe një afat kohor ku duhet të kesh dorëzuar X ndalesa; prandaj Amazon duhet të dijë pse ndalesat e mbetura janë mbrapa planit, për të përmirësuar efikasitetin e ardhshëm.',
 
-      'faq_q14': 'Pse të kërkojmë ndonjëherë të ndihmosh një koleg?',
+      'faq_q14': 'Pse ndonjëherë të kërkojmë të shkosh të ndihmosh një koleg?',
       'faq_a14':
-          'Vonesa e një kolegu mund të vijë nga një sërë faktorësh: mbulim i dobët interneti në zonë, trafik i rënduar ose rrugë të bllokuara nga ndërtimet. Në raste të tilla, nevojitet mbështetja jote që ai të përfundojë rrugën e tij në kohë.',
+          'Sepse shumë faktorë ndikojnë në vonesën e kolegut, si lidhje e dobët interneti në zonë, trafik, rrugë të bllokuara nga punime, që e bëjnë të vështirë dorëzimin në kohë. Prandaj nevojitet ndihma jote.',
 
       'faq_q15':
-          'A do të dorëzoj rrugë standarde që nga dita e parë, si shoferët më me përvojë?',
+          'A filloj që në ditën e parë të dorëzoj paketa në ruter standard si shoferët më me përvojë?',
       'faq_a15':
-          'Jo. Ti do të fillosh me një periudhë hyrëse prej 14 ditësh pune gjatë së cilës do të zbatosh atë që ke mësuar në ditët ride-along me trajnerin tënd dhe do të familjarizohesh me zonën, automjetin, scanner-in dhe procesin e përgjithshëm të punës.\n'
-          'Gjatë këtyre 14 ditëve, Amazon do të reduktojë numrin tënd ditor të paketave dhe ndalesave deri në 50% krahasuar me një rrugë standarde.',
+          'Jo, sigurisht që jo. Në fillim ke një periudhë prej 14 ditësh pune për të vënë në praktikë atë që ke mësuar në ditët “ride-along” me trajnerin dhe për t’u përshtatur me zonën, furgonin, scanner-in dhe procesin e punës.\n'
+          'Gjatë kësaj periudhe 14-ditore, Amazon do të të japë deri në 50% më pak paketa dhe ndalesa se normalisht.',
 
       'faq_q16':
-          'Çfarë duhet të bëj nëse një adresë është e pasaktë ose pini në hartë nuk është korrekt?',
+          'Çfarë të bëj kur një adresë është e gabuar dhe/ose pini i vendndodhjes nuk është i saktë në hartë?',
       'faq_a16':
-          'Së pari, verifiko pinin duke kërkuar adresën në Google Maps, i cili është më i saktë dhe tashmë i instaluar në scanner-in tënd. Nëse vendndodhja nuk përputhet, raporto pasaktësinë te dispatcher-i në detyrë.',
+          'Së pari konfirmo që pini nuk është i saktë duke kërkuar adresën në Google Maps (është më i saktë dhe është i instaluar në scanner). Nëse nuk përputhet, njofto dispatcher-in në detyrë për gabimet.',
 
       'faq_q17':
-          'Cilat janë detyrat e mia ditore para fillimit dhe pas përfundimit të punës?',
+          'Cilat janë detyrat e mia të përditshme para se të filloj dhe pasi të mbaroj punën?',
       'faq_a17':
-          '1. Me mbërritjen në parking, sigurohu që mban këpucët e sigurisë, jelekun e sigurisë dhe uniformën e Amazon-it.\n'
-          '2. Kontrollo që scanner-i është plotësisht i karikuar. Nëse jo, njofto një dispatcher në vend.\n'
-          '3. Inspekto automjetin për çdo problem.\n'
-          '4. Nis udhëtimin në aplikacionin Mentor në scanner-in tënd.\n'
-          '5. Bëj një foto të panelit të automjetit që tregon kilometrat aktuale dhe reseto numëruesin ditor të udhëtimit në zero.\n'
-          '6. Përgatitu të shkosh në Waiting Area vetëm 10 minuta para kohës së planifikuar të ngarkimit — jo më herët.\n'
-          '7. Kur të jesh në Waiting Area, fik motorin dhe hap Flex App-in dhe Timesheet-in. Mos e hap Flex App-in më herët se 10 minuta para ngarkimit; ky vulosje 10-minutëshe është e detyrueshme.\n'
-          '8. Shko në Loading Area sipas udhëzimeve të Yard Marshall-it. Në Loading Area, fik motorin dhe dil nga automjeti vetëm pasi të dëgjosh bilbilin e Yard Marshall-it.\n'
-          '9. Pasi ngarkimi të përfundojë, ndiz automjetin dhe fillo të lëvizësh vetëm kur udhëzohesh nga Yard Marshall-i.\n'
-          '10. Pasi të kesh përfunduar të gjitha ndalesat, kontrollo rezervuarin e karburantit. Nëse mbetet më pak se gjysma, mbushe automjetin.\n'
-          '11. Me kthimin në stacion, lëri të gjitha paketat e mbetura në zonat e caktuara nga Amazon dhe ktheji çantat menjëherë.\n'
-          '12. Pas kthimit në parking, fik automjetin dhe plotëso Green Book-un (Tageskontrollblatt). Dërgo një foto të kilometrave ditore së bashku me një foto të Green Book-ut.\n'
-          '13. Fik automjetin dhe kthe çantën e punës në zonën ose në automjetin e caktuar.',
+          '1- Kur vjen në parking, sigurohu që mban këpucë sigurie, jelek sigurie dhe uniformën e Amazon.\n'
+          '2- Kontrollo nëse scanner-i është i karikuar plotësisht dhe njofto dispatcher-in nëse nuk është.\n'
+          '3- Kontrollo nëse ka ndonjë problem me furgonin.\n'
+          '4- Nis udhëtimin në aplikacionin Mentor në scanner.\n'
+          '5- Posto një foto të panelit të furgonit që tregon kilometrat aktualë dhe trip-in ditor (në furgon) të resetuar në 0.\n'
+          '6- Shko në Waiting Area vetëm 10 minuta para orës së planifikuar të ngarkimit, jo më herët.\n'
+          '7- Në Waiting Area, fik motorin, hap Flex App dhe Timesheet. Jo asnjë minutë më herët, sidomos Flex App. Mos harro “timestamp”-in 10-minutësh.\n'
+          '8- Pastaj shko në Loading Area sipas udhëzimeve të Yard Marshall. Në Loading Area fik motorin dhe dil nga furgoni vetëm PASI të dëgjosh bilbilin e Yard Marshall.\n'
+          '9- Pasi të kesh ngarkuar, ndiz furgonin dhe nis lëvizjen vetëm kur Yard Marshall të të udhëzojë.\n'
+          '10- Pasi të përfundosh ndalesat, kontrollo karburantin; nëse është më pak se gjysma, mbushe.\n'
+          '11- Në stacion, lëri paketat e mbetura në zonat e caktuara nga Amazon dhe kthe çantat në kohë.\n'
+          '12- Në parking, fik furgonin dhe plotëso Green Book (Tageskontrollblatt), posto foto të kilometrave ditorë dhe foto të Green Book.\n'
+          '13- Fik furgonin dhe kthe çantën e punës në zonën e caktuar.',
 
       'faq_q18':
-          'A ka diçka që duhet të bëj kur përdor një furgon tjetër nga ai i zakonshmi?',
+          'A duhet të bëj diçka kur ndërroj furgonin dhe marr një tjetër në vend të atij që përdor zakonisht?',
       'faq_a18':
-          'Po. Para nisjes së rrugës, regjistro një video të detajuar të automjetit, ku kapet çdo dëm ekzistues — përfshirë gërvishtje të vogla dhe gropëza — që të mos mbash përgjegjësi për dëmet paraprake gjatë inspektimit të ardhshëm.',
+          'Duhet të bësh një video që tregon me detaje çdo dëmtim të vogël që mund të kenë bërë shoferët para teje, që të mos jetë faji yt në inspektimin e ardhshëm.',
 
       'faq_q19':
-          'Çfarë duhet të bëj nëse Flex App-i ngarkon vazhdimisht dhe po ma ngadalëson rrjedhën e punës?',
+          'Çfarë të bëj nëse Flex App është gjithmonë duke u ngarkuar dhe po ma ngadalëson punën?',
       'faq_a19':
-          'Së pari, konfirmo që ke një lidhje aktive interneti. Mund ta verifikosh duke dërguar një mesazh te klienti i ndalesës aktuale — nëse ai kalon, lidhja është aktive. Alternativisht, hap një aplikacion tjetër në scanner, si për shembull shfletuesin, dhe provo një kërkim.\n'
-          'Nëse nuk ka lidhje aktive interneti, ndiq këto hapa sipas radhës:\n'
-          '1. Rinise scanner-in. Kjo duhet të jetë gjithmonë përpjekja e parë.\n'
-          '2. Aktivizo dhe çaktivizo modalitetin e aeroplanit. Kjo shpesh funksionon pa pasur nevojë për një rinisje të plotë.\n'
-          '3. Si zgjidhje e fundit, ndaj një hotspot celular nga telefoni yt personal për deri në 10 minuta, që sistemi të rifreskohet.\n'
-          'Mund të punosh edhe offline, por duhet të rilidhesh me internetin në një moment gjatë turnit. Për të aktivizuar modalitetin offline, shkarko paraprakisht hartat offline në Flex App: shko te Settings → Offline Maps (opsioni i fundit) → Download DBY5 → Allow downloads with mobile connection.\n',
+          'Së pari kontrollo nëse ke lidhje aktive interneti. Mund ta provosh duke dërguar një mesazh te klienti i ndalesës aktuale; nëse shkon, atëherë interneti është aktiv. Mund ta kontrollosh edhe duke hapur një aplikacion tjetër, p.sh. browser-in.\n'
+          'Hapat nëse NUK ka lidhje aktive interneti:\n'
+          '1- Rinise scanner-in. Kjo duhet të jetë gjithmonë gjëja e parë.\n'
+          '2- Aktivizo/çaktivizo airplane mode. Shpesh funksionon pa pritur rinisjen.\n'
+          '3- Si zgjidhje e fundit, përdor hotspot nga telefoni personal për maksimum 10 minuta, vetëm sa të rifreskohet sistemi.\n'
+          'Mund të punosh edhe offline, por në një moment duhet të lidhet interneti. Për offline duhet të shkarkosh offline maps në Flex App: Settings – Offline Maps (opsioni i fundit) – Download DBY5 – Allow downloads with mobile connection.\n',
 
       'faq_q20':
-          'Çfarë duhet të bëj nëse lidhja e internetit është aktive, por Flex App-i ende nuk funksionon siç duhet?',
+          'Po nëse interneti është aktiv, por Flex App prapë nuk punon siç duhet?',
       'faq_a20':
-          'Provo hapat e mëposhtëm sipas radhës:\n'
-          '1. Rinise scanner-in.\n'
-          '2. Aktivizo dhe çaktivizo modalitetin e aeroplanit.\n'
-          '3. Mbylle aplikacionin dhe rihape.\n'
-          '4. Çaktivizo dhe riaktivizo Location Services (GPS).\n'
-          '5. Dil nga Flex App-i dhe kyçu përsëri duke përdorur kredencialet që përdor për aplikacionin Mentor.\n'
-          '6. Kontrollo nëse aplikacioni ka nevojë për përditësim.\n'
-          'Kalo nëpër këta hapa një nga një. Nëse njëri nuk e zgjidh problemin, kalo te tjetri.',
+          '1- Rinise scanner-in.\n'
+          '2- Aktivizo/çaktivizo airplane mode\n'
+          '3- Dil nga aplikacioni\n'
+          '4- Çaktivizo/aktivizo Location Services (GPS)\n'
+          '5- Dil (log out) nga Flex App dhe hyr përsëri (log in) me kredencialet që përdor për Mentor App.\n'
+          '6- Kontrollo nëse aplikacioni ka nevojë për përditësim.\n'
+          'Provoji këto hapa një nga një. Nëse njëri nuk funksionon, provo tjetrin.',
     },
 
     // =========================
@@ -2769,220 +2820,257 @@ class AppLocalizations {
       'faq_green_book_video_open_failed':
           'A Green Book videólink nem nyitható meg.',
 
-      'faq_q1': 'Mi a legfontosabb szempont a napi munkád során?',
-      'faq_a1':
-          'Minden csomagot gondosan kézbesíteni, és mindvégig professzionálisan viselkedni.',
+      'faq_q1': 'Mi a legfontosabb a napi feladatod során?',
+      'faq_a1': 'A csomagok minőségi kézbesítése és a megfelelő viselkedés.',
 
-      'faq_q2':
-          'Mit kerülj el, ha probléma adódik egy ügyféllel?',
+      'faq_q2': 'Mit NE tegyél, ha problémád van az ügyféllel?',
       'faq_a2':
-          'Kérjük, ne próbáld meg egyedül megoldani a helyzetet. Ehelyett azonnal értesítsd a szolgálatos diszpécsert. Mi fogjuk a kommunikációt az ügyféllel a te nevedben, hogy megelőzzük az eszkalációt és elkerüljük az Amazon felőli negatív következményeket. Itt vagyunk, hogy támogassunk téged.',
+          'NE próbáld meg egyedül kezelni a helyzetet, hanem értesítsd a szolgálatos diszpécsert. Mi megpróbálunk az ügyféllel beszélni helyetted, és elkerülni az Amazon felől érkező negatív következményeket az ügyfélpanaszok miatt. Itt vagyunk neked!',
 
       'faq_q3':
-          'Mit tegyek, ha egy ügyféllel való helyzet már eszkalálódott?',
+          'Mi van akkor, ha a helyzet már elmérgesedett, és az ügyfél valami miatt nem elégedett?',
       'faq_a3':
-          'Soha nincs túl késő orvosolni egy hibát. Kérjük, vedd fel velünk a kapcsolatot, és megtesszük a tőlünk telhetőt, hogy a problémát közvetlenül az ügyféllel rendezzük.',
+          'Soha nincs túl késő kijavítani a hibákat. Hívj minket akkor is, és megpróbáljuk rendezni a helyzetet az ügyféllel. Jobb későn, mint soha.',
 
       'faq_q4':
-          'Mi a fontosabb: a mennyiség (minél több megálló minél gyorsabban) vagy a minőség?',
+          'Mi a fontosabb: Mennyiség (minél gyorsabban minél több megálló) vagy Minőség?',
       'faq_a4':
-          'A minőség mindig elsőbbséget élvez. Kövesd gondosan az ügyfél kézbesítési utasításait, és soha ne hagyj csomagot nem biztonságos helyen csak azért, mert lemaradásban vagy.',
+          'Minőség! Mindig minőség! Kövesd az ügyfél utasításait, és NE hagyd a csomagot nem biztonságos helyen csak azért, mert le vagy maradva a megállókkal.',
 
       'faq_q5':
-          'Mi történik, ha a minőségre koncentrálok, de emiatt lemaradok a megállókkal?',
+          'Mi van, ha a minőségre figyelek, de emiatt lemaradok a megállókkal?',
       'faq_a5':
-          'Az útvonaladat így vagy úgy, de be fogod fejezni. Támogatást biztosítunk, ha az ésszerű és szükséges.',
+          'Be fogod fejezni a megállókat, valahogy. Megpróbálunk segítséget küldeni, de csak akkor, ha ezt ésszerűnek látjuk.',
+
+      'faq_q6': 'Mi az a scorecard és mi az a DNR?',
+      'faq_a6': 'Örülünk, hogy megkérdezted.',
 
       // 7 – Weekly scorecard
       'faq_q7': 'Heti scorecard',
       'faq_a7':
-          'A heti scorecard tömör áttekintést ad a csapat teljesítményéről a legfontosabb célkitűzéseink tükrében. Kiemeli az erősségeinket, azonosítja a fejlesztést igénylő területeket, és segít meghatározni a következő heti fókuszt. Az összesített teljesítményszintek a következők:\n'
+          'A heti scorecard gyors, átlátható képet ad arról, hogyan teljesít a csapat a fő céljaink mentén. '
+          'Segít látni, mi megy jól, hol maradunk el, és mire kell fókuszálnunk a következő héten.\n\n'
+          'Az összesített értékelések:\n'
           '• Fantastic Plus: >93% (kiemelkedő teljesítmény)\n'
           '• Fantastic: 85% – 92,9%\n'
           '• Great: 70% – 84,9%\n'
           '• Fair: 50% – 69,9%\n'
           '• Poor: <50%',
 
-      'faq_q7_1': 'DNR fül — Delivered Not Received',
+      'faq_q7_1': 'DNR fül\nDelivered Not Received',
       'faq_a7_1':
-          'A DNR akkor kerül rögzítésre, ha a "Swipe to finish" gombbal kézbesítettként jelöltél meg egy csomagot, de az ügyfél ténylegesen nem kapta meg. Gyakori okok: csomaglopás, üres csomagolás érkezéskor vagy rossz címre történő kézbesítés.\n'
-          'Minden kedden megkapod azokat a fényképeket, amelyek az előző héten rád rögzített DNR-ekhez tartoznak.',
+          'Akkor fordul elő, amikor kézbesítettél egy csomagot, és a „Swipe to finish” gombbal megerősítetted a kézbesítést, '
+          'de az ügyfél mégsem kapta meg a csomagot különböző okok miatt: csomaglopás, üres doboz, vagy rossz címre történő kézbesítés.\n'
+          'Minden kedden képeket kapsz az összes DNR-esetedről az adott héten.',
 
       'faq_q7_1_1':
-          'Hogyan kerülhetem el a DNR-eket, és mennyire jelentősen befolyásolják a heti scorecardot?',
+          'Hogyan kerülhetem el ezt, és mennyire fontos ez a heti scorecardban?',
       'faq_a7_1_1':
-          'A DNR-ek jelentős hatással vannak a pontszámodra. Az elkerülésükhöz értesítsd az ügyfelet előre, hogy úton vagy, és csak azon a csengőn csengess, amelyen az ügyfél neve egyértelműen látható.',
+          'Nagyon fontos. Ennek elkerüléséhez előre értesítsd az ügyfelet, hogy hamarosan érkezel, és CSAK annál a csengőnél csengess, amelyen az ő neve szerepel.',
 
-      'faq_q7_1_2': 'Hogyan előzhetem meg a csomageltűnéseket?',
+      'faq_q7_1_2': 'Hogyan kerülhetem el a csomagok eltűnését?',
       'faq_a7_1_2':
-          'Amikor csak lehetséges, add át a csomagot közvetlenül az ügyfélnek. Ha ez nem lehetséges, küldj üzenetet az ügyfélnek, amelyben pontosan közlöd, hol hagytad a csomagot — például a garázsban, a lépcső alatt, a fészerben vagy egy virágcserép mögött.\n'
-          'Ha úgy érzed, hogy nem biztonságos felügyelet nélkül hagyni a csomagot, ne hagyd ott. Vidd magaddal, és később próbáld meg újra kézbesíteni. Ez kiemelten fontos.',
+          'Mindig próbáld a csomagokat kézből átadni az ügyfélnek. Ha ez nem lehetséges, küldj üzenetet, és írd meg, hol hagytad a csomagot, '
+          'például a garázsban, a lépcső alatt, a fészerben, a virágcserép mögött stb.\n'
+          'Ha nem érzed biztonságosnak a felügyelet nélküli lerakást, inkább vidd magaddal a csomagot, és próbáld meg később újra. Ez NAGYON fontos.',
 
-      'faq_q7_1_3': 'Hogyan tudom megállapítani, hogy egy helyszín biztonságos-e?',
+      'faq_q7_1_3': 'Honnan tudom, hogy egy hely biztonságos-e vagy sem?',
       'faq_a7_1_3':
-          'Használd az ítélőképességedet és a józan eszedet. Egy 20–30 emeletes épület postaládáinál hagyott csomagot például jóval nagyobb valószínűséggel lopnak el, mint egy családi háznál hagyottat.\n'
-          'Támogatásképpen minden reggel közzéteszünk egy listát azokról a címekről, amelyeknél a korábbi kézbesítési adatok és statisztikák alapján magas a lopás vagy az ügyfélpanasz kockázata.',
+          'Ösztön és józan ész. Ha egy épület 20–30 emeletes, és a postaládáknál hagyod a csomagot, sokkal nagyobb az esélye a lopásnak, '
+          'mintha egy családi házban kézbesítenéd.\n'
+          'Emellett, hogy segítsünk a napi kézbesítésekben és elkerüld a DNR-t, minden reggel közzéteszünk egy képet olyan címekről, '
+          'amelyeknél nagy a csomaglopás és panasz esélye a korábbi eredmények és statisztikák alapján.',
 
       'faq_q7_1_4':
-          'Hogyan hat egy elveszett vagy ellopott csomag a pontszámomra?',
+          'Mi van, ha egy csomag elveszik vagy ellopják? Hogyan hat ez a pontszámomra?',
       'faq_a7_1_4':
-          'A hatás jelentős. Egyetlen elveszett csomag is legalább 30%-kal csökkentheti a pontszámodat, és minimum 600 pontba kerül. Fontos: minél magasabb a neved mellett megjelenő pontszám a scorecardban, annál rosszabb a teljesítmény. Minél több csomagot kézbesítesz hetente, annál kevesebb pontot veszítesz esetenként, és a hiányzó tárgy értéke is számít — a drágább termékek nagyobb pontveszteséget eredményeznek. Ezt a mutatót a lehető legalacsonyabban kell tartanunk.\n'
-          'Ugyanilyen fontos: ha rendszeresen magas az elveszett csomagjaid száma, kénytelenek leszünk megszüntetni a munkaviszonyodat, mivel az Amazon idővel lopásra gyanakodhat. Ez komoly kockázat, amelyet nem lehet figyelmen kívül hagyni.',
+          'Nagyon rosszul. Ez legalább 30%-kal ronthatja a pontszámodat, és már egyetlen csomag is legalább 600 pont veszteséget jelenthet. '
+          'Minél több pont szerepel a scorecardban a neved mellett, annál rosszabb. Minél több csomagot kézbesítesz egy munkahéten, annál kevesebb pontot veszítesz egy esetnél. '
+          'A pontveszteség az eltűnt áru értékétől is függ: minél drágább, annál több pont.\n'
+          'Fontos továbbá: ha rendszeresen sok az elveszett csomagod, el kell küldenünk, mert az Amazon előbb-utóbb csomaglopásra gyanakodhat. Ez nagyon veszélyes.',
 
       // CC
-      'faq_q7_2': 'CC fül — Contact Compliance',
+      'faq_q7_2': 'CC fül\nContact Compliance',
       'faq_a7_2':
-          'Ez a mutató azt méri, milyen gyakran veszed fel a kapcsolatot az ügyféllel a kézbesítés kapcsán — üzenetben vagy telefonhívással. Minél kevesebbet kommunikálsz az ügyféllel, annál alacsonyabb lesz a pontszámod ebben a kategóriában. Ezt a mutatót a lehető legmagasabban kell tartanunk, mivel az egyik legegyszerűbb kategória a jó teljesítéshez, és jelentősen hozzájárul az összpontszámodhoz.',
+          'Azt mutatja, hányszor léptél kapcsolatba az ügyféllel a kézbesítés kapcsán – üzenetben vagy telefonon. '
+          'Minél kevesebbet kommunikálsz az ügyféllel, annál alacsonyabb lesz a pontszámod ebben a kategóriában. '
+          'Ezt a részt a lehető legmagasabban kell tartani, mert ez az egyik legegyszerűbb kategória, és sokat javít az összpontszámon.',
 
-      'faq_q7_2_1': 'Miért fontos az ügyféllel való kapcsolattartás?',
+      'faq_q7_2_1': 'Miért kell ezt csinálnom?',
       'faq_a7_2_1':
-          'A csomagkézbesítés nem egyszerűen "drop-and-go" művelet. Előre értesítened kell az ügyfelet, és adott esetben meg kell kérdezned, hova szeretné, hogy a csomagot elhelyezd.',
+          'A csomagkézbesítés nem csak „lerak és kész”. Előre tájékoztasd az ügyfelet, és kérdezd meg, hova szeretné, hogy a csomag kerüljön.',
 
       'faq_q7_2_2': 'Hogyan javíthatom a CC pontszámomat?',
       'faq_a7_2_2':
-          'Egyszerű: hívj — és különösen küldj üzenetet — az ügyfélnek minden megállónál.',
+          'Köszönjük a kérdést. Egyszerű: hívással, és különösen üzenetküldéssel szinte minden megállónál.',
 
       // CE
-      'faq_q7_3': 'CE fül — Ügyféleszkaláció',
+      'faq_q7_3': 'CE fül\nÜgyfél-eszkaláció',
       'faq_a7_3':
-          'Idézd fel, mekkora hatással van egy DNR a pontszámodra — egy ügyféleszkaláció ennek legalább kétszeres mértékben káros. Az incidens súlyosságától függően akár az állásod elvesztéséhez is vezethet.',
+          'Emlékszel, milyen rosszul hatott a DNR a pontszámodra? Ez legalább kétszer olyan rossz, és akár az állásodat is kockáztatod – attól függően, mennyire súlyos volt a helyzet.',
 
-      'faq_q7_3_1': 'Hogyan kerülhetem el az ügyféleszkalációt?',
+      'faq_q7_3_1': 'Hogyan kerülhetem el ezt?',
       'faq_a7_3_1':
-          'Mindig kövesd gondosan az ügyfél kézbesítési utasításait. Ha hiba történik, először kérj elnézést. Ha az ügyfél dühös, kérj tőle egy percet, hogy közvetlenül velünk beszélhessen — ilyenkor már amúgy is velünk kellene vonalban lenned. Ahogy a 2. szakasz is leírja, az ilyen helyzeteket a legjobb ránk hagyni.',
+          'Mindig kövesd az ügyfél kézbesítési utasításait. Hiba esetén először kérj elnézést. '
+          'Ha az ügyfél mérges, kérd meg, hogy adjon egy percet, hogy beszélhessen velünk – miközben te már hívsz minket. '
+          'A 2. szakasz alapján mostanra tudnod kell, hogy a legjobb, ha az ilyen helyzeteket ránk bízod.',
 
       // POD
-      'faq_q7_4': 'POD fül — Picture on Delivery',
+      'faq_q7_4': 'POD fül\nKép a kézbesítésről',
       'faq_a7_4':
-          'Ez az oszlop azokat a csomagokat sorolja fel, amelyeknél Picture on Delivery (POD) készült, de a beküldött fényképet "Invalid" vagy "Not Sure" minősítéssel jelölték. Az elutasítás gyakori okai:\n'
-          '1. Az ügyfél adatait tartalmazó csomagcímke látható a képen. A csomagot fénykép előtt úgy kell fordítani, hogy a címke ne látszódjon.\n'
-          '2. A fénykép elmosódott.\n'
-          '3. Személy látható a fényképen.\n'
-          '4. Nincs csomag a képen.\n'
-          '5. A csomag a jármű belsejében van.\n'
-          '6. A csomag kézben van.\n'
-          '7. A csomag a postaládában van.\n'
-          '8. A csomag túl közel van a kamerához.\n'
-          '9. A fénykép túl sötét.\n'
-          'Ennek a kategóriának kell a legegyszerűbben 100%-ot elérnie, és ezzel érzékelhetően javítja az összpontszámodat.',
+          'Ez az oszlop azokat a csomagokat mutatja, amelyeknél POD-fotó szükséges, és készült is fotó, de az „Invalid” vagy „Not Sure” minősítést kapott. '
+          'A POD elutasításának okai lehetnek:\n'
+          '1- A fotón látszik a címke az ügyfél adataival. A csomagot a fotó előtt fordítsd meg.\n'
+          '2- Homályos fotó\n'
+          '3- Személy látható a fotón\n'
+          '4- Nem látható csomag a fotón\n'
+          '5- Csomag az autóban\n'
+          '6- Csomag kézben\n'
+          '7- Csomag a postaládában\n'
+          '8- Túl közeli fotó\n'
+          '9- Túl sötét fotó.\n'
+          'Ennek mindig a legegyszerűbbnek kell lennie: 100%-os eredményre kell törekedni, és javítja az összpontszámot.',
 
       // LoR
-      'faq_q7_5': 'LoR fül — Lost on Road',
+      'faq_q7_5': 'LoR fül\nLost on Road',
       'faq_a7_5':
-          'Ez a mutató akkor büntet, amikor egy csomag, amelyet a rakodásnál beszkenneltél, sikertelen kézbesítési kísérlet után sem kézbesítésre, sem a műszak végén visszaszállításra nem kerül. Ilyen esetekben a csomag elveszettnek minősül, és a büntetés egy DNR-rel egyenértékű. Kérjük, gondosan számold meg a visszahozott csomagokat, és győződj meg arról, hogy megegyeznek a szkenneren látható listával: Today’s Itinerary → Summary → Problems. Ha a számok nem egyeznek, jelezd a szolgálatos diszpécsernek, mielőtt a műszakot az Amazon alkalmazásban lezárnád.',
+          'Akkor kapsz büntetést, ha a rakodásnál beszkenneltél egy csomagot, de a műszak végén nem hoztad vissza sikertelen kézbesítés esetén. '
+          'Ilyenkor a csomag elveszettnek számít, és annyi pontot veszíthetsz, mint egy DNR-nél. '
+          'Számold meg pontosan a visszahozott csomagokat, és ellenőrizd, hogy egyeznek-e a scannerben látható listával. '
+          'Ezt itt találod: Today’s Itinerary – Summary – Problems. Ha nem egyezik, még a műszak lezárása előtt jelezd a szolgálatos diszpécsernek az Amazon appban.',
 
       // DCR
-      'faq_q7_6': 'DCR fül — Delivery Completion Rate',
+      'faq_q7_6': 'DCR fül\nDelivery Completion Rate',
       'faq_a7_6':
-          'Ez a mutató a kézbesítési teljesítményedet tükrözi a terv szerint teljesített kézbesítések arányának nyomon követésével. Segít értékelni a szolgáltatásunk hatékonyságát és megbízhatóságát, és felszínre hoz olyan problémákat, mint a késések, a sikertelen kísérletek vagy az útvonal-problémák. A DCR-ed mindig legyen a lehető legmagasabb. Ennek érdekében végezz reattempts-eket, amikor csak lehetséges, és minimalizáld a visszaszállított csomagok számát.',
+          'A csomagkézbesítési képességedet mutatja. Azt követi, hogy a tervezett kézbesítések hány százalékát teljesítetted, '
+          'és segít mérni a hatékonyságot és megbízhatóságot. Kiemeli a problémákat, mint késések, sikertelen kísérletek vagy útvonal-problémák. '
+          'Ennek mindig a lehető legmagasabbnak kell lennie. Ehhez naponta végezz újrapróbálkozásokat (reattempt), és amennyire csak lehet, kerüld a visszahozást.',
 
       // CDF
-      'faq_q7_7': 'CDF fül (korábban DEX) — Customer Delivery Feedback',
+      'faq_q7_7': 'CDF fül (korábban: DEX)\nÜgyfél kézbesítési visszajelzés',
       'faq_a7_7':
-          'Ez a mutató rögzíti a címzett kézbesítéssel kapcsolatos élményét, beleértve a pontosságot, az áru állapotát és a sofőr professzionalizmusát. Segít azonosítani szolgáltatásunk erősségeit és a fejlesztendő területeket. A kézbesítés után az ügyfél kérdőíves e-mailt kap az Amazontól, például a következő kérdésekkel:\n'
-          '1) Időben kézbesítették a csomagodat? (Igen / Nem)\n'
-          '2) Biztonságos helyen hagyták a csomagot? (Igen / Nem)\n'
-          '3) Érkezéskor jó állapotban volt a csomag? (Igen / Nem)\n'
-          '4) Mennyire vagy elégedett összességében a kézbesítéssel? (Nagyon elégedett / Elégedett / Semleges / Elégedetlen / Nagyon elégedetlen)\n'
-          '5) Hogyan értékelnéd a kommunikációt és a követési frissítéseket ehhez a kézbesítéshez? (Kiváló / Jó / Közepes / Rossz)\n'
-          '6) Udvarias és professzionális volt a kézbesítő? (Igen / Nem / Nem alkalmazható — kontaktmentes kézbesítés)\n'
-          '7) Van-e megjegyzésed a kézbesítési élménnyel kapcsolatban? (Egyéb ügyfélmegjegyzések)',
+          'Az ügyfél kézbesítési élményét rögzíti, beleértve a pontosságot, az áru állapotát és a sofőr professzionalizmusát. '
+          'Segít az erősségek és fejlesztendő területek azonosításában. A kézbesítés után az ügyfél e-mailt kap az Amazontól a kézbesítési élményről, például ilyen kérdésekkel:\n'
+          '1) Időben érkezett meg a csomag?\n'
+          'Igen / Nem\n'
+          '2) Biztonságos helyen lett lerakva a csomag?\n'
+          'Igen / Nem\n'
+          '3) Jó állapotban érkezett meg a csomag?\n'
+          'Igen / Nem\n'
+          '4) Mennyire vagy összességében elégedett a kézbesítéssel?\n'
+          'Nagyon elégedett / Elégedett / Semleges / Elégedetlen / Nagyon elégedetlen\n'
+          '5) Hogyan értékeled a kommunikációt és a követési (tracking) frissítéseket ehhez a kézbesítéshez?\n'
+          'Kiváló / Jó / Közepes / Rossz\n'
+          '6) Udvarias és professzionális volt a kézbesítő?\n'
+          'Igen / Nem / Nem alkalmazható (kontaktmentes kézbesítés)\n'
+          '7) Van-e megjegyzésed a kézbesítési élménnyel kapcsolatban?\n'
+          '(Ügyfél megjegyzései)',
 
-      'faq_q7_8':
-          'Mit tartsak szem előtt a scorecarddal kapcsolatban általánosságban?',
+      'faq_q7_8': 'Mit tartsak észben a scorecarddal kapcsolatban?',
       'faq_a7_8':
-          'A minőség és a hatékonyság jelentős különbséget jelent. A kiemelkedő pontszámok előnyösek neked, a cégnek és az egész csapatnak. Az ügyfél-elégedettség a legfőbb prioritásunk, a kimagasló eredményeket pedig a cég bónusszal jutalmazza.\n'
-          'Adj bele mindent — és ennek megfelelően leszel jutalmazva.',
+          'A minőség és a hatékonyság sokat számít. A jó pontszám jó neked, jó a cégnek és jó az egész csapatnak. Az ügyfél-elégedettség nagyon fontos, '
+          'és a jó pontszámokat a cég bónusszal jutalmazza.\n'
+          'Add a legjobbat, kapd a legjobbat.',
 
       // 8+
-      'faq_q8': 'Milyen további területek igénylik a figyelmemet?',
+      'faq_q8': 'Milyen más területekre kell még figyelnem?',
       'faq_a8':
-          'Helyezd előtérbe a személyes biztonságodat: vezess felelősségteljesen, előzd meg a sérüléseket, és légy óvatos a kutyákkal a harapások elkerülése érdekében. Bánj gondosan valamennyi munkaeszközzel — beleértve a napi járművet és a munkahelyi szkennert vagy telefont is. Mindig a biztonsági cipődben, a láthatósági mellényben és az időjárásnak megfelelő Amazon-kabátban vagy -pólóban jelenj meg a munkahelyen.',
+          'Vigyázz magadra: vezess biztonságosan, kerüld a sérüléseket, és figyelj a kutyákra/kutyaharapásra. '
+          'Óvd a munkaeszközöket is, például a napi járművet és a munka scannert/telefont. '
+          'Munkába mindig biztonsági cipőben és láthatósági mellényben érkezz, valamint Amazon kabátban vagy pólóban (az időjárástól függően).',
 
       'faq_q9':
-          'Mit tegyek, ha balesetet szenvedek vagy kárt teszek a munkajárműben?',
+          'Mi történik, ha balesetet okozok vagy megsértem a munkajárművet?',
       'faq_a9':
-          'Először is győződj meg arról, hogy nem sérültél meg súlyosan. A járműkárt illetően: ha megállapítjuk, hogy a balesetet gondatlanság okozta — például vezetés közbeni mobiltelefon-használatból eredő figyelemelterelés —, a teljes kárért személyesen te leszel felelős. Emellett az ezt követő rendőrségi jegyzőkönyv jogosítvány-felfüggesztéshez vezethet, és egy ilyen incidens azonnali elbocsátás alapjául szolgál. Kevésbé súlyos esetekben két hónapra kizárásra kerülsz a Heti Scorecard Bónuszokból. Minden incidensről köteles vagy minket haladéktalanul értesíteni, és a következőket megadni: az incidens időpontja és helyszíne, adatok minden magán- vagy közterületi kárról (falak, kerítések, lámpaoszlopok, személyek vagy állatok), valamint jól látható fényképek a jármű sérüléseiről.',
+          'Először is győződj meg róla, hogy jól vagy, és nem sérültél meg súlyosan. '
+          'A járműkár kapcsán: ha úgy ítéljük meg, hogy a baleset gondatlanságból történt – például figyelemelterelés, mint a telefonhasználat vezetés közben –, '
+          'akkor személyesen felelsz a teljes kárért. Emellett rendőrségi jegyzőkönyvet kapsz, ami akár jogosítványfelfüggesztéshez is vezethet. '
+          'Ez akár azonnali elbocsátás oka is lehet. Egyéb esetben „csak” 2 hónapra kizárunk a heti Scorecard bónuszokból. '
+          'Esemény esetén köteles vagy azonnal értesíteni minket, és elküldeni az időpontot, helyszínt, hogy történt-e kár magán- vagy közterületen (falak, kerítések, lámpaoszlopok, emberek és/vagy állatok), valamint a kár helyét és fotókat a sérülésekről.',
 
-      'faq_q10':
-          'Mit tegyek, ha egy csomag megsérült vagy hiányzik?',
+      'faq_q10': 'Mit tegyek, ha a csomag sérült és/vagy hiányzik?',
       'faq_a10':
-          'Ha egy csomag megsérült, a rendszerben jelöld meg sérültnek, és vidd vissza az állomásra. Ha a sérült csomag folyadékot tartalmaz, és további csomagokat is érintett, készíts fényképet az összes érintett csomagról, és küldd el a szolgálatos diszpécsernek. Az incidenst a nevedben jelentjük az Amazonnak.\n'
-          'Ha egy csomag hiányzik, hiányzónak jelölheted — kivéve, ha OTP-csomagról van szó, ebben az esetben előbb fel kell venned velünk a kapcsolatot, mielőtt hiányzónak jelölnéd. Ez döntő fontosságú.',
+          'Ha egy csomag sérült, nyugodtan könyveld sérültnek, és vidd vissza a állomásra. '
+          'Ha folyadékos csomag volt, és más csomagokat is megrongált, készíts fotót az összes sérült csomagról, és küldd el a szolgálatos diszpécsernek – mi jelentjük az Amazon felé.\n'
+          'Ha egy csomag hiányzik, jelölheted hiányzónak – kivéve, ha OTP-s. OTP esetén ELŐSZÖR jelentsd nekünk, mielőtt hiányzónak jelölöd. Ez NAGYON fontos.',
 
       'faq_q11': 'Mi az az OTP (One-Time Password) csomag?',
       'faq_a11':
-          'Az OTP-csomag egy nagy értékű terméket tartalmaz, amelyhez az Amazon előírja, hogy az ügyfél a kézbesítés előtt egyszer használatos jelszót adjon meg a sofőrnek. Ez biztosítja, hogy a csomag a megfelelő címzetthez kerüljön. Az OTP-csomagokat kiemelt gondossággal kezeld, soha ne hagyd őket felügyelet nélkül, és csak annak az ügyfélnek add át, aki a helyes jelszót megadta.',
+          'Ez egy drága termék, amelynél az Amazon megköveteli, hogy az ügyfél egy egyszer használatos jelszót (OTP) adjon a sofőrnek kézbesítés előtt, '
+          'hogy biztosan a megfelelő személy kapja meg. Kiemelten figyelj az ilyen csomagokra: ne hagyd felügyelet nélkül, és csak annak add át, aki megadta a jelszót.',
 
-      'faq_q12':
-          'Miért kérünk folyamatosan arra, hogy lassíts, ahelyett hogy gyorsabban dolgoznál?',
+      'faq_q12': 'Miért mondjuk folyton, hogy lassíts, és ne menj gyorsabban?',
       'faq_a12':
-          'Megértjük, hogy ez ismétlődőnek tűnhet, de a rendszer ezt követeli meg. Az algoritmus által előre meghatározott óránkénti megálló-célt be kell tartanunk, hogy a jövőben további útvonalakat kaphassunk, és biztosítani tudjuk számodra a folyamatos munkát.\n'
-          'Ezen túlmenően a túl gyors munkavégzés növeli a DNR kockázatát, ami pontokat von le tőled és a cégtől is a heti scorecardban.',
+          'Mi sem szeretjük, de így működik a rendszer. Követnünk kell az algoritmust, és a meghatározott óránkénti megálló-számot, '
+          'hogy a jövőben több útvonalat kapjunk, te pedig többet dolgozhass, és ne legyél „sz_strip” (szabad).\n'
+          'Ráadásul, ha túl gyorsan mész, megnő a DNR kockázata, és pontokat veszítesz – te is, és a cég is – a heti scorecardban.',
 
       'faq_q13':
-          'Miért kérdezik néha a diszpécserek, hogy lemaradtam-e, vagy valami nincs rendben?',
+          'A diszpécserek miért kérdezik néha, hogy miért vagy lemaradva, és hogy van-e valami probléma?',
       'faq_a13':
-          'Megértjük, hogy ezek az érdeklődések nem mindig kényelmesek, de a visszajelzésedre támaszkodunk, hogy megértsük, mi történt az úton, ami a késést okozta. Az Amazon azért kéri ezt az információt, mert minden megállóhoz tartozik egy ütemezett kézbesítési időablak. Ha egy útvonal lemaradásba kerül, az Amazonnak tudnia kell az okát, hogy ezen adatok alapján javíthassa a jövőbeli kézbesítési hatékonyságot.',
+          'Tudjuk, hogy ez nem kellemes, de szükségünk van visszajelzésre, mi történt az úton, ami miatt lemaradtál a megállókkal. '
+          'Amazon ezt a visszajelzést kéri tőlünk, mert időlimit is van, ameddig X megállót teljesítened kellett volna. Ezek az információk segítenek az Amazonnak a jövőbeli kézbesítési hatékonyság javításában.',
 
-      'faq_q14': 'Miért kérünk néha arra, hogy segíts egy kollégának?',
+      'faq_q14': 'Miért kérjük néha, hogy menj és segíts egy kollégának?',
       'faq_a14':
-          'Egy kolléga lemaradását számos tényező okozhatja: gyenge internetlefedettség a területen, erős forgalom vagy építkezések miatt lezárt utcák. Ilyen esetekben szükség van a támogatásodra, hogy időben be tudja fejezni az útvonalát.',
+          'Mert sok tényező okozhat késést: rossz internet a környéken, forgalom, útlezárások/építkezések, amelyek megnehezítik az időben történő kézbesítést. Ilyenkor szükség van a segítségedre.',
 
       'faq_q15':
-          'Az első napomtól kezdve standard útvonalakat fogok kézbesíteni, mint a tapasztaltabb sofőrök?',
+          'Az első napomon rögtön ugyanazokat a standard útvonalakat kapom, mint a tapasztalt sofőrök?',
       'faq_a15':
-          'Nem. 14 munkanapos beilleszkedési időszakkal kezdesz, amely alatt alkalmazhatod a trénereddel eltöltött ride-along napokon tanultakat, és megismerkedhetsz a területtel, a járművel, a szkennerrel és a teljes munkafolyamattal.\n'
-          'Ez alatt a 14 nap alatt az Amazon a napi csomagok és megállók számát akár 50%-kal csökkenti a standard útvonalhoz képest.',
+          'Nem, természetesen nem. Kezdetben 14 munkanapos időszakod van, hogy a trénerrel töltött ride-along napokon tanultakat gyakorold, '
+          'és hozzászokj a területhez, az autóhoz, a scannerhez és a munkafolyamathoz.\n'
+          'Ebben a 14 napban az Amazon akár 50%-kal kevesebb csomagot és megállót ad a szokásosnál.',
 
       'faq_q16':
-          'Mit tegyek, ha egy cím helytelen vagy a térkép-pin pontatlan?',
+          'Mit tegyek, ha rossz a cím és/vagy a térképen nem jó a helyszín-pin?',
       'faq_a16':
-          'Először ellenőrizd a pint úgy, hogy rákeresel a címre a Google Mapsben, amely pontosabb és már telepítve van a szkennereden. Ha a helyszín nem egyezik, jelezd az eltérést a szolgálatos diszpécsernek.',
+          'Először ellenőrizd, hogy a pin tényleg rossz-e: keresd meg a címet Google Maps-ben (pontosabb, és a scannereden is telepítve van). '
+          'Ha nem egyezik, jelezd a szolgálatos diszpécsernek a hibát.',
 
       'faq_q17':
-          'Mik a napi feladataim a munka megkezdése előtt és befejezése után?',
+          'Mik a napi feladataim a munka kezdése előtt és a munka végén?',
       'faq_a17':
-          '1. A parkolóba érkezve győződj meg arról, hogy biztonsági cipőt, láthatósági mellényt és Amazon-egyenruhát viselsz.\n'
-          '2. Ellenőrizd, hogy a szkennered teljesen fel van-e töltve. Ha nincs, értesítsd a helyszínen lévő diszpécsert.\n'
-          '3. Vizsgáld át a járművet esetleges hibák szempontjából.\n'
-          '4. Indítsd el az utat a szkennereden lévő Mentor alkalmazásban.\n'
-          '5. Készíts fényképet a jármű műszerfaláról, amely az aktuális kilométer-állást mutatja, és állítsd vissza a napi trip-számlálót nullára.\n'
-          '6. Készülj fel, hogy a Waiting Area-ba csak az ütemezett rakodási idő előtt 10 perccel indulj — semmiképpen sem korábban.\n'
-          '7. Miután a Waiting Area-ba értél, állítsd le a motort, és indítsd el a Flex appot és a Timesheetet. Ne nyisd meg a Flex appot korábban, mint 10 perccel a rakodás előtt; ez a 10 perces időbélyegző követelmény.\n'
-          '8. A Yard Marshall utasításai szerint haladj a Loading Area-ba. A Loading Area-ban állítsd le a motort, és csak a Yard Marshall sípja után szállj ki a járműből.\n'
-          '9. A rakodás befejezése után indítsd el a járművet, és csak akkor indulj el, ha a Yard Marshall erre utasít.\n'
-          '10. Miután az összes megállóval végeztél, ellenőrizd az üzemanyagszintet. Ha fél tanknál kevesebb marad, tankolj.\n'
-          '11. Az állomásra visszatérve tedd le az összes megmaradt csomagot az Amazon által kijelölt helyekre, és add le haladéktalanul a táskákat.\n'
-          '12. A parkolóba visszaérve állítsd le a járművet, és töltsd ki a Green Bookot (Tageskontrollblatt). Küldj fényképet a napi megtett kilométerekről, valamint a Green Bookról.\n'
-          '13. Állítsd le a járművet, és vidd vissza a munkatáskádat a kijelölt helyre vagy a járműbe.',
+          '1- Amikor a parkolóba érkezel, először ellenőrizd, hogy rajtad van-e a biztonsági cipő, a láthatósági mellény és az Amazon egyenruha.\n'
+          '2- Ellenőrizd, hogy a scanner teljesen fel van-e töltve, és jelezd a jelenlévő diszpécsernek, ha nincs.\n'
+          '3- Nézd meg, van-e valami probléma az autóval.\n'
+          '4- Indítsd el a Mentor appban a tripet a scannereden.\n'
+          '5- Küldj képet a műszerfalról: aktuális kilométeróra-állás és a napi trip (az autóban) 0-ra resetelve.\n'
+          '6- Csak 10 perccel a tervezett rakodási idő előtt menj le a Waiting Area-ba – ne korábban.\n'
+          '7- A Waiting Area-ban: motor leállít, Flex App és Timesheet indítás. Kérlek, ne egy perccel sem előbb, különösen a Flex Appot. Ne felejtsd el a 10 perces időbélyeget.\n'
+          '8- Végül menj a Loading Area-ba a Yard Marshall utasításai szerint. Ott motor leállít, és csak AZUTÁN szállj ki, hogy hallottad a Yard Marshall sípját.\n'
+          '9- Rakodás után indítsd be az autót, és csak akkor indulj el, ha a Yard Marshall utasít rá.\n'
+          '10- Miután végeztél az összes megállóval, ellenőrizd az üzemanyagszintet, és ha fél tank alatt van, tankolj.\n'
+          '11- Az állomáson tedd le a megmaradt csomagokat az Amazon által kijelölt helyekre, a táskákat időben add le.\n'
+          '12- A parkolóban állítsd le az autót, töltsd ki a Green Bookot (Tageskontrollblatt), és küldj képet a napi megtett kilométerről, valamint a Green Bookról.\n'
+          '13- Állítsd le az autót, és vidd vissza a munkatáskát a kijelölt helyre.',
 
       'faq_q18':
-          'Kell-e bármit tennem, ha a szokásostól eltérő furgont használok?',
+          'Kell-e bármit csinálnom, ha furgont cserélek, és nem a megszokottat viszem?',
       'faq_a18':
-          'Igen. Az út megkezdése előtt készíts részletes videót a járműről, amelyen minden már meglévő sérülés — beleértve az apró karcolásokat és horpadásokat is — felismerhető, hogy a következő ellenőrzéskor a korábbi sérülésekért ne téged vonjanak felelősségre.',
+          'Készíts róla videót, amely részletesen mutatja az összes apró sérülést, amit az előző sofőr(ök) okozhattak, hogy a következő ellenőrzésnél ne téged hibáztassanak.',
 
       'faq_q19':
-          'Mit tegyek, ha a Flex app folyamatosan tölt, és lassítja a munkafolyamatomat?',
+          'Mit tegyek, ha a Flex app folyamatosan tölt, és lelassítja a munkafolyamatot?',
       'faq_a19':
-          'Először ellenőrizd, hogy aktív internetkapcsolatod van-e. Ezt úgy tudod tesztelni, hogy üzenetet küldesz az aktuális megállónál lévő ügyfélnek — ha átmegy, akkor a kapcsolat aktív. Alternatív megoldásként nyiss meg egy másik alkalmazást a szkenneren, például a böngészőt, és próbálj keresni.\n'
-          'Ha nincs aktív internetkapcsolat, kövesd az alábbi lépéseket sorban:\n'
-          '1. Indítsd újra a szkennert. Mindig ez legyen az első próbálkozás.\n'
-          '2. Kapcsold ki, majd be a repülő módot. Ez gyakran teljes újraindítás nélkül is működik.\n'
-          '3. Végső megoldásként ossz meg egy mobil hotspotot a személyes telefonodról legfeljebb 10 percre, hogy a rendszer frissíthessen.\n'
-          'Offline is dolgozhatsz, de a műszak során valamikor újra csatlakoznod kell az internethez. Az offline mód engedélyezéséhez először töltsd le az offline térképeket a Flex appban: Settings → Offline Maps (utolsó lehetőség) → Download DBY5 → Allow downloads with mobile connection.\n',
+          'Először ellenőrizd, hogy van-e aktív internetkapcsolat. Ezt úgy tudod tesztelni, hogy üzenetet küldesz az aktuális megállónál lévő ügyfélnek. '
+          'Ha átmegy, akkor van internet. Ezt úgy is ellenőrizheted, hogy megnyitsz egy másik appot (pl. böngésző), és keresel valamit.\n'
+          'Lépések, ha nincs aktív internet:\n'
+          '1- Indítsd újra a scannert. Ez legyen mindig az első.\n'
+          '2- Kapcsold be/ki a repülő módot. Ez gyakran működik újraindítás nélkül is.\n'
+          '3- Utolsó lehetőségként ossz meg hotspotot a saját telefonodról legfeljebb 10 percre, hogy a rendszer frissíteni tudjon.\n'
+          'Offline is dolgozhatsz, de egy ponton újra csatlakoznod kell. Offline munkához előbb le kell töltened az offline térképeket a Flex appban: Settings – Offline Maps (utolsó opció) – Download DBY5 – Allow downloads with mobile connection.\n',
 
       'faq_q20':
-          'Mit tegyek, ha az internetkapcsolat aktív, de a Flex app mégsem működik megfelelően?',
+          'Mi van, ha van internet, de a Flex app mégsem működik rendesen?',
       'faq_a20':
-          'Próbáld ki az alábbi lépéseket sorrendben:\n'
-          '1. Indítsd újra a szkennert.\n'
-          '2. Kapcsold ki, majd be a repülő módot.\n'
-          '3. Lépj ki az appból, majd nyisd meg újra.\n'
-          '4. Kapcsold ki, majd be a helymeghatározást (GPS).\n'
-          '5. Jelentkezz ki a Flex appból, és lépj be újra a Mentor apphoz használt bejelentkezési adatokkal.\n'
-          '6. Ellenőrizd, hogy az alkalmazásnak szüksége van-e frissítésre.\n'
-          'Ezeket a lépéseket egyenként dolgozd fel. Ha az egyik nem oldja meg a problémát, lépj a következőre.',
+          '1- Scanner újraindítása.\n'
+          '2- Repülő mód be/ki\n'
+          '3- Kilépés az appból\n'
+          '4- Helymeghatározás (GPS) ki/be\n'
+          '5- Kijelentkezés a Flex appból, majd bejelentkezés újra (a Mentor apphoz használt adatokkal).\n'
+          '6- Ellenőrizd, hogy van-e frissítés az apphoz.\n'
+          'Ezeket a lépéseket egymás után próbáld ki. Ha az egyik nem működik, menj a következőre.',
     },
 
     // =========================
@@ -3496,214 +3584,220 @@ class AppLocalizations {
       'faq_green_book_video_open_failed':
           'Linkul video Green Book nu a putut fi deschis.',
 
-      'faq_q1': 'Care este cel mai important aspect al muncii tale zilnice?',
-      'faq_a1':
-          'Livrarea fiecărui colet cu grijă și păstrarea unui comportament profesional în orice moment.',
+      'faq_q1': 'Ce este cel mai important în sarcina ta zilnică?',
+      'faq_a1': 'Livrarea coletelor cu calitate și cu un comportament bun.',
 
-      'faq_q2':
-          'Ce ar trebui să eviți dacă apare o problemă cu un client?',
+      'faq_q2': 'Ce NU ar trebui să faci în cazul unor probleme cu clientul?',
       'faq_a2':
-          'Te rugăm să nu încerci să rezolvi singur situația. În schimb, anunță imediat dispecerul de serviciu. Noi vom comunica cu clientul în numele tău pentru a preveni escaladarea și a evita orice consecințe negative din partea Amazon. Suntem aici ca să te susținem.',
+          'NU încerca să gestionezi situația singur și informează în schimb dispecerul de serviciu. Vom încerca să vorbim cu clientul pentru tine și să evităm orice consecințe negative din partea Amazon din cauza reclamațiilor clienților. Suntem aici pentru tine!',
 
       'faq_q3':
-          'Ce ar trebui să fac dacă o situație cu un client a escaladat deja?',
+          'Ce se întâmplă dacă situația a escaladat deja și clientul nu este mulțumit de ceea ce s-a întâmplat?',
       'faq_a3':
-          'Nu este niciodată prea târziu pentru a remedia o greșeală. Te rugăm să ne contactezi, iar noi vom face tot posibilul să rezolvăm situația direct cu clientul.',
+          'Nu este niciodată prea târziu să corectezi orice greșeli. Sună-ne în continuare și vom încerca să reparăm greșeala cu clientul. Mai bine mai târziu decât niciodată.',
 
       'faq_q4':
-          'Ce este mai important: cantitatea (finalizarea cât mai multor opriri cât mai rapid) sau calitatea?',
+          'Ce este mai important, Cantitatea (viteza de a livra cât mai multe opriri posibil) sau Calitatea?',
       'faq_a4':
-          'Calitatea are întotdeauna prioritate. Urmează cu atenție instrucțiunile de livrare ale clientului și nu lăsa niciodată un colet într-o locație nesigură doar pentru că ești în întârziere.',
+          'Calitatea! Întotdeauna calitatea! Urmează instrucțiunile clientului și NU lăsa coletul în locuri nesigure doar pentru că ești în urmă cu opririle.',
 
       'faq_q5':
-          'Ce se întâmplă dacă mă concentrez pe calitate, dar rămân în urmă cu opririle?',
+          'Ce se întâmplă dacă mă concentrez pe calitate, dar apoi rămân în urmă cu opririle?',
       'faq_a5':
-          'Îți vei finaliza ruta într-un fel sau altul. Vom organiza sprijin atunci când acest lucru este rezonabil și necesar.',
+          'Îți vei termina opririle, într-un fel sau altul. Vom încerca să trimitem ajutor, dar numai dacă vedem că este rezonabil.',
+
+      'faq_q6': 'Ce este scorecard-ul și ce este un DNR?',
+      'faq_a6': 'Ne bucurăm că ai întrebat.',
 
       // 7 – Weekly scorecard
       'faq_q7': 'Scorecard săptămânal',
       'faq_a7':
-          'Scorecard-ul săptămânal oferă o privire de ansamblu concisă asupra performanței echipei în raport cu obiectivele noastre principale. Acesta evidențiază punctele noastre forte, identifică zonele care necesită îmbunătățiri și ne ajută să stabilim focusul pentru săptămâna următoare. Nivelurile generale de performanță sunt următoarele:\n'
+          'Scorecard-ul săptămânal ne oferă o imagine rapidă și clară despre cum se descurcă echipa în ceea ce privește obiectivele noastre cheie. Ne ajută să vedem ce merge bine, unde rămânem în urmă și pe ce trebuie să ne concentrăm pentru săptămâna următoare. Scorurile generale sunt următoarele:\n'
           '• Fantastic Plus: >93% (performanță excepțională)\n'
           '• Fantastic: 85% – 92.9%\n'
           '• Great: 70% – 84.9%\n'
           '• Fair: 50% – 69.9%\n'
           '• Poor: <50%',
 
-      'faq_q7_1': 'Fila DNR — Delivered Not Received',
+      'faq_q7_1': 'Fila DNR\nDelivered Not Received',
       'faq_a7_1':
-          'Un DNR este înregistrat atunci când ai marcat un colet ca fiind livrat folosind butonul „Swipe to finish”, dar clientul nu l-a primit în realitate. Cauzele frecvente includ furtul coletului, un ambalaj gol la sosire sau livrarea la o adresă greșită.\n'
-          'În fiecare marți vei primi fotografii pentru fiecare DNR înregistrat pe numele tău în săptămâna precedentă.',
+          'Este atunci când ai livrat un colet și ai apăsat butonul „Swipe to finish”, confirmând că ai livrat coletul, dar clientul nu a primit coletul din mai multe motive: furtul coletului, cutia fiind goală de conținut și, de asemenea, livrarea greșită la o adresă greșită.\n'
+          'În fiecare marți vei primi poze cu fiecare DNR pe care l-ai avut în timpul săptămânii.',
 
       'faq_q7_1_1':
-          'Cum pot evita DNR-urile și cât de mult afectează acestea scorecard-ul meu săptămânal?',
+          'Cum ar trebui să evit acest lucru și cât de important este pentru scorecard-ul săptămânal?',
       'faq_a7_1_1':
-          'DNR-urile au un impact major asupra scorului tău. Pentru a le preveni, anunță clientul în prealabil că ești pe drum și sună doar la soneria pe care numele clientului este vizibil în mod clar.',
+          'Este foarte important și, pentru a evita acest lucru, pur și simplu ar trebui să informezi clientul din timp că vei ajunge în curând la casa/afacerea lui și să suni DOAR la soneria pe care este trecut numele lui.',
 
-      'faq_q7_1_2': 'Cum pot preveni pierderea coletelor?',
+      'faq_q7_1_2': 'Cum evit pierderile de colete?',
       'faq_a7_1_2':
-          'Ori de câte ori este posibil, înmânează coletul direct clientului. Dacă acest lucru nu este posibil, trimite-i un mesaj în care îi comunici exact unde a fost lăsat coletul — de exemplu, în garaj, sub scări, în șopron sau în spatele unui ghiveci de flori.\n'
-          'Dacă ai impresia că nu este sigur să lași coletul nesupravegheat, nu îl lăsa. Ia-l cu tine și reîncearcă livrarea mai târziu. Acest lucru este extrem de important.',
+          'Încearcă întotdeauna să predai coletele direct clientului și, dacă acest lucru nu este posibil, trimite un mesaj informându-l unde a fost lăsat coletul, de exemplu, în garaj, sub scări, în șopron, în spatele vazei cu flori etc..\n'
+          'Dacă nu consideri că este sigur să lași coletul nesupravegheat, te rugăm, cel mai bine este întotdeauna să iei coletul și să încerci din nou mai târziu. Acest lucru este FOARTE important.',
 
-      'faq_q7_1_3': 'Cum pot stabili dacă o locație este sigură?',
+      'faq_q7_1_3': 'Cum știu ce loc este sigur sau nu?',
       'faq_a7_1_3':
-          'Folosește-ți judecata și bunul-simț. De exemplu, un colet lăsat lângă cutiile poștale ale unei clădiri cu 20–30 de etaje are șanse mult mai mari de a fi furat decât unul lăsat la o reședință privată.\n'
-          'Pentru a te sprijini, publicăm în fiecare dimineață o listă de adrese care prezintă un risc ridicat de furt sau de reclamații din partea clienților, pe baza datelor istorice de livrare și a statisticilor.',
+          'Instinct și bun simț. Dacă o clădire are 20 - 30 de etaje și îl lași lângă cutiile poștale, șansele să fie furat sunt din ce în ce mai mari comparativ cu o casă privată.\n'
+          'De asemenea, pentru a te ajuta la livrările zilnice și pentru a evita să primești un DNR, în fiecare dimineață vom posta o poză cu adrese care au o probabilitate mare ca pachetele să fie furate și clienții să se plângă, pe baza rezultatelor și statisticilor livrărilor anterioare.',
 
       'faq_q7_1_4':
-          'Cum afectează un colet pierdut sau furat scorul meu?',
+          'Ce se întâmplă dacă un colet este pierdut sau furat, cum îmi va afecta scorul?',
       'faq_a7_1_4':
-          'Impactul este semnificativ. Un singur colet pierdut îți poate reduce scorul cu cel puțin 30% și te costă minimum 600 de puncte. Reține: cu cât numărul punctelor afișate sub numele tău în scorecard este mai mare, cu atât performanța este considerată mai slabă. Cu cât livrezi mai multe colete pe săptămână, cu atât pierzi mai puține puncte per incident, iar valoarea articolului lipsă este de asemenea relevantă — articolele mai scumpe generează o pierdere mai mare de puncte. Trebuie să menținem acest indicator cât mai scăzut posibil.\n'
-          'La fel de important: dacă înregistrezi în mod constant un număr mare de colete pierdute, vom fi obligați să încetăm colaborarea, deoarece Amazon ar putea suspecta în cele din urmă un furt. Este un risc serios și nu poate fi ignorat.',
+          'Rău. Acest lucru te va afecta cu cel puțin 30% și asta doar cu un singur colet, care îți scade cel puțin 600 de puncte. Cu cât vezi mai multe puncte în scorecard sub numele tău, cu atât este mai rău. Cu cât livrezi mai multe colete pe săptămâna de lucru, cu atât pierzi mai puține puncte. Punctele pe care le pierzi variază și în funcție de prețul articolului pierdut: cu cât este mai scump, cu atât se pierd mai multe puncte. Ar trebui să păstrăm această secțiune de scor cât mai mică posibil.\n'
+          'De asemenea, nu trebuie ignorat faptul că, dacă în mod regulat ai un număr mare de colete pierdute, va trebui să te eliberăm din funcție, deoarece mai devreme sau mai târziu Amazon poate suspecta furt de colete și, prin urmare, acest lucru este foarte periculos.',
 
       'faq_q7_2':
-          'Fila CC — Contact Compliance',
+          'Fila CC\n'
+          'Contact Compliance',
       'faq_a7_2':
-          'Acest indicator măsoară cât de des contactezi clientul în legătură cu livrarea sa, fie prin mesaj, fie prin apel telefonic. Cu cât comunici mai puțin cu clientul, cu atât scorul tău în această categorie va fi mai scăzut. Trebuie să menținem acest indicator cât mai ridicat posibil, întrucât este una dintre cele mai simple categorii în care poți obține performanțe bune, iar contribuția sa la scorul tău general este semnificativă.',
+          'Înseamnă de câte ori ai contactat clientul în legătură cu livrarea lui, fie prin mesaj, fie printr-un apel telefonic. Cu cât interacționezi mai puțin cu clientul, cu atât vei obține scoruri mai mici în scorecard și ar trebui să păstrăm această secțiune cât mai sus posibil, deoarece este de fapt una dintre cele mai ușoare categorii și ajută mult la scorul tău general.',
 
-      'faq_q7_2_1': 'De ce este important contactul cu clientul?',
+      'faq_q7_2_1': 'De ce ar trebui să fac asta?',
       'faq_a7_2_1':
-          'Livrarea coletelor nu este o operațiune simplă de tip „drop-and-go”. Trebuie să anunți clientul în prealabil și, când este cazul, să îl întrebi unde dorește să fie livrat coletul.',
+          'Livrarea coletelor nu înseamnă doar Drop&Go, ar trebui să informezi clientul în prealabil și să îl întrebi unde ar dori să fie livrat coletul.',
 
-      'faq_q7_2_2': 'Cum îmi îmbunătățesc scorul CC?',
+      'faq_q7_2_2': 'Cum îmi îmbunătățesc scorurile CC?',
       'faq_a7_2_2':
-          'Este simplu: sună — și mai ales trimite mesaje — clientului la fiecare oprire.',
+          'Îți mulțumim că ai întrebat. Simplu, sunând și mai ales trimițând mesaje clienților la fiecare oprire.',
 
-      'faq_q7_3': 'Fila CE — Customer Escalation',
+      'faq_q7_3': 'Fila CE\nCostumer Escalation',
       'faq_a7_3':
-          'Amintește-ți ce impact are un DNR asupra scorului tău — o escaladare a clientului este de cel puțin două ori mai gravă. În funcție de severitatea incidentului, aceasta poate duce chiar la pierderea locului de muncă.',
+          'Îți amintești cât de rău ți-a afectat DNR scorurile? Ei bine, asta este cel puțin de 2 ori mai rău și riști, de asemenea, să îți pierzi locul de muncă, deoarece depinde de cât de gravă a fost situația.',
 
-      'faq_q7_3_1': 'Cum pot evita escaladările cu clientul?',
+      'faq_q7_3_1': 'Cum evit acest lucru?',
       'faq_a7_3_1':
-          'Urmează întotdeauna cu atenție instrucțiunile de livrare ale clientului. Dacă survine o greșeală, cere-ți mai întâi scuze. Dacă clientul este supărat, cere-i un minut pentru a vorbi direct cu noi — ar trebui să fii deja în legătură telefonică cu noi. Așa cum se menționează în Secțiunea 2, este întotdeauna mai bine să lași astfel de situații în grija noastră.',
+          'Urmând întotdeauna instrucțiunile de livrare ale clientului și, în cazul unei greșeli, mai întâi te rugăm să îți ceri scuze, iar dacă clientul este supărat, te rugăm să îi ceri un minut din timpul lui pentru a vorbi cu noi, deoarece deja ne suni. Citind Secțiunea 2, ar trebui să știi până acum că este cel mai bine să ne lași pe noi să gestionăm astfel de situații.',
 
-      'faq_q7_4': 'Fila POD — Picture on Delivery',
+      'faq_q7_4': 'Fila POD\nPicture on Delivery',
       'faq_a7_4':
-          'Această coloană listează coletele eligibile pentru Picture on Delivery (POD) la care fotografia trimisă a fost marcată ca „Invalid” sau „Not Sure”. Motivele frecvente de respingere includ:\n'
-          '1. Eticheta coletului cu datele clientului este vizibilă în fotografie. Coletul trebuie întors astfel încât eticheta să nu fie vizibilă înainte de a realiza fotografia.\n'
-          '2. Fotografia este neclară.\n'
-          '3. O persoană este vizibilă în fotografie.\n'
-          '4. Nu se detectează niciun colet în fotografie.\n'
-          '5. Coletul se află în interiorul vehiculului.\n'
-          '6. Coletul este ținut în mână.\n'
-          '7. Coletul este plasat în cutia poștală.\n'
-          '8. Coletul este prea aproape de cameră.\n'
-          '9. Fotografia este prea întunecată.\n'
-          'Această categorie ar trebui să fie cea mai ușoară pentru a obține un scor de 100%, iar acest lucru îți îmbunătățește scorul general.',
+          'Această coloană arată lista coletelor eligibile pentru POD-uri, pentru care au fost făcute fotografii, dar care au fost fie Invalid, fie Not Sure. Motivele pentru respingerea unui POD pot include:\n'
+          '1- Eticheta coletului este în poză cu detaliile clientului. Coletul trebuie întors invers înainte de a face poza.\n'
+          '2- Poză neclară\n'
+          '3- Persoană vizibilă în poză\n'
+          '4- Niciun colet detectat în poză\n'
+          '5- Colet în mașină\n'
+          '6- Colet în mână\n'
+          '7- Colet în cutia poștală\n'
+          '8- Colet prea aproape\n'
+          '9- Poză prea întunecată.\n'
+          'Aceasta ar trebui să fie întotdeauna cea mai ușoară, unde ar trebui să ai un scor de 100% și îți îmbunătățește scorul general',
 
-      'faq_q7_5': 'Fila LoR — Lost on Road',
+      'faq_q7_5': 'Fila LoR\nLost on Road',
       'faq_a7_5':
-          'Acest indicator te penalizează atunci când un colet scanat la încărcare nu este nici livrat, nici returnat la sfârșitul turei după o încercare de livrare nereușită. În astfel de situații, coletul este considerat pierdut, iar penalizarea este echivalentă cu un DNR. Te rugăm să numeri cu atenție coletele aduse înapoi și să te asiguri că acestea corespund listei afișate pe scanner la: Today’s Itinerary → Summary → Problems. Dacă numărul nu se potrivește, anunță dispecerul de serviciu înainte de a încheia tura în aplicația Amazon.',
+          'Te penalizează atunci când ai scanat un colet la încărcare și nu l-ai returnat la sfârșitul turei în cazul unei livrări nereușite. Astfel coletul s-a pierdut și vei pierde la fel de multe puncte ca la un DNR, așa că te rugăm să numeri bine coletele pe care le aduci înapoi și să te asiguri că se potrivesc cu coletele afișate în scanner. Le poți găsi la: Todays Itinerary - Summary - Problems. Dacă nu se potrivesc, te rugăm să informezi dispecerul de serviciu înainte de a încheia munca în aplicația Amazon.',
 
-      'faq_q7_6': 'Fila DCR — Delivery Completion Rate',
+      'faq_q7_6': 'Fila DCR\nDelivery Completion Rate',
       'faq_a7_6':
-          'Acest indicator reflectă performanța ta de livrare, urmărind procentul de livrări finalizate conform planului. Ne ajută să evaluăm eficiența și fiabilitatea serviciului nostru și scoate în evidență probleme precum întârzieri, încercări eșuate sau probleme de rutare. DCR-ul tău ar trebui să fie întotdeauna cât mai ridicat. Pentru a obține acest lucru, efectuează reîncercări (reattempts) ori de câte ori este posibil și minimizează numărul coletelor returnate.',
+          'Îți arată capacitățile de a livra colete. Urmărește procentul livrărilor finalizate conform planului, ajutându-ne să măsurăm eficiența și fiabilitatea livrărilor noastre. Evidențiază probleme precum întârzieri, încercări eșuate sau probleme de rutare. Acesta ar trebui să fie întotdeauna cât mai mare posibil. Pentru a face acest lucru posibil ar trebui în fiecare zi să faci reattempts și să eviți cât de mult poți returnarea coletelor.',
 
-      'faq_q7_7': 'Fila CDF (anterior DEX) — Customer Delivery Feedback',
+      'faq_q7_7': 'Fila CDF (Anterior, DEX)\nCostumer Delivery Feedback',
       'faq_a7_7':
-          'Acest indicator reflectă experiența destinatarului cu livrarea, inclusiv punctualitatea, starea bunurilor și profesionalismul șoferului. Ne ajută să identificăm punctele forte ale serviciului nostru și zonele care necesită îmbunătățiri. După livrare, clientul primește un e-mail de sondaj de la Amazon cu întrebări precum:\n'
-          '1) A fost coletul livrat la timp? (Da / Nu)\n'
-          '2) A fost coletul lăsat într-un loc sigur? (Da / Nu)\n'
-          '3) A fost coletul în stare bună la sosire? (Da / Nu)\n'
-          '4) Cât de mulțumit ești per ansamblu de livrare? (Foarte mulțumit / Mulțumit / Neutru / Nemulțumit / Foarte nemulțumit)\n'
-          '5) Cum ai evalua comunicarea și actualizările de urmărire pentru această livrare? (Excelent / Bun / Acceptabil / Slab)\n'
-          '6) A fost persoana care a efectuat livrarea politicoasă și profesionistă? (Da / Nu / Nu se aplică — livrare fără contact)\n'
-          '7) Ai comentarii despre experiența ta de livrare? (Comentarii suplimentare ale clientului)',
+          'Captează experiența destinatarului cu procesul de livrare, inclusiv punctualitatea, starea bunurilor și profesionalismul șoferului. Ne ajută să identificăm punctele forte ale serviciului și zonele de îmbunătățire. La finalul livrării, clientul primește un e-mail de la Amazon despre experiența livrării, cu întrebări precum:\n'
+          '1) A fost coletul livrat la timp?\n'
+          'Da / Nu\n'
+          '2) A fost coletul lăsat într-un loc sigur?\n'
+          'Da / Nu\n'
+          '3) A fost coletul în stare bună când a ajuns?\n'
+          'Da / Nu\n'
+          '4) Cât de mulțumit ești de livrare în general?\n'
+          'Foarte mulțumit / Mulțumit / Neutru / Nemulțumit / Foarte nemulțumit\n'
+          '5) Cum ai evalua comunicarea și actualizările de urmărire pentru această livrare?\n'
+          'Excelent / Bun / Acceptabil / Slab\n'
+          '6) A fost persoana de livrare amabilă și profesionistă?\n'
+          'Da / Nu / Nu se aplică (Livrare fără contact)\n'
+          '7) Ai comentarii despre experiența ta de livrare?\n'
+          '(Comentarii suplimentare ale clientului)',
 
-      'faq_q7_8':
-          'Ce ar trebui să țin minte despre scorecard în general?',
+      'faq_q7_8': 'Ce ar trebui să am în vedere despre scorecard?',
       'faq_a7_8':
-          'Calitatea și eficiența fac o diferență semnificativă. Scorurile bune îți aduc beneficii ție, companiei și întregii echipe. Satisfacția clientului este prioritatea noastră principală, iar rezultatele excelente sunt recompensate cu un bonus din partea companiei.\n'
-          'Dă ce ai tu mai bun și vei fi recompensat corespunzător.',
+          'Calitatea și eficiența contează mult. Scorurile bune sunt bune pentru tine, pentru companie și bune pentru întreaga echipă. Satisfacția clientului este foarte importantă și scorurile bune sunt însoțite de un bonus din partea companiei.\n'
+          'Dă tot ce poți, primește ce e mai bun.',
 
-      'faq_q8': 'La ce alte domenii trebuie să fiu atent?',
+      'faq_q8': 'La ce alte domenii ar trebui să fiu atent?',
       'faq_a8':
-          'Prioritizează-ți siguranța personală conducând responsabil, evitând accidentările și fiind precaut în preajma câinilor pentru a preveni mușcăturile. Tratează cu grijă toate echipamentele de lucru — inclusiv vehiculul zilnic și scannerul sau telefonul de lucru. Vino întotdeauna la muncă purtând pantofii de siguranță, vesta de siguranță și jacheta sau tricoul Amazon potrivit condițiilor meteorologice.',
+          'Ai grijă de tine conducând în siguranță, evitând accidentările și evitând câinii și mușcăturile de câine. Ai grijă de echipamentele de lucru, cum ar fi vehiculul zilnic, scannerul/telefonul de lucru și vino la muncă purtând pantofii de siguranță și vesta de siguranță, jachetă sau tricou marca Amazon (în funcție de vreme).',
 
       'faq_q9':
-          'Ce ar trebui să fac dacă sunt implicat într-un accident sau dacă deteriorez vehiculul de lucru?',
+          'Ce se întâmplă dacă fac un accident de mașină sau deteriorez vehiculul de lucru?',
       'faq_a9':
-          'Mai întâi, asigură-te că ești în siguranță și că nu ești rănit grav. În privința daunelor vehiculului: dacă stabilim că accidentul a fost cauzat de neglijență — de exemplu, distragerea atenției din cauza utilizării telefonului mobil în timpul condusului — vei fi personal răspunzător pentru întreaga valoare a daunelor. În plus, raportul de poliție care urmează poate conduce la suspendarea permisului, iar un astfel de incident constituie motiv pentru concediere imediată. În cazurile mai puțin grave, vei fi exclus timp de două luni de la Bonusurile Scorecard-ului Săptămânal. Ești obligat să ne informezi imediat după orice incident și să ne furnizezi următoarele: ora și locul incidentului, detalii despre eventualele daune asupra proprietății private sau publice (ziduri, garduri, stâlpi de iluminat, persoane sau animale) și fotografii clare ale daunelor vehiculului.',
+          'Mai întâi, asigură-te că ești bine și că nu ești rănit grav. În ceea ce privește daunele la mașină, dacă stabilim că accidentele apar din neglijență – de exemplu, distrageri precum utilizarea telefonului mobil în timpul conducerii – vei fi personal răspunzător pentru întreaga daună. În plus, vei primi un raport de la poliție, care ar putea duce chiar la suspendarea permisului. Desigur, acesta este și un motiv pentru concediere imediată. În caz contrar, ești doar exclus de la bonusurile Weekly Scorecard pentru 2 luni. În cazul unui incident, ești OBLIGAT să ne informezi imediat și să ne furnizezi ora incidentului, locația, dacă există daune la proprietăți private sau publice (cum ar fi pereți, garduri, stâlpi de iluminat, persoane și/sau animale de companie), locația și poze cu daunele mașinii.',
 
-      'faq_q10':
-          'Ce ar trebui să fac dacă un colet este deteriorat sau lipsă?',
+      'faq_q10': 'Ce fac când am colete deteriorate și/sau lipsă.',
       'faq_a10':
-          'Dacă un colet este deteriorat, marchează-l ca deteriorat în sistem și returnează-l la stație. Dacă coletul deteriorat conține lichid și a afectat și alte colete, fă o fotografie cu toate coletele afectate și trimite-o dispecerului de serviciu. Noi vom raporta incidentul către Amazon în numele tău.\n'
-          'Dacă un colet lipsește, îl poți marca drept lipsă — cu excepția cazului în care este un colet OTP, situație în care trebuie să ne contactezi mai întâi înainte de a-l marca. Acest lucru este esențial.',
+          'Când un colet este deteriorat, te rugăm să îl înregistrezi ca deteriorat și să îl returnezi la stație. Dacă acel colet deteriorat a fost un colet cu lichide și a deteriorat și alte colete, te rugăm să faci o poză cu toate coletele deteriorate și să o trimiți dispecerului de serviciu și vom raporta noi către Amazon.\n'
+          'Când un colet lipsește, te rugăm să îl marchezi/înregistrezi ca lipsă, cu excepția cazului în care are un OTP, pentru care TREBUIE să ne raportezi mai întâi înainte de a-l marca drept lipsă. Acest lucru este FOARTE important.',
 
       'faq_q11': 'Ce este un colet OTP (One-Time Password)?',
       'faq_a11':
-          'Un colet OTP conține un articol de valoare ridicată pentru care Amazon solicită clientului să furnizeze șoferului o parolă unică înainte de livrare. Acest lucru asigură că pachetul ajunge la destinatarul corect. Coletele OTP trebuie manipulate cu maximă atenție, nu trebuie lăsate niciodată nesupravegheate și trebuie înmânate exclusiv clientului care a furnizat parola corectă.',
+          'Este un articol scump pentru care Amazon cere clientului să îi ofere șoferului o parolă unică (One Time Password) înainte de a livra coletul, pentru a se asigura că coletul este livrat persoanei/clientului potrivit. Trebuie să ai grijă deosebită de astfel de colete, să nu le lași nesupravegheate și să înmânezi coletele doar clientului care ți-a furnizat parola.',
 
       'faq_q12':
-          'De ce îți cerem mereu să încetinești în loc să lucrezi mai repede?',
+          'De ce te tot deranjăm să încetinești și să nu mergi mai repede?',
       'faq_a12':
-          'Înțelegem că acest lucru poate părea repetitiv, dar este impus de sistem. Trebuie să respectăm ținta de opriri pe oră prestabilită de algoritm, astfel încât să putem obține rute suplimentare în viitor și să ne asigurăm că vei continua să primești muncă.\n'
-          'În plus, munca prea rapidă crește riscul unui DNR, care te costă atât pe tine, cât și pe companie puncte în scorecard-ul săptămânal.',
+          'Nici nouă nu ne place, dar așa este sistemul. Trebuie să urmăm algoritmul sistemului și să facem cât mai multe opriri pe oră, așa cum este stabilit, ca să putem obține mai multe rute în viitor și tu să ajungi să lucrezi mai mult și să nu fii liber.\n'
+          'De asemenea, mergând mai repede, riști să primești un DNR și riști să pierzi puncte pentru ambele, pentru tine și pentru companie, în scorecard-ul săptămânal.',
 
       'faq_q13':
-          'De ce mă întreabă uneori dispecerii dacă sunt în urmă sau dacă ceva nu este în regulă?',
+          'Atunci de ce dispecerii uneori mă întreabă de ce sunt în urmă și dacă este ceva în neregulă?',
       'faq_a13':
-          'Înțelegem că aceste verificări nu sunt întotdeauna convenabile, dar ne bazăm pe feedback-ul tău pentru a înțelege ce s-a întâmplat pe traseu și ce a cauzat întârzierea. Amazon solicită aceste informații deoarece fiecare oprire are o fereastră de livrare programată. Când o rută întârzie, Amazon trebuie să cunoască motivul pentru a îmbunătăți eficiența livrărilor viitoare pe baza acestor date.',
+          'Știm că acest lucru nu este plăcut, dar avem nevoie de un feedback despre ce s-ar fi putut întâmpla pe drum care te-a făcut să rămâi în urmă cu opririle. Amazon ne cere acest feedback deoarece există și un termen-limită până la care ar fi trebuit să livrezi X opriri, prin urmare Amazon trebuie să știe de ce opririle rămase sunt în urmă față de programul de livrare și, cu aceste informații, să îmbunătățească eficiența livrărilor viitoare.',
 
-      'faq_q14': 'De ce ți se cere uneori să ajuți un coleg?',
+      'faq_q14': 'De ce uneori îți cerem să mergi să ajuți un coleg?',
       'faq_a14':
-          'Întârzierea unui coleg poate rezulta din diverși factori: acoperire slabă a internetului în zonă, trafic intens sau străzi blocate din cauza lucrărilor de construcții. În astfel de situații, sprijinul tău este necesar pentru a-l ajuta să-și finalizeze ruta la timp.',
+          'Pentru că mulți factori joacă un rol în întârzierea colegului, cum ar fi conexiunea slabă la internet în zonă, traficul, străzi blocate din cauza lucrărilor în zonă, ceea ce a făcut dificil pentru celălalt șofer să livreze la timp, prin urmare ajutorul tău este necesar.',
 
       'faq_q15':
-          'Voi livra rute standard din prima mea zi, la fel ca șoferii mai experimentați?',
+          'În prima mea zi, încep imediat să livrez colete pe rute standard ca alți șoferi de livrare mai experimentați?',
       'faq_a15':
-          'Nu. Vei începe cu o perioadă de acomodare de 14 zile lucrătoare, în care vei aplica ceea ce ai învățat în zilele de ride-along cu trainerul tău și te vei familiariza cu zona, vehiculul, scanner-ul și întregul flux de lucru.\n'
-          'În această perioadă de 14 zile, Amazon îți va reduce cu până la 50% numărul zilnic de colete și opriri comparativ cu o rută standard.',
+          'Nu, evident că nu este cazul pentru tine. La început vei avea o perioadă de 14 zile de lucru pentru a pune în practică ceea ce ai învățat în zilele de ride-along cu trainerul tău și pentru a te adapta la zonă, la mașină, la scanner și pentru a învăța procesul de lucru.\n'
+          'Cu asta spus, pentru acea perioadă de 14 zile, Amazon îți va da cu până la 50% mai puține colete și opriri decât în mod normal în programul tău.',
 
       'faq_q16':
-          'Ce ar trebui să fac dacă o adresă este greșită sau pinul de pe hartă este inexact?',
+          'Ce să faci când o adresă este greșită și/sau pinul locației nu este corect pe hartă?',
       'faq_a16':
-          'Mai întâi, verifică pinul căutând adresa în Google Maps, care este mai precis și este deja instalat pe scanner-ul tău. Dacă locația nu corespunde, raportează neconcordanța dispecerului de serviciu.',
+          'Mai întâi confirmă că pinul nu este corect căutând adresa în Google Maps (este mai precis și este deja instalat pe scannerul tău) și, dacă nu se potrivește, informează un dispecer de serviciu cu erorile.',
 
       'faq_q17':
-          'Care sunt sarcinile mele zilnice înainte de începerea și după încheierea muncii?',
+          'Care sunt sarcinile mele zilnice înainte de a începe și după ce termin munca?',
       'faq_a17':
-          '1. La sosirea în parcare, asigură-te că porți pantofii de siguranță, vesta de siguranță și uniforma Amazon.\n'
-          '2. Verifică dacă scanner-ul este complet încărcat. Dacă nu, anunță un dispecer prezent în acel moment.\n'
-          '3. Inspectează vehiculul pentru eventuale probleme.\n'
-          '4. Pornește traseul în aplicația Mentor de pe scanner.\n'
-          '5. Fă o fotografie a bordului vehiculului care să arate kilometrajul curent și resetează la zero contorul zilnic de parcurs.\n'
-          '6. Pregătește-te să te deplasezi în Waiting Area doar cu 10 minute înainte de ora programată de încărcare — nu mai devreme.\n'
-          '7. Odată ajuns în Waiting Area, oprește motorul și deschide Flex App-ul și Timesheet-ul. Nu deschide Flex App-ul mai devreme de 10 minute înainte de încărcare; această ștampilă de timp de 10 minute este obligatorie.\n'
-          '8. Deplasează-te în Loading Area conform instrucțiunilor Yard Marshall-ului. În Loading Area, oprește motorul și ieși din vehicul doar după ce ai auzit fluierul Yard Marshall-ului.\n'
-          '9. După finalizarea încărcării, pornește vehiculul și începe să conduci doar atunci când Yard Marshall-ul îți indică acest lucru.\n'
-          '10. După finalizarea tuturor opririlor, verifică rezervorul de combustibil. Dacă mai este mai puțin de jumătate, alimentează.\n'
-          '11. La întoarcerea la stație, depune toate coletele rămase în zonele desemnate de Amazon și returnează prompt sacii.\n'
-          '12. Ajuns înapoi în parcare, oprește vehiculul și completează Green Book-ul (Tageskontrollblatt). Trimite o fotografie cu kilometrajul parcurs în ziua respectivă, împreună cu o fotografie a Green Book-ului.\n'
-          '13. Oprește vehiculul și returnează geanta de lucru în zona sau în vehiculul desemnat.',
+          '1- Când ajungi în parcare, mai întâi te asiguri că porți pantofii de siguranță și vesta de siguranță și uniforma Amazon.\n'
+          '2- Verifică dacă scannerul tău este complet încărcat și informează un dispecer prezent în acel moment dacă nu este încărcat.\n'
+          '3- Verifică dacă este ceva în neregulă cu mașina.\n'
+          '4- Începe trip-ul în aplicația Mentor pe scannerul tău.\n'
+          '5- Postează poza tabloului de bord al mașinii care arată kilometrajul curent al mașinii și trip-ul zilnic (în mașină) resetat la 0.\n'
+          '6- Pregătește-te să cobori în Waiting Area doar cu 10 minute înainte de ora planificată de încărcare, nu mai devreme.\n'
+          '7- Când ești în Waiting area, oprește mașina, pornește Flex App și Timesheet. Te rog, nici măcar un minut mai devreme, mai ales flex app-ul. Nu uita timestamp-ul de 10 minute.\n'
+          '8- Apoi mergi la Loading Area conform instrucțiunilor Yard Marshall. Când ești în Loading area, oprește mașina și părăsește mașina DOAR DUPĂ ce ai auzit fluierul Yard Marshall.\n'
+          '9- După ce ai terminat încărcarea mașinii, pornește mașina și începe să conduci, dar numai când Yard Marshall îți spune.\n'
+          '10- După ce ai terminat toate opririle, verifică rezervorul și, dacă este sub jumătate, te rog să alimentezi.\n'
+          '11- Când ești la stație, te rog să lași toate coletele rămase în zonele desemnate de Amazon, lasă sacii la timp\n'
+          '12- Când ești în parcare, oprește mașina și completează Green Book (Tageskontrollblat), postează poza cu kilometrajul zilnic pe care l-ai făcut în timpul zilei livrând, împreună cu o poză cu Green Book.\n'
+          '13- Oprește mașina și te rog să returnezi geanta de lucru în zona desemnată/van',
 
       'faq_q18':
-          'Trebuie să fac ceva atunci când folosesc un alt vehicul decât cel obișnuit?',
+          'Trebuie să fac ceva când schimb van-ul și iau un alt van decât cel pe care îl iau de obicei?',
       'faq_a18':
-          'Da. Înainte de a porni în cursă, înregistrează un video detaliat al vehiculului, care să surprindă fiecare deteriorare existentă — inclusiv zgârieturi și lovituri minore — astfel încât să nu fii tras la răspundere pentru daune preexistente la următoarea inspecție.',
+          'Ar trebui să faci un video cu el, surprinzând în detaliu fiecare mică daună pe care șoferul(șoferii) anterior(i) ar fi putut să o facă, astfel încât să nu fie vina ta la următoarea inspecție a mașinii.',
 
       'faq_q19':
-          'Ce ar trebui să fac dacă aplicația Flex se încarcă în mod constant și îmi încetinește fluxul de lucru?',
+          'Ce ar trebui să fac dacă aplicația Flex se încarcă constant și îmi încetinește fluxul de lucru?',
       'faq_a19':
-          'Mai întâi, confirmă că ai o conexiune activă la internet. Poți verifica acest lucru trimițând un mesaj clientului de la oprirea curentă — dacă ajunge la destinație, conexiunea este activă. Alternativ, deschide o altă aplicație pe scanner, cum ar fi browser-ul, și încearcă o căutare.\n'
-          'Dacă nu există o conexiune activă la internet, urmează acești pași în ordine:\n'
-          '1. Repornește scanner-ul. Aceasta ar trebui să fie întotdeauna prima încercare.\n'
-          '2. Activează și dezactivează modul avion. Acest lucru funcționează adesea fără a fi nevoie de o repornire completă.\n'
-          '3. Ca ultimă soluție, partajează un hotspot de pe telefonul tău personal timp de maximum 10 minute, pentru ca sistemul să se reîmprospăteze.\n'
-          'Poți lucra și offline, dar trebuie să te reconectezi la internet la un moment dat în timpul turei. Pentru a activa modul offline, descarcă mai întâi hărțile offline din Flex App: accesează Settings → Offline Maps (ultima opțiune) → Download DBY5 → Allow downloads with mobile connection.\n',
+          'Mai întâi verifică dacă ai o conexiune activă la internet. Pentru a face asta poți încerca să trimiți un mesaj clientului de la oprirea curentă și, dacă se trimite, atunci înseamnă că internetul este activ. Poți verifica și deschizând o altă aplicație pe scanner, cum ar fi browserul, și căutând ceva pe el.\n'
+          'Pașii pe care ar trebui să îi urmezi dacă nu există o conexiune activă la internet:\n'
+          '1- Repornește scannerul. Acesta ar trebui să fie întotdeauna primul lucru pe care îl încerci.\n'
+          '2- Pornește/oprește modul avion. Acesta funcționează de cele mai multe ori fără să aștepți repornirea scannerului.\n'
+          '3- Ca ultimă soluție, te rog să încerci să partajezi un hotspot de pe telefonul tău personal pentru doar 10 minute max, doar pentru ca sistemul să se reîmprospăteze.\n'
+          'Poți lucra și offline, dar la un moment dat trebuie să te conectezi la internet și să fii activ. Pentru a lucra offline trebuie mai întâi să descarci hărțile offline în aplicația Flex. Pentru a face asta, mergi la Settings - Offline Maps (ultima opțiune) - Download DBY5 - Allow downloads with mobile connection.\n',
 
       'faq_q20':
-          'Ce ar trebui să fac dacă conexiunea la internet este activă, dar aplicația Flex tot nu funcționează corect?',
+          'Ce se întâmplă dacă conexiunea la internet este activă și aplicația Flex încă nu funcționează așa cum ar trebui?',
       'faq_a20':
-          'Încearcă următorii pași în ordine:\n'
-          '1. Repornește scanner-ul.\n'
-          '2. Activează și dezactivează modul avion.\n'
-          '3. Închide aplicația și redeschide-o.\n'
-          '4. Dezactivează și reactivează Location Services (GPS).\n'
-          '5. Deconectează-te din Flex App și conectează-te din nou folosind credențialele utilizate pentru aplicația Mentor.\n'
-          '6. Verifică dacă aplicația necesită o actualizare.\n'
-          'Parcurge acești pași pe rând. Dacă unul nu rezolvă problema, treci la următorul.',
+          '1- Repornește scannerul.\n'
+          '2- Pornește/oprește modul avion\n'
+          '3- Ieși din aplicație\n'
+          '4- Oprește/pornește Location Services (GPS)\n'
+          '5- Deloghează-te din aplicația Flex și loghează-te din nou cu credențialele pe care le folosești pentru aplicația Mentor.\n'
+          '6- Verifică dacă aplicația trebuie actualizată.\n'
+          'Ar trebui să încerci acești pași unul câte unul. Dacă unul nu funcționează, te rog încearcă următorul de mai jos.',
     },
 
     // =========================
@@ -4210,214 +4304,219 @@ class AppLocalizations {
       'faq_green_book_video_open_failed':
           'Nije moguće otvoriti poveznicu za Green Book video.',
 
-      'faq_q1': 'Što je najvažniji aspekt tvog svakodnevnog rada?',
-      'faq_a1':
-          'Pažljivo dostaviti svaki paket i u svakom trenutku ponašati se profesionalno.',
+      'faq_q1': 'Što je najvažnije u tvom dnevnom zadatku?',
+      'faq_a1': 'Dostavljanje paketa kvalitetno i uz dobro ponašanje.',
 
-      'faq_q2':
-          'Što trebaš izbjeći ako se pojavi problem s kupcem?',
+      'faq_q2': 'Što ne smiješ napraviti u slučaju problema s kupcem?',
       'faq_a2':
-          'Molimo te, ne pokušavaj sam riješiti situaciju. Umjesto toga, odmah obavijesti dežurnog dispečera. Mi ćemo komunicirati s kupcem u tvoje ime kako bismo spriječili eskalaciju i izbjegli negativne posljedice od strane Amazona. Tu smo da te podržimo.',
+          'NE pokušavaj sam rješavati situaciju i umjesto toga obavijesti dežurnog dispečera. Pokušat ćemo razgovarati s kupcem umjesto tebe i izbjeći bilo kakve loše posljedice od Amazona zbog pritužbi kupaca. Tu smo za tebe!',
 
       'faq_q3':
-          'Što trebam učiniti ako je situacija s kupcem već eskalirala?',
+          'Što ako je situacija već eskalirala i kupac nije zadovoljan zbog onoga što se dogodilo?',
       'faq_a3':
-          'Nikada nije prekasno riješiti pogrešku. Molimo te, javi nam se i učinit ćemo sve što je u našoj moći da problem riješimo izravno s kupcem.',
+          'Nikada nije prekasno ispraviti greške. I dalje nas nazovi i pokušat ćemo ispraviti grešku s kupcem. Bolje ikad nego nikad.',
 
       'faq_q4':
-          'Što je važnije: količina (dovršavanje što više stajanja što brže) ili kvaliteta?',
+          'Što je važnije, Količina (brzina dostave što više stajanja) ili Kvaliteta?',
       'faq_a4':
-          'Kvaliteta je uvijek na prvom mjestu. Pažljivo slijedi upute kupca za dostavu i nikada ne ostavljaj paket na nesigurnom mjestu samo zato što kasniš.',
+          'Kvaliteta! Uvijek kvaliteta! Slijedi upute kupca i NE ostavljaj paket na nesigurnim mjestima samo zato što kasniš sa stajanjima.',
 
       'faq_q5':
-          'Što se događa ako se fokusiram na kvalitetu, a zaostanem sa stajanjima?',
+          'Što ako se fokusiram na kvalitetu, ali onda zaostanem sa stajanjima?',
       'faq_a5':
-          'Svoju ćeš rutu tako ili tako dovršiti. Organizirat ćemo podršku kada je to razumno i potrebno.',
+          'Završit ćeš svoja stajanja, na ovaj ili onaj način. Pokušat ćemo poslati pomoć, ali samo ako vidimo da je to razumno.',
+
+      'faq_q6': 'Što je scorecard i što je DNR?',
+      'faq_a6': 'Drago nam je da pitaš.',
 
       // 7 – Weekly scorecard
       'faq_q7': 'Tjedni scorecard',
       'faq_a7':
-          'Tjedni scorecard pruža sažet pregled učinka tima u odnosu na naše ključne ciljeve. On ističe naše snage, identificira područja koja zahtijevaju poboljšanje i pomaže nam odrediti fokus za nadolazeći tjedan. Ukupne razine učinka su sljedeće:\n'
+          'Tjedni scorecard daje nam brz, jasan pregled kako tim stoji s našim ključnim ciljevima. Pomaže nam uočiti što ide dobro, gdje zaostajemo i na što se trebamo fokusirati u nadolazećem tjednu. Ukupni rezultati su sljedeći:\n'
           '• Fantastic Plus: >93% (iznimna izvedba)\n'
           '• Fantastic: 85% – 92.9%\n'
           '• Great: 70% – 84.9%\n'
           '• Fair: 50% – 69.9%\n'
           '• Poor: <50%',
 
-      'faq_q7_1': 'DNR kartica — Delivered Not Received',
+      'faq_q7_1': 'DNR kartica\nDelivered Not Received',
       'faq_a7_1':
-          'DNR se bilježi kada si paket označio kao dostavljen pomoću gumba "Swipe to finish", ali ga kupac zapravo nije primio. Česti uzroci uključuju krađu paketa, prazno pakiranje pri dolasku ili dostavu na pogrešnu adresu.\n'
-          'Svakog utorka primit ćeš fotografije svakog DNR-a zabilježenog na tvoje ime u prethodnom tjednu.',
+          'To je kada si dostavio paket i kliknuo gumb "Swipe to finish" potvrđujući da si dostavio paket, ali kupac nije primio paket iz više razloga: krađa paketa, kutija je bila prazna od sadržaja paketa te pogrešna dostava na pogrešnu adresu.\n'
+          'Svakog utorka dobit ćeš slike svakog DNR-a koji si imao tijekom tjedna.',
 
       'faq_q7_1_1':
-          'Kako mogu izbjeći DNR-ove i koliko značajno oni utječu na moj tjedni scorecard?',
+          'Kako to trebam izbjeći i koliko je to važno za tjedni scorecard?',
       'faq_a7_1_1':
-          'DNR-ovi imaju značajan utjecaj na tvoj rezultat. Da ih spriječiš, unaprijed obavijesti kupca da dolaziš i zvoni samo na zvono na kojem je jasno naznačeno ime kupca.',
+          'Vrlo je važno, a da bi to izbjegao jednostavno trebaš unaprijed obavijestiti kupca da uskoro dolaziš na njihovu kuću/poslovni prostor i zvoniti SAMO na zvono s njihovim imenom.',
 
-      'faq_q7_1_2': 'Kako mogu spriječiti gubitke paketa?',
+      'faq_q7_1_2': 'Kako izbjeći gubitke paketa?',
       'faq_a7_1_2':
-          'Kad god je to moguće, predaj paket izravno kupcu. Ako to nije moguće, pošalji kupcu poruku u kojoj mu točno navodiš gdje je paket ostavljen — primjerice u garaži, ispod stepenica, u šupi ili iza cvjetnog lonca.\n'
-          'Ako smatraš da nije sigurno ostaviti paket bez nadzora, ne ostavljaj ga. Uzmi ga sa sobom i ponovno pokušaj dostavu kasnije. Ovo je izuzetno važno.',
+          'Uvijek pokušaj predati pakete iz ruke kupcu, a ako to nije moguće, pošalji poruku u kojoj ih obavještavaš gdje je paket ostavljen, na primjer u garaži, ispod stepenica, u šupi, iza vaze s cvijećem itd..\n'
+          'Ako ne misliš da je sigurno ostaviti paket bez nadzora, molimo, uvijek je najbolje samo uzeti paket i pokušati ponovno kasnije. Ovo je VRLO važno.',
 
-      'faq_q7_1_3': 'Kako mogu procijeniti je li lokacija sigurna?',
+      'faq_q7_1_3': 'Kako znam koje je mjesto sigurno ili ne?',
       'faq_a7_1_3':
-          'Koristi vlastitu prosudbu i zdrav razum. Primjerice, paket ostavljen kraj sandučića u zgradi od 20 do 30 katova puno je vjerojatnije da će biti ukraden nego onaj ostavljen u privatnoj kući.\n'
-          'Kao podršku, svako jutro objavljujemo popis adresa koje nose visok rizik od krađe ili pritužbi kupaca, temeljen na povijesnim podacima o dostavama i statistici.',
+          'Instinkt i zdrav razum. Ako zgrada ima 20 - 30 katova i ostaviš paket kod sandučića, šanse da bude ukraden su sve veće u usporedbi s privatnom kućom.\n'
+          'Također, kako bismo ti pomogli u svakodnevnim dostavama i kako bi izbjegao DNR, svako jutro ćemo objaviti sliku s adresama koje imaju veliku vjerojatnost krađe paketa i pritužbi kupaca, na temelju prethodnih rezultata dostava i statistike.',
 
       'faq_q7_1_4':
-          'Kako izgubljen ili ukraden paket utječe na moj rezultat?',
+          'Što ako se paket izgubi ili bude ukraden, kako će to utjecati na moj rezultat?',
       'faq_a7_1_4':
-          'Utjecaj je značajan. Samo jedan izgubljen paket može smanjiti tvoj rezultat za najmanje 30% i košta te minimalno 600 bodova. Imaj na umu: što je broj bodova pod tvojim imenom u scorecardu veći, to se učinak smatra lošijim. Što više paketa dostavljaš tjedno, to manje bodova gubiš po incidentu, a vrijednost nedostajućeg predmeta također ima ulogu — skuplji predmeti rezultiraju većim gubitkom bodova. Ovaj pokazatelj moramo držati što nižim.\n'
-          'Jednako važno: ako redovito bilježiš velik broj izgubljenih paketa, bit ćemo prisiljeni prekinuti radni odnos, jer Amazon u nekom trenutku može posumnjati na krađu. To je ozbiljan rizik koji se ne smije zanemariti.',
+          'Loše. To će te pogoditi za najmanje 30% i to je samo s jednim paketom koji ti oduzme najmanje 600 bodova. Što više bodova vidiš u scorecardu uz svoje ime, to je gore. Što više paketa dostaviš po radnom tjednu, to manje bodova gubiš. Bodovi koje gubiš također ovise o cijeni izgubljenog artikla: što je skuplje, više bodova se gubi. Ovu sekciju rezultata trebamo držati što niže moguće.\n'
+          'Ne smije se zanemariti ni činjenica da, ako redovito imaš velik broj izgubljenih paketa, morat ćemo te otpustiti jer prije ili kasnije Amazon može posumnjati na krađu paketa, a to je vrlo opasno.',
 
       'faq_q7_2':
-          'CC kartica — Contact Compliance',
+          'CC kartica\n'
+          'Contact Compliance',
       'faq_a7_2':
-          'Ovaj pokazatelj mjeri koliko često kontaktiraš kupca u vezi s njegovom dostavom, bilo putem poruke bilo telefonskim pozivom. Što manje komuniciraš s kupcem, to će tvoj rezultat u ovoj kategoriji biti niži. Ovaj pokazatelj trebamo držati što višim, budući da je jedna od najlakših kategorija za postizanje dobrih rezultata i značajno doprinosi tvom ukupnom rezultatu.',
+          'Znači koliko puta si kontaktirao kupca u vezi njihove dostave, bilo putem poruke ili telefonskog poziva. Što manje komuniciraš s kupcem, to ćeš dobiti manje bodova u scorecardu, i ovu sekciju trebamo držati što višom jer je zapravo jedna od najlakših kategorija i puno pomaže tvom ukupnom rezultatu.',
 
-      'faq_q7_2_1': 'Zašto je važan kontakt s kupcem?',
+      'faq_q7_2_1': 'Zašto bih to trebao raditi?',
       'faq_a7_2_1':
-          'Dostava paketa nije puka "drop-and-go" operacija. Trebaš unaprijed obavijestiti kupca i, kada je prikladno, pitati gdje želi da se paket dostavi.',
+          'Dostava paketa nije samo Drop&Go, trebao bi unaprijed obavijestiti kupca i pitati ih gdje bi željeli da paket bude dostavljen.',
 
-      'faq_q7_2_2': 'Kako mogu poboljšati svoj CC rezultat?',
+      'faq_q7_2_2': 'Kako poboljšati svoje CC rezultate?',
       'faq_a7_2_2':
-          'Jednostavno: nazovi — i posebno pošalji poruku — kupcu na svakom stajanju.',
+          'Hvala što pitaš. Jednostavno: pozivima, a posebno slanjem poruka kupcima na svakoj stanici.',
 
-      'faq_q7_3': 'CE kartica — Customer Escalation',
+      'faq_q7_3': 'CE kartica\nCostumer Escalation',
       'faq_a7_3':
-          'Sjeti se kakav utjecaj DNR ima na tvoj rezultat — eskalacija kupca najmanje je dvostruko štetnija. Ovisno o težini incidenta, može dovesti čak i do gubitka radnog mjesta.',
+          'Sjećaš se koliko je loše DNR utjecao na tvoje rezultate? E pa, ovo je najmanje 2 puta gore, i također riskiraš gubitak posla jer ovisi o tome koliko je situacija bila loša.',
 
-      'faq_q7_3_1': 'Kako mogu izbjeći eskalacije s kupcem?',
+      'faq_q7_3_1': 'Kako to izbjeći?',
       'faq_a7_3_1':
-          'Uvijek pažljivo slijedi upute kupca za dostavu. Ako dođe do pogreške, prvo se ispričaj. Ako je kupac uzrujan, zamoli ga za trenutak vremena kako bi izravno razgovarao s nama — trebao bi već biti u telefonskoj vezi s nama. Kao što je navedeno u Odjeljku 2, uvijek je najbolje prepustiti nama rješavanje takvih situacija.',
+          'Tako da uvijek slijediš upute kupca za dostavu i u slučaju pogreške prvo se ispričaj, a ako je kupac ljut, zamoli ih za minutu vremena da razgovaraju s nama, jer nas već zoveš. Čitanjem Odjeljka 2, do sada bi trebao znati da je najbolje prepustiti nama da rješavamo takve situacije.',
 
-      'faq_q7_4': 'POD kartica — Picture on Delivery',
+      'faq_q7_4': 'POD kartica\nPicture on Delivery',
       'faq_a7_4':
-          'Ova kolona navodi pakete koji ispunjavaju uvjete za Picture on Delivery (POD), kod kojih je poslana fotografija označena kao "Invalid" ili "Not Sure". Česti razlozi odbijanja uključuju:\n'
-          '1. Etiketa paketa s podacima kupca vidljiva je na fotografiji. Paket treba okrenuti tako da etiketa ne bude vidljiva prije nego što se fotografija snimi.\n'
-          '2. Fotografija je mutna.\n'
-          '3. Osoba je vidljiva na fotografiji.\n'
-          '4. Paket nije prepoznat na fotografiji.\n'
-          '5. Paket se nalazi unutar vozila.\n'
-          '6. Paket je u ruci.\n'
-          '7. Paket je stavljen u sandučić.\n'
-          '8. Paket je preblizu kameri.\n'
-          '9. Fotografija je pretamna.\n'
-          'U ovoj kategoriji trebalo bi biti najlakše postići 100%, a time se primjetno poboljšava tvoj ukupni rezultat.',
+          'Ova kolona prikazuje popis paketa koji su podobni za POD, za koje su fotografije snimljene, ali su označene kao Invalid ili Not Sure. Razlozi za odbijanje POD-a mogu uključivati:\n'
+          '1- Etiketa paketa na fotografiji s podacima kupca. Paket treba okrenuti naopako prije nego što se snimi fotografija.\n'
+          '2- Zamućena fotografija\n'
+          '3- Osoba vidljiva na fotografiji\n'
+          '4- Nije detektiran paket na fotografiji\n'
+          '5- Paket u autu\n'
+          '6- Paket u ruci\n'
+          '7- Paket u sandučiću\n'
+          '8- Paket preblizu\n'
+          '9- Fotografija previše tamna.\n'
+          'Ovo bi uvijek trebalo biti najlakše gdje trebaš imati rezultat od 100% i poboljšava tvoj ukupni rezultat',
 
-      'faq_q7_5': 'LoR kartica — Lost on Road',
+      'faq_q7_5': 'LoR kartica\nLost on Road',
       'faq_a7_5':
-          'Ovaj pokazatelj te kažnjava kada paket koji si skenirao pri utovaru nije ni dostavljen ni vraćen na kraju smjene nakon neuspješnog pokušaja dostave. U takvim se slučajevima paket smatra izgubljenim, a kazna je jednaka DNR-u. Molimo te da pažljivo prebrojiš pakete koje vraćaš i provjeriš podudaraju li se s popisom prikazanim na scanneru pod: Today’s Itinerary → Summary → Problems. Ako se brojevi ne podudaraju, obavijesti dežurnog dispečera prije nego što završiš smjenu u Amazon aplikaciji.',
+          'Kažnjava te kada si skenirao paket pri utovaru i nisi ga vratio na kraju smjene u slučaju neuspješne dostave. Dakle, paket je izgubljen i izgubit ćeš onoliko bodova koliko bi izgubio i za DNR, zato dobro prebroji pakete koje vraćaš i provjeri odgovaraju li paketima prikazanim u scanneru. Možeš ih pronaći na: Todays Itinerary - Summary - Problems. Ako se ne podudaraju, molimo obavijesti dežurnog dispečera prije završetka rada u Amazon aplikaciji.',
 
-      'faq_q7_6': 'DCR kartica — Delivery Completion Rate',
+      'faq_q7_6': 'DCR kartica\nDelivery Completion Rate',
       'faq_a7_6':
-          'Ovaj pokazatelj odražava tvoj učinak u dostavi praćenjem postotka dostava dovršenih prema planu. Pomaže nam procijeniti učinkovitost i pouzdanost naše usluge te otkriva probleme poput kašnjenja, neuspjelih pokušaja ili problema s rutom. Tvoj DCR uvijek treba biti što viši. Da bi to postigao, provedi ponovne pokušaje (reattempts) kad god je to izvedivo i smanji broj vraćenih paketa.',
+          'Pokazuje tvoje sposobnosti u dostavljanju paketa. Prati postotak dostava dovršenih prema planu, pomažući nam mjeriti učinkovitost i pouzdanost naših dostava. Ističe probleme poput kašnjenja, neuspješnih pokušaja ili problema s rutiranjem. Ovo bi uvijek trebalo biti što više moguće. Da bi to bilo moguće, svaki dan trebaš raditi reattempts i izbjegavati koliko god možeš vraćanje paketa.',
 
-      'faq_q7_7': 'CDF kartica (ranije DEX) — Customer Delivery Feedback',
+      'faq_q7_7': 'CDF kartica (Previously, DEX)\nCostumer Delivery Feedback',
       'faq_a7_7':
-          'Ovaj pokazatelj bilježi iskustvo primatelja s dostavom, uključujući točnost, stanje robe i profesionalnost vozača. Pomaže nam identificirati snage naše usluge i područja za poboljšanje. Nakon dostave kupac prima anketnu e-poštu od Amazona s pitanjima kao što su:\n'
-          '1) Je li tvoj paket dostavljen na vrijeme? (Da / Ne)\n'
-          '2) Je li paket ostavljen na sigurnom mjestu? (Da / Ne)\n'
-          '3) Je li paket bio u dobrom stanju pri dolasku? (Da / Ne)\n'
-          '4) Koliko si zadovoljan dostavom ukupno? (Vrlo zadovoljan / Zadovoljan / Neutralan / Nezadovoljan / Vrlo nezadovoljan)\n'
-          '5) Kako bi ocijenio komunikaciju i ažuriranja praćenja za ovu dostavu? (Odlično / Dobro / Osrednje / Loše)\n'
-          '6) Je li dostavljač bio ljubazan i profesionalan? (Da / Ne / Nije primjenjivo — beskontaktna dostava)\n'
-          '7) Imaš li komentare o svom iskustvu dostave? (Dodatni komentari kupca)',
+          'Bilježi iskustvo primatelja s procesom dostave, uključujući točnost, stanje robe i profesionalnost vozača. Pomaže nam identificirati snage usluge i područja za poboljšanje. Na kraju dostave, kupac dobiva e-mail od Amazona o iskustvu dostave, s pitanjima kao što su:\n'
+          '1) Je li tvoj paket dostavljen na vrijeme?\n'
+          'Da / Ne\n'
+          '2) Je li paket ostavljen na sigurnom mjestu?\n'
+          'Da / Ne\n'
+          '3) Je li paket bio u dobrom stanju kada je stigao?\n'
+          'Da / Ne\n'
+          '4) Koliko si zadovoljan dostavom ukupno?\n'
+          'Vrlo zadovoljan / Zadovoljan / Neutralan / Nezadovoljan / Vrlo nezadovoljan\n'
+          '5) Kako bi ocijenio komunikaciju i ažuriranja praćenja za ovu dostavu?\n'
+          'Odlično / Dobro / Osrednje / Loše\n'
+          '6) Je li dostavljač bio ljubazan i profesionalan?\n'
+          'Da / Ne / Nije primjenjivo (Bes kontaktna dostava)\n'
+          '7) Imaš li komentare o svom iskustvu dostave?\n'
+          '(Dodatni komentari kupca)',
 
-      'faq_q7_8':
-          'Što trebam imati na umu u vezi sa scorecardom općenito?',
+      'faq_q7_8': 'Što trebam imati na umu o scorecardu?',
       'faq_a7_8':
-          'Kvaliteta i učinkovitost čine značajnu razliku. Snažni rezultati koriste tebi, tvrtki i cijelom timu. Zadovoljstvo kupaca naš je najviši prioritet, a iznimni rezultati nagrađuju se bonusom od strane tvrtke.\n'
-          'Daj sve od sebe i bit ćeš odgovarajuće nagrađen.',
+          'Kvaliteta i učinkovitost puno znače. Dobri rezultati su dobri za tebe, za kompaniju i dobri za cijeli tim. Zadovoljstvo kupaca je vrlo važno i dobri rezultati su popraćeni bonusom od kompanije.\n'
+          'Daj najbolje od sebe, dobiješ najbolje.',
 
-      'faq_q8': 'Na koja druga područja trebam obratiti pažnju?',
+      'faq_q8': 'Na koja druga područja trebam paziti?',
       'faq_a8':
-          'Daj prioritet svojoj osobnoj sigurnosti: vozi odgovorno, sprječavaj ozljede i budi oprezan u blizini pasa kako bi izbjegao ugrize. Sa svom radnom opremom — uključujući dnevno vozilo i radni scanner ili telefon — postupaj pažljivo. Na posao uvijek dolazi u sigurnosnim cipelama, sigurnosnom prsluku i prikladnoj Amazon jakni ili majici za vremenske uvjete.',
+          'Brini se o sebi vozeći sigurno, izbjegavajući ozljede i izbjegavajući pse i ugrize pasa. Budi pažljiv s radnom opremom kao što su dnevno vozilo, radni scanner/telefon i dolazi na posao noseći sigurnosne cipele i sigurnosni prsluk, Amazon jaknu ili majicu (ovisno o vremenu).',
 
       'faq_q9':
-          'Što trebam učiniti ako sudjelujem u nesreći ili oštetim radno vozilo?',
+          'Što se događa ako doživim prometnu nesreću ili oštetim radno vozilo?',
       'faq_a9':
-          'Najprije se uvjeri da si siguran i da nisi teško ozlijeđen. Što se tiče oštećenja vozila: ako utvrdimo da je nesreća uzrokovana nemarom — primjerice, ometanjem zbog korištenja mobilnog telefona tijekom vožnje — osobno ćeš biti odgovoran za puni iznos štete. Osim toga, policijski zapisnik koji slijedi može rezultirati suspenzijom vozačke dozvole, a takav incident predstavlja osnovu za trenutni otkaz. U manje ozbiljnim slučajevima bit ćeš isključen iz Tjednih Scorecard Bonusa na dva mjeseca. Obvezan si odmah nas obavijestiti nakon bilo kojeg incidenta i pružiti sljedeće: vrijeme i lokaciju incidenta, podatke o bilo kakvoj šteti na privatnoj ili javnoj imovini (zidovi, ograde, stupovi rasvjete, ljudi ili životinje) te jasne fotografije oštećenja vozila.',
+          'Prvo, provjeri da si dobro i da nisi teško ozlijeđen. Što se tiče štete na vozilu, ako utvrdimo da se nesreće događaju zbog nemara – na primjer, ometanja poput korištenja mobitela tijekom vožnje – bit ćeš osobno odgovoran za punu štetu. Osim toga, dobit ćeš policijski zapisnik, što može čak rezultirati suspenzijom vozačke dozvole. Naravno, to je također razlog za trenutni otkaz. U suprotnom, samo si isključen iz primanja tjednih Scorecard bonusa na 2 mjeseca. U slučaju incidenta, DUŽAN si nas odmah obavijestiti i dati nam vrijeme incidenta, lokaciju, postoji li šteta na privatnoj ili javnoj imovini (poput zidova, ograda, stupova rasvjete, ljudi i/ili kućnih ljubimaca), lokaciju i fotografije štete na vozilu.',
 
-      'faq_q10':
-          'Što trebam učiniti ako je paket oštećen ili nedostaje?',
+      'faq_q10': 'Što radim kada imam pakete oštećene i/ili nedostaju.',
       'faq_a10':
-          'Ako je paket oštećen, označi ga kao oštećen u sustavu i vrati ga u stanicu. Ako oštećeni paket sadrži tekućinu i utjecao je na druge pakete, napravi fotografiju svih pogođenih paketa i pošalji je dežurnom dispečeru. Incident ćemo u tvoje ime prijaviti Amazonu.\n'
-          'Ako paket nedostaje, možeš ga označiti kao nedostajući — osim ako se radi o OTP paketu, u kojem nas slučaju moraš prvo kontaktirati prije nego što ga označiš. Ovo je ključno.',
+          'Kada je paket oštećen, slobodno ga označi kao oštećen i vrati ga u stanicu. Ako je taj oštećeni paket bio tekući paket i oštetio druge pakete, molimo napravi fotografiju svih oštećenih paketa i pošalji je dežurnom dispečeru, a mi ćemo to prijaviti Amazonu za tebe.\n'
+          'Kada paket nedostaje, slobodno ga označi/rezerviraj kao nedostajući osim ako ima OTP za koji MORAŠ prvo nama prijaviti prije nego što ga označiš kao nedostajući. Ovo je VRLO važno.',
 
       'faq_q11': 'Što je OTP (One-Time Password) paket?',
       'faq_a11':
-          'OTP paket sadrži predmet visoke vrijednosti za koji Amazon zahtijeva da kupac prije dostave dostavljaču priopći jednokratnu lozinku. Time se osigurava da paket dođe do ispravnog primatelja. OTP pakete moraš tretirati s najvećom pažnjom, nikada ih ne ostavljaj bez nadzora i predaj ih isključivo kupcu koji je priopćio točnu lozinku.',
+          'To je skup predmet za koji Amazon zahtijeva da kupac dostavljaču da jednokratnu lozinku (One Time Password) prije dostave paketa, kako bi se osiguralo da je paket dostavljen pravoj osobi/kupcu. Moraš biti posebno pažljiv s takvim paketima, ne ostavljati ih bez nadzora i predati ih samo kupcu koji ti je dao lozinku.',
 
-      'faq_q12':
-          'Zašto te neprestano tražimo da usporiš umjesto da radiš brže?',
+      'faq_q12': 'Zašto te stalno gnjavimo da usporiš i da ne ideš brže?',
       'faq_a12':
-          'Razumijemo da ti se to može činiti ponavljajućim, ali to zahtijeva sustav. Moramo se pridržavati cilja stajanja-po-satu koji je prethodno odredio algoritam, kako bismo u budućnosti mogli osigurati dodatne rute i osigurati ti kontinuitet posla.\n'
-          'Osim toga, prebrzi rad povećava rizik od DNR-a, što tebe i tvrtku košta bodova u tjednom scorecardu.',
+          'Ni nama se to ne sviđa, ali takav je sustav. Moramo slijediti algoritam sustava i napraviti onoliko stajanja po satu koliko je unaprijed određeno kako bismo u budućnosti dobili više ruta i da ti možeš više raditi i ne biti slobodan.\n'
+          'Također, bržom vožnjom riskiraš DNR i gubitak bodova za oboje, sebe i kompaniju, u tjednom scorecardu.',
 
       'faq_q13':
-          'Zašto me dispečeri ponekad pitaju kasnim li ili je li nešto pošlo po zlu?',
+          'Pa zašto me dispečeri ponekad pitaju zašto kasnim i je li nešto pošlo po zlu?',
       'faq_a13':
-          'Razumijemo da te provjere nisu uvijek ugodne, ali ovisimo o tvojoj povratnoj informaciji kako bismo shvatili što se na cesti moglo dogoditi i uzrokovati kašnjenje. Amazon traži te informacije jer svako stajanje ima predviđeni vremenski okvir za dostavu. Kada ruta kasni, Amazon mora znati razlog kako bi na temelju tih podataka poboljšao buduću učinkovitost dostave.',
+          'Znamo da ovo nije ugodno, ali trebamo povratnu informaciju o tome što se moglo dogoditi na cesti zbog čega si zaostao sa stajanjima. Amazon traži ovu povratnu informaciju jer postoji i vremensko ograničenje do kojeg si trebao dostaviti X stajanja, stoga Amazon treba znati zašto su preostala stajanja iza rasporeda dostave i s ovom informacijom poboljšati buduću učinkovitost dostave.',
 
-      'faq_q14': 'Zašto te ponekad tražimo da pomogneš kolegi?',
+      'faq_q14': 'Zašto te ponekad tražimo da ideš pomoći kolegi?',
       'faq_a14':
-          'Kašnjenje kolege može biti posljedica različitih čimbenika: slabe internetske pokrivenosti u području, gustog prometa ili ulica zatvorenih zbog gradilišta. U takvim slučajevima tvoja je pomoć potrebna kako bi on mogao na vrijeme završiti svoju rutu.',
+          'Zato što mnogi faktori utječu na kašnjenje kolege, poput loše internetske veze u području, prometa, blokiranih ulica zbog radova u području, što je otežalo drugom vozaču da dostavi na vrijeme, stoga je potrebna tvoja pomoć.',
 
       'faq_q15':
-          'Hoću li od prvog dana voziti standardne rute kao iskusniji vozači?',
+          'Počinjem li odmah prvog dana dostavljati standardne rute kao i drugi, iskusniji vozači?',
       'faq_a15':
-          'Ne. Započet ćeš s uvodnim razdobljem od 14 radnih dana, tijekom kojih ćeš primijeniti ono što si naučio na ride-along danima s trenerom i upoznati se s područjem, vozilom, scannerom i cjelokupnim tijekom rada.\n'
-          'Tijekom tih 14 dana Amazon će tvoj dnevni broj paketa i stajanja smanjiti do 50% u odnosu na standardnu rutu.',
+          'Ne, očito to nije slučaj za tebe. Na početku ćeš imati razdoblje od 14 radnih dana da u praksi primijeniš ono što si naučio u ride-along danima s trenerom i prilagodiš se području, vozilu, scanneru i naučiš tijek rada.\n'
+          'Uz to, za to razdoblje od 14 dana, Amazon će ti dati do 50% manje paketa i stajanja nego inače u tvom rasporedu.',
 
       'faq_q16':
-          'Što trebam učiniti ako je adresa netočna ili je pin na karti neprecizan?',
+          'Što učiniti kada je adresa pogrešna i/ili pin lokacije nije točan na karti?',
       'faq_a16':
-          'Najprije provjeri pin tako da potražiš adresu u Google Mapsu, koji je precizniji i već instaliran na tvom scanneru. Ako se lokacija ne podudara, prijavi odstupanje dežurnom dispečeru.',
+          'Prvo potvrdi da pin nije točan tako što ćeš potražiti adresu u Google Maps (točnije je i već je instalirano na tvom scanneru) i ako se ne podudara, obavijesti dežurnog dispečera o greškama.',
 
       'faq_q17':
-          'Koji su moji dnevni zadaci prije početka i nakon završetka rada?',
+          'Koji su moji dnevni zadaci prije nego počnem i nakon što završim posao?',
       'faq_a17':
-          '1. Po dolasku na parking provjeri nosiš li sigurnosne cipele, sigurnosni prsluk i Amazon uniformu.\n'
-          '2. Provjeri je li scanner potpuno napunjen. Ako nije, obavijesti prisutnog dispečera.\n'
-          '3. Pregledaj vozilo kako bi uočio eventualne nedostatke.\n'
-          '4. Pokreni vožnju u Mentor aplikaciji na svom scanneru.\n'
-          '5. Napravi fotografiju instrumentne ploče vozila koja prikazuje trenutnu kilometražu i resetiraj dnevni brojač na nulu.\n'
-          '6. Pripremi se za odlazak u Waiting Area tek 10 minuta prije planiranog vremena utovara — nikako ranije.\n'
-          '7. Jednom kad si u Waiting Area, ugasi motor i pokreni Flex aplikaciju i Timesheet. Nemoj otvarati Flex aplikaciju ranije od 10 minuta prije utovara; taj vremenski pečat od 10 minuta je obavezan.\n'
-          '8. Nastavi do Loading Area prema uputama Yard Marshalla. U Loading Area ugasi motor i napusti vozilo tek nakon što začuješ zvižduk Yard Marshalla.\n'
-          '9. Nakon završetka utovara upali vozilo i počni voziti tek kada te Yard Marshall uputi.\n'
-          '10. Nakon što završiš sva stajanja, provjeri spremnik goriva. Ako je preostalo manje od pola, dopuni gorivo.\n'
-          '11. Po povratku u stanicu odloži sve preostale pakete u područja koja je odredio Amazon i žurno vrati vreće.\n'
-          '12. Vrati se na parking, ugasi vozilo i ispuni Green Book (Tageskontrollblatt). Pošalji fotografiju dnevne prijeđene kilometraže zajedno s fotografijom Green Booka.\n'
-          '13. Ugasi vozilo i vrati radnu torbu na označeno mjesto ili u vozilo.',
+          '1- Kada dođeš na parking, prvo provjeri nosiš li sigurnosne cipele, sigurnosni prsluk i Amazon uniformu.\n'
+          '2- Provjeri je li scanner potpuno napunjen i obavijesti dispečera koji je tada prisutan ako nije napunjen.\n'
+          '3- Provjeri ima li nešto pogrešno s vozilom.\n'
+          '4- Pokreni trip u Mentor aplikaciji na svom scanneru.\n'
+          '5- Objavi fotografiju instrument ploče vozila koja prikazuje trenutnu kilometražu i dnevni trip (u vozilu) resetiran na 0.\n'
+          '6- Pripremi se za spuštanje u Waiting Area samo 10 minuta prije planiranog vremena utovara, ne ranije.\n'
+          '7- Kada si u Waiting area, ugasi vozilo, pokreni Flex App i Timesheet. Molimo, ni minutu ranije, posebno flex app. Ne zaboravi 10-minutni timestamp.\n'
+          '8- Zatim idi u Loading Area prema uputama Yard Marshalla. Kada si u Loading area, ugasi vozilo i izađi iz vozila TEK NAKON što čuješ zvižduk Yard Marshalla.\n'
+          '9- Nakon što završiš utovar, upali vozilo i počni voziti, ali samo kada ti Yard Marshall kaže.\n'
+          '10- Nakon što završiš sva stajanja, provjeri spremnik goriva i ako je manje od pola, molimo natoči gorivo.\n'
+          '11- Kada si na stanici, molimo odloži sve preostale pakete na područja koja je odredio Amazon, odloži vreće na vrijeme\n'
+          '12- Kada si na parkingu, ugasi vozilo i ispuni Green Book (Tageskontrollblat), objavi fotografiju dnevne kilometraže koju si napravio tijekom dana dostavljajući, zajedno s fotografijom Green Booka.\n'
+          '13- Ugasi vozilo i molimo vrati radnu torbu na označeno mjesto/van',
 
       'faq_q18':
-          'Trebam li nešto učiniti kada koristim drugo vozilo umjesto svog uobičajenog?',
+          'Moram li nešto učiniti kada mijenjam kombi i uzmem drugi kombi umjesto onog koji obično uzimam?',
       'faq_a18':
-          'Da. Prije početka vožnje snimi detaljan video vozila na kojem je prepoznatljivo svako postojeće oštećenje — uključujući sitne ogrebotine i udubljenja — kako pri sljedećem pregledu ne bi bio odgovoran za prethodno postojeća oštećenja.',
+          'Trebao bi napraviti video, detaljno snimajući svaku malu štetu koju su prethodni vozač(i) mogli napraviti, kako ne bi bila tvoja krivnja pri sljedećem pregledu vozila.',
 
       'faq_q19':
-          'Što trebam učiniti ako se Flex aplikacija neprestano učitava i usporava moj tijek rada?',
+          'Što trebam učiniti ako se Flex aplikacija stalno učitava i usporava moj tijek rada?',
       'faq_a19':
-          'Najprije provjeri imaš li aktivnu internetsku vezu. To možeš utvrditi slanjem poruke kupcu na trenutnom stajanju — ako poruka prođe, veza je aktivna. Također možeš otvoriti drugu aplikaciju na scanneru, poput preglednika, i pokušati nešto pretražiti.\n'
-          'Ako nema aktivne internetske veze, slijedi ove korake redom:\n'
-          '1. Ponovno pokreni scanner. Ovo uvijek treba biti prvi pokušaj.\n'
-          '2. Uključi i ponovno isključi zrakoplovni način rada. Ovo često pomaže bez potpunog ponovnog pokretanja.\n'
-          '3. Kao posljednje rješenje, podijeli mobilni hotspot sa svog osobnog telefona na najviše 10 minuta kako bi se sustav osvježio.\n'
-          'Možeš raditi i offline, ali u nekom trenutku tijekom smjene moraš se ponovno spojiti na internet. Za aktiviranje offline načina prvo preuzmi offline karte u Flex aplikaciji: idi na Settings → Offline Maps (posljednja opcija) → Download DBY5 → Allow downloads with mobile connection.\n',
+          'Prvo provjeri imaš li aktivnu internetsku vezu. Da to provjeriš možeš pokušati poslati poruku kupcu na trenutnom stajanju i ako prođe, to znači da je internetska veza aktivna. Također možeš provjeriti otvaranjem druge aplikacije na scanneru, poput preglednika, i pretraživanjem nečega.\n'
+          'Koraci koje trebaš slijediti ako nema aktivne internetske veze:\n'
+          '1- Ponovno pokreni scanner. Ovo bi uvijek trebalo biti prvo što pokušaš.\n'
+          '2- Uključi/isključi airplane mode. Ovo radi većinu vremena bez čekanja da se scanner ponovno pokrene.\n'
+          '3- Kao posljednje rješenje, molimo pokušaj podijeliti hotspot s osobnog telefona na maksimalno 10 minuta samo da se sustav osvježi.\n'
+          'Možeš raditi i offline, ali u nekom trenutku moraš se spojiti na internet i biti aktivan. Da radiš offline, prvo moraš preuzeti offline karte u Flex aplikaciji. Da to napraviš, ideš na Settings - Offline Maps (zadnja opcija) - Download DBY5 - Allow downloads with mobile connection.\n',
 
       'faq_q20':
-          'Što trebam učiniti ako je internetska veza aktivna, ali Flex aplikacija i dalje ne radi ispravno?',
+          'Što ako je internetska veza aktivna, a Flex aplikacija i dalje ne radi kako bi trebala?',
       'faq_a20':
-          'Pokušaj sljedeće korake redom:\n'
-          '1. Ponovno pokreni scanner.\n'
-          '2. Uključi i ponovno isključi zrakoplovni način rada.\n'
-          '3. Zatvori aplikaciju i ponovno je otvori.\n'
-          '4. Isključi i ponovno uključi Location Services (GPS).\n'
-          '5. Odjavi se iz Flex aplikacije i ponovno se prijavi s vjerodajnicama koje koristiš za Mentor aplikaciju.\n'
-          '6. Provjeri treba li aplikaciju ažurirati.\n'
-          'Prolazi kroz ove korake jedan po jedan. Ako jedan ne riješi problem, prijeđi na sljedeći.',
+          '1- Ponovno pokreni scanner.\n'
+          '2- Uključi/isključi airplane mode\n'
+          '3- Izađi iz aplikacije\n'
+          '4- Isključi/uključi Location Services (GPS)\n'
+          '5- Odjavi se iz Flex aplikacije i ponovno se prijavi s vjerodajnicama koje koristiš za Mentor aplikaciju.\n'
+          '6- Provjeri treba li aplikaciju ažurirati.\n'
+          'Trebaš isprobati ove korake jedan po jedan. Ako jedan ne radi, molimo pokušaj sljedeći ispod njega.',
     },
 
     // =========================
@@ -4905,212 +5004,213 @@ class AppLocalizations {
       'faq_green_book_video_missing': 'رابط فيديو Green Book غير مُعدّ بعد.',
       'faq_green_book_video_open_failed': 'تعذر فتح رابط فيديو Green Book.',
 
-      'faq_q1': 'ما أهم جانب في عملك اليومي؟',
-      'faq_a1':
-          'تسليم كل طرد بعناية والحفاظ على سلوك مهني في جميع الأوقات.',
+      'faq_q1': 'ما هو الأهم في مهمتك اليومية؟',
+      'faq_a1': 'تسليم الطرود بجودة وبسلوك جيد.',
 
-      'faq_q2': 'ما الذي ينبغي تجنبه في حال نشوء مشكلة مع الزبون؟',
+      'faq_q2': 'ما الذي يجب ألا تفعله في حال حدوث مشاكل مع الزبون؟',
       'faq_a2':
-          'يُرجى عدم محاولة حل الموقف بنفسك. بل أبلغ المشرف المناوب فور وقوع المشكلة. سنتولى التواصل مع الزبون نيابةً عنك لمنع تصاعد الموقف وتفادي أي تبعات سلبية من جانب أمازون. نحن هنا لدعمك.',
+          'لا تحاول التعامل مع الموقف بنفسك، وبدلاً من ذلك أخبر المرسِل/المشرف المناوب. سنحاول التحدث إلى الزبون نيابةً عنك وتجنب أي عواقب سيئة من أمازون بسبب شكاوى الزبائن. نحن هنا من أجلك!',
 
       'faq_q3':
-          'ما الذي ينبغي فعله إذا تصاعد الموقف مع الزبون بالفعل؟',
+          'ماذا لو كان الموقف قد تصاعد بالفعل والزبون غير سعيد لأي سبب حدث؟',
       'faq_a3':
-          'لم يفت الأوان أبدًا لمعالجة أي خطأ. يُرجى التواصل معنا وسنبذل قصارى جهدنا لحل المشكلة مباشرةً مع الزبون.',
+          'ليس هناك وقت متأخر لإصلاح أي أخطاء. اتصل بنا رغم ذلك وسنحاول إصلاح الخطأ مع الزبون. متأخرًا خير من ألا يأتي أبدًا.',
 
       'faq_q4':
-          'أيهما أهم: الكمية (إنجاز أكبر عدد ممكن من التوقفات بأسرع وقت) أم الجودة؟',
+          'ما الأهم، الكمية (سرعة توصيل أكبر عدد ممكن من التوقفات) أم الجودة؟',
       'faq_a4':
-          'الجودة لها الأولوية دائمًا. اتبع تعليمات التسليم الخاصة بالزبون بدقة، ولا تترك الطرد أبدًا في مكان غير آمن لمجرد أنك متأخر عن الجدول.',
+          'الجودة! دائمًا الجودة! اتبع تعليمات الزبون ولا تترك الطرد في أماكن غير آمنة فقط لأنك متأخر في التوقفات.',
 
-      'faq_q5':
-          'ما الذي يحدث إذا ركّزت على الجودة وتأخرت في التوقفات؟',
+      'faq_q5': 'ماذا لو ركّزت على الجودة لكنني تأخرت في التوقفات؟',
       'faq_a5':
-          'ستُنهي مسارك بشكل أو بآخر. سنوفّر لك الدعم حين يكون ذلك معقولًا وضروريًا.',
+          'ستُنهي توقفاتك، بطريقة أو بأخرى. سنحاول إرسال مساعدة ولكن فقط إذا رأينا أن ذلك معقول.',
+
+      'faq_q6': 'ما هو الـ scorecard وما هو DNR؟',
+      'faq_a6': 'سعيدون أنك سألت.',
 
       'faq_q7': 'الـ Scorecard الأسبوعي',
       'faq_a7':
-          'يوفّر الـ scorecard الأسبوعي نظرة موجزة على أداء الفريق مقارنةً بأهدافنا الرئيسية. فهو يُبرز نقاط قوتنا، ويحدد المجالات التي تحتاج إلى تحسين، ويساعدنا على تعيين محور التركيز للأسبوع المقبل. فيما يلي مستويات الأداء العامة:\n'
+          'يعطينا الـ scorecard الأسبوعي نظرة سريعة وواضحة على أداء الفريق تجاه أهدافنا الرئيسية. يساعدنا على تحديد ما يسير جيدًا، وأين نتأخر، وعلى ماذا يجب أن نركز للأسبوع القادم. النتائج الإجمالية كما يلي:\n'
           '• Fantastic Plus: >93% (أداء استثنائي)\n'
           '• Fantastic: 85% – 92.9%\n'
           '• Great: 70% – 84.9%\n'
           '• Fair: 50% – 69.9%\n'
           '• Poor: <50%',
 
-      'faq_q7_1': 'تبويب DNR — Delivered Not Received',
+      'faq_q7_1': 'تبويب DNR\nDelivered Not Received',
       'faq_a7_1':
-          'يُسجَّل الـ DNR عندما تكون قد وسَمت طردًا باعتباره مسلَّمًا باستخدام زر "Swipe to finish"، إلا أن الزبون لم يستلمه فعليًا. وتشمل الأسباب الشائعة سرقة الطرد، أو تفريغ الصندوق قبل الوصول، أو التسليم إلى عنوان خاطئ.\n'
-          'ستستلم كل يوم ثلاثاء صورًا لكل حالة DNR سُجِّلت ضدك خلال الأسبوع السابق.',
+          'يحدث ذلك عندما تكون قد سلّمت طردًا، وضغطت زر "Swipe to finish" لتأكيد أنك سلّمت الطرد، لكن الزبون لم يستلم الطرد لعدة أسباب: سرقة الطرد، أن يكون الصندوق فارغًا من محتويات الطرد، أو التسليم الخاطئ إلى عنوان خاطئ.\n'
+          'كل يوم ثلاثاء ستستلم صورًا لكل حالة DNR حصلت عليها خلال الأسبوع.',
 
-      'faq_q7_1_1':
-          'كيف يمكنني تجنُّب حالات الـ DNR، وما مدى تأثيرها على الـ scorecard الأسبوعي؟',
+      'faq_q7_1_1': 'كيف أتجنب ذلك وما مدى أهميته في الـ scorecard الأسبوعي؟',
       'faq_a7_1_1':
-          'يُؤثر الـ DNR بشكل كبير على نتيجتك. لتجنّبه، أبلغ الزبون مسبقًا بأنك في الطريق إليه، واضغط فقط على الجرس الذي يظهر عليه اسم الزبون بشكل واضح.',
+          'هذا مهم جدًا ولتجنبه عليك ببساطة إبلاغ الزبون مسبقًا بأنك ستصل قريبًا إلى منزلهم/عملهم وأن ترن الجرس فقط الذي يحمل لوحة اسمهم.',
 
-      'faq_q7_1_2': 'كيف يمكنني الحد من فقدان الطرود؟',
+      'faq_q7_1_2': 'كيف أتجنب فقدان الطرود؟',
       'faq_a7_1_2':
-          'كلما أمكن، سلّم الطرد للزبون شخصيًا. وإذا لم يكن ذلك ممكنًا، أرسل للزبون رسالة تُبيّن بدقة موقع ترك الطرد — كأن يكون في المرآب، أو أسفل الدرج، أو في السقيفة، أو خلف إناء الزهور.\n'
-          'إذا كنت ترى أن ترك الطرد دون مراقبة غير آمن، فلا تتركه. خذه معك وأعد محاولة التسليم لاحقًا. هذا الأمر بالغ الأهمية.',
+          'حاول دائمًا تسليم الطرود يدًا بيد إلى الزبون، وإذا لم يكن ذلك ممكنًا، أرسل رسالة تُبلغه أين تم ترك الطرد، على سبيل المثال في المرآب، تحت الدرج، في السقيفة، خلف مزهرية الزهور، إلخ..\n'
+          'إذا كنت لا تعتقد أن ترك الطرد دون مراقبة آمن، فالخيار الأفضل دائمًا هو أخذ الطرد ومحاولة التسليم مرة أخرى لاحقًا. هذا مهم جدًا.',
 
-      'faq_q7_1_3': 'كيف يمكنني تحديد ما إذا كان الموقع آمنًا؟',
+      'faq_q7_1_3': 'كيف أعرف إن كان المكان آمنًا أم لا؟',
       'faq_a7_1_3':
-          'اعتمد على تقديرك الشخصي والحس السليم. فعلى سبيل المثال، يكون احتمال سرقة الطرد المتروك بجانب صناديق البريد في مبنى من 20 إلى 30 طابقًا أعلى بكثير مقارنةً بالطرد المتروك في منزل خاص.\n'
-          'ولتقديم الدعم لك، ننشر كل صباح قائمة بالعناوين التي تنطوي على مخاطر عالية للسرقة أو الشكاوى من الزبائن، استنادًا إلى بيانات التسليم السابقة والإحصاءات.',
+          'الحدس وأيضًا المنطق السليم. إذا كان المبنى يتكون من 20 - 30 طابقًا وتركت الطرد بجانب صناديق البريد، فاحتمالات سرقته تكون أعلى وأعلى مقارنةً ببيت خاص.\n'
+          'كذلك، لمساعدتك في تسليماتك اليومية وتجنب التعرض لـ DNR، سننشر كل صباح صورة بعناوين لديها احتمالية عالية لسرقة الطرود وشكاوى الزبائن، بناءً على نتائج التسليم السابقة والإحصائيات.',
 
-      'faq_q7_1_4':
-          'كيف يؤثر فقدان طرد أو سرقته على نتيجتي؟',
+      'faq_q7_1_4': 'ماذا لو فُقد طرد أو سُرق، كيف سيؤثر ذلك على نتيجتي؟',
       'faq_a7_1_4':
-          'التأثير كبير. قد يؤدي فقدان طرد واحد إلى خفض نتيجتك بنسبة لا تقل عن 30% ويكلفك ما لا يقل عن 600 نقطة. تذكّر: كلما زاد عدد النقاط الظاهرة تحت اسمك في الـ scorecard، كان الأداء أسوأ. وكلما زاد عدد الطرود التي تسلّمها أسبوعيًا، قلّت النقاط التي تفقدها في كل حادث، كما تُؤخذ قيمة الطرد المفقود في الاعتبار — إذ تؤدي البضائع الأكثر تكلفة إلى فقدان نقاط أعلى. علينا إبقاء هذا المؤشر منخفضًا قدر المستطاع.\n'
-          'ومن الأهمية بمكان: إذا سجّلت باستمرار عددًا كبيرًا من الطرود المفقودة، سنضطر إلى إنهاء علاقة العمل، لأن أمازون قد تشتبه في النهاية بوقوع سرقة. يُعدّ هذا خطرًا جسيمًا ولا يجوز تجاهله.',
+          'بشكل سيئ. سيؤثر عليك بنسبة لا تقل عن 30% وذلك مع طرد واحد فقط قد يخصم منك ما لا يقل عن 600 نقطة. كلما زادت النقاط التي تراها في الـ scorecard تحت اسمك، كان الوضع أسوأ. كلما زاد عدد الطرود التي تسلمها في أسبوع العمل، قلّت النقاط التي تخسرها. وتختلف النقاط التي تخسرها أيضًا حسب سعر العنصر المفقود؛ كلما كان أغلى، خُسرت نقاط أكثر. يجب أن نبقي قسم النتيجة هذا منخفضًا قدر الإمكان.\n'
+          'ولا ينبغي تجاهل حقيقة أنه إذا كان لديك بانتظام عدد كبير من الطرود المفقودة، فسيتعين علينا الاستغناء عنك لأن أمازون قد تشتبه عاجلاً أم آجلاً بسرقة الطرود، ولذلك فهذا أمر خطير جدًا.',
 
       'faq_q7_2':
-          'تبويب CC — Contact Compliance',
+          'تبويب CC\n'
+          'Contact Compliance',
       'faq_a7_2':
-          'يقيس هذا المؤشر مدى تواصلك مع الزبون بخصوص عملية التسليم، سواءً عن طريق رسائل نصية أو مكالمات هاتفية. كلما قلّ تواصلك مع الزبون، انخفضت نتيجتك في هذه الفئة. علينا إبقاء هذا المؤشر مرتفعًا قدر الإمكان، فهو من أيسر الفئات للتفوق فيها ويُسهم إسهامًا كبيرًا في نتيجتك الإجمالية.',
+          'يعني عدد المرات التي تواصلت فيها مع الزبون بشأن تسليمه، سواء عبر رسالة أو مكالمة هاتفية. كلما قل تفاعلك مع الزبون، قلّت النقاط التي ستحصل عليها في الـ scorecard، ويجب أن نبقي هذا القسم مرتفعًا قدر الإمكان لأنه في الواقع من أسهل الفئات ويساعد كثيرًا في نتيجتك الإجمالية.',
 
-      'faq_q7_2_1': 'لماذا يُعدّ التواصل مع الزبون مهمًا؟',
+      'faq_q7_2_1': 'لماذا يجب أن أفعل هذا؟',
       'faq_a7_2_1':
-          'تسليم الطرود لا يقتصر على عملية "drop-and-go". ينبغي إبلاغ الزبون مسبقًا، وسؤاله — عند الاقتضاء — عن المكان الذي يفضّل استلام الطرد فيه.',
+          'تسليم الطرود ليس مجرد Drop&Go، يجب عليك أيضًا إبلاغ الزبون مسبقًا وسؤاله أين يود أن يتم تسليم الطرد.',
 
-      'faq_q7_2_2': 'كيف يمكنني تحسين درجة الـ CC لديّ؟',
+      'faq_q7_2_2': 'كيف أحسن درجات CC الخاصة بي؟',
       'faq_a7_2_2':
-          'الأمر بسيط: اتصل بالزبون — وخاصّةً أرسل له رسالة نصية — في كل توقف.',
+          'شكرًا لسؤالك. بسيط: بالاتصال وخاصة بإرسال الرسائل للزبائن في كل توقف.',
 
-      'faq_q7_3': 'تبويب CE — Customer Escalation',
+      'faq_q7_3': 'تبويب CE\nCostumer Escalation',
       'faq_a7_3':
-          'تذكّر مدى تأثير الـ DNR على نتيجتك — إن تصعيد الزبون يتسبب بضعفي الضرر على الأقل. وبحسب درجة خطورة الحادث، قد يصل الأمر إلى فقدان الوظيفة.',
+          'هل تتذكر مدى سوء تأثير DNR على درجاتك؟ حسنًا، هذا أسوأ على الأقل بمرتين، كما أنك تخاطر بفقدان وظيفتك لأنه يعتمد على مدى سوء الوضع.',
 
-      'faq_q7_3_1': 'كيف يمكنني تجنُّب تصعيد الزبون؟',
+      'faq_q7_3_1': 'كيف أتجنب ذلك؟',
       'faq_a7_3_1':
-          'اتبع دائمًا تعليمات تسليم الزبون بدقة. وفي حال وقوع خطأ، اعتذر أولًا. وإذا كان الزبون غاضبًا، فاطلب منه لحظةً كي يتحدث إلينا مباشرةً — يُفترض أن تكون حينها متواصلًا معنا هاتفيًا. وكما ذُكر في القسم 2، يبقى الأفضل دائمًا أن ندع أمر معالجة مثل هذه الحالات لنا.',
+          'باتباع تعليمات تسليم الزبون دائمًا، وفي حال حدوث خطأ، اعتذر أولاً، وإذا كان الزبون غاضبًا فاطلب منه دقيقة من وقته للتحدث معنا بينما أنت تتصل بنا بالفعل. بقراءة القسم 2، يجب أن تعرف الآن أنه من الأفضل تركنا نتعامل مع مثل هذه القضايا.',
 
-      'faq_q7_4': 'تبويب POD — Picture on Delivery',
+      'faq_q7_4': 'تبويب POD\nPicture on Delivery',
       'faq_a7_4':
-          'يسرد هذا العمود الطرود المؤهلة لـ Picture on Delivery (POD) التي وُسمت فيها الصورة المرسَلة بأنها "Invalid" أو "Not Sure". ومن الأسباب الشائعة للرفض:\n'
-          '1. ظهور ملصق الطرد الذي يتضمن بيانات الزبون في الصورة. ينبغي قلب الطرد بحيث لا يظهر الملصق قبل التقاط الصورة.\n'
-          '2. الصورة غير واضحة.\n'
-          '3. ظهور شخص في الصورة.\n'
-          '4. لا يظهر أي طرد في الصورة.\n'
-          '5. الطرد داخل المركبة.\n'
-          '6. الطرد في اليد.\n'
-          '7. الطرد موضوع داخل صندوق البريد.\n'
-          '8. الطرد قريب جدًا من الكاميرا.\n'
-          '9. الصورة شديدة الإظلام.\n'
-          'ينبغي أن تكون هذه الفئة الأيسر لبلوغ نتيجة 100%، وتحقيق ذلك يُحسّن نتيجتك الإجمالية.',
+          'يعرض هذا العمود قائمة الطرود المؤهلة لـ POD والتي تم التقاط صور لها لكنها كانت إما Invalid أو Not Sure. أسباب رفض POD قد تشمل:\n'
+          '1- ظهور ملصق الطرد في الصورة مع تفاصيل الزبون. يجب قلب الطرد قبل التقاط الصورة.\n'
+          '2- صورة غير واضحة\n'
+          '3- ظهور شخص في الصورة\n'
+          '4- لا يظهر طرد في الصورة\n'
+          '5- الطرد داخل السيارة\n'
+          '6- الطرد في اليد\n'
+          '7- الطرد في صندوق البريد\n'
+          '8- الطرد قريب جدًا\n'
+          '9- الصورة مظلمة جدًا.\n'
+          'يجب أن يكون هذا دائمًا الأسهل حيث ينبغي أن تحصل على نتيجة 100% وهو يحسن نتيجتك الإجمالية',
 
-      'faq_q7_5': 'تبويب LoR — Lost on Road',
+      'faq_q7_5': 'تبويب LoR\nLost on Road',
       'faq_a7_5':
-          'يُعاقبك هذا المؤشر حين يكون قد جرى مسح طرد لدى التحميل، ثم لا يُسلَّم ولا يُعاد في نهاية الوردية إثر محاولة تسليم فاشلة. في هذه الحالات يُعدّ الطرد مفقودًا، وتكون العقوبة موازية لحالة DNR. يُرجى عدّ الطرود التي تعيدها بعناية والتأكد من تطابقها مع القائمة الظاهرة على جهازك ضمن: Today’s Itinerary → Summary → Problems. وإذا لم تتطابق الأعداد، أبلغ المشرف المناوب قبل إنهاء الوردية في تطبيق أمازون.',
+          'يعاقبك عندما تكون قد مسحت/سكنت طردًا من التحميل ولم تقم بإرجاعه في نهاية الوردية في حال فشل التسليم. وبالتالي يكون الطرد قد فُقد وستفقد نقاطًا بقدر ما ستفقده في DNR، لذا يرجى عدّ الطرود التي تعيدها جيدًا والتأكد من أنها تطابق الطرود المعروضة في الجهاز. يمكنك العثور عليها في: Todays Itinerary - Summary - Problems. إذا لم تتطابق، يرجى إبلاغ المرسِل/المشرف المناوب قبل إنهاء العمل في تطبيق أمازون.',
 
-      'faq_q7_6': 'تبويب DCR — Delivery Completion Rate',
+      'faq_q7_6': 'تبويب DCR\nDelivery Completion Rate',
       'faq_a7_6':
-          'يعكس هذا المؤشر أداءك في التسليم عبر تتبع نسبة التسليمات المنجزة وفقًا للخطة. وهو يساعدنا على تقييم كفاءة خدمتنا وموثوقيتها، كما يُبرز مشاكل كالتأخير ومحاولات التسليم الفاشلة ومسائل التوجيه. يجب أن يكون معدل الـ DCR مرتفعًا قدر المستطاع. ولتحقيق ذلك، نفّذ reattempts كلما أمكن، وقلِّل عدد الطرود المُعادة.',
+          'يعرض قدراتك على تسليم الطرود. يتتبع نسبة التسليمات التي تمت كما هو مخطط، مما يساعدنا على قياس كفاءة وموثوقية تسليماتنا. يبرز مشكلات مثل التأخيرات، المحاولات الفاشلة، أو مشاكل التوجيه. يجب أن يكون هذا مرتفعًا قدر الإمكان. ولتحقيق ذلك يجب أن تقوم يوميًا بمحاولات إعادة التسليم (reattempts) وتجنب قدر الإمكان إعادة الطرود.',
 
-      'faq_q7_7': 'تبويب CDF (سابقًا DEX) — Customer Delivery Feedback',
+      'faq_q7_7': 'تبويب CDF (Previously, DEX)\nCostumer Delivery Feedback',
       'faq_a7_7':
-          'يرصد هذا المؤشر تجربة المستلِم مع عملية التسليم، بما في ذلك الالتزام بالمواعيد، وحالة البضائع، ومهنية السائق. وهو يساعدنا على تحديد نقاط قوة خدمتنا والمجالات الواجب تطويرها. بعد التسليم، يتلقى الزبون بريدًا إلكترونيًا للاستبيان من أمازون يتضمن أسئلة من قبيل:\n'
-          '1) هل سُلِّم طردك في الوقت المحدد؟ (نعم / لا)\n'
-          '2) هل تُرك الطرد في مكان آمن؟ (نعم / لا)\n'
-          '3) هل كان الطرد في حالة جيدة عند وصوله؟ (نعم / لا)\n'
-          '4) ما مدى رضاك عن عملية التسليم إجمالًا؟ (راضٍ جدًا / راضٍ / محايد / غير راضٍ / غير راضٍ جدًا)\n'
-          '5) كيف تقيّم التواصل وتحديثات التتبع لهذا التسليم؟ (ممتاز / جيد / مقبول / سيئ)\n'
-          '6) هل كان مندوب التسليم لبِقًا ومهنيًا؟ (نعم / لا / غير منطبق — تسليم بدون تلامس)\n'
-          '7) هل لديك أي ملاحظات بشأن تجربتك في التسليم؟ (ملاحظات إضافية من الزبون)',
+          'يلتقط تجربة المستلم مع عملية التسليم، بما في ذلك الالتزام بالمواعيد، حالة البضائع، واحترافية السائق. يساعدنا على تحديد نقاط القوة ومجالات التحسين. في نهاية التسليم، يحصل الزبون على بريد إلكتروني من أمازون حول تجربة التسليم، مع أسئلة مثل:\n'
+          '1) هل تم تسليم طردك في الوقت المحدد؟\n'
+          'نعم / لا\n'
+          '2) هل تم ترك الطرد في مكان آمن؟\n'
+          'نعم / لا\n'
+          '3) هل كان الطرد في حالة جيدة عند وصوله؟\n'
+          'نعم / لا\n'
+          '4) ما مدى رضاك عن التسليم بشكل عام؟\n'
+          'راضٍ جدًا / راضٍ / محايد / غير راضٍ / غير راضٍ جدًا\n'
+          '5) كيف تقيّم التواصل وتحديثات التتبع لهذه التسليم؟\n'
+          'ممتاز / جيد / مقبول / سيئ\n'
+          '6) هل كان موظف التسليم مهذبًا ومحترفًا؟\n'
+          'نعم / لا / غير قابل للتطبيق (تسليم بدون تواصل)\n'
+          '7) هل لديك أي تعليقات حول تجربة التسليم الخاصة بك؟\n'
+          '(تعليقات إضافية من الزبون)',
 
-      'faq_q7_8':
-          'ما الذي ينبغي أن أضعه في الاعتبار بشأن الـ scorecard بصفة عامة؟',
+      'faq_q7_8': 'ماذا يجب أن أضع في ذهني بشأن الـ scorecard؟',
       'faq_a7_8':
-          'تُحدث الجودة والكفاءة فرقًا جوهريًا. فالنتائج القوية تعود بالنفع عليك، وعلى الشركة، وعلى الفريق بأكمله. يحظى رضا الزبون بأعلى الأولويات لدينا، كما أن النتائج المتميزة تُكافَأ بمنحة من الشركة.\n'
-          'اجتهد بأفضل ما لديك، وستحصل على المكافأة المستحقة.',
+          'الجودة والكفاءة تقطع شوطًا طويلاً. الدرجات الجيدة جيدة لك، وللشركة، وجيدة للفريق بأكمله. رضا الزبون مهم جدًا والدرجات الجيدة تكون مصحوبة بمكافأة من الشركة.\n'
+          'ابذل أفضل ما لديك، تحصل على الأفضل.',
 
-      'faq_q8': 'ما المجالات الأخرى التي تستدعي انتباهي؟',
+      'faq_q8': 'ما المجالات الأخرى التي يجب أن أكون حذرًا بشأنها؟',
       'faq_a8':
-          'امنح الأولوية لسلامتك الشخصية بالقيادة بمسؤولية، وتجنُّب الإصابات، وتوخّي الحذر قرب الكلاب لتفادي العضّات. تعامل مع جميع معدّات العمل — بما فيها مركبة اليوم وجهاز المسح/هاتف العمل — بعناية تامة. احرص دائمًا على الحضور إلى العمل بحذاء السلامة، وسترة السلامة، والسترة أو القميص المميّز بعلامة أمازون وفقًا للأحوال الجوية.',
+          'الاعتناء بنفسك بالقيادة بأمان، وتجنب الإصابات وتجنب الكلاب وعضّات الكلاب. الحذر مع معدات العمل مثل السيارة اليومية، جهاز المسح/الهاتف الخاص بالعمل والحضور إلى العمل مرتديًا حذاء السلامة وسترة السلامة، وسترة أو قميص بعلامة أمازون (حسب الطقس).',
 
-      'faq_q9':
-          'ما الذي ينبغي فعله إذا تعرّضت لحادث أو ألحقت ضررًا بمركبة العمل؟',
+      'faq_q9': 'ماذا يحدث إذا تعرضت لحادث سيارة أو أتلفت مركبة العمل؟',
       'faq_a9':
-          'أولًا، تأكّد من أنك بأمان وأنك لم تُصَب بجروح بالغة. أما فيما يخص الضرر الذي لحق بالمركبة: إذا ثبت لدينا أن الحادث قد نجم عن الإهمال — كاستخدام الهاتف المحمول أثناء القيادة — فستتحمّل شخصيًا المسؤولية الكاملة عن تكلفة الضرر. فضلًا عن ذلك، فإن محضر الشرطة اللاحق قد يُفضي إلى تعليق رخصة القيادة، كما يُشكّل هذا الحادث سببًا للفصل الفوري. وفي الحالات الأقل خطورة، ستُستبعد من مكافآت الـ Weekly Scorecard لمدة شهرين. أنت مُلزم بإخطارنا فور وقوع أي حادث، وبتزويدنا بالمعلومات التالية: وقت الحادث وموقعه، وتفاصيل أي ضرر لحق بممتلكات خاصة أو عامة (جدران، أسوار، أعمدة إنارة، أشخاص أو حيوانات)، إلى جانب صور واضحة للأضرار التي لحقت بالمركبة.',
+          'أولاً، تأكد أنك بخير وأنك لست مصابًا بجروح خطيرة. أما بخصوص ضرر السيارة، فإذا قررنا أن الحوادث تحدث بسبب الإهمال – على سبيل المثال، تشتت الانتباه مثل استخدام الهاتف المحمول أثناء القيادة – فستكون مسؤولاً شخصيًا عن كامل الضرر. بالإضافة إلى ذلك، ستحصل على تقرير من الشرطة، والذي قد يؤدي حتى إلى تعليق الرخصة. وبالطبع، هذا أيضًا سبب للفصل الفوري. وإلا فسيتم فقط استبعادك من الحصول على مكافآت الـ Weekly Scorecard لمدة شهرين. في حالة حدوث حادث، أنت مُلزم بإبلاغنا فورًا وتزويدنا بوقت الحادث، والموقع، وما إذا كان هناك أضرار لممتلكات خاصة أو عامة (مثل الجدران، الأسوار، أعمدة الإنارة، الأشخاص و/أو الحيوانات الأليفة)، والموقع وصور أضرار السيارة.',
 
-      'faq_q10':
-          'ما الذي ينبغي فعله إذا كان الطرد تالفًا أو مفقودًا؟',
+      'faq_q10': 'ماذا أفعل عندما تكون لدي طرود تالفة و/أو مفقودة.',
       'faq_a10':
-          'إذا كان الطرد تالفًا، وسِمه بأنه تالف في النظام وأعِده إلى المحطة. وإذا كان الطرد التالف يحتوي على سائل وألحق الضرر بطرود أخرى، فالتقط صورة لجميع الطرود المتضررة وأرسلها إلى المشرف المناوب. وسنقوم بإبلاغ أمازون بالحادث نيابةً عنك.\n'
-          'إذا كان الطرد مفقودًا، فيمكنك وسمه بأنه مفقود — ما لم يكن طرد OTP، ففي هذه الحالة يتعين التواصل معنا أولًا قبل وسمه. يُعدّ ذلك أمرًا جوهريًا.',
+          'عندما يكون الطرد تالفًا، لا تتردد في تسجيله كتالف وإعادته إلى المحطة. إذا كان الطرد التالف يحتوي على سوائل وأتلف طرودًا أخرى معه، يرجى التقاط صورة لجميع الطرود التالفة وإرسالها إلى المرسِل/المشرف المناوب وسنقوم بالإبلاغ إلى أمازون نيابةً عنك.\n'
+          'عندما يكون الطرد مفقودًا، لا تتردد في وضع علامة/تسجيل أنه مفقود إلا إذا كان يحتوي على OTP، وفي هذه الحالة يجب عليك إبلاغنا أولاً قبل وضع علامة أنه مفقود. هذا مهم جدًا.',
 
       'faq_q11': 'ما هو طرد OTP (One-Time Password)؟',
       'faq_a11':
-          'يحتوي طرد OTP على صنف عالي القيمة تشترط أمازون بشأنه أن يزود الزبون السائق بكلمة مرور لمرة واحدة قبل التسليم. ويضمن ذلك وصول الطرد إلى المستلِم الصحيح. يجب التعامل مع طرود OTP بأقصى قدر من العناية، وعدم تركها دون مراقبة مطلقًا، وتسليمها فقط إلى الزبون الذي قدّم كلمة المرور الصحيحة.',
+          'هو عنصر باهظ الثمن تطلب أمازون من الزبون أن يزوّد السائق بكلمة مرور لمرة واحدة قبل تسليم الطرد، لضمان أن الطرد سُلّم للشخص/الزبون الصحيح. يجب أن تعتني بهذه الطرود بعناية كبيرة، وألا تتركها دون مراقبة وأن تسلمها فقط للزبون الذي قدّم لك كلمة المرور.',
 
-      'faq_q12':
-          'لماذا نُكرّر عليك طلب الإبطاء بدلًا من العمل بوتيرة أسرع؟',
+      'faq_q12': 'لماذا نستمر في إزعاجك لتبطئ ولا تذهب أسرع؟',
       'faq_a12':
-          'نُدرك أن هذا قد يبدو تكرارًا، إلا أن النظام يستوجبه. يتعيّن علينا الالتزام بمعدّل التوقفات في الساعة الذي حدّدته الخوارزمية مسبقًا، حتى نتمكن من تأمين مسارات إضافية مستقبلًا، ونضمن استمرار حصولك على عمل.\n'
-          'إضافةً إلى ذلك، فإن العمل بسرعة مفرطة يرفع من مخاطر الـ DNR، مما يُكلِّفك والشركة نقاطًا في الـ scorecard الأسبوعي.',
+          'نحن أيضًا لا نحب ذلك، لكن هذا هو النظام. نحتاج إلى اتباع خوارزمية النظام والقيام بعدد من التوقفات في الساعة كما هو محدد مسبقًا حتى نحصل على المزيد من المسارات في المستقبل وتعمل أكثر ولا تكون متفرغًا.\n'
+          'كما أن الذهاب أسرع يعرضك لخطر DNR وخسارة نقاط لكلا الطرفين، لنفسك وللشركة، في الـ scorecard الأسبوعي.',
 
       'faq_q13':
-          'لماذا يستفسر المرسلون/المشرفون أحيانًا عما إذا كنتُ متأخرًا أو إذا كان هناك خلل؟',
+          'إذًا لماذا يسألني المرسِلون/المشرفون أحيانًا لماذا أنت متأخر وهل هناك شيء خاطئ؟',
       'faq_a13':
-          'نُدرك أن هذه الاستفسارات ليست ملائمة دائمًا، إلا أننا نعتمد على ملاحظاتك لفهم ما قد يكون قد طرأ على الطريق وأدى إلى التأخير. وتطلب أمازون هذه المعلومات لأن لكل توقف نافذة تسليم مُجدوَلَة. وعند تأخّر المسار، تحتاج أمازون إلى معرفة السبب لتحسين كفاءة التسليم مستقبلًا اعتمادًا على هذه البيانات.',
+          'نعلم أن هذا غير مريح، لكننا نحتاج بعض الملاحظات حول ما الذي قد يكون حدث على الطريق وأدى إلى تأخرك في التوقفات. أمازون يطلب منا هذه الملاحظات لأن هناك أيضًا حدًا زمنيًا كان يجب أن تكون قد سلّمت خلاله X توقف، لذلك تحتاج أمازون إلى معرفة لماذا التوقفات المتبقية متأخرة عن جدول التسليم وبهذه المعلومات تحسن كفاءة التسليم في المستقبل.',
 
-      'faq_q14': 'لماذا يُطلب منك أحيانًا مساعدة زميل؟',
+      'faq_q14': 'لماذا نطلب منك أحيانًا أن تذهب لمساعدة زميل؟',
       'faq_a14':
-          'قد يعود تأخّر الزميل إلى عوامل متعددة: ضعف تغطية الإنترنت في المنطقة، أو كثافة حركة المرور، أو إغلاق الشوارع بسبب أعمال إنشاء. في مثل هذه الحالات، تُصبح مساعدتك ضرورية لتمكينه من إنهاء مساره في الوقت المحدد.',
+          'لأن هناك عوامل كثيرة تؤثر في تأخر الزميل مثل ضعف اتصال الإنترنت في المنطقة، الازدحام، إغلاق الطرق بسبب أعمال البناء في المنطقة مما جعل من الصعب على السائق الآخر التسليم في الوقت المحدد، لذلك نحتاج مساعدتك.',
 
       'faq_q15':
-          'هل سأُسلّم مسارات قياسية منذ يومي الأول، شأني شأن السائقين الأكثر خبرة؟',
+          'هل أبدأ فورًا في يومي الأول بتسليم طرود المسار القياسي مثل غيري من السائقين الأكثر خبرة؟',
       'faq_a15':
-          'لا. ستبدأ بفترة تدريب تمهيدية مدتها 14 يوم عمل تطبّق خلالها ما تعلّمته خلال أيام الركوب مع المدرب (ride-along)، وتتعرّف على المنطقة والمركبة وجهاز المسح وسير العمل بأكمله.\n'
-          'وخلال هذه الأيام الأربعة عشر، ستُخفّض أمازون عدد الطرود والتوقفات اليومية بما يصل إلى 50% مقارنةً بالمسار القياسي.',
+          'لا، من الواضح أن هذا ليس الحال بالنسبة لك. في البداية سيكون لديك فترة 14 يوم عمل لتطبيق ما تعلمته في أيام الركوب مع المدرب والتأقلم مع المنطقة، السيارة، الجهاز وتعلم سير العمل.\n'
+          'وبناءً على ذلك، خلال تلك الفترة البالغة 14 يومًا، ستمنحك أمازون ما يصل إلى 50% أقل من الطرود والتوقفات المعتادة في جدولك.',
 
       'faq_q16':
-          'ما الذي ينبغي فعله إذا كان العنوان غير صحيح أو كان دبوس الخريطة غير دقيق؟',
+          'ماذا أفعل عندما يكون العنوان خاطئًا و/أو دبوس الموقع غير صحيح على الخريطة؟',
       'faq_a16':
-          'أولًا، تحقّق من الدبوس عن طريق البحث عن العنوان في Google Maps، إذ إنه أكثر دقة ومُثبَّت بالفعل على جهازك. إذا لم يتطابق الموقع، فأبلغ المشرف المناوب بالتباين.',
+          'أولاً أكد أن الدبوس غير صحيح من خلال البحث عن العنوان في خرائط Google (أدق وهو مثبت بالفعل على جهازك) وإذا لم يتطابق، أخبر المرسِل/المشرف المناوب بالأخطاء.',
 
-      'faq_q17':
-          'ما هي مهامي اليومية قبل بدء العمل وبعد الانتهاء منه؟',
+      'faq_q17': 'ما هي مهامي اليومية قبل أن أبدأ وبعد أن أنهي العمل؟',
       'faq_a17':
-          '1. تأكّد لدى وصولك إلى الموقف من ارتدائك لحذاء السلامة، وسترة السلامة، وزيّ أمازون.\n'
-          '2. تحقّق من أن جهازك مشحون بالكامل. وإذا لم يكن كذلك، فأبلغ المشرف الموجود في الموقع.\n'
-          '3. افحص المركبة للتأكد من عدم وجود أعطال.\n'
-          '4. ابدأ الرحلة في تطبيق Mentor على جهازك.\n'
-          '5. التقط صورة للوحة عدادات المركبة تُظهر عدد الكيلومترات الحالية، وأعد ضبط عداد الرحلة اليومية إلى الصفر.\n'
-          '6. استعدّ للانتقال إلى منطقة الانتظار قبل موعد التحميل المقرر بعشر دقائق فقط — وليس قبل ذلك.\n'
-          '7. عند وصولك إلى منطقة الانتظار، أوقف تشغيل المحرك وافتح تطبيقي Flex وTimesheet. لا تفتح Flex قبل موعد التحميل بأكثر من عشر دقائق؛ فهذا الختم الزمني مطلوب.\n'
-          '8. انتقل إلى منطقة التحميل وفقًا لتعليمات Yard Marshall. داخل منطقة التحميل، أوقف تشغيل المحرك ولا تغادر المركبة إلا بعد أن تسمع صفّارة Yard Marshall.\n'
-          '9. فور اكتمال التحميل، شغّل المركبة وابدأ القيادة فقط عندما يُوجّهك Yard Marshall إلى ذلك.\n'
-          '10. بعد الانتهاء من جميع توقفاتك، تحقّق من خزان الوقود. وإذا تبقّى منه أقل من النصف، فعبّئه.\n'
-          '11. لدى عودتك إلى المحطة، أنزِل جميع الطرود المتبقية في المناطق التي حدّدتها أمازون، وأعِد الحقائب دون تأخير.\n'
-          '12. بعد العودة إلى الموقف، أوقف تشغيل المركبة واستكمل الـ Green Book (Tageskontrollblatt). أرسل صورة للمسافة اليومية المقطوعة إلى جانب صورة للـ Green Book.\n'
-          '13. أوقف تشغيل المركبة وأعِد حقيبة العمل إلى المنطقة أو المركبة المخصَّصة.',
+          '1- عندما تدخل إلى الموقف، تأكد أولاً أنك ترتدي حذاء السلامة وسترة السلامة وبدلة أمازون.\n'
+          '2- تحقق أن جهازك مشحون بالكامل وأبلغ المرسِل/المشرف الموجود في تلك اللحظة إذا لم يكن مشحونًا.\n'
+          '3- تحقق إذا كان هناك أي شيء خاطئ في السيارة.\n'
+          '4- ابدأ الرحلة على تطبيق Mentor على جهازك.\n'
+          '5- انشر صورة للوحة عدادات السيارة تُظهر عداد الكيلومترات الحالي والرحلة اليومية (في السيارة) مع إعادة ضبطها إلى 0.\n'
+          '6- استعد للنزول إلى منطقة الانتظار قبل 10 دقائق فقط من وقت التحميل المخطط، وليس أبكر.\n'
+          '7- عندما تكون في منطقة الانتظار، أطفئ السيارة، ابدأ تطبيق Flex والـ Timesheet. من فضلك لا قبل ذلك بدقيقة، وخاصة تطبيق Flex. لا تنسَ طابع الـ 10 دقائق.\n'
+          '8- أخيرًا اذهب إلى منطقة التحميل وفقًا لتعليمات Yard Marshall. عندما تكون في منطقة التحميل، أطفئ السيارة ولا تغادر السيارة إلا بعد أن تسمع صفارة Yard Marshall.\n'
+          '9- بعد أن تنتهي من تحميل سيارتك، شغّل السيارة وابدأ القيادة ولكن فقط عندما يأمرك Yard Marshall بذلك.\n'
+          '10- بعد أن تنتهي من جميع توقفاتك، تحقق من خزان الوقود وإذا كان أقل من النصف المتبقي، يرجى تعبئته.\n'
+          '11- عندما تكون في المحطة، يرجى إسقاط جميع الطرود المتبقية في المناطق المخصصة من أمازون، وإسقاط الأكياس في الوقت المناسب\n'
+          '12- عندما تكون في الموقف، أوقف السيارة وأكمل Green Book (Tageskontrollblat)، وانشر صورة للمسافة اليومية التي قطعتها خلال اليوم في التسليم، مع صورة لـ Green Book.\n'
+          '13- أطفئ السيارة ويرجى إعادة حقيبة العمل إلى المنطقة/الفان المخصصة',
 
       'faq_q18':
-          'هل هناك ما يتعيّن فعله عند استخدام مركبة مختلفة عن المركبة المعتادة؟',
+          'هل يجب أن أفعل أي شيء عندما أغير الفان وأخذ فانًا آخر بدلًا من الذي أستخدمه عادةً؟',
       'faq_a18':
-          'نعم. قبل بدء الرحلة، سجّل مقطع فيديو تفصيليًا للمركبة يتضمّن كل ضرر قائم — بما في ذلك الخدوش والدعَكَات الصغيرة — حتى لا تتحمّل مسؤولية الأضرار السابقة خلال الفحص التالي.',
+          'يجب أن تصوّر فيديو له، يلتقط بالتفصيل كل ضرر صغير ربما أحدثه السائق/السائقون السابقون، حتى لا يكون الخطأ عليك في الفحص التالي للسيارة.',
 
       'faq_q19':
-          'ما الذي ينبغي فعله إذا استمر تطبيق Flex في التحميل وتباطأ سير عملي؟',
+          'ماذا يجب أن أفعل إذا كان تطبيق Flex يقوم بالتحميل باستمرار ويبطئ سير عملي؟',
       'faq_a19':
-          'تحقّق أولًا من وجود اتصال إنترنت فعّال. يمكنك اختبار ذلك بإرسال رسالة إلى الزبون عند التوقف الحالي — فإذا وصلت، فالاتصال فعّال. ويمكنك بدلًا من ذلك فتح تطبيق آخر على الجهاز، كالمتصفح، ومحاولة إجراء عملية بحث.\n'
-          'في حال عدم توفر اتصال إنترنت فعّال، اتّبع الخطوات التالية بالترتيب:\n'
-          '1. أعد تشغيل جهازك. ينبغي أن يكون هذا دائمًا أول ما تجرّبه.\n'
-          '2. فعِّل ثم عطِّل وضع الطائرة. كثيرًا ما يُفلح ذلك دون الحاجة إلى إعادة تشغيل كاملة.\n'
-          '3. كحلٍّ أخير، شارِك نقطة اتصال من هاتفك الشخصي لمدة لا تتجاوز 10 دقائق حتى يتمكّن النظام من التحديث.\n'
-          'يمكنك العمل دون اتصال أيضًا، غير أنه يتعيّن عليك إعادة الاتصال بالإنترنت في مرحلةٍ ما أثناء الوردية. ولتفعيل الوضع دون اتصال، نزّل أولًا الخرائط غير المتصلة عبر Flex: انتقل إلى Settings → Offline Maps (الخيار الأخير) → Download DBY5 → Allow downloads with mobile connection.\n',
+          'تحقق أولاً مما إذا كان لديك اتصال إنترنت نشط. للقيام بذلك يمكنك محاولة إرسال رسالة إلى زبون التوقف الحالي وإذا تمت بنجاح فهذا يعني أن اتصال الإنترنت نشط. يمكنك أيضًا التحقق بفتح تطبيق آخر على الجهاز مثل المتصفح والبحث عن شيء.\n'
+          'الخطوات التي يجب اتباعها إذا لم يكن هناك اتصال إنترنت نشط:\n'
+          '1- أعد تشغيل جهازك. يجب أن يكون هذا دائمًا أول شيء تجرّبه.\n'
+          '2- شغّل/أوقف وضع الطيران. هذا يعمل معظم الوقت دون الحاجة لانتظار إعادة التشغيل.\n'
+          '3- كحل أخير جدًا، حاول مشاركة نقطة اتصال من هاتفك الشخصي لمدة 10 دقائق كحد أقصى فقط لكي يقوم النظام بتحديث نفسه.\n'
+          'يمكنك أيضًا العمل دون اتصال لكن في مرحلة ما يجب أن تتصل بالإنترنت وتكون نشطًا. للعمل دون اتصال يجب أولاً تنزيل الخرائط غير المتصلة في تطبيق Flex. للقيام بذلك، اذهب إلى Settings - Offline Maps (الخيار الأخير) - Download DBY5 - Allow downloads with mobile connection.\n',
 
       'faq_q20':
-          'ما الذي ينبغي فعله إذا كان اتصال الإنترنت فعّالًا ولكن تطبيق Flex لا يزال لا يعمل على النحو المطلوب؟',
+          'ماذا لو كان اتصال الإنترنت نشطًا لكن تطبيق Flex ما زال لا يعمل كما ينبغي؟',
       'faq_a20':
-          'جرِّب الخطوات التالية بالترتيب:\n'
-          '1. أعد تشغيل الجهاز.\n'
-          '2. فعِّل ثم عطِّل وضع الطائرة.\n'
-          '3. أغلق التطبيق وأعد فتحه.\n'
-          '4. عطِّل ثم أعِد تفعيل خدمات الموقع (GPS).\n'
-          '5. سجّل الخروج من Flex وأعد تسجيل الدخول ببيانات الاعتماد التي تستخدمها لتطبيق Mentor.\n'
-          '6. تحقّق مما إذا كان التطبيق يتطلّب تحديثًا.\n'
-          'نفِّذ هذه الخطوات واحدةً تلو الأخرى. وإذا لم تُفلح إحداها في حل المشكلة، فانتقل إلى التالية.',
+          '1- أعد تشغيل الجهاز.\n'
+          '2- شغّل/أوقف وضع الطيران\n'
+          '3- اخرج من التطبيق\n'
+          '4- أوقف/شغّل خدمات الموقع (GPS)\n'
+          '5- سجّل الخروج من تطبيق Flex ثم سجّل الدخول مرة أخرى باستخدام بيانات الاعتماد التي تستخدمها لتطبيق Mentor.\n'
+          '6- تحقق مما إذا كان التطبيق يحتاج إلى تحديث.\n'
+          'يجب أن تجرب هذه الخطوات واحدة تلو الأخرى. إذا لم تعمل واحدة، يرجى تجربة التالية بعدها.',
     },
 
     // =========================
@@ -5530,160 +5630,154 @@ class AppLocalizations {
           'Green Book video baglantisi acilamadi.',
 
       // Added for full key coverage (from EN fallback)
-      'faq_a1':
-          'Her paketi ozenle teslim etmek ve her zaman profesyonel bir tutum sergilemek.',
+      'faq_a1': 'Paketleri kaliteli sekilde ve dogru davranisla teslim etmek.',
       'faq_a10':
-          'Paket hasarliysa sistemde hasarli olarak isaretleyin ve istasyona iade edin. Hasarli paket sivi icerip diger paketleri de etkilediyse, etkilenen tum paketlerin fotografini cekip nobetteki dispatcher\\\'a gonderin. Olayi sizin adiniza Amazon\\\'a biz bildiririz.\nPaket eksikse eksik olarak isaretleyebilirsiniz; ancak OTP paketi soz konusuysa, isaretlemeden once mutlaka bizimle iletisime gecmeniz gerekir. Bu hayati onem tasir.',
+          'Hasarli paketi hasarli olarak isaretleyip istasyona iade edebilirsiniz. Eger sizan sivi baska paketlere de zarar verdiyse, tum hasarli paketlerin fotograflarini cekip nobetteki dispatcher\\\'a gonderin; Amazon\\\'a biz bildiririz.\nPaket eksikse, OTP degilse eksik olarak isaretleyebilirsiniz. OTP ise, eksik isaretlemeden ONCE bize bildirmeniz ZORUNLUDUR. Bu COK ONEMLI.',
       'faq_a11':
-          'OTP paketi, Amazon\\\'un teslimat oncesinde musterinin surucuye tek kullanimlik bir sifre vermesini gerektirdigi yuksek degerli bir urun icerir. Bu, paketin dogru alicinin eline gecmesini guvence altina alir. OTP paketlerini en ust duzeyde ozenle ele alin, hicbir kosulda gozetsiz birakmayin ve yalnizca dogru sifreyi ileten musteriye teslim edin.',
+          'Amazon\\\'un, pahali urunlerde teslimat oncesi musteriden tek kullanimlik sifre istemesidir. Amaç paketin dogru kisiye teslim edildigini dogrulamaktir. Bu paketlerde ekstra dikkatli olun; gozetsiz birakmayin ve yalnizca sifreyi veren musterinin kendisine teslim edin.',
       'faq_a12':
-          'Bunun tekrarliyor gibi gorunebilecegini biliyoruz; ancak sistemin gerekliligidir. Algoritmanin belirledigi saat basi durak hedefini tutturmamiz gerekir; boylece ilerleyen donemlerde ek rotalar alabilir ve size surekli is akisi saglayabiliriz.\nAyrica cok hizli calismak DNR riskini artirir ve bu da hem size hem de sirkete haftalik scorecard\\\'da puan kaybettirir.',
+          'Bu bizim de hosumuza gitmiyor ama sistem boyle calisiyor. Algoritmaya uygun ilerleyip saatlik planli durak performansini korumamiz gerekiyor; boylece daha fazla rota alir, siz de daha fazla calisma gunu bulursunuz.\nAsiri hiz, DNR riskini artirir ve hem sizin hem de sirketin haftalik puanlarini dusurur.',
       'faq_a13':
-          'Bu sorgulamalarin her zaman uygun zamana denk gelmedigini biliyoruz; ancak gecikmeye neden olan etkenleri anlamak icin geri bildirime ihtiyac duyuyoruz. Amazon, her durak icin belirlenmis bir teslimat zamani penceresi oldugu icin bu bilgiyi talep eder. Bir rota geride kaldiginda, gelecekteki teslimat verimliliginin bu verilere dayanarak iyilestirilebilmesi icin Amazon\\\'un gecikmenin nedenini bilmesi gerekir.',
+          'Hos olmayabilecegini biliyoruz; ancak yolda ne oldugunu anlamak icin geri bildirim gerekli. Amazon belirli saatlerde belirli X duraga ulasilmasini bekler. Kalan duraklar neden geride, bunu bilmek ister; boylece gelecekte planlamayi iyilestirir.',
       'faq_a14':
-          'Bir meslektasinizin gecikmesi cesitli etkenlerden kaynaklanabilir: bolgedeki zayif internet kapsami, yogun trafik veya insaat nedeniyle kapali caddeler. Boyle durumlarda, rotasini zamaninda tamamlayabilmesi icin sizin desteginize ihtiyac duyulur.',
+          'Gecikmeler internet sorunu, trafik, yol calismasi gibi bircok nedenle olabilir. Diger surucunun zamaninda bitirebilmesi icin desteginize ihtiyac duyulabilir.',
       'faq_a15':
-          'Hayir. Egitmeninizle gecirdiginiz ride-along gunlerinde ogrendiklerinizi uygulayabilmeniz ve bolge, arac, scanner ile genel is akisina adapte olabilmeniz icin 14 is gunluk bir oryantasyon suresiyle baslarsiniz.\nBu 14 gun boyunca Amazon, gunluk paket ve durak sayinizi standart bir rotaya gore %50\\\'ye kadar azaltir.',
+          'Hayir. Baslangicta egitmenle ride-alongda ogrendiklerinizi uygulayacaginiz ve bolge/arac/scanner akisina alisacaginiz 14 is gunluk bir donem olur.\nBu surede Amazon size normalden %50\\\'ye kadar daha az paket ve durak verir.',
       'faq_a16':
-          'Oncelikle adresi Google Maps\\\'te arayarak pini dogrulayin; bu uygulama daha dogru sonuc verir ve scanner\\\'inizda hali hazirda yuklu gelir. Konum eslesmiyorsa, uyumsuzlugu nobetteki dispatcher\\\'a bildirin.',
+          'Once adresi Google Maps\\\'te kontrol ederek pinin yanlis oldugunu dogrulayin (genelde daha dogrudur ve scanner\\\'da kurulu gelir). Eslesmiyorsa nobetteki dispatcher\\\'a hatayi bildirin.',
       'faq_a17':
-          '1. Otoparka vardiginizda guvenlik ayakkabisi, guvenlik yeleginizi ve Amazon uniformanizi giydiginizden emin olun.\n2. Scanner\\\'inizin tamamen dolu oldugunu kontrol edin. Dolu degilse, sahadaki bir dispatcher\\\'i bilgilendirin.\n3. Araci olasi ariza veya sorun acisindan gozden gecirin.\n4. Scanner\\\'daki Mentor uygulamasi uzerinden yolculugu baslatin.\n5. Aracin gostergesinin fotografini cekin (mevcut kilometre gorunur halde) ve gunluk yol sayacini sifirlayin.\n6. Planlanmis yukleme zamanindan yalnizca 10 dakika once Waiting Area\\\'ya gecmek icin hazirlanin — daha erken degil.\n7. Waiting Area\\\'ya ulastiginizda motoru kapatip Flex uygulamasini ve Timesheet\\\'i baslatin. Flex uygulamasini yukleme saatinden 10 dakikadan daha once acmayin; bu 10 dakikalik zaman damgasi zorunludur.\n8. Yard Marshall\\\'in talimatlari dogrultusunda Loading Area\\\'ya ilerleyin. Loading Area\\\'da motoru kapatin ve araci yalnizca Yard Marshall\\\'in dudugunu duyduktan sonra terk edin.\n9. Yukleme tamamlandiktan sonra araci calistirin ve yalnizca Yard Marshall\\\'in talimati ile harekete gecin.\n10. Tum duraklarinizi tamamladiktan sonra yakit seviyesini kontrol edin. Yarisindan az kalmissa arac yakitini takviye edin.\n11. Istasyona dondugunuzde tum kalan paketleri Amazon\\\'un belirledigi alanlara birakin ve cantalari gecikmeden teslim edin.\n12. Otoparka geri dondugunuzde araci kapatin ve Green Book\\\'u (Tageskontrollblatt) doldurun. Gun icinde katedilen kilometrenin fotografi ile Green Book\\\'un fotografini gonderin.\n13. Araci kapatin ve is cantanizi belirlenen alana veya arace geri birakin.',
+          '1- Parka girdiginizde guvenlik ayakkabisi, yelek ve Amazon uniformasi giydiginizi kontrol edin.\n2- Scanner\\\'in dolu oldugunu kontrol edin; degilse dispatcher\\\'a bildirin.\n3- Aracta sorun var mi kontrol edin.\n4- Scanner\\\'da Mentor uygulamasinda trip baslatin.\n5- Arac kilometresi ve gunluk trip sifirini gosteren fotograf paylasin.\n6- Yukleme saatinden yalnizca 10 dk once Waiting Area\\\'ya inin.\n7- Waiting Area\\\'da araci kapatip Flex App ve Timesheet\\\'i baslatin (erken degil).\n8- Yard Marshall talimatlariyla Loading Area\\\'ya gecin; dudukten once aractan inmeyin.\n9- Yukleme bitince, sadece talimat geldikten sonra cikis yapin.\n10- Tum duraklar bitince yakit yaridan azsa doldurun.\n11- Istasyonda kalan paketleri dogru alanlara, cantalari zamaninda birakin.\n12- Parkta araci kapatip Green Book\\\'u doldurun; gunluk km ve Green Book fotograflarini paylasin.\n13- Araci kapatip ekipman cantasini ayrilan alana teslim edin.',
       'faq_a18':
-          'Evet. Yola cikmadan once aracin ayrintili bir videosunu cekin; kucuk cizikler ve goknetler dahil mevcut her turlu hasari kayit altina alin. Boylece bir sonraki incelemede onceden var olan hasarlardan sorumlu tutulmazsiniz.',
+          'Evet. Aracin tum mevcut hasarlarini ayrintili gosteren bir video cekin; boylece sonraki kontrolde onceki hasarlardan sorumlu tutulmazsiniz.',
       'faq_a19':
-          'Oncelikle aktif bir internet baglantiniz oldugunu dogrulayin. Bunu, mevcut duraktaki musteriye bir mesaj gondererek test edebilirsiniz — mesaj iletilirse baglanti aktiftir. Alternatif olarak scanner\\\'da baska bir uygulamayi (ornegin tarayiciyi) acarak bir arama deneyin.\nAktif bir internet baglantiniz yoksa asagidaki adimlari sirayla uygulayin:\n1. Scanner\\\'i yeniden baslatin. Bu her zaman ilk denenmesi gereken adim olmalidir.\n2. Ucak modunu acip kapatin. Bu islem genellikle scanner\\\'i tam olarak yeniden baslatmaya gerek kalmadan sorunu cozer.\n3. Son care olarak, sistemin kendini yenilemesi amaciyla kisisel telefonunuzdan en fazla 10 dakika boyunca mobil hotspot paylasin.\nCevrimdisi olarak da calisabilirsiniz; ancak vardiya icinde bir noktada internete yeniden baglanmaniz gerekir. Cevrimdisi modu kullanmak icin once Flex uygulamasinda cevrimdisi haritalari indirin: Settings → Offline Maps (son secenek) → Download DBY5 → Allow downloads with mobile connection.',
+          'Once internet baglantinizin aktif oldugunu kontrol edin: mevcut duraga mesaj gondermeyi deneyin veya tarayicida bir arama yapin.\nBaglanti yoksa adimlar:\n1- Scanner\\\'i yeniden baslatin (ilk denenecek adim).\n2- Ucak modunu ac/kapat.\n3- Son care olarak en fazla 10 dk kisisel hotspot verin.\nCevrimdisi da calisabilirsiniz; ancak bir noktada internete baglanmaniz gerekir. Flex\\\'te once Offline Maps indirin: Settings - Offline Maps - Download DBY5 - Allow downloads with mobile connection.',
       'faq_a2':
-          'Lutfen durumu kendi basiniza cozmeye calismayin. Bunun yerine, nobetteki dispatcher\\\'i derhal bilgilendirin. Olayin buyumesini ve Amazon tarafindan olumsuz sonuclarla karsilasilmasini engellemek icin sizin adiniza musteri ile iletisime biz geceriz. Size destek olmak icin buradayiz.',
+          'Durumu kendi basiniza cozmeye CALISMAYIN; bunun yerine nobetteki dispatcher\\\'i bilgilendirin. Sizin adiniza musteriyle iletisime gecip Amazon sikayetlerinden dogabilecek olumsuzluklari onlemeye calisiriz. Yaninizdayiz!',
       'faq_a20':
-          'Asagidaki adimlari sirayla uygulayin:\n1. Scanner\\\'i yeniden baslatin.\n2. Ucak modunu acip kapatin.\n3. Uygulamadan cikis yapin ve yeniden acin.\n4. Konum Servislerini (GPS) kapatip yeniden acin.\n5. Flex uygulamasindan cikis yapin ve Mentor uygulamasinda kullandiginiz kimlik bilgileriyle yeniden giris yapin.\n6. Uygulamanin guncellenmesi gerekip gerekmedigini kontrol edin.\nAdimlari tek tek uygulayin. Biri sorunu cozmezse bir sonrakine gecin.',
+          '1- Scanner\\\'i yeniden baslatin.\n2- Ucak modunu ac/kapatin.\n3- Uygulamadan cikis yapin.\n4- Konum servislerini (GPS) kapatip acin.\n5- Flex\\\'ten cikis yapip Mentor\\\'da kullandiginiz bilgilerle yeniden girin.\n6- Uygulama guncellemesi gerekip gerekmedigini kontrol edin.\nBu adimlari tek tek deneyin; biri olmazsa bir sonrakine gecin.',
       'faq_a3':
-          'Bir hatayi duzeltmek icin hicbir zaman gec degildir. Lutfen bizimle iletisime gecin; sorunu dogrudan musteri ile cozmek icin elimizden geleni yapariz.',
+          'Hatayi duzeltmek icin asla gec degildir. Bizi yine de arayin; musteriyle durumu duzeltmeye calisiriz. Gec olsun, guc olmasin.',
       'faq_a4':
-          'Kalite her zaman on planda olmalidir. Musterinin teslimat talimatlarini dikkatle uygulayin ve yalnizca programin gerisinde oldugunuz icin bir paketi guvenli olmayan bir yere asla birakmayin.',
+          'Kalite! Her zaman kalite! Musteri talimatlarini izleyin ve duraklarda geride olsaniz bile paketi guvensiz yerlere birakmayin.',
       'faq_a5':
-          'Rotanizi bir sekilde tamamlayacaksiniz. Makul ve gerekli oldugunda destek temin edecegiz.',
+          'Duraklarinizi bir sekilde tamamlarsiniz. Mantikli gordugumuzde destek gondermeye calisiriz.',
+      'faq_a6': 'Guzel soru.',
       'faq_a7':
-          'Haftalik scorecard, temel hedeflerimiz kapsaminda ekibin performansina iliskin ozet bir goster sunar. Gucl yonlerimizi on plana cikarir, iyilestirilmesi gereken alanlari belirler ve onumuzdeki hafta icin odagimizi saptamaya yardimci olur. Genel performans kademeleri sunlardir:\n• Fantastic Plus: >93% (istisnai performans)\n• Fantastic: 85% - 92.9%\n• Great: 70% - 84.9%\n• Fair: 50% - 69.9%\n• Poor: <50%',
+          'Haftalik scorecard, ekibin temel hedeflerde nasil performans gosterdigini hizli ve net bicimde gosterir. Nelerin iyi gittigini, nerede geride kaldigimizi ve gelecek hafta neye odaklanmamiz gerektigini anlamamiza yardimci olur. Genel puan araliklari:\n• Fantastic Plus: >93% (istisnai performans)\n• Fantastic: 85% - 92.9%\n• Great: 70% - 84.9%\n• Fair: 50% - 69.9%\n• Poor: <50%',
       'faq_a7_1':
-          'Bir paketi "Swipe to finish" dugmesiyle teslim edildi olarak isaretlemenize ragmen musterinin paketi fiilen teslim almamasi durumunda bir DNR kaydedilir. Yaygin nedenler arasinda paket hirsizligi, kutunun bos sekilde teslim edilmesi veya yanlis adrese teslimat yer alir.\nHer Sali, bir onceki hafta aleyhinize kaydedilen her bir DNR icin fotograflar tarafiniza iletilir.',
+          'Paketi teslim edip "Bitirmek icin kaydir" ile onaylamaniza ragmen musterinin paketi alamamasi durumudur. Sebepler: paket hirsizligi, kutunun bos olmasi, yanlis adrese teslim vb.\nHer Sali, o hafta aldiginiz tum DNR\\\'lerin gorsellerini alirsiniz.',
       'faq_a7_1_1':
-          'DNR\\\'ler puaninizi onemli olcude etkiler. Bunlari onlemek icin musteriyi yola ciktiginizdan onceden haberdar edin ve yalnizca musterinin adinin acikca gorundugu zile basin.',
+          'Cok onemlidir. Onlemek icin, teslimata gitmeden once musteriyi bilgilendirin ve yalnizca isimlikteki dogru zile basin.',
       'faq_a7_1_2':
-          'Mumkun oldugunda paketi dogrudan musteriye elden teslim edin. Bu mumkun degilse, musteriye paketin tam olarak nerede birakildigini aciklayan bir mesaj gonderin — ornegin garajda, merdiven altinda, kulubede veya cicek saksisinin arkasinda.\nPaketi gozetsiz birakmanin guvenli olmadigina kanaat getirirseniz, birakmayin. Paketi yaniniza alin ve daha sonra yeniden teslim etmeyi deneyin. Bu konu buyuk onem tasir.',
+          'Mumkunse paketi bizzat musteriye teslim edin. Mumkun degilse paketin nereye birakildigini mesajla net yazin (garaj, merdiven alti, kulube, saksinin arkasi vb.).\nGuvenli degilse paketi birakmayin; yaniniza alip daha sonra tekrar deneyin. Bu COK onemli.',
       'faq_a7_1_3':
-          'Muhakemenizi ve saglam duyunuzu kullanin. Ornegin, 20 ila 30 katli bir binada posta kutularinin yanina birakilan bir paketin calinma olasiligi, ozel bir konuta birakilan bir pakete kiyasla cok daha yuksektir.\nSize destek olmak icin her sabah, gecmis teslimat verileri ve istatistiklere dayanarak yuksek hirsizlik veya musteri sikayeti riski tasiyan adreslerin listesini paylasiyoruz.',
+          'Icgudu ve sagduyu. 20-30 katli bir binada posta kutularinin yanina birakmak, mustakil eve gore daha yuksek risk tasir.\nAyrica her sabah, DNR riskini azaltmak icin hirsizlik/sikayet riski yuksek adresleri paylasiyoruz.',
       'faq_a7_1_4':
-          'Etkisi oldukca buyuktur. Tek bir kayip paket bile puaninizi en az %30 oraninda dusurebilir ve size en az 600 puana mal olur. Onemli bir not: Scorecard\\\'da adinizin altinda gorunen puan ne kadar yuksekse, performans o denli kotu degerlendirilir. Haftalik teslim ettiginiz paket sayisi arttikca olay basina kaybettiginiz puan azalir; ayrica kayip olan urunun degeri de hesaba katilir — daha pahali urunler daha yuksek puan kaybina yol acar. Bu metrigi mumkun oldugunca dusuk tutmamiz gerekir.\nAyni derecede onemli olan husus: Surekli olarak yuksek sayida kayip paket kaydi olusturmaniz durumunda, Amazon zamanla hirsizlik supheci yaklasimlar gelistirebileceginden is iliskinize son vermek zorunda kalabiliriz. Bu ciddi bir risktir ve goz ardi edilmemelidir.',
+          'Cok olumsuz etkiler. Tek bir paket bile en az %30 etki yaratabilir ve ciddi puan kaybi dogurur. Isminizin altinda ne kadar cok puan varsa durum o kadar kotudur. Haftalik teslimat sayisi arttikca kayip etkisi gorece azalir; urun degeri yuksekse kayip puan da artar. Bu bolumu mumkun oldugunca dusuk tutmaliyiz.\nDuzensiz olarak yuksek kayip sayisi olursa, Amazon hirsizlik supheci surecler baslatabilir; bu nedenle cok risklidir.',
       'faq_a7_2':
-          'Bu metrik, teslimat hakkinda musteriyle ne siklikla iletisime gectiginizi olcer — mesaj veya telefon araciligiyla. Musteriyle ne kadar az iletisim kurarsaniz bu kategorideki puaniniz o denli dusuk olur. Bu metrigi mumkun oldugunca yuksek tutmamiz gerekir; zira iyi performans gostermenin en kolay kategorilerinden biridir ve genel puaniniza onemli bir katki saglar.',
+          'Musteriyle teslimat hakkinda kac kez iletisime gectiginizi (mesaj/arama) gosterir. Musteriyle ne kadar az iletisim olursa scorecard puani o kadar duser. Bu bolum yuksek olmali; en kolay kategorilerden biridir ve toplam skora ciddi katkisi vardir.',
       'faq_a7_2_1':
-          'Paket teslimati yalnizca bir "drop-and-go" operasyonu degildir. Musteriyi onceden bilgilendirmeli ve uygun oldugunda paketi nereye birakmak istedigini sormalisiniz.',
+          'Teslimat sadece Drop&Go degildir. Musteriyi onceden bilgilendirin ve paketin nereye birakilmasini istedigini sorun.',
       'faq_a7_2_2':
-          'Oldukca basit: her durakta musteriyi arayin — ve ozellikle musteriye mesaj atin.',
+          'Basit: her durakta ozellikle mesaj atarak ve gerekirse arayarak.',
       'faq_a7_3':
-          'Bir DNR\\\'nin puaniniza olan etkisini hatirlayin — bir musteri eskalasyonu bunun en az iki kati kadar zararlidir. Olayin ciddiyetine bagli olarak isinizi kaybetmenize dahi yol acabilir.',
+          'DNR\\\'nin puana etkisini hatirliyor musunuz? CE bunun en az iki kati kotu olabilir ve olay agirligina gore is riskine kadar gidebilir.',
       'faq_a7_3_1':
-          'Musterinin teslimat talimatlarina her zaman titizlikle uyun. Bir hata meydana gelirse once ozur dileyin. Musteri ofkeliyse, bizimle dogrudan gorusebilmesi icin kendisinden bir dakika rica edin — bu asamada zaten bizimle telefonda olmaniz gerekir. Bolum 2\\\'de de belirtildigi gibi, bu tur durumlari bize birakmaniz her zaman en dogrusudur.',
+          'Her zaman musteri teslimat talimatlarina uyun. Hata olursa ozur dileyin. Musteri ofkeliyse bizle bir dakika gorusmesini rica edin ve bizi arayin. Bu tur durumlari bizim yonetmemiz en dogrusudur.',
       'faq_a7_4':
-          'Bu kolonda, Picture on Delivery (POD) icin uygun olup gonderilen fotografin "Invalid" veya "Not Sure" olarak isaretlendigi paketler listelenir. Yaygin red gerekceleri sunlardir:\n1. Musteri bilgilerini iceren paket etiketi fotografta goruluyor. Paket, fotografin cekilmesinden once etiket gorunmeyecek sekilde ceviri lmelidir.\n2. Fotograf bulaniktir.\n3. Fotografta bir kisi goruluyor.\n4. Fotografta hicbir paket algilanmamistir.\n5. Paket aracin icindedir.\n6. Paket eldedir.\n7. Paket posta kutusunun icindedir.\n8. Paket kameraya asiri yakindir.\n9. Fotograf cok karanliktir.\nBu kategori 100% puan elde edilmesi en kolay kategori olmalidir ve bunu basarmak genel puaninizi belirgin sekilde iyilestirir.',
+          'Bu sutun, POD icin uygun olup fotograf cekilmis ancak "Gecersiz" veya "Emin Degil" olarak isaretlenen paketleri gosterir. Reddetme nedenleri:\n1- Fotoğrafta musteri bilgili etiket gorunmesi (paket ters cevrilmeli)\n2- Bulanik fotograf\n3- Fotografta kisi gorunmesi\n4- Fotografta paket gorunmemesi\n5- Paket arac icinde\n6- Paket elde\n7- Paket posta kutusunda\n8- Paket cok yakin\n9- Fotograf cok karanlik\nBu kategori genelde en kolay olandir; hedef 100% olmalidir ve toplam skoru guclu sekilde iyilestirir.',
       'faq_a7_5':
-          'Bu metrik, yuklemede taradigniz bir paketin basarisiz bir teslimat girisiminin ardindan ne teslim edilmesi ne de vardiyanin sonunda iade edilmesi halinde sizi cezalandirir. Boyle durumlarda paket kayip sayilir ve ceza bir DNR\\\'ye esdegerdir. Lutfen iade ettiginiz paketleri titizlikle sayin ve scanner\\\'da gorunen listeyle eslestiklerinden emin olun. Liste su yol izlenerek bulunur: Today\\\'s Itinerary → Summary → Problems. Sayilar eslesmiyorsa, Amazon uygulamasinda vardiyayi kapatmadan once nobetteki dispatcher\\\'a bildirin.',
+          'Yuklemeden taradiginiz paketi basarisiz teslimat sonrasi vardiya sonunda iade etmezseniz ceza alirsiniz. Paket kayip sayilir ve DNR benzeri puan kaybi olur. Iade ettiginiz paketleri mutlaka sayin ve scanner\\\'daki listeyle eslestirin. Yol: Today\\\'s Itinerary - Summary - Problems. Eslesmiyorsa Amazon uygulamasinda isi bitirmeden once nobetteki dispatcher\\\'a bilgi verin.',
       'faq_a7_6':
-          'Bu metrik, planlanan sekilde tamamlanan teslimatlarin yuzdesini izleyerek teslimat performansinizi yansitir. Hizmetimizin verimliligini ve guvenilirligini degerlendirmemize yardimci olur ve gecikmeler, basarisiz teslimat girisimleri veya rota sorunlari gibi hususlari gun yuzune cikarir. DCR\\\'niz her zaman mumkun olan en yuksek seviyede olmalidir. Bu hedefe ulasmak icin mumkun oldugunda yeniden teslimat denemesi (reattempts) yapin ve iade edilen paket sayisini asgariye indirin.',
+          'Paket teslim etme performansinizi gosterir. Planlanan teslimatlarin yuzdesini takip ederek verimlilik ve guvenilirligi olcer. Gecikme, basarisiz deneme veya rota sorunlarini ortaya cikarir. Bu deger mumkun oldugunca yuksek olmalidir. Bunun icin gunluk yeniden deneme yapin ve iadeleri minimumda tutun.',
       'faq_a7_7':
-          'Bu metrik, alicinin teslimat deneyimini — dakiklik, ürünun durumu ve surucunun profesyonelligi dahil olmak uzere — kayda alir. Hizmetimizin guclu yonlerini ve gelisim alanlarini belirlememize yardimci olur. Teslimatin ardindan musteri, Amazon\\\'dan asagidaki gibi sorulari iceren bir anket e-postasi alir:\n1) Paketiniz zamaninda teslim edildi mi? (Evet / Hayir)\n2) Paket guvenli bir yere birakildi mi? (Evet / Hayir)\n3) Paket vardiginda iyi durumda miydi? (Evet / Hayir)\n4) Teslimattan genel olarak ne kadar memnun kaldiniz? (Cok memnun / Memnun / Notr / Memnun degil / Hic memnun degil)\n5) Bu teslimat icin iletisim ve takip bildirimlerini nasil degerlendirirsiniz? (Mukemmel / Iyi / Orta / Kotu)\n6) Teslimati yapan kisi nazik ve profesyonel miydi? (Evet / Hayir / Uygulanamaz — temassiz teslimat)\n7) Teslimat deneyiminiz hakkinda baska bir yorumunuz var mi? (Ek musteri yorumu)',
+          'Alicinin teslimat deneyimini (dakiklik, urun durumu, surucu profesyonelligi) olcer. Hizmette guclu/zayif alanlari gormemizi saglar. Teslimattan sonra musteriye Amazon tarafindan su tur sorular gelir:\n1) Paketiniz zamaninda teslim edildi mi? (Evet/Hayir)\n2) Paket guvenli bir yere birakildi mi? (Evet/Hayir)\n3) Paket geldiginde durumu iyi miydi? (Evet/Hayir)\n4) Genel teslimat memnuniyetiniz? (Cok memnun ... Cok memnun degil)\n5) Iletisim ve takip guncellemelerini nasil degerlendirirsiniz? (Mukemmel/Iyi/Orta/Kotu)\n6) Teslimati yapan kisi nazik ve profesyonel miydi? (Evet/Hayir/Uygulanamaz)\n7) Ek yorumunuz var mi? (Musteri yorumu)',
       'faq_a7_8':
-          'Kalite ve verimlilik onemli bir fark yaratir. Yuksek puanlar size, sirkete ve butun ekibe fayda saglar. Musteri memnuniyeti en ust onceligimizdir ve olaganustu sonuclar sirket tarafindan bir bonusla odullendirilir.\nElinizden gelenin en iyisini yapin — karsiliginda hak ettiginiz odulu alirsiniz.',
+          'Kalite ve verimlilik birlikte ilerler. Iyi skorlar sizin, sirketin ve tum ekibin yararinadir. Musteri memnuniyeti kritiktir; iyi skorlar bonusla da desteklenir.\nElinizden gelenin en iyisini yapin, en iyisini alin.',
       'faq_a8':
-          'Kisisel guvenliginize oncelik verin: sorumlu bir sekilde arac kullanin, yaralanmalari onlemek icin dikkatli olun ve isirilmayi engellemek icin kopeklere karsi tedbirli davranin. Gunluk arac ile is scanner veya telefon dahil olmak uzere tum is ekipmanlarini ozenle kullanin. Ise her zaman guvenlik ayakkabilariniz, guvenlik yeleginiz ve hava kosullarina uygun Amazon markali mont veya tisortunuz ile gelin.',
+          'Guvenli surus yapin, yaralanmalardan ve kopek isirmalarindan kacinin. Arac, scanner/telefon gibi ekipmanlara dikkat edin. Ise gelirken guvenlik ayakkabisi, reflektorlu yelek ve hava durumuna uygun Amazon kiyafeti giyin.',
       'faq_a9':
-          'Oncelikle guvende oldugunuzdan ve ciddi sekilde yaralanmadiginizdan emin olun. Arac hasari konusunda: kazanin ihmalden — ornegin arac kullanirken telefon kullaniminin yol actigi dikkat dagilmasindan — kaynaklandigini tespit etmemiz halinde, hasarin tum maliyetinden sahsen sorumlu olursunuz. Ayrica, kaza sonrasi duzenlenen polis raporu surucu belgesi iptaline yol acabilir ve bu tur bir olay derhal is akdi feshi icin gerekce teskil eder. Daha hafif durumlarda Haftalik Scorecard Bonuslari\\\'ndan iki ay sureyle hariç tutulursunuz. Her turlu olaydan sonra bizi derhal bilgilendirmekle yukumlusunuz ve asagidaki bilgileri iletmelisiniz: olayin zamani ve konumu, ozel veya kamuya ait mulke (duvar, cit, aydinlatma direkleri, kisi veya hayvan) verilen her turlu hasara iliskin bilgiler ile arac hasarlarinin net fotograflari.',
+          'Once iyi oldugunuzdan ve agir yaralanmadiginizdan emin olun. Hasar, ihmalden kaynaklaniyorsa (ornegin suruste telefonla dikkat daginikligi), tum zarardan sahsen sorumlu olabilirsiniz. Polis raporu duzenlenebilir ve ehliyet yaptirimlari olabilir. Bu durum is akdinin derhal feshine kadar gidebilir. Bunun disinda 2 ay boyunca haftalik scorecard bonuslarindan yararlanamazsiniz. Kaza aninda bizi DERHAL bilgilendirmeniz zorunludur: saat, konum, ozel/kamu malina hasar (duvar, cit, direk, kisi/hayvan), hasarin yeri ve arac fotograflari.',
 
-      'faq_q1': 'Gunluk calismanizin en onemli yonu nedir?',
+      'faq_q1': 'Gunluk gorevinizde en onemli sey nedir?',
 
-      'faq_q10': 'Bir paket hasarli ya da kayipsa ne yapmaliyim?',
+      'faq_q10': 'Paket hasarli ve/veya eksikse ne yapmaliyim?',
 
       'faq_q11': 'OTP (One-Time Password) paketi nedir?',
 
       'faq_q12':
-          'Neden sizden daha hizli calismak yerine yavaslamanizi istemeye devam ediyoruz?',
+          'Neden hep yavaslayin, daha hizli gitmeyin diye hatirlatiyorsunuz?',
 
       'faq_q13':
-          'Dispatcher\\\'lar neden bazen geride olup olmadigimi veya bir sorun olup olmadigini soruyor?',
+          'O halde dispatcher neden bazen neden geride kaldigimi soruyor?',
 
-      'faq_q14': 'Neden bazen bir meslektasa yardim etmeniz isteniyor?',
+      'faq_q14': 'Neden bazen bir ekip arkadasina yardima gitmem isteniyor?',
 
       'faq_q15':
-          'Ilk gunumden itibaren, daha deneyimli suruculer gibi standart rotalar dagiticak miyim?',
+          'Ilk gunumden itibaren deneyimli suruculer gibi standart rota mi alirim?',
 
       'faq_q16':
-          'Bir adres hatali oldugunda veya haritadaki pin dogru olmadiginda ne yapmaliyim?',
+          'Adres yanlissa veya haritadaki pin dogru degilse ne yapmaliyim?',
 
       'faq_q17':
-          'Ise baslamadan once ve ise bitirdikten sonra yerine getirmem gereken gunluk gorevler nelerdir?',
+          'Ise baslamadan once ve bitirdikten sonra gunluk gorevlerim neler?',
 
       'faq_q18':
-          'Her zamanki aracimin yerine farkli bir van kullanacagim zaman bir islem yapmam gerekiyor mu?',
+          'Her zamanki aracim yerine baska bir van aldigimda ek bir sey yapmali miyim?',
 
       'faq_q19':
-          'Flex uygulamasi surekli yukleniyor ve is akisimi yavaslatiyorsa ne yapmaliyim?',
+          'Flex uygulamasi surekli yuklenip is akisimi yavaslatirsa ne yapmaliyim?',
 
-      'faq_q2':
-          'Bir musteriyle bir sorun yasandiginda nelerden kacinmaliyim?',
+      'faq_q2': 'Musteriyle sorun yasandiginda ne yapmamalisiniz?',
 
       'faq_q20':
-          'Internet baglantisi aktifken Flex uygulamasi hala duzgun calismiyorsa ne yapmaliyim?',
+          'Internet aktif ama Flex yine de duzgun calismiyorsa ne yapmaliyim?',
 
       'faq_q3':
-          'Musteriyle olan bir durum zaten buyumusse ne yapmaliyim?',
+          'Durum zaten buyuduysa ve musteri memnun degilse ne yapmaliyim?',
 
-      'faq_q4':
-          'Hangisi daha onemli: nicelik (mumkun olan en kisa surede mumkun olan en fazla durak) mi yoksa kalite mi?',
+      'faq_q4': 'Hangisi daha onemli: Miktar (hiz) mi yoksa Kalite mi?',
 
-      'faq_q5':
-          'Kaliteye odaklanip duraklarda geriye dustugumde ne olur?',
+      'faq_q5': 'Kaliteye odaklanirsam ve duraklarda geriye dusersem ne olur?',
+
+      'faq_q6': 'Scorecard ve DNR nedir?',
 
       'faq_q7': 'Haftalik Scorecard',
 
-      'faq_q7_1': 'DNR Sekmesi — Delivered Not Received',
+      'faq_q7_1': 'DNR Sekmesi\nTeslim Edildi Ama Alinmadi',
 
       'faq_q7_1_1':
-          'DNR\\\'leri nasil onleyebilirim ve bunlar haftalik scorecard\\\'imi ne derece etkiler?',
+          'Bunu nasil onleyebilirim ve haftalik scorecard icin onemi nedir?',
 
-      'faq_q7_1_2': 'Paket kayiplarini nasil onleyebilirim?',
+      'faq_q7_1_2': 'Paket kaybini nasil onlerim?',
 
-      'faq_q7_1_3':
-          'Bir konumun guvenli olup olmadigini nasil anlarim?',
+      'faq_q7_1_3': 'Hangi yerin guvenli oldugunu nasil anlarim?',
 
-      'faq_q7_1_4':
-          'Kayip veya calinan bir paket puanimi nasil etkiler?',
+      'faq_q7_1_4': 'Paket kaybolursa veya calinirsa puanim nasil etkilenir?',
 
-      'faq_q7_2': 'CC Sekmesi — Contact Compliance',
+      'faq_q7_2': 'CC Sekmesi\nIletisim Uyumlulugu',
 
-      'faq_q7_2_1': 'Musteri iletisimi neden onemlidir?',
+      'faq_q7_2_1': 'Bunu neden yapmaliyim?',
 
-      'faq_q7_2_2': 'CC puanimi nasil iyilestirebilirim?',
+      'faq_q7_2_2': 'CC puanimi nasil artiririm?',
 
-      'faq_q7_3': 'CE Sekmesi — Musteri Eskalasyonu',
+      'faq_q7_3': 'CE Sekmesi\nMusteri Eskalasyonu',
 
-      'faq_q7_3_1': 'Musteri eskalasyonlarini nasil onleyebilirim?',
+      'faq_q7_3_1': 'Bunu nasil onlerim?',
 
-      'faq_q7_4': 'POD Sekmesi — Teslimatta Fotograf',
+      'faq_q7_4': 'POD Sekmesi\nTeslimatta Fotograf',
 
-      'faq_q7_5': 'LoR Sekmesi — Lost on Road',
+      'faq_q7_5': 'LoR Sekmesi\nYolda Kaybolan',
 
-      'faq_q7_6': 'DCR Sekmesi — Teslimat Tamamlama Orani',
+      'faq_q7_6': 'DCR Sekmesi\nTeslimat Tamamlama Orani',
 
-      'faq_q7_7':
-          'CDF Sekmesi (onceden DEX) — Musteri Teslimat Geri Bildirimi',
+      'faq_q7_7': 'CDF Sekmesi (Onceden DEX)\nMusteri Teslimat Geri Bildirimi',
 
-      'faq_q7_8':
-          'Genel olarak scorecard konusunda aklimda tutmam gerekenler nelerdir?',
+      'faq_q7_8': 'Scorecard konusunda aklimda ne olmali?',
 
-      'faq_q8': 'Dikkat etmem gereken diger alanlar hangileridir?',
+      'faq_q8': 'Diger hangi alanlarda dikkatli olmaliyim?',
 
-      'faq_q9':
-          'Bir kaza yasarsam veya is aracina hasar verirsem ne yapmaliyim?',
+      'faq_q9': 'Kaza yaparsam veya arac hasar gorurse ne olur?',
 
       'kpi_desc_cc':
           'CC (Musteri Iletisimi)\n\nDeger ne kadar yuksekse o kadar iyidir.\n\nCok onemli:\nAsagidaki durumlarda paketi teslim edemediginiz HER durumda mutlaka "Guvenli birakma yeri yok" veya "Adres bulunamadi" mesaji gondermelisiniz:\n\n- musteri evde degilse veya\n- adres bulunamiyorsa',
@@ -6159,162 +6253,152 @@ class AppLocalizations {
           'Не удалось открыть ссылку на видео Green Book.',
 
       // Added for full key coverage (from EN fallback)
-      'faq_a1':
-          'Аккуратно доставлять каждую посылку и всегда вести себя профессионально.',
+      'faq_a1': 'Качественно доставлять посылки и вести себя профессионально.',
       'faq_a10':
-          'Если посылка повреждена, отметьте её как damaged в системе и верните на станцию. Если повреждённая посылка содержала жидкость и пострадали другие отправления, сфотографируйте все затронутые посылки и отправьте фотографии дежурному диспетчеру. Сообщение в Amazon мы передадим от вашего имени.\nЕсли посылка отсутствует, её можно пометить как missing — за исключением OTP-посылок: в этом случае вам необходимо сначала связаться с нами, и только затем отмечать посылку. Это критически важно.',
+          'Если посылка повреждена, отметьте ее как damaged и верните на станцию. Если это жидкость и она повредила другие посылки, сфотографируйте все поврежденные отправления и отправьте дежурному диспетчеру; мы передадим в Amazon.\nЕсли посылка отсутствует, можно отметить missing, кроме OTP-посылок: по OTP вы ОБЯЗАНЫ сначала сообщить нам, и только потом отмечать missing. Это ОЧЕНЬ ВАЖНО.',
       'faq_a11':
-          'OTP-посылка содержит дорогостоящий товар, для которого Amazon требует, чтобы клиент сообщил водителю одноразовый пароль до момента вручения. Это гарантирует, что посылка попадёт именно к нужному получателю. С OTP-посылками следует обращаться максимально аккуратно, ни в коем случае не оставлять их без присмотра и передавать только тому клиенту, который сообщил корректный пароль.',
+          'Это дорогой товар, для которого Amazon требует одноразовый пароль от клиента перед вручением, чтобы убедиться, что посылка передана правильному получателю. С такими посылками нужна повышенная осторожность: не оставляйте их без присмотра и вручайте только клиенту, который сообщил пароль.',
       'faq_a12':
-          'Мы понимаем, что подобные просьбы могут казаться однообразными, однако этого требует система. Мы обязаны придерживаться заданной алгоритмом нормы стопов в час, чтобы в будущем получать дополнительные маршруты и обеспечивать вам стабильный объём работы.\nКроме того, избыточная скорость повышает риск DNR, что приводит к потере баллов в недельном scorecard как для вас, так и для компании.',
+          'Нам это тоже не всегда нравится, но так работает система. Нужно следовать алгоритму и плановому темпу стопов в час, чтобы компания получала больше маршрутов, а у вас было больше рабочих смен.\nСлишком высокая скорость повышает риск DNR и может снизить недельные баллы и для вас, и для компании.',
       'faq_a13':
-          'Мы понимаем, что такие проверки не всегда удобны, однако нам необходима ваша обратная связь, чтобы понять, что именно произошло на маршруте и привело к задержке. Amazon запрашивает эту информацию, поскольку для каждого стопа предусмотрено плановое окно доставки. Если маршрут отстаёт, Amazon должен знать причину, чтобы на основании этих данных повышать эффективность будущих доставок.',
+          'Мы понимаем, что это неприятно, но нам нужна обратная связь о причинах отставания на маршруте. Amazon задает контрольные точки по времени (к какому времени должен быть выполнен X стоп), поэтому важно понимать причины отставания и улучшать планирование.',
       'faq_a14':
-          'Задержка коллеги может быть обусловлена целым рядом факторов: плохим покрытием сети в районе, интенсивным дорожным движением или перекрытиями улиц из-за строительных работ. В подобных ситуациях ваша помощь необходима, чтобы коллега смог вовремя завершить свой маршрут.',
+          'На задержку влияют многие факторы: плохой интернет, трафик, перекрытые улицы из-за работ и т.д. Поэтому иногда нужна помощь, чтобы коллега успел завершить маршрут вовремя.',
       'faq_a15':
-          'Нет. Вы начнёте с 14-дневного адаптационного периода (в рабочих днях), в течение которого сможете применить на практике всё, что изучили в дни ride-along с тренером, и освоиться с районом, автомобилем, сканером и общим рабочим процессом.\nВ течение этих 14 дней Amazon сокращает ваш ежедневный объём посылок и стопов до 50% по сравнению со стандартным маршрутом.',
+          'Нет. В начале у вас есть 14 рабочих дней адаптации, чтобы применить знания после ride-along с тренером, привыкнуть к району, машине, scanner и рабочему процессу.\nВ этот период Amazon обычно дает до 50% меньше обычного количества посылок и стопов.',
       'faq_a16':
-          'Сначала проверьте pin, найдя адрес в Google Maps — приложение работает точнее и уже установлено на вашем сканере. Если место не совпадает, сообщите о расхождении дежурному диспетчеру.',
+          'Сначала проверьте адрес в Google Maps (обычно точнее и уже установлен в scanner). Если не совпадает, сообщите дежурному диспетчеру об ошибке.',
       'faq_a17':
-          '1. По прибытии на парковку убедитесь, что на вас защитная обувь, сигнальный жилет и форма Amazon.\n2. Убедитесь, что сканер полностью заряжен. Если это не так, сообщите находящемуся на площадке диспетчеру.\n3. Осмотрите автомобиль на предмет возможных неполадок.\n4. Запустите trip в приложении Mentor на сканере.\n5. Сделайте фотографию приборной панели, где виден текущий пробег, и сбросьте дневной счётчик trip до нуля.\n6. Подготовьтесь к переходу в Waiting Area только за 10 минут до запланированного времени погрузки — не раньше.\n7. В Waiting Area заглушите двигатель и запустите Flex App и Timesheet. Не открывайте Flex App ранее чем за 10 минут до погрузки; этот 10-минутный штамп обязателен.\n8. Проследуйте в Loading Area согласно указаниям Yard Marshall. В Loading Area заглушите двигатель и покидайте автомобиль только после свистка Yard Marshall.\n9. По завершении погрузки запустите автомобиль и начинайте движение только по указанию Yard Marshall.\n10. После выполнения всех стопов проверьте уровень топлива. Если осталось менее половины, заправьте автомобиль.\n11. По возвращении на станцию сдайте все оставшиеся посылки в отведённых Amazon зонах и своевременно верните сумки.\n12. Вернувшись на парковку, заглушите автомобиль и заполните Green Book (Tageskontrollblatt). Отправьте фото дневного пробега вместе с фото Green Book.\n13. Заглушите автомобиль и верните рабочую сумку в установленную зону или в транспортное средство.',
+          '1- При заезде на парковку убедитесь, что на вас защитная обувь, жилет и форма Amazon.\n2- Проверьте, что scanner заряжен; если нет, сообщите диспетчеру.\n3- Проверьте состояние автомобиля.\n4- Запустите trip в приложении Mentor на scanner.\n5- Отправьте фото панели с текущим пробегом и daily trip, сброшенным в 0.\n6- В Waiting Area спускайтесь только за 10 минут до времени загрузки.\n7- В Waiting Area заглушите машину и запустите Flex App и Timesheet (не раньше).\n8- Переходите в Loading Area по инструкциям Yard Marshall; выходите из авто только после свистка.\n9- После загрузки начинайте движение только по команде Yard Marshall.\n10- После всех стопов проверьте топливо; если меньше половины - заправьтесь.\n11- На станции сдайте оставшиеся посылки и сумки в нужные зоны Amazon.\n12- На парковке заглушите машину, заполните Green Book (Tageskontrollblat), отправьте фото дневного пробега и Green Book.\n13- Верните рабочую сумку в назначенную зону.',
       'faq_a18':
-          'Да. Перед выездом снимите подробное видео автомобиля, на котором видны все имеющиеся повреждения — включая мелкие царапины и вмятины — чтобы при следующем осмотре вам не были вменены уже существовавшие дефекты.',
+          'Да. Снимите подробное видео всех имеющихся повреждений, чтобы на следующей проверке это не считалось вашей виной.',
       'faq_a19':
-          'Сначала убедитесь, что у вас есть активное интернет-соединение. Проверить это можно, отправив сообщение клиенту текущего стопа — если сообщение уходит, соединение активно. Альтернативно откройте другое приложение на сканере, например браузер, и попробуйте выполнить поисковый запрос.\nЕсли активного интернет-соединения нет, выполните следующие действия по порядку:\n1. Перезагрузите сканер. Это всегда первая мера, которую следует попробовать.\n2. Включите и выключите авиарежим. Часто этого достаточно, и полная перезагрузка не требуется.\n3. В качестве крайней меры раздайте мобильный hotspot со своего личного телефона на время до 10 минут, чтобы система смогла обновиться.\nВы также можете работать в режиме офлайн, однако в какой-то момент смены вам потребуется вновь подключиться к интернету. Чтобы включить офлайн-режим, заранее загрузите офлайн-карты в Flex App: откройте Settings → Offline Maps (последний пункт) → Download DBY5 → Allow downloads with mobile connection.',
+          'Сначала проверьте активность интернета: попробуйте отправить сообщение текущему клиенту или открыть поиск в браузере на scanner.\nЕсли интернета нет:\n1- Перезапустите scanner (всегда первый шаг).\n2- Включите/выключите авиарежим.\n3- В крайнем случае раздайте личный hotspot максимум на 10 минут для обновления системы.\nМожно работать офлайн, но позже нужно снова подключиться к интернету. Для офлайна заранее скачайте карты в Flex: Settings - Offline Maps - Download DBY5 - Allow downloads with mobile connection.',
       'faq_a2':
-          'Пожалуйста, не пытайтесь урегулировать ситуацию самостоятельно. Немедленно уведомите дежурного диспетчера. Мы возьмём общение с клиентом на себя, чтобы не допустить эскалации и избежать негативных последствий со стороны Amazon. Мы здесь, чтобы поддержать вас.',
+          'НЕ пытайтесь решить ситуацию самостоятельно. Сразу сообщите дежурному диспетчеру. Мы свяжемся с клиентом за вас и постараемся предотвратить негативные последствия из-за жалоб в Amazon. Мы рядом и готовы помочь.',
       'faq_a20':
-          'Выполните следующие шаги по порядку:\n1. Перезагрузите сканер.\n2. Включите и выключите авиарежим.\n3. Закройте приложение и запустите его снова.\n4. Отключите и снова включите службы геолокации (GPS).\n5. Выйдите из Flex App и войдите повторно, используя учётные данные от приложения Mentor.\n6. Проверьте, требуется ли обновление приложения.\nВыполняйте шаги один за другим. Если один из них не решает проблему, переходите к следующему.',
+          '1- Перезапустите scanner.\n2- Включите/выключите авиарежим.\n3- Полностью выйдите из приложения.\n4- Выключите/включите Location Services (GPS).\n5- Выйдите из Flex и войдите снова с данными Mentor.\n6- Проверьте, требуется ли обновление приложения.\nВыполняйте шаги по одному: если один не помог, переходите к следующему.',
       'faq_a3':
-          'Исправить ошибку никогда не поздно. Пожалуйста, свяжитесь с нами — мы сделаем всё возможное, чтобы урегулировать ситуацию напрямую с клиентом.',
+          'Исправить ошибку никогда не поздно. Все равно позвоните нам, и мы постараемся урегулировать ситуацию с клиентом. Лучше поздно, чем никогда.',
       'faq_a4':
-          'Качество всегда имеет приоритет. Чётко следуйте инструкциям клиента по доставке и никогда не оставляйте посылку в небезопасном месте только из-за отставания от графика.',
+          'Качество! Всегда качество! Следуйте инструкциям клиента и НЕ оставляйте посылку в небезопасных местах, даже если отстаете по стопам.',
       'faq_a5':
-          'Вы так или иначе завершите свой маршрут. Мы организуем поддержку, если это действительно разумно и необходимо.',
+          'Вы все равно закончите маршрут. Мы постараемся отправить помощь, если это действительно обосновано.',
+      'faq_a6': 'Отличный вопрос.',
       'faq_a7':
-          'Недельный scorecard предоставляет сжатый обзор результатов работы команды по отношению к нашим ключевым целям. Он выделяет наши сильные стороны, определяет области, требующие улучшения, и помогает обозначить фокус на предстоящую неделю. Общие уровни производительности таковы:\n• Fantastic Plus: >93% (исключительная результативность)\n• Fantastic: 85% - 92.9%\n• Great: 70% - 84.9%\n• Fair: 50% - 69.9%\n• Poor: <50%',
+          'Еженедельный scorecard дает быстрый и понятный обзор того, как команда выполняет ключевые цели. Он помогает видеть, что идет хорошо, где есть отставание и на чем сосредоточиться на следующей неделе. Общие уровни:\n• Fantastic Plus: >93% (исключительная работа)\n• Fantastic: 85% - 92.9%\n• Great: 70% - 84.9%\n• Fair: 50% - 69.9%\n• Poor: <50%',
       'faq_a7_1':
-          'DNR фиксируется в случаях, когда посылка была отмечена как доставленная с помощью кнопки "Swipe to finish", но фактически клиенту она не была передана. К частым причинам относятся кража посылки, пустая упаковка на момент прибытия или доставка по неверному адресу.\nКаждый вторник вы будете получать фотографии по каждому DNR, зафиксированному за вами за предыдущую неделю.',
+          'Это ситуация, когда вы доставили посылку и подтвердили "Swipe to finish", но клиент не получил ее по ряду причин: кража, пустая коробка, доставка по неверному адресу и т.д.\nКаждый вторник вы получаете изображения всех DNR за неделю.',
       'faq_a7_1_1':
-          'DNR оказывают существенное влияние на ваш показатель. Чтобы избежать их, заранее уведомляйте клиента о вашем прибытии и нажимайте только на тот звонок, на котором чётко указано имя клиента.',
+          'Это очень важно. Чтобы снизить риск, заранее уведомляйте клиента о доставке и звоните только в правильный звонок по табличке с именем.',
       'faq_a7_1_2':
-          'По возможности всегда передавайте посылку клиенту лично. Если это невозможно, отправьте клиенту сообщение, в котором точно укажите, где именно оставлена посылка — например, в гараже, под лестницей, в сарае или за цветочным горшком.\nЕсли вы считаете, что оставлять посылку без присмотра небезопасно, не оставляйте её. Возьмите посылку с собой и повторите попытку доставки позже. Это крайне важно.',
+          'По возможности передавайте посылку лично клиенту. Если это невозможно, отправьте сообщение, где именно оставили посылку (гараж, под лестницей, в сарае, за вазоном и т.п.).\nЕсли место кажется небезопасным, лучше не оставлять посылку, а взять ее с собой и попробовать доставить позже. Это ОЧЕНЬ важно.',
       'faq_a7_1_3':
-          'Руководствуйтесь здравым смыслом и собственным опытом. Например, посылка, оставленная у почтовых ящиков в доме на 20–30 этажей, подвергается значительно большему риску кражи, чем посылка, оставленная у частного дома.\nДля вашей поддержки мы ежедневно публикуем список адресов с повышенным риском кражи или жалоб клиентов, составленный на основе истории доставок и статистики.',
+          'По здравому смыслу и опыту. Например, в доме на 20-30 этажей оставлять у почтовых ящиков обычно намного рискованнее, чем в частном доме.\nТакже по утрам мы публикуем адреса с повышенным риском DNR, чтобы вам было проще избегать проблем.',
       'faq_a7_1_4':
-          'Последствия значительны. Даже одна утерянная посылка способна снизить ваш показатель как минимум на 30% и стоит не менее 600 баллов. Обратите внимание: чем больше штрафных баллов отображается под вашим именем в scorecard, тем хуже оценивается ваша результативность. Чем больше посылок вы доставляете в неделю, тем меньше баллов вы теряете за отдельный инцидент; стоимость утерянного товара также учитывается — более дорогие позиции приводят к большему списанию баллов. Мы должны удерживать этот показатель на как можно более низком уровне.\nНе менее важно: при систематически высоком числе потерянных посылок мы будем вынуждены прекратить сотрудничество, поскольку Amazon может в итоге заподозрить хищение. Это серьёзный риск, который нельзя игнорировать.',
+          'Сильно негативно. Даже одна посылка может заметно ухудшить показатель и дать крупный штраф по баллам. Чем больше штрафных баллов у вашего имени, тем хуже. При большем количестве доставок эффект отдельного инцидента относительно ниже; дорогие товары дают больший минус. Этот показатель нужно держать как можно ниже.\nЕсли потери происходят регулярно, Amazon может заподозрить кражу, что очень опасно для работы.',
       'faq_a7_2':
-          'Данная метрика отражает, насколько часто вы связываетесь с клиентом по поводу его доставки — сообщением или звонком. Чем меньше вы коммуницируете с клиентом, тем ниже ваш показатель в этой категории. Мы должны удерживать этот показатель как можно выше: это одна из самых простых категорий для достижения высокой оценки, и она существенно влияет на ваш общий балл.',
+          'Показывает, как часто вы связываетесь с клиентом по доставке (сообщения/звонки). Чем меньше коммуникации, тем ниже балл. Этот раздел должен быть высоким: это одна из самых простых категорий и она сильно помогает общему результату.',
       'faq_a7_2_1':
-          'Доставка посылок — это не просто операция «drop-and-go». Вам следует заранее уведомлять клиента и при необходимости уточнять, куда именно он хотел бы получить свою посылку.',
+          'Доставка - это не только Drop&Go. Нужно заранее информировать клиента и уточнять, куда лучше оставить посылку.',
       'faq_a7_2_2':
-          'Всё просто: звоните — и особенно пишите сообщения — клиенту на каждом стопе.',
+          'Очень просто: звоните и особенно пишите клиентам на каждом стопе.',
       'faq_a7_3':
-          'Вспомните, насколько сильно DNR влияет на ваш показатель — эскалация со стороны клиента наносит как минимум вдвое больший урон. В зависимости от тяжести инцидента это может привести даже к потере должности.',
+          'Помните, как DNR влияет на баллы? CE обычно минимум в 2 раза хуже и в тяжелых случаях может привести к потере работы.',
       'faq_a7_3_1':
-          'Всегда тщательно соблюдайте инструкции клиента по доставке. Если произошла ошибка, в первую очередь извинитесь. Если клиент раздражён, попросите у него минуту, чтобы он мог поговорить непосредственно с нами — к этому моменту вы уже должны находиться с нами на связи. Как указано в разделе 2, подобные ситуации лучше всего оставлять на наше усмотрение.',
+          'Всегда следуйте инструкциям клиента по доставке. Если произошла ошибка, сначала извинитесь. Если клиент зол, попросите минуту на разговор с нами и сразу звоните. Такие ситуации лучше передавать нам.',
       'faq_a7_4':
-          'В этой колонке перечислены посылки, для которых предусмотрено Picture on Delivery (POD), однако загруженное фото было помечено как «Invalid» или «Not Sure». К наиболее распространённым причинам отклонения относятся:\n1. На фото видна этикетка посылки с данными клиента. Перед съёмкой посылку следует повернуть так, чтобы этикетка не попадала в кадр.\n2. Фотография размыта.\n3. В кадре виден человек.\n4. На фото не определяется посылка.\n5. Посылка находится внутри автомобиля.\n6. Посылка в руке.\n7. Посылка помещена внутрь почтового ящика.\n8. Посылка расположена слишком близко к камере.\n9. Фото слишком тёмное.\nДанная категория должна быть самой простой для достижения 100%, и её выполнение заметно улучшает ваш общий показатель.',
+          'В этой колонке показаны посылки, для которых фото сделано, но помечено как Invalid или Not Sure. Причины отклонения POD:\n1- На фото видна этикетка с данными клиента (посылку нужно повернуть)\n2- Размытое фото\n3- На фото виден человек\n4- На фото не видно посылки\n5- Посылка в машине\n6- Посылка в руке\n7- Посылка в почтовом ящике\n8- Посылка слишком близко\n9- Фото слишком темное\nОбычно это самая простая категория: цель 100%, и она хорошо повышает общий score.',
       'faq_a7_5':
-          'Эта метрика штрафует вас в тех случаях, когда посылка, отсканированная при погрузке, не была ни доставлена, ни возвращена в конце смены после неудачной попытки доставки. В подобных ситуациях посылка считается утерянной, а штраф эквивалентен DNR. Тщательно пересчитывайте возвращаемые посылки и сверяйте их со списком, отображаемым в сканере: Today’s Itinerary → Summary → Problems. Если количество не совпадает, сообщите дежурному диспетчеру до завершения смены в приложении Amazon.',
+          'Штрафует, если вы отсканировали посылку при загрузке, но не вернули ее в конце смены после неуспешной доставки. Такая посылка считается потерянной, и штраф сопоставим с DNR. Тщательно считайте возвраты и сверяйте их со scanner. Путь: Today\\\'s Itinerary - Summary - Problems. Если не совпадает, сообщите дежурному диспетчеру до завершения смены в приложении Amazon.',
       'faq_a7_6':
-          'Эта метрика отражает вашу эффективность доставки, отслеживая долю доставок, выполненных согласно плану. Она помогает нам оценивать эффективность и надёжность сервиса и выявлять такие проблемы, как задержки, неудачные попытки или трудности маршрутизации. Ваш DCR всегда должен быть максимально высоким. Для этого выполняйте reattempts всякий раз, когда это целесообразно, и сводите к минимуму количество возвращаемых посылок.',
+          'Показывает вашу способность завершать доставки. Отслеживает долю выполненных доставок и отражает эффективность и надежность. Выявляет задержки, неудачные попытки и проблемы маршрута. Значение должно быть как можно выше. Для этого делайте повторные попытки и по возможности уменьшайте возвраты.',
       'faq_a7_7':
-          'Эта метрика фиксирует впечатления получателя о доставке — пунктуальность, состояние товара и профессионализм водителя. Она помогает определять сильные стороны нашего сервиса и зоны для развития. После доставки клиент получает от Amazon письмо-опрос с такими вопросами:\n1) Была ли ваша посылка доставлена вовремя? (Да / Нет)\n2) Была ли посылка оставлена в безопасном месте? (Да / Нет)\n3) Была ли посылка в надлежащем состоянии при получении? (Да / Нет)\n4) Насколько вы в целом удовлетворены доставкой? (Очень удовлетворён / Удовлетворён / Нейтрально / Не удовлетворён / Совершенно не удовлетворён)\n5) Как вы оцениваете коммуникацию и обновления отслеживания по этой доставке? (Отлично / Хорошо / Средне / Плохо)\n6) Был ли сотрудник службы доставки вежлив и профессионален? (Да / Нет / Неприменимо — бесконтактная доставка)\n7) Есть ли у вас комментарии о вашем опыте доставки? (Дополнительные комментарии клиента)',
+          'Оценивает опыт получателя: вовремя ли доставка, состояние посылки, профессионализм водителя. Это помогает видеть сильные и слабые стороны сервиса. После доставки клиент получает письмо Amazon с вопросами:\n1) Доставлена ли посылка вовремя? (Да/Нет)\n2) Оставлена ли посылка в безопасном месте? (Да/Нет)\n3) Была ли посылка в хорошем состоянии? (Да/Нет)\n4) Общая удовлетворенность доставкой?\n5) Как вы оцениваете коммуникацию и трекинг? (Отлично/Хорошо/Средне/Плохо)\n6) Был ли курьер вежлив и профессионален?\n7) Дополнительные комментарии клиента.',
       'faq_a7_8':
-          'Качество и эффективность имеют решающее значение. Высокие показатели приносят пользу вам, компании и всей команде. Удовлетворённость клиента является нашим главным приоритетом, а выдающиеся результаты отмечаются бонусом от компании.\nДавайте максимум — и получите соответствующее вознаграждение.',
+          'Качество и эффективность идут вместе. Хорошие баллы полезны вам, компании и всей команде. Удовлетворенность клиента критична, а хорошие показатели поддерживаются бонусами.\nДелайте максимум - получайте максимум.',
       'faq_a8':
-          'Отдавайте приоритет личной безопасности: управляйте автомобилем ответственно, предотвращайте травмы и проявляйте осторожность рядом с собаками, чтобы избежать укусов. Бережно относитесь ко всему рабочему оборудованию — включая ежедневный автомобиль и рабочий сканер/телефон. Всегда приходите на работу в защитной обуви, сигнальном жилете и подходящей по погоде куртке или футболке с брендингом Amazon.',
+          'Берегите себя: безопасное вождение, профилактика травм, осторожность с собаками и укусами. Бережно относитесь к рабочему оборудованию (машина, scanner/телефон) и приходите в защитной обуви, жилете и фирменной одежде Amazon по погоде.',
       'faq_a9':
-          'В первую очередь убедитесь, что вы не получили серьёзных травм. Что касается ущерба автомобилю: если мы установим, что ДТП произошло по причине небрежности — например, отвлечения на мобильный телефон во время вождения — вы будете нести личную ответственность за полную стоимость ущерба. Кроме того, оформленный полицейский протокол может повлечь за собой приостановку действия водительского удостоверения, а подобный инцидент является основанием для немедленного увольнения. В менее серьёзных случаях вы будете исключены из программы Weekly Scorecard Bonus на два месяца. Вы обязаны немедленно уведомить нас о любом инциденте и предоставить следующую информацию: время и место происшествия, сведения о возможном ущербе частной или муниципальной собственности (стены, ограждения, столбы освещения, люди или животные), а также чёткие фотографии повреждений автомобиля.',
+          'Сначала убедитесь, что вы не получили серьезных травм. Если ущерб вызван небрежностью (например, использование телефона за рулем), вы можете нести полную личную ответственность за повреждения. Также возможен полицейский протокол и санкции по правам. Это может стать причиной немедленного увольнения. В ином случае вы исключаетесь из Weekly Scorecard Bonus на 2 месяца. При инциденте вы ОБЯЗАНЫ немедленно сообщить нам время, место, наличие ущерба частной/публичной собственности (стены, заборы, столбы, люди/животные), а также прислать фото повреждений авто.',
 
-      'faq_q1': 'Какой аспект вашей ежедневной работы наиболее важен?',
+      'faq_q1': 'Что самое важное в вашей ежедневной работе?',
 
-      'faq_q10':
-          'Что делать, если посылка повреждена или отсутствует?',
+      'faq_q10': 'Что делать, если посылка повреждена и/или отсутствует?',
 
-      'faq_q11': 'Что представляет собой OTP-посылка (One-Time Password)?',
+      'faq_q11': 'Что такое OTP (One-Time Password) посылка?',
 
-      'faq_q12':
-          'Почему мы продолжаем просить вас замедлиться вместо того, чтобы работать быстрее?',
+      'faq_q12': 'Почему вы постоянно просите замедлиться и не ехать быстрее?',
 
       'faq_q13':
-          'Почему диспетчеры иногда интересуются, отстаёте ли вы или что-то идёт не так?',
+          'Тогда почему диспетчеры иногда спрашивают, почему вы отстаете?',
 
-      'faq_q14':
-          'Почему вас иногда просят помочь коллеге?',
+      'faq_q14': 'Почему иногда просят помочь коллеге?',
 
       'faq_q15':
-          'Буду ли я с первого дня выполнять стандартные маршруты, как более опытные водители?',
+          'С первого дня я сразу получу стандартный маршрут как у опытных водителей?',
 
       'faq_q16':
-          'Что делать, если адрес указан неверно или pin на карте неточен?',
+          'Что делать, если адрес неверный и/или pin на карте неправильный?',
 
-      'faq_q17':
-          'Какие ежедневные задачи предусмотрены до начала и после завершения работы?',
+      'faq_q17': 'Какие ежедневные задачи до начала и после окончания смены?',
 
       'faq_q18':
-          'Требуется ли что-либо делать, когда я использую другой автомобиль вместо привычного?',
+          'Нужно ли что-то делать, если я беру другой фургон вместо своего обычного?',
 
       'faq_q19':
-          'Что делать, если приложение Flex постоянно загружается и замедляет мой рабочий процесс?',
+          'Что делать, если приложение Flex постоянно грузится и тормозит работу?',
 
-      'faq_q2':
-          'Чего следует избегать при возникновении проблемы с клиентом?',
+      'faq_q2': 'Чего нельзя делать при проблеме с клиентом?',
 
       'faq_q20':
-          'Что делать, если интернет-соединение активно, но приложение Flex по-прежнему работает некорректно?',
+          'Что если интернет активен, но Flex все равно работает некорректно?',
 
-      'faq_q3':
-          'Что делать, если ситуация с клиентом уже обострилась?',
+      'faq_q3': 'Что делать, если ситуация уже обострилась и клиент недоволен?',
 
-      'faq_q4':
-          'Что важнее: количество (выполнение как можно большего числа стопов в максимально короткие сроки) или качество?',
+      'faq_q4': 'Что важнее: количество (скорость) или качество?',
 
-      'faq_q5':
-          'Что произойдёт, если я сосредоточусь на качестве, но начну отставать по стопам?',
+      'faq_q5': 'Если я делаю упор на качество и начинаю отставать по стопам?',
+
+      'faq_q6': 'Что такое scorecard и DNR?',
 
       'faq_q7': 'Еженедельный Scorecard',
 
-      'faq_q7_1': 'Вкладка DNR — Delivered Not Received',
+      'faq_q7_1': 'Вкладка DNR\nДоставлено, но не получено',
 
-      'faq_q7_1_1':
-          'Как можно избежать DNR и насколько существенно они влияют на мой недельный scorecard?',
+      'faq_q7_1_1': 'Как этого избежать и насколько это важно для scorecard?',
 
-      'faq_q7_1_2': 'Как предотвратить потерю посылок?',
+      'faq_q7_1_2': 'Как избежать потери посылок?',
 
-      'faq_q7_1_3': 'Как определить, является ли место безопасным?',
+      'faq_q7_1_3': 'Как понять, безопасное место или нет?',
 
       'faq_q7_1_4':
-          'Как утерянная или украденная посылка влияет на мой показатель?',
+          'Если посылка потеряна или украдена, как это повлияет на мой счет?',
 
-      'faq_q7_2': 'Вкладка CC — Contact Compliance',
+      'faq_q7_2': 'Вкладка CC\nСоответствие коммуникации',
 
-      'faq_q7_2_1': 'Почему контакт с клиентом важен?',
+      'faq_q7_2_1': 'Почему это важно делать?',
 
-      'faq_q7_2_2': 'Как улучшить показатель CC?',
+      'faq_q7_2_2': 'Как улучшить CC?',
 
-      'faq_q7_3': 'Вкладка CE — Customer Escalation',
+      'faq_q7_3': 'Вкладка CE\nЭскалация клиента',
 
-      'faq_q7_3_1': 'Как избежать эскалации со стороны клиента?',
+      'faq_q7_3_1': 'Как этого избежать?',
 
-      'faq_q7_4': 'Вкладка POD — Picture on Delivery',
+      'faq_q7_4': 'Вкладка POD\nФото при доставке',
 
-      'faq_q7_5': 'Вкладка LoR — Lost on Road',
+      'faq_q7_5': 'Вкладка LoR\nПотеряно в пути',
 
-      'faq_q7_6': 'Вкладка DCR — Delivery Completion Rate',
+      'faq_q7_6': 'Вкладка DCR\nПроцент завершения доставок',
 
-      'faq_q7_7':
-          'Вкладка CDF (ранее DEX) — Customer Delivery Feedback',
+      'faq_q7_7': 'Вкладка CDF (ранее DEX)\nОбратная связь клиента по доставке',
 
-      'faq_q7_8':
-          'Что следует помнить о scorecard в целом?',
+      'faq_q7_8': 'Что важно помнить о scorecard?',
 
-      'faq_q8':
-          'Каким ещё аспектам необходимо уделять особое внимание?',
+      'faq_q8': 'В каких еще областях нужно быть особенно внимательным?',
 
       'faq_q9':
-          'Что делать, если я попал в ДТП или повредил рабочий автомобиль?',
+          'Что будет, если я попаду в ДТП или поврежу рабочий автомобиль?',
 
       'kpi_desc_cc':
           'CC (Контакт с клиентом)\n\nЧем выше значение, тем лучше.\n\nКрайне важно:\nВы ДОЛЖНЫ ВСЕГДА отправлять сообщение "No safe location" или "Address not found", когда не можете доставить посылку, потому что:\n\n- клиента нет дома или\n- адрес не найден',

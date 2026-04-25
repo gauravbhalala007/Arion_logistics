@@ -3,12 +3,74 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../services/auth_service.dart'; // Ensure this path is correct
+import 'package:google_fonts/google_fonts.dart';
+import '../services/auth_service.dart';
 
-// Define the custom colors used in the mockup
-const Color primaryTeal = Color(0xFF50B39E);
-const Color backgroundLight = Color(0xFFF5F5F5);
-const Color coColor = Color(0xFF3B5B53); // Darker green for 'CO'
+// --- Codriver Design Tokens (from CODRIVER_STYLEGUIDE.md) ---
+// Brand
+const Color _codriverGreen = Color(0xFF00B287);
+const Color _codriverDeep = Color(0xFF006047);
+const Color _green50 = Color(0xFFE6F8F2);
+
+// Semantic — Light
+const Color _background = Color(0xFFFAFAFA);
+const Color _surface = Color(0xFFF2F2F7);
+const Color _surfaceElevated = Color(0xFFFFFFFF);
+const Color _separator = Color(0xFFC6C6C8);
+const Color _label = Color(0xFF000000);
+const Color _labelSecondary = Color(0x993C3C43);
+const Color _labelTertiary = Color(0x4D3C3C43);
+
+// Status
+const Color _error = Color(0xFFFF3B30);
+const Color _success = Color(0xFF34C759);
+
+// Spacing (4-pt grid)
+const double _spXs = 8;
+const double _spSm = 12;
+const double _spMd = 16;
+const double _spLg = 20;
+const double _spXl = 24;
+const double _spXxl = 32;
+const double _spXxxl = 48;
+
+// SF Pro → fallback to system. Apply letter-spacing per styleguide.
+TextStyle get _title1 => GoogleFonts.inter(
+  fontSize: 28,
+  height: 34 / 28,
+  fontWeight: FontWeight.w700,
+  letterSpacing: -0.4,
+  color: _label,
+);
+
+TextStyle get _headline => GoogleFonts.inter(
+  fontSize: 17,
+  height: 22 / 17,
+  fontWeight: FontWeight.w600,
+  letterSpacing: -0.3,
+);
+
+TextStyle get _body => GoogleFonts.inter(
+  fontSize: 17,
+  height: 22 / 17,
+  fontWeight: FontWeight.w400,
+  letterSpacing: -0.3,
+  color: _label,
+);
+
+TextStyle get _subheadline => GoogleFonts.inter(
+  fontSize: 15,
+  height: 20 / 15,
+  fontWeight: FontWeight.w400,
+  letterSpacing: -0.2,
+);
+
+TextStyle get _footnote => GoogleFonts.inter(
+  fontSize: 13,
+  height: 18 / 13,
+  fontWeight: FontWeight.w400,
+  letterSpacing: -0.05,
+);
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -20,7 +82,11 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _emailFocus = FocusNode();
+  final _passwordFocus = FocusNode();
+
   bool _busy = false;
+  bool _passwordVisible = false;
   String? _errorMessage;
   String? _infoMessage;
 
@@ -28,10 +94,12 @@ class _LoginPageState extends State<LoginPage> {
   void dispose() {
     _email.dispose();
     _password.dispose();
+    _emailFocus.dispose();
+    _passwordFocus.dispose();
     super.dispose();
   }
 
-  // --- Utility Methods (Auth and Snack) ---
+  // --- Auth ---
 
   Future<void> _submit() async {
     if (_busy) return;
@@ -49,13 +117,11 @@ class _LoginPageState extends State<LoginPage> {
       await AuthService.signIn(email: email, password: password);
 
       // Helps OS/browser password managers decide to save credentials.
-      // (On Flutter web, prompts can still be browser-dependent.)
+      // (On Flutter web, prompts are still browser-dependent.)
       TextInput.finishAutofillContext(shouldSave: true);
 
       if (!mounted) return;
       _clearMessages();
-
-      // 🔹 After successful sign-in, go to the root route where AuthGate is
       Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
     } on FirebaseAuthException catch (e) {
       _showError(_mapLoginError(e));
@@ -144,45 +210,307 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  // --- UI ---
+
+  static const double _splitBreakpoint = 900;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _background,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isWide = constraints.maxWidth >= _splitBreakpoint;
+          if (isWide) {
+            return Row(
+              children: [
+                Expanded(child: _buildBrandPanel()),
+                Expanded(child: _buildFormPanel()),
+              ],
+            );
+          }
+          return SafeArea(child: _buildFormPanel());
+        },
+      ),
+    );
+  }
+
+  Widget _buildBrandPanel() {
+    return Container(
+      color: _codriverDeep,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(72),
+          child: Align(
+            alignment: Alignment.bottomLeft,
+            child: Text(
+              'organize and improve\nyour delivery team',
+              textAlign: TextAlign.left,
+              style: GoogleFonts.inter(
+                color: Colors.white,
+                fontSize: 56,
+                height: 1.25,
+                fontWeight: FontWeight.w500,
+                letterSpacing: -1.0,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFormPanel() {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: ListView(
+          padding: const EdgeInsets.symmetric(
+            horizontal: _spXl,
+            vertical: _spXxl,
+          ),
+          shrinkWrap: true,
+          children: [
+            const SizedBox(height: _spXxl),
+            _buildLogo(),
+            const SizedBox(height: _spMd),
+            _buildLoginCard(),
+            const SizedBox(height: _spXxl),
+            _buildFooter(),
+            const SizedBox(height: _spXl),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLogo() {
+    return Center(
+      child: Image.asset(
+        'assets/login_codriver_logo.png',
+        width: 300,
+        fit: BoxFit.contain,
+      ),
+    );
+  }
+
+  Widget _buildLoginCard() {
+    return Container(
+      padding: const EdgeInsets.all(_spXl),
+      decoration: BoxDecoration(
+        color: _surfaceElevated,
+        borderRadius: const BorderRadius.all(Radius.circular(32)),
+        border: Border.all(color: Colors.black.withOpacity(0.08), width: 2),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A000000),
+            offset: Offset(0, 1),
+            blurRadius: 2,
+          ),
+          BoxShadow(
+            color: Color(0x0F000000),
+            offset: Offset(0, 4),
+            blurRadius: 12,
+          ),
+        ],
+      ),
+      child: AutofillGroup(
+        onDisposeAction: AutofillContextAction.commit,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Welcome', textAlign: TextAlign.center, style: _title1),
+            const SizedBox(height: _spXs),
+            Text(
+              'Sign in to continue to Codriver',
+              textAlign: TextAlign.center,
+              style: _subheadline.copyWith(color: _labelSecondary),
+            ),
+            const SizedBox(height: _spXl),
+
+            _buildStatusCard(),
+
+            _CodriverTextField(
+              controller: _email,
+              focusNode: _emailFocus,
+              hintText: 'you@example.com',
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
+              prefixIcon: Icons.mail_outline_rounded,
+              autofillHints: const [
+                AutofillHints.username,
+                AutofillHints.email,
+              ],
+              onChanged: _onFieldChanged,
+              onSubmitted: (_) => _passwordFocus.requestFocus(),
+            ),
+            const SizedBox(height: _spMd),
+
+            _CodriverTextField(
+              controller: _password,
+              focusNode: _passwordFocus,
+              hintText: 'Your password',
+              obscureText: !_passwordVisible,
+              enableSuggestions: false,
+              autocorrect: false,
+              textInputAction: TextInputAction.done,
+              prefixIcon: Icons.lock_outline_rounded,
+              autofillHints: const [AutofillHints.password],
+              onChanged: _onFieldChanged,
+              onSubmitted: (_) => _submit(),
+              suffix: _PasswordToggleButton(
+                visible: _passwordVisible,
+                onToggle: () {
+                  setState(() => _passwordVisible = !_passwordVisible);
+                },
+              ),
+            ),
+            const SizedBox(height: _spXs),
+
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: _reset,
+                style: TextButton.styleFrom(
+                  foregroundColor: _codriverDeep,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: _spSm,
+                    vertical: _spXs,
+                  ),
+                  minimumSize: const Size(0, 0),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: const StadiumBorder(),
+                ),
+                child: Text(
+                  'Forgot password?',
+                  style: _footnote.copyWith(
+                    color: _codriverDeep,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: _spLg),
+
+            _buildPrimaryButton(),
+            const SizedBox(height: _spMd),
+
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'New here?',
+                  style: _footnote.copyWith(color: _labelSecondary),
+                ),
+                TextButton(
+                  onPressed: () =>
+                      Navigator.of(context).pushReplacementNamed('/signup'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: _codriverGreen,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: _spXs,
+                      vertical: _spXs,
+                    ),
+                    minimumSize: const Size(0, 0),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: const StadiumBorder(),
+                  ),
+                  child: Text(
+                    'Sign up',
+                    style: _footnote.copyWith(
+                      color: _codriverGreen,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _onFieldChanged(String _) {
+    if (_errorMessage != null || _infoMessage != null) _clearMessages();
+  }
+
+  Widget _buildPrimaryButton() {
+    return SizedBox(
+      height: 50,
+      child: ElevatedButton(
+        onPressed: _busy ? null : _submit,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: _codriverGreen,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: _codriverGreen.withOpacity(0.5),
+          disabledForegroundColor: Colors.white,
+          shape: const StadiumBorder(),
+          elevation: 0,
+          shadowColor: _codriverGreen.withOpacity(0.4),
+          padding: const EdgeInsets.symmetric(horizontal: _spXxl),
+          textStyle: _headline,
+        ),
+        child: _busy
+            ? Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation(Colors.white),
+                    ),
+                  ),
+                  const SizedBox(width: _spSm),
+                  Text('Please wait…', style: _headline),
+                ],
+              )
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Continue', style: _headline),
+                  const SizedBox(width: _spXs),
+                  const Icon(Icons.arrow_forward_rounded, size: 20),
+                ],
+              ),
+      ),
+    );
+  }
+
   Widget _buildStatusCard() {
     final message = _errorMessage ?? _infoMessage;
-    if (message == null || message.isEmpty) {
-      return const SizedBox.shrink();
-    }
+    if (message == null || message.isEmpty) return const SizedBox.shrink();
 
     final isError = _errorMessage != null;
-    final borderColor = isError
-        ? const Color(0xFFF3B0B0)
-        : const Color(0xFF9ED9C8);
-    final bgColor = isError ? const Color(0xFFFFF4F4) : const Color(0xFFF2FBF7);
-    final iconColor = isError ? const Color(0xFFC24141) : primaryTeal;
+    final accent = isError ? _error : _success;
+    final bg = isError ? const Color(0xFFFFF1F0) : _green50;
     final icon = isError
         ? Icons.error_outline_rounded
         : Icons.check_circle_outline_rounded;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      margin: const EdgeInsets.only(bottom: _spMd),
+      padding: const EdgeInsets.symmetric(horizontal: _spMd, vertical: _spSm),
       decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: borderColor),
+        color: bg,
+        borderRadius: const BorderRadius.all(Radius.circular(12)), // sm
+        border: Border.all(color: accent.withOpacity(0.25)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: iconColor, size: 20),
-          const SizedBox(width: 10),
+          Icon(icon, color: accent, size: 20),
+          const SizedBox(width: _spSm),
           Expanded(
             child: Text(
               message,
-              style: TextStyle(
-                color: isError
-                    ? const Color(0xFF7F1D1D)
-                    : const Color(0xFF155E4B),
-                fontSize: 14,
+              style: _footnote.copyWith(
+                color: isError ? const Color(0xFF7F1D1D) : _codriverDeep,
                 fontWeight: FontWeight.w600,
-                height: 1.35,
               ),
             ),
           ),
@@ -191,188 +519,171 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  // --- Build Method with Mockup UI ---
-
-  @override
-  Widget build(BuildContext context) {
-    // The theme object is still required for the form styling helper
-    // final theme = Theme.of(context);
-
-    return Scaffold(
-      backgroundColor: backgroundLight,
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
-            child: ListView(
-              shrinkWrap: true,
-              children: [
-                // 1. Branding / Logo Section -- UPDATED FOR IMAGE LOGO ONLY
-                const SizedBox(height: 60), // Increased top space slightly
-                Center(
-                  child: Column(
-                    children: [
-                      // *** IMAGE ASSET LOGO ***
-                      // Replace 'assets/codriver_logo.png' with your actual image path.
-                      Image.asset(
-                        'assets/codriver_logo.png',
-                        width:
-                            350, // Adjust size as needed for your full logo image
-                        height: 200,
-                        fit: BoxFit.contain,
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 60), // Space before the card
-                // 2. Login Form Card (Remains the same)
-                Card(
-                  elevation: 0,
-                  color: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: AutofillGroup(
-                      onDisposeAction: AutofillContextAction.commit,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const Text(
-                            'Welcome back!',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          _buildStatusCard(),
-
-                          // Email Input Field
-                          TextField(
-                            controller: _email,
-                            keyboardType: TextInputType.emailAddress,
-                            autofillHints: const [AutofillHints.username],
-                            textInputAction: TextInputAction.next,
-                            onChanged: (_) {
-                              if (_errorMessage != null ||
-                                  _infoMessage != null) {
-                                _clearMessages();
-                              }
-                            },
-                            decoration: _getInputDecoration('Your email'),
-                          ),
-                          const SizedBox(height: 16),
-
-                          // Password Input Field
-                          TextField(
-                            controller: _password,
-                            obscureText: true,
-                            enableSuggestions: false,
-                            autocorrect: false,
-                            autofillHints: const [AutofillHints.password],
-                            textInputAction: TextInputAction.done,
-                            onChanged: (_) {
-                              if (_errorMessage != null ||
-                                  _infoMessage != null) {
-                                _clearMessages();
-                              }
-                            },
-                            onSubmitted: (_) => _submit(),
-                            decoration: _getInputDecoration('Your password'),
-                          ),
-                          const SizedBox(height: 32),
-
-                          // Login Button ("Continue")
-                          ElevatedButton(
-                            onPressed: _busy ? null : _submit,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: primaryTeal,
-                              foregroundColor: Colors.white,
-                              minimumSize: const Size(double.infinity, 56),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(28),
-                              ),
-                              elevation: 0,
-                              textStyle: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            child: Text(_busy ? 'Please wait…' : 'Continue'),
-                          ),
-
-                          const SizedBox(height: 16),
-
-                          // Forgot Password Link
-                          TextButton(
-                            onPressed: () => Navigator.of(
-                              context,
-                            ).pushReplacementNamed('/signup'),
-                            child: const Text('New here?? SignUp.'),
-                          ),
-                          TextButton(
-                            onPressed: _reset,
-                            child: Text(
-                              'Forgot password?',
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 40),
-
-                // 3. Footer Branding (English company name)
-                Align(
-                  alignment: Alignment.center,
-                  child: Text(
-                    'Kreativvwerk',
-                    style: TextStyle(
-                      color: Colors.grey.shade500,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 40),
-              ],
-            ),
-          ),
+  Widget _buildFooter() {
+    return Center(
+      child: Text(
+        'Kreativwerk | www.kw-agentur.de',
+        style: _footnote.copyWith(
+          color: _labelTertiary,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.3,
         ),
       ),
     );
   }
+}
 
-  // Helper function for input field decoration
-  InputDecoration _getInputDecoration(String hintText) {
-    return InputDecoration(
-      hintText: hintText,
-      hintStyle: const TextStyle(color: Colors.grey),
-      filled: true,
-      fillColor: Colors.grey.shade50,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide.none,
+// --- Small reusable bits (scoped to this file) ---
+
+class _CodriverTextField extends StatefulWidget {
+  final TextEditingController controller;
+  final FocusNode? focusNode;
+  final String hintText;
+  final bool obscureText;
+  final bool enableSuggestions;
+  final bool autocorrect;
+  final TextInputType? keyboardType;
+  final TextInputAction? textInputAction;
+  final Iterable<String>? autofillHints;
+  final IconData? prefixIcon;
+  final Widget? suffix;
+  final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onSubmitted;
+
+  const _CodriverTextField({
+    required this.controller,
+    required this.hintText,
+    this.focusNode,
+    this.obscureText = false,
+    this.enableSuggestions = true,
+    this.autocorrect = true,
+    this.keyboardType,
+    this.textInputAction,
+    this.autofillHints,
+    this.prefixIcon,
+    this.suffix,
+    this.onChanged,
+    this.onSubmitted,
+  });
+
+  @override
+  State<_CodriverTextField> createState() => _CodriverTextFieldState();
+}
+
+class _CodriverTextFieldState extends State<_CodriverTextField> {
+  late final FocusNode _node;
+  bool _ownsNode = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.focusNode != null) {
+      _node = widget.focusNode!;
+    } else {
+      _node = FocusNode();
+      _ownsNode = true;
+    }
+    _node.addListener(_onFocusChange);
+  }
+
+  @override
+  void dispose() {
+    _node.removeListener(_onFocusChange);
+    if (_ownsNode) _node.dispose();
+    super.dispose();
+  }
+
+  void _onFocusChange() => setState(() {});
+
+  @override
+  Widget build(BuildContext context) {
+    final focused = _node.hasFocus;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      curve: Curves.easeInOut,
+      decoration: BoxDecoration(
+        color: _surface,
+        borderRadius: const BorderRadius.all(Radius.circular(999)), // pill
+        border: Border.all(
+          color: focused ? _codriverGreen : _separator.withOpacity(0.0),
+          width: focused ? 1.5 : 1,
+        ),
       ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide.none,
+      child: Row(
+        children: [
+          if (widget.prefixIcon != null) ...[
+            const SizedBox(width: _spMd),
+            Icon(
+              widget.prefixIcon,
+              size: 20,
+              color: focused ? _codriverGreen : _labelSecondary,
+            ),
+          ],
+          Expanded(
+            child: TextField(
+              controller: widget.controller,
+              focusNode: _node,
+              obscureText: widget.obscureText,
+              enableSuggestions: widget.enableSuggestions,
+              autocorrect: widget.autocorrect,
+              keyboardType: widget.keyboardType,
+              textInputAction: widget.textInputAction,
+              autofillHints: widget.autofillHints,
+              onChanged: widget.onChanged,
+              onSubmitted: widget.onSubmitted,
+              cursorColor: _codriverGreen,
+              style: _body,
+              decoration: InputDecoration(
+                isDense: true,
+                hintText: widget.hintText,
+                hintStyle: _body.copyWith(color: _labelTertiary),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: widget.prefixIcon == null ? _spMd : _spSm,
+                  vertical: _spMd,
+                ),
+              ),
+            ),
+          ),
+          if (widget.suffix != null) ...[
+            widget.suffix!,
+            const SizedBox(width: _spXs),
+          ],
+        ],
       ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: primaryTeal, width: 2),
+    );
+  }
+}
+
+class _PasswordToggleButton extends StatelessWidget {
+  final bool visible;
+  final VoidCallback onToggle;
+
+  const _PasswordToggleButton({required this.visible, required this.onToggle});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: visible ? 'Hide password' : 'Show password',
+      child: Tooltip(
+        message: visible ? 'Hide password' : 'Show password',
+        child: InkWell(
+          onTap: onToggle,
+          customBorder: const StadiumBorder(),
+          child: Container(
+            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: _spSm),
+            child: Icon(
+              visible ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+              size: 20,
+              color: _labelSecondary,
+            ),
+          ),
+        ),
       ),
     );
   }

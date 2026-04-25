@@ -1,34 +1,50 @@
-# Claude Code — project context
+# CoDriver App — Projektregeln
 
-<!-- cloude-code-toolbox:mcp-skills-awareness-begin -->
+## Skills
 
-### MCP & Skills awareness (Cloude Code ToolBox)
+Beim Arbeiten an dieser App **immer** die folgenden Skills anwenden:
 
-_Last synced: 2026-04-15T20:11:20.889Z._
+- `flutter-building-layouts` — für jede Art von UI-/Layout-Arbeit (Widgets, Responsive Design, Scaffold/Row/Column/Stack, etc.)
+- `flutter-animating-apps` — für alle animierten Übergänge, Mikro-Interaktionen und State-getriebenen Animationen.
+- `firebase-basics` — für alle allgemeinen Firebase-Arbeiten (Firestore, Storage, Functions, Rules, Konfiguration).
+- `firebase-auth-basics` — speziell für Firebase Authentication (Sign-in, Sign-up, Passwort-Reset, Rollen, Tokens).
+- `firebase-hosting-basics` — für Deployment und Konfiguration von Firebase Hosting (Build, `firebase deploy`, Headers, Rewrites).
+- `frontend-design` — für visuelles Design, Komposition, Spacing, Typografie und Komponenten-Ästhetik.
+- `web-design-guidelines` — für übergreifende Web-Design-Prinzipien (Hierarchie, Kontrast, Accessibility, Motion, moderne UI-Patterns).
 
-- **Full report:** `.claude/cloude-code-toolbox-mcp-skills-awareness.md` in this workspace (auto-overwritten on each scan). Use it as ground truth for configured servers and skill folders.
-- **MCP:** For **live tools** in Claude Code, enable the matching server via `/mcp` (and VS Code `mcp.json` where applicable).
-- **When the user’s task matches a server** (e.g. Confluence work and a **Confluence** / **Atlassian** MCP is listed), **prefer that server id** and plan on tool use—not only file search.
-- **Skills:** Folders below contain `SKILL.md`; attach or cite paths in chat when relevant.
+### Installation (einmalig pro Umgebung)
 
-#### Workspace MCP
+```bash
+npx skills add https://github.com/flutter/skills --skill flutter-building-layouts
+npx skills add https://github.com/flutter/skills --skill flutter-animating-apps
+npx skills add https://github.com/firebase/agent-skills --skill firebase-basics
+npx skills add https://github.com/firebase/agent-skills --skill firebase-auth-basics
+npx skills add https://github.com/firebase/agent-skills --skill firebase-hosting-basics
+npx skills add https://github.com/anthropics/skills --skill frontend-design
+npx skills add https://github.com/vercel-labs/agent-skills --skill web-design-guidelines
+```
 
-- `/Users/gauravbhalala/projects/dsp-kpi/.vscode/mcp.json` _(workspace: dsp-kpi)_ — _file missing_
+### Anwendungsregel
 
-_No active workspace servers in mcp.json._
+- Bei jeder Änderung an Flutter-Widgets, Screens, Animationen, Firebase-Logik, Auth-Flows, Hosting-Deployments oder visuellem Design die oben genannten Skills heranziehen, **bevor** Code geschrieben wird.
+- Wenn ein Skill Best-Practices oder Patterns vorgibt, diese übernehmen statt eigene Lösungen zu erfinden.
+- Breakpoints, Responsive-Strategie, Animation-Kurven und Firebase-Patterns konsistent mit den Skill-Empfehlungen halten.
 
-#### User MCP
+## Projektstruktur
 
-- `/Users/gauravbhalala/Library/Application Support/Code/User/mcp.json` — _file missing_
+- Flutter-App: `flutter_app/kpi_admin/`
+- Firebase-Konfiguration: `flutter_app/kpi_admin/firebase.json`, generierte Options in `lib/firebase_options.dart`
+- Parser-Service: `parser_service/`
+- Firebase Functions/Rules: `firebase/`
 
-_No active user-scoped servers in mcp.json._
+## Entwicklungs-Workflow
 
-#### Project skills
+```bash
+cd "flutter_app/kpi_admin"
+flutter run -d chrome
+```
 
-_None found (or no workspace open)._
-
-#### User skills
-
-_None found._
-
-<!-- cloude-code-toolbox:mcp-skills-awareness-end -->
+Im laufenden Prozess:
+- `r` → Hot Reload (UI-Änderungen, ~1–2 s)
+- `R` → Hot Restart (Struktur-Änderungen, ~3–5 s)
+- `q` → Beenden

@@ -22,7 +22,6 @@ class AuthService {
     required String lastName,
     required String email,
     required String password,
-    String? companyName,
   }) async {
     final cred = await _auth.createUserWithEmailAndPassword(
       email: email,
@@ -36,8 +35,6 @@ class AuthService {
       'firstName': firstName,
       'lastName': lastName,
       'email': email,
-      if (companyName != null && companyName.isNotEmpty)
-        'companyName': companyName,
       'approved': false,
       'role': 'user',
       'createdAt': FieldValue.serverTimestamp(),
