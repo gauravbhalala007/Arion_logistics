@@ -307,8 +307,8 @@ class _FeedbackPageState extends State<FeedbackPage> {
 
         final me = snap.data?.data() ?? <String, dynamic>{};
         final role = (me['role'] ?? '').toString().trim().toLowerCase();
-        final isStaff = role == 'admin' || role == 'developer';
         final isDeveloper = role == 'developer';
+        final isStaff = isDeveloper;
 
         final Query<Map<String, dynamic>> query = isStaff
             ? FirebaseFirestore.instance

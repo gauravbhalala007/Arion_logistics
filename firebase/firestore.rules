@@ -23,8 +23,10 @@ service cloud.firestore {
       return signedIn() && me().data.role == 'developer';
     }
 
-    function isStaff() {
-      return isAdmin() || isDeveloper();
+    // "staff" for feedback handling should be only developers.
+    // Admins/DSPs must not see each other's feedback.
+    function isFeedbackStaff() {
+      return isDeveloper();
     }
 
     function isApproved(userId) {
@@ -68,12 +70,12 @@ service cloud.firestore {
         && request.resource.data.createdByUid == request.auth.uid
         && request.resource.data.status == 'open';
 
-      // Staff can read everything; submitters can read their own items.
-      allow read: if (isStaff() && isApproved(request.auth.uid))
+      // Developers can read everything; submitters can read their own items.
+      allow read: if (isFeedbackStaff() && isApproved(request.auth.uid))
         || (signedIn() && resource.data.createdByUid == request.auth.uid);
 
-      // Only staff can update status/metadata.
-      allow update, delete: if isStaff() && isApproved(request.auth.uid);
+      // Only developers can update/delete feedback.
+      allow update, delete: if isFeedbackStaff() && isApproved(request.auth.uid);
     }
 
     match /users/{userId} {
