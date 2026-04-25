@@ -19,6 +19,14 @@ service cloud.firestore {
       return signedIn() && me().data.role == 'admin';
     }
 
+    function isDeveloper() {
+      return signedIn() && me().data.role == 'developer';
+    }
+
+    function isStaff() {
+      return isAdmin() || isDeveloper();
+    }
+
     function isApproved(userId) {
       return get(/databases/$(database)/documents/users/$(userId)).data.approved == true;
     }
@@ -47,6 +55,25 @@ service cloud.firestore {
 
     function driverTransporterId() {
       return isDriver() ? me().data.transporterId : request.auth.token.transporterId;
+    }
+
+    // ------------------------------------------------------------------------
+    // Feedback (global collection)
+    // ------------------------------------------------------------------------
+    match /feedback/{feedbackId} {
+      // Non-driver users can submit feedback for themselves once approved.
+      allow create: if signedIn()
+        && isApproved(request.auth.uid)
+        && me().data.role != 'driver'
+        && request.resource.data.createdByUid == request.auth.uid
+        && request.resource.data.status == 'open';
+
+      // Staff can read everything; submitters can read their own items.
+      allow read: if (isStaff() && isApproved(request.auth.uid))
+        || (signedIn() && resource.data.createdByUid == request.auth.uid);
+
+      // Only staff can update status/metadata.
+      allow update, delete: if isStaff() && isApproved(request.auth.uid);
     }
 
     match /users/{userId} {

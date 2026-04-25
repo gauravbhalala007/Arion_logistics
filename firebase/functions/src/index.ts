@@ -11,6 +11,7 @@ import * as https from "node:https";
 import {initializeApp} from "firebase-admin/app";
 import {getFirestore, FieldValue} from "firebase-admin/firestore";
 import { getAuth, UserRecord } from "firebase-admin/auth";
+import {getStorage} from "firebase-admin/storage";
 
 import {onSchedule} from "firebase-functions/v2/scheduler";
 
@@ -1148,3 +1149,65 @@ export const translateFaqText = onCall(async (request) => {
     translations,
   };
 });
+
+/**
+ * Scheduled job: delete resolved feedback older than 7 days.
+ * Also attempts to delete the stored attachment file (if any).
+ */
+export const cleanupResolvedFeedback = onSchedule(
+  {
+    schedule: "every day 03:10",
+    region: "us-central1",
+    timeZone: "Europe/Berlin",
+    memory: "256MiB",
+  },
+  async () => {
+    const MS_PER_DAY = 24 * 60 * 60 * 1000;
+    const cutoff = new Date(Date.now() - 7 * MS_PER_DAY);
+    const bucket = getStorage().bucket();
+
+    let totalDeleted = 0;
+    // Avoid long running schedules; process in a few chunks.
+    for (let round = 0; round < 8; round += 1) {
+      const snap = await db
+        .collection("feedback")
+        .where("status", "==", "resolved")
+        .where("resolvedAt", "<=", cutoff)
+        .orderBy("resolvedAt", "asc")
+        .limit(200)
+        .get();
+
+      if (snap.empty) break;
+
+      const deletes: Promise<unknown>[] = [];
+      const batch = db.batch();
+
+      for (const doc of snap.docs) {
+        const data = doc.data() as Record<string, unknown>;
+        const attachmentPath = (data.attachmentPath || "").toString().trim();
+        if (attachmentPath) {
+          deletes.push(
+            bucket.file(attachmentPath).delete({ignoreNotFound: true}).catch((err) => {
+              logger.warn(
+                `cleanupResolvedFeedback: failed to delete attachment ${attachmentPath}`,
+                err,
+              );
+            }),
+          );
+        }
+        batch.delete(doc.ref);
+      }
+
+      await batch.commit();
+      await Promise.all(deletes);
+
+      totalDeleted += snap.size;
+    }
+
+    if (totalDeleted > 0) {
+      logger.info(
+        `cleanupResolvedFeedback: deleted ${totalDeleted} resolved feedback docs older than ${cutoff.toISOString()}`,
+      );
+    }
+  },
+);
