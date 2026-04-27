@@ -58,6 +58,10 @@ type DeleteDriverData = {
   transporterId?: string;
 };
 
+type DeleteFeedbackData = {
+  feedbackId?: string;
+};
+
 type TranslateFaqTextData = {
   sourceLang?: string;
   targetLangs?: unknown;
@@ -1148,6 +1152,54 @@ export const translateFaqText = onCall(async (request) => {
     sourceLang,
     translations,
   };
+});
+
+/**
+ * Deletes a feedback document (and its attachment if present).
+ * Allowed for:
+ * - the submitter (createdByUid)
+ * - developer role
+ */
+export const deleteFeedback = onCall(async (request) => {
+  const uid = requireAuthUid(request.auth);
+  const data = (request.data || {}) as DeleteFeedbackData;
+
+  const feedbackId = (data.feedbackId || "").toString().trim();
+  if (!feedbackId) {
+    throw new HttpsError("invalid-argument", "feedbackId is required.");
+  }
+
+  const userSnap = await db.collection("users").doc(uid).get();
+  const user = userSnap.data() || {};
+  if (user.approved !== true) {
+    throw new HttpsError("permission-denied", "User is not approved.");
+  }
+  const role = (user.role || "").toString().trim().toLowerCase();
+  if (role === "driver") {
+    throw new HttpsError("permission-denied", "Drivers cannot delete feedback.");
+  }
+
+  const ref = db.collection("feedback").doc(feedbackId);
+  const snap = await ref.get();
+  if (!snap.exists) {
+    throw new HttpsError("not-found", "Feedback not found.");
+  }
+
+  const fbData = snap.data() || {};
+  const createdByUid = (fbData.createdByUid || "").toString().trim();
+  const isDeveloper = role === "developer";
+
+  if (!isDeveloper && createdByUid !== uid) {
+    throw new HttpsError("permission-denied", "Not allowed to delete this feedback.");
+  }
+
+  const attachmentPath = (fbData.attachmentPath || "").toString().trim();
+  if (attachmentPath) {
+    await getStorage().bucket().file(attachmentPath).delete({ignoreNotFound: true});
+  }
+
+  await ref.delete();
+  return {ok: true};
 });
 
 /**
