@@ -287,6 +287,7 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
     required List<Locale> locales,
     required Map<String, TextEditingController> qCtrls,
     required Map<String, TextEditingController> aCtrls,
+    bool overwriteExisting = false,
   }) async {
     final codes = locales.map((l) => l.languageCode.toLowerCase()).toList();
 
@@ -310,6 +311,10 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
     final targets = <String>[];
     for (final code in codes) {
       if (code == sourceLang) continue;
+      if (overwriteExisting) {
+        targets.add(code);
+        continue;
+      }
       final needsQuestion =
           sourceQuestion.isNotEmpty &&
           (qCtrls[code]?.text.trim().isEmpty ?? true);
@@ -354,14 +359,14 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
         final aCtrl = aCtrls[code];
 
         if (qCtrl != null &&
-            qCtrl.text.trim().isEmpty &&
-            qTranslated.isNotEmpty) {
+            qTranslated.isNotEmpty &&
+            (overwriteExisting || qCtrl.text.trim().isEmpty)) {
           qCtrl.text = qTranslated;
           translatedCount++;
         }
         if (aCtrl != null &&
-            aCtrl.text.trim().isEmpty &&
-            aTranslated.isNotEmpty) {
+            aTranslated.isNotEmpty &&
+            (overwriteExisting || aCtrl.text.trim().isEmpty)) {
           aCtrl.text = aTranslated;
           translatedCount++;
         }
@@ -431,8 +436,8 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
 
     for (final locale in locales) {
       final code = locale.languageCode;
-      final qValue = _localizedFaqValue(data, 'question', code);
-      final aValue = _localizedFaqValue(data, 'answer', code);
+      final qValue = _storedFaqEditorValue(data, 'question', code);
+      final aValue = _storedFaqEditorValue(data, 'answer', code);
       qCtrls[code] = TextEditingController(text: qValue);
       aCtrls[code] = TextEditingController(text: aValue);
     }
@@ -467,6 +472,7 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
                 locales: locales,
                 qCtrls: qCtrls,
                 aCtrls: aCtrls,
+                overwriteExisting: true,
               );
               if (!mounted || !dialogOpen) return;
               setStateDialog(() => translating = false);
@@ -1023,6 +1029,23 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
         pick(field) ??
         (fallbackKey != null ? pick(fallbackKey) : null) ??
         '';
+  }
+
+  String _storedFaqEditorValue(
+    Map<String, dynamic>? data,
+    String field,
+    String langCode,
+  ) {
+    final localized = _overrideValue(data, field, langCode);
+    if (localized.isNotEmpty) return localized;
+
+    // Preserve older custom FAQs that may only have the base English fields.
+    if (langCode == 'en' && data != null) {
+      final raw = data[field];
+      final text = raw?.toString().trim() ?? '';
+      if (text.isNotEmpty) return text;
+    }
+    return '';
   }
 
   String? _firstLocalizedKey(Map<String, dynamic> data, String field) {

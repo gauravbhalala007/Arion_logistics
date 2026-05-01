@@ -973,6 +973,15 @@ class _FeedbackPageState extends State<FeedbackPage> {
                                               const SizedBox(width: 8),
                                               PopupMenuButton<String>(
                                                 tooltip: 'Actions',
+                                                color: Colors.white,
+                                                elevation: 8,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(14),
+                                                  side: const BorderSide(
+                                                    color: Color(0xFFE5E7EB),
+                                                  ),
+                                                ),
                                                 onSelected: (v) {
                                                   if (v == 'resolve' &&
                                                       isStaff) {

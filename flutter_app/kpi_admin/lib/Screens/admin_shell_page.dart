@@ -22,6 +22,7 @@ import 'admin_academy_page.dart';
 import 'admin_dispatcher_pill_page.dart';
 import 'dsp_profile_page.dart';
 import 'feedback_page.dart';
+import 'fleet_status_page.dart';
 
 class AdminShellPage extends StatefulWidget {
   final AppNav initialNav;
@@ -133,6 +134,7 @@ class _AdminShellPageState extends State<AdminShellPage> {
               ScorecardOverviewPage(),
               PodQualityOverviewPage(),
               DriversHubPage(),
+              FleetStatusPage(),
               TaskSheetPage(),
               AdminShiftAbsencePage(),
               AdminIncidentReportsPage(),
@@ -160,26 +162,28 @@ class _AdminShellPageState extends State<AdminShellPage> {
         return 2;
       case AppNav.drivers:
         return 3;
-      case AppNav.tasks:
+      case AppNav.fleetStatus:
         return 4;
-      case AppNav.shiftAbsence:
+      case AppNav.tasks:
         return 5;
-      case AppNav.incidentReports:
+      case AppNav.shiftAbsence:
         return 6;
-      case AppNav.academy:
+      case AppNav.incidentReports:
         return 7;
-      case AppNav.dispatcherPill:
+      case AppNav.academy:
         return 8;
-      case AppNav.notifications:
+      case AppNav.dispatcherPill:
         return 9;
-      case AppNav.feedback:
+      case AppNav.notifications:
         return 10;
-      case AppNav.faqs:
+      case AppNav.feedback:
         return 11;
-      case AppNav.adminApprovals:
+      case AppNav.faqs:
         return 12;
-      case AppNav.profile:
+      case AppNav.adminApprovals:
         return 13;
+      case AppNav.profile:
+        return 14;
       default:
         return 0;
     }

@@ -1,9 +1,77 @@
-// TEMP ONLY to diagnose
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    match /{allPaths=**} {
-      allow read, write: if true;
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function callerDoc() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid));
+    }
+
+    function callerFleetScope() {
+      return request.auth.uid;
+    }
+
+    function callerRole() {
+      return signedIn() && callerDoc().data.role != null
+        ? callerDoc().data.role
+        : '';
+    }
+
+    function isApprovedFleetViewer() {
+      return signedIn()
+        && callerDoc().data.approved == true
+        && callerRole().matches('(?i)^(admin|user|developer)$');
+    }
+
+    function isApprovedFleetManager() {
+      return isApprovedFleetViewer();
+    }
+
+    function ownerDocExists(ownerOrScopeId) {
+      return firestore.exists(/databases/(default)/documents/users/$(ownerOrScopeId));
+    }
+
+    function ownerFleetScope(ownerOrScopeId) {
+      return ownerDocExists(ownerOrScopeId)
+        && firestore.get(/databases/(default)/documents/users/$(ownerOrScopeId)).data.dspUid != null
+        && firestore.get(/databases/(default)/documents/users/$(ownerOrScopeId)).data.dspUid != ''
+          ? firestore.get(/databases/(default)/documents/users/$(ownerOrScopeId)).data.dspUid
+          : ownerOrScopeId;
+    }
+
+    function ownerMatchesFleetScope(ownerOrScopeId) {
+      return ownerOrScopeId == callerFleetScope()
+        || ownerFleetScope(ownerOrScopeId) == callerFleetScope();
+    }
+
+    function vehicleExistsForScope(ownerOrScopeId, vehicleNumber) {
+      return firestore.exists(
+        /databases/(default)/documents/users/$(ownerOrScopeId)/vehicles/$(vehicleNumber)
+      );
+    }
+
+    function canReadVehicleDocument(ownerOrScopeId, vehicleNumber) {
+      return isApprovedFleetViewer()
+        && ownerMatchesFleetScope(ownerOrScopeId)
+        && vehicleExistsForScope(ownerOrScopeId, vehicleNumber);
+    }
+
+    function canWriteVehicleDocument(ownerOrScopeId, vehicleNumber) {
+      return isApprovedFleetManager()
+        && ownerMatchesFleetScope(ownerOrScopeId)
+        && vehicleExistsForScope(ownerOrScopeId, vehicleNumber);
+    }
+
+    match /vehicles/{ownerOrScopeId}/{vehicleNumber}/documents/{fileName} {
+      allow read: if canReadVehicleDocument(ownerOrScopeId, vehicleNumber);
+      allow write: if canWriteVehicleDocument(ownerOrScopeId, vehicleNumber);
+    }
+
+    match /vehicles/{ownerOrScopeId}/{vehicleNumber}/{fileName} {
+      allow read: if canReadVehicleDocument(ownerOrScopeId, vehicleNumber);
+      allow write: if canWriteVehicleDocument(ownerOrScopeId, vehicleNumber);
     }
   }
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -2141,17 +2142,296 @@ class _NotificationHistoryTileLive extends StatelessWidget {
 }
 
 // ---------------------------
-// FLEET HUB (unchanged dummy UI)
+// FLEET HUB
 // ---------------------------
 
-class _FleetHubCard extends StatelessWidget {
+class _FleetHubCard extends StatefulWidget {
   final double scale;
   final bool adaptiveHeight;
   const _FleetHubCard({required this.scale, this.adaptiveHeight = false});
 
   @override
+  State<_FleetHubCard> createState() => _FleetHubCardState();
+}
+
+class _FleetHubCardState extends State<_FleetHubCard> {
+  static const List<String> _requiredDocumentTypes = <String>[
+    'tuv',
+    'insurance',
+    'service',
+    'rc',
+  ];
+
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _vehicleSubscription;
+  final Map<String, StreamSubscription<QuerySnapshot<Map<String, dynamic>>>>
+  _documentSubscriptions =
+      <String, StreamSubscription<QuerySnapshot<Map<String, dynamic>>>>{};
+  final Map<String, _FleetDashboardVehicle> _vehicles =
+      <String, _FleetDashboardVehicle>{};
+  final Map<String, List<_FleetDashboardDocument>> _documentsByVehicleId =
+      <String, List<_FleetDashboardDocument>>{};
+  final Set<String> _readyDocumentVehicleIds = <String>{};
+
+  bool _loading = true;
+  Object? _loadError;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeFleetHub();
+  }
+
+  @override
+  void dispose() {
+    _vehicleSubscription?.cancel();
+    for (final subscription in _documentSubscriptions.values) {
+      subscription.cancel();
+    }
+    super.dispose();
+  }
+
+  Future<void> _initializeFleetHub() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      return;
+    }
+
+    try {
+      final userSnap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .get();
+      final userData = userSnap.data() ?? const <String, dynamic>{};
+      final rawScope = (userData['dspUid'] ?? '').toString().trim();
+      final fleetScope = rawScope.isEmpty ? uid : rawScope;
+      _listenToVehicles(fleetScope);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadError = error;
+      });
+    }
+  }
+
+  void _listenToVehicles(String fleetScope) {
+    _vehicleSubscription?.cancel();
+    for (final subscription in _documentSubscriptions.values) {
+      subscription.cancel();
+    }
+    _documentSubscriptions.clear();
+    _vehicles.clear();
+    _documentsByVehicleId.clear();
+    _readyDocumentVehicleIds.clear();
+
+    _vehicleSubscription = FirebaseFirestore.instance
+        .collection('users')
+        .doc(fleetScope)
+        .collection('vehicles')
+        .snapshots()
+        .listen(
+          (snapshot) {
+            final nextVehicles = <String, _FleetDashboardVehicle>{
+              for (final doc in snapshot.docs)
+                doc.id: _FleetDashboardVehicle.fromDoc(doc),
+            };
+
+            final removedVehicleIds = _vehicles.keys
+                .where((vehicleId) => !nextVehicles.containsKey(vehicleId))
+                .toList(growable: false);
+            for (final vehicleId in removedVehicleIds) {
+              _documentSubscriptions.remove(vehicleId)?.cancel();
+              _documentsByVehicleId.remove(vehicleId);
+              _readyDocumentVehicleIds.remove(vehicleId);
+            }
+
+            _vehicles
+              ..clear()
+              ..addAll(nextVehicles);
+
+            for (final entry in nextVehicles.entries) {
+              if (_documentSubscriptions.containsKey(entry.key)) continue;
+              _documentSubscriptions[entry.key] = FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(fleetScope)
+                  .collection('vehicles')
+                  .doc(entry.key)
+                  .collection('documents')
+                  .snapshots()
+                  .listen(
+                    (documentsSnapshot) {
+                      _documentsByVehicleId[entry.key] = documentsSnapshot.docs
+                          .map(_FleetDashboardDocument.fromDoc)
+                          .toList(growable: false);
+                      _readyDocumentVehicleIds.add(entry.key);
+                      if (!mounted) return;
+                      setState(() {
+                        _loading =
+                            _readyDocumentVehicleIds.length < _vehicles.length;
+                      });
+                    },
+                    onError: (error) {
+                      if (!mounted) return;
+                      setState(() {
+                        _readyDocumentVehicleIds.add(entry.key);
+                        _loading =
+                            _readyDocumentVehicleIds.length < _vehicles.length;
+                        _loadError = error;
+                      });
+                    },
+                  );
+            }
+
+            if (!mounted) return;
+            setState(() {
+              _loading = nextVehicles.isNotEmpty &&
+                  _readyDocumentVehicleIds.length < nextVehicles.length;
+              _loadError = null;
+            });
+          },
+          onError: (error) {
+            if (!mounted) return;
+            setState(() {
+              _loading = false;
+              _loadError = error;
+            });
+          },
+        );
+  }
+
+  int _compareDocumentRecency(
+    _FleetDashboardDocument a,
+    _FleetDashboardDocument b,
+  ) {
+    final aTime = a.uploadedAt;
+    final bTime = b.uploadedAt;
+    if (aTime != null && bTime != null) {
+      return aTime.compareTo(bTime);
+    }
+    if (aTime != null) return 1;
+    if (bTime != null) return -1;
+    return a.id.compareTo(b.id);
+  }
+
+  List<_FleetComplianceItem> _buildComplianceItems() {
+    final items = <_FleetComplianceItem>[];
+
+    for (final vehicle in _vehicles.values) {
+      final latestByType = <String, _FleetDashboardDocument>{};
+      final documents =
+          _documentsByVehicleId[vehicle.id] ?? const <_FleetDashboardDocument>[];
+
+      for (final document in documents) {
+        final type = document.type.trim().toLowerCase();
+        if (!_requiredDocumentTypes.contains(type)) continue;
+        final current = latestByType[type];
+        if (current == null ||
+            _compareDocumentRecency(document, current) > 0) {
+          latestByType[type] = document;
+        }
+      }
+
+      for (final type in _requiredDocumentTypes) {
+        items.add(
+          _FleetComplianceItem.fromVehicleDocument(
+            vehicleNumber: vehicle.vehicleNumber,
+            type: type,
+            document: latestByType[type],
+          ),
+        );
+      }
+    }
+
+    items.sort((a, b) {
+      final priorityComparison = a.priority.compareTo(b.priority);
+      if (priorityComparison != 0) return priorityComparison;
+
+      final aDate = a.sortDate;
+      final bDate = b.sortDate;
+      if (aDate != null && bDate != null) {
+        final dateComparison = aDate.compareTo(bDate);
+        if (dateComparison != 0) return dateComparison;
+      } else if (aDate != null) {
+        return -1;
+      } else if (bDate != null) {
+        return 1;
+      }
+
+      final vehicleComparison = a.vehicleNumber.compareTo(b.vehicleNumber);
+      if (vehicleComparison != 0) return vehicleComparison;
+      return a.type.compareTo(b.type);
+    });
+
+    return items.take(6).toList(growable: false);
+  }
+
+  String _expiryText(BuildContext context, _FleetComplianceItem item) {
+    final t = AppLocalizations.of(context);
+    if (item.state == _FleetComplianceState.missing) {
+      return t.t('fleet_status_vehicle_details_missing');
+    }
+    if (item.state == _FleetComplianceState.noExpiry) {
+      return t.t('fleet_status_vehicle_details_not_set');
+    }
+    final expiryDate = item.expiryDate;
+    if (expiryDate == null) {
+      return t.t('fleet_status_vehicle_details_not_set');
+    }
+    return MaterialLocalizations.of(context).formatShortDate(expiryDate);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final scale = widget.scale;
+    final total = _vehicles.length;
+    final active = _vehicles.values
+        .where((vehicle) => vehicle.status.trim().toLowerCase() == 'active')
+        .length;
+    final inactive = total - active;
+    final items = _buildComplianceItems();
+
+    Widget content = Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(_r(12, scale)),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F8F8),
+        borderRadius: BorderRadius.circular(_r(18, scale)),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: _loading
+          ? Center(
+              child: Text(
+                t.t('admin_home_loading_documents'),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: _r(14, scale),
+                  fontWeight: FontWeight.w700,
+                  color: AdminHomePage._kMuted,
+                ),
+              ),
+            )
+          : _loadError != null || items.isEmpty
+          ? Center(
+              child: Text(
+                t.t('admin_home_no_items'),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: _r(14, scale),
+                  fontWeight: FontWeight.w700,
+                  color: AdminHomePage._kMuted,
+                ),
+              ),
+            )
+          : _FleetComplianceList(
+              scale: scale,
+              adaptiveHeight: widget.adaptiveHeight,
+              items: items,
+              expiryTextBuilder: (item) => _expiryText(context, item),
+            ),
+    );
 
     return _AdminCard(
       scale: scale,
@@ -2159,43 +2439,50 @@ class _FleetHubCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(
-                Icons.directions_car_filled_outlined,
-                color: AdminHomePage._kGreen,
-                size: _r(22, scale),
-              ),
-              SizedBox(width: _r(10, scale)),
-              Text(
-                t.t('admin_home_fleet_hub'),
-                style: TextStyle(
-                  fontSize: _r(20, scale),
-                  fontWeight: FontWeight.w900,
-                  color: AdminHomePage._kText,
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.directions_car_filled_outlined,
+                      color: AdminHomePage._kGreen,
+                      size: _r(22, scale),
+                    ),
+                    SizedBox(width: _r(10, scale)),
+                    Flexible(
+                      child: Text(
+                        t.t('admin_home_fleet_hub'),
+                        style: TextStyle(
+                          fontSize: _r(20, scale),
+                          fontWeight: FontWeight.w900,
+                          color: AdminHomePage._kText,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
+              ),
+              SizedBox(width: _r(12, scale)),
+              _FleetStats(
+                scale: scale,
+                total: total,
+                active: active,
+                inactive: inactive,
               ),
             ],
           ),
-          SizedBox(height: _r(14, scale)),
-          Expanded(
-            child: Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF7F8F8),
-                borderRadius: BorderRadius.circular(_r(18, scale)),
-                border: Border.all(color: const Color(0xFFE5E7EB)),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                t.t('coming_soon'),
-                style: TextStyle(
-                  fontSize: _r(18, scale),
-                  fontWeight: FontWeight.w800,
-                  color: AdminHomePage._kMuted,
-                ),
-              ),
+          SizedBox(height: _r(16, scale)),
+          Text(
+            t.t('admin_home_service'),
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: _r(13, scale),
+              color: AdminHomePage._kText,
             ),
           ),
+          SizedBox(height: _r(10, scale)),
+          if (widget.adaptiveHeight) content else Expanded(child: content),
         ],
       ),
     );
@@ -2204,7 +2491,16 @@ class _FleetHubCard extends StatelessWidget {
 
 class _FleetStats extends StatelessWidget {
   final double scale;
-  const _FleetStats({required this.scale});
+  final int total;
+  final int active;
+  final int inactive;
+
+  const _FleetStats({
+    required this.scale,
+    required this.total,
+    required this.active,
+    required this.inactive,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -2212,23 +2508,24 @@ class _FleetStats extends StatelessWidget {
     return Wrap(
       spacing: _r(14, scale),
       runSpacing: _r(6, scale),
+      alignment: WrapAlignment.end,
       children: [
         _MiniStat(
           scale: scale,
           label: t.t('admin_home_total'),
-          value: '57',
+          value: '$total',
           color: AdminHomePage._kText,
         ),
         _MiniStat(
           scale: scale,
           label: t.t('admin_home_active'),
-          value: '45',
+          value: '$active',
           color: AdminHomePage._kGreen,
         ),
         _MiniStat(
           scale: scale,
           label: t.t('admin_home_inactive'),
-          value: '12',
+          value: '$inactive',
           color: AdminHomePage._kOrange,
         ),
       ],
@@ -2252,6 +2549,7 @@ class _MiniStat extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Text(
           label,
@@ -2273,6 +2571,292 @@ class _MiniStat extends StatelessWidget {
       ],
     );
   }
+}
+
+class _FleetComplianceList extends StatelessWidget {
+  final double scale;
+  final bool adaptiveHeight;
+  final List<_FleetComplianceItem> items;
+  final String Function(_FleetComplianceItem item) expiryTextBuilder;
+
+  const _FleetComplianceList({
+    required this.scale,
+    required this.adaptiveHeight,
+    required this.items,
+    required this.expiryTextBuilder,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (adaptiveHeight) {
+      return Column(
+        children: items
+            .map(
+              (item) => Padding(
+                padding: EdgeInsets.only(bottom: _r(10, scale)),
+                child: _FleetComplianceTile(
+                  scale: scale,
+                  item: item,
+                  expiryText: expiryTextBuilder(item),
+                ),
+              ),
+            )
+            .toList(growable: false),
+      );
+    }
+
+    return ListView.separated(
+      primary: false,
+      itemCount: items.length,
+      separatorBuilder: (_, __) => SizedBox(height: _r(10, scale)),
+      itemBuilder: (_, index) => _FleetComplianceTile(
+        scale: scale,
+        item: items[index],
+        expiryText: expiryTextBuilder(items[index]),
+      ),
+    );
+  }
+}
+
+class _FleetComplianceTile extends StatelessWidget {
+  final double scale;
+  final _FleetComplianceItem item;
+  final String expiryText;
+
+  const _FleetComplianceTile({
+    required this.scale,
+    required this.item,
+    required this.expiryText,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final expiryColor = item.state == _FleetComplianceState.expired
+        ? const Color(0xFFDC2626)
+        : item.state == _FleetComplianceState.upcoming
+        ? AdminHomePage._kOrange
+        : AdminHomePage._kMuted;
+
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: _r(12, scale),
+        vertical: _r(10, scale),
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(_r(12, scale)),
+        border: Border.all(color: const Color(0xFFEDEFF3)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              item.vehicleNumber,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: _r(12, scale),
+                color: AdminHomePage._kText,
+              ),
+            ),
+          ),
+          _FleetDocumentTypeTag(scale: scale, type: item.type),
+          SizedBox(width: _r(10, scale)),
+          Text(
+            expiryText,
+            style: TextStyle(
+              fontSize: _r(12, scale),
+              fontWeight: FontWeight.w900,
+              color: expiryColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FleetDocumentTypeTag extends StatelessWidget {
+  final double scale;
+  final String type;
+
+  const _FleetDocumentTypeTag({required this.scale, required this.type});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = type == 'service'
+        ? AdminHomePage._kOrange
+        : type == 'insurance'
+        ? const Color(0xFF2563EB)
+        : type == 'rc'
+        ? const Color(0xFF7C3AED)
+        : AdminHomePage._kGreen;
+
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: _r(10, scale),
+        vertical: _r(4, scale),
+      ),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.14),
+        borderRadius: BorderRadius.circular(_r(999, scale)),
+        border: Border.all(color: color.withOpacity(0.30)),
+      ),
+      child: Text(
+        _fleetDocumentTypeLabel(context, type),
+        style: TextStyle(
+          fontSize: _r(10, scale),
+          fontWeight: FontWeight.w900,
+          color: color,
+          letterSpacing: 0.2,
+        ),
+      ),
+    );
+  }
+}
+
+class _FleetDashboardVehicle {
+  const _FleetDashboardVehicle({
+    required this.id,
+    required this.vehicleNumber,
+    required this.status,
+  });
+
+  final String id;
+  final String vehicleNumber;
+  final String status;
+
+  factory _FleetDashboardVehicle.fromDoc(
+    QueryDocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    final data = doc.data();
+    return _FleetDashboardVehicle(
+      id: doc.id,
+      vehicleNumber: (data['vehicleNumber'] ?? doc.id).toString(),
+      status: (data['status'] ?? 'active').toString(),
+    );
+  }
+}
+
+class _FleetDashboardDocument {
+  const _FleetDashboardDocument({
+    required this.id,
+    required this.type,
+    required this.expiryDate,
+    required this.uploadedAt,
+  });
+
+  final String id;
+  final String type;
+  final DateTime? expiryDate;
+  final DateTime? uploadedAt;
+
+  factory _FleetDashboardDocument.fromDoc(
+    QueryDocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    final data = doc.data();
+    return _FleetDashboardDocument(
+      id: doc.id,
+      type: (data['type'] ?? '').toString(),
+      expiryDate: (data['expiryDate'] as Timestamp?)?.toDate(),
+      uploadedAt: (data['uploadedAt'] as Timestamp?)?.toDate(),
+    );
+  }
+}
+
+enum _FleetComplianceState { missing, expired, noExpiry, upcoming }
+
+class _FleetComplianceItem {
+  const _FleetComplianceItem({
+    required this.vehicleNumber,
+    required this.type,
+    required this.state,
+    required this.expiryDate,
+  });
+
+  final String vehicleNumber;
+  final String type;
+  final _FleetComplianceState state;
+  final DateTime? expiryDate;
+
+  int get priority {
+    switch (state) {
+      case _FleetComplianceState.missing:
+        return 0;
+      case _FleetComplianceState.expired:
+        return 1;
+      case _FleetComplianceState.noExpiry:
+        return 2;
+      case _FleetComplianceState.upcoming:
+        return 3;
+    }
+  }
+
+  DateTime? get sortDate {
+    if (state == _FleetComplianceState.expired ||
+        state == _FleetComplianceState.upcoming) {
+      return expiryDate;
+    }
+    return null;
+  }
+
+  factory _FleetComplianceItem.fromVehicleDocument({
+    required String vehicleNumber,
+    required String type,
+    required _FleetDashboardDocument? document,
+  }) {
+    if (document == null) {
+      return _FleetComplianceItem(
+        vehicleNumber: vehicleNumber,
+        type: type,
+        state: _FleetComplianceState.missing,
+        expiryDate: null,
+      );
+    }
+
+    final expiryDate = document.expiryDate;
+    if (expiryDate == null) {
+      return _FleetComplianceItem(
+        vehicleNumber: vehicleNumber,
+        type: type,
+        state: _FleetComplianceState.noExpiry,
+        expiryDate: null,
+      );
+    }
+
+    return _FleetComplianceItem(
+      vehicleNumber: vehicleNumber,
+      type: type,
+      state: _isFleetExpiryDateExpired(expiryDate)
+          ? _FleetComplianceState.expired
+          : _FleetComplianceState.upcoming,
+      expiryDate: expiryDate,
+    );
+  }
+}
+
+String _fleetDocumentTypeLabel(BuildContext context, String type) {
+  final t = AppLocalizations.of(context);
+  switch (type) {
+    case 'tuv':
+      return t.t('fleet_status_vehicle_document_type_tuv');
+    case 'insurance':
+      return t.t('fleet_status_vehicle_document_type_insurance');
+    case 'service':
+      return t.t('fleet_status_vehicle_document_type_service');
+    case 'rc':
+      return t.t('fleet_status_vehicle_document_type_rc');
+    default:
+      return type;
+  }
+}
+
+bool _isFleetExpiryDateExpired(DateTime date) {
+  final normalizedDate = DateTime(date.year, date.month, date.day);
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  return normalizedDate.isBefore(today);
 }
 
 class _FleetList extends StatelessWidget {

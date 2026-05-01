@@ -4,12 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
+import '../localization/app_localizations.dart';
 
 enum AppNav {
   home,
   dashboard,
   podQuality,
   drivers,
+  fleetStatus,
   tasks,
   shiftAbsence,
   incidentReports,
@@ -59,6 +61,7 @@ class AppSideMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const dark = Color(0xFF0B1220);
+    final t = AppLocalizations.of(context);
 
     final navItems = <Widget>[
       _MenuItem(
@@ -84,6 +87,29 @@ class AppSideMenu extends StatelessWidget {
         label: 'Drivers Hub',
         active: active == AppNav.drivers,
         onTap: () => _handleNav(context, AppNav.drivers, '/drivers'),
+      ),
+      StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: _userDocStream(),
+        builder: (context, snap) {
+          final data = snap.data?.data() ?? const <String, dynamic>{};
+          final role = (data['role'] ?? '')
+              .toString()
+              .trim()
+              .toLowerCase();
+          final approved = data['approved'] == true;
+          final canAccessFleet =
+              approved &&
+              (role == 'admin' || role == 'user' || role == 'developer');
+          if (!canAccessFleet) return const SizedBox.shrink();
+
+          return _MenuItem(
+            icon: Icons.local_shipping_outlined,
+            label: t.t('fleet_status_nav'),
+            active: active == AppNav.fleetStatus,
+            onTap: () =>
+                _handleNav(context, AppNav.fleetStatus, '/fleet-status'),
+          );
+        },
       ),
       _MenuItem(
         icon: Icons.task_alt_outlined,
@@ -266,9 +292,9 @@ class AppSideMenu extends StatelessWidget {
                                 Icons.logout,
                                 color: Colors.white70,
                               ),
-                              label: const Text(
-                                'Sign out',
-                                style: TextStyle(color: Colors.white70),
+                              label: Text(
+                                t.t('button_sign_out'),
+                                style: const TextStyle(color: Colors.white70),
                               ),
                             ),
                           ),

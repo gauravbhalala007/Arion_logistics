@@ -373,6 +373,8 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
+                          dropdownColor: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
                           value: _bucketItems.contains(_bucket)
                               ? _bucket
                               : 'ALL',
@@ -1101,9 +1103,7 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
 
                                                 _MetricCol(
                                                   title: 'CE',
-                                                  value: _ceDisplayStr(
-                                                    ceCount,
-                                                  ),
+                                                  value: _ceDisplayStr(ceCount),
                                                   w: w,
                                                 ),
                                                 VerticalDivider(

@@ -28,6 +28,34 @@ service cloud.firestore {
       return signedIn() && me().data.role == 'driver';
     }
 
+    function companyScope() {
+      return ('dspUid' in me().data) && me().data.dspUid != null && me().data.dspUid != ''
+        ? me().data.dspUid
+        : request.auth.uid;
+    }
+
+    function roleValue() {
+      return me().data.role == null ? '' : me().data.role;
+    }
+
+    function isApprovedFleetManager() {
+      return signedIn()
+        && isApproved(request.auth.uid)
+        && roleValue().matches('(?i)^(admin|user|developer)$');
+    }
+
+    function isApprovedFleetViewer() {
+      return signedIn()
+        && isApproved(request.auth.uid)
+        && roleValue().matches('(?i)^(admin|user|developer)$');
+    }
+
+    function fleetDocScope(data) {
+      return ('dspUid' in data) && data.dspUid != null && data.dspUid != ''
+        ? data.dspUid
+        : (('companyId' in data) && data.companyId != null && data.companyId != '' ? data.companyId : '');
+    }
+
     // is the caller a driver that belongs to this DSP userId?
     // (requires users/{driverUid} to have a field "dspUid")
     function isDriverOf(userId) {
@@ -64,6 +92,42 @@ service cloud.firestore {
       // Only admins may update/delete user docs (for now)
       allow update: if isAdmin() || isSelf(userId); 
       allow delete: if isAdmin();
+
+      match /vehicles/{vehicleId} {
+        allow get, list: if isApprovedFleetViewer() && userId == companyScope();
+
+        allow create, update: if isApprovedFleetManager()
+          && userId == companyScope()
+          && request.resource.data.vehicleNumber == vehicleId
+          && fleetDocScope(request.resource.data) == userId
+          && (!exists(/databases/$(database)/documents/users/$(userId)/vehicles/$(vehicleId))
+            || fleetDocScope(resource.data) == userId)
+          && request.resource.data.status in [
+            'active',
+            'grounded',
+            'in_service',
+            'defleeted',
+          ]
+          && request.resource.data.tuvStatus in ['valid', 'expired', 'pending'];
+
+        allow delete: if false;
+
+        match /documents/{documentId} {
+          allow get, list: if isApprovedFleetViewer() && userId == companyScope();
+
+          allow create, update, delete: if isApprovedFleetManager()
+            && userId == companyScope()
+            && request.resource.data.type in ['tuv', 'insurance', 'service', 'rc']
+            && request.resource.data.fileUrl is string
+            && request.resource.data.fileName is string
+            && request.resource.data.uploadedAt is timestamp
+            && (!('expiryDate' in request.resource.data)
+              || request.resource.data.expiryDate == null
+              || request.resource.data.expiryDate is timestamp)
+            && (!('storagePath' in request.resource.data)
+              || request.resource.data.storagePath is string);
+        }
+      }
 
       // ---------- reports (scorecards) ----------
       // users/{userId}/reports/{reportId}
@@ -224,5 +288,6 @@ service cloud.firestore {
         }
       }
     }
+
   }
 }

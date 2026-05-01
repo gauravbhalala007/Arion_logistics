@@ -55,6 +55,35 @@ service cloud.firestore {
       return isDriverOf(userId) || isDriverOfByToken(userId);
     }
 
+    function companyScope() {
+      return request.auth.uid;
+    }
+
+    function fleetCompanyScope() {
+      return request.auth.uid;
+    }
+
+    function roleValue() {
+      return me().data.role == null ? '' : me().data.role;
+    }
+
+    function isApprovedFleetManager() {
+      return signedIn()
+        && isApproved(request.auth.uid)
+        && roleValue().matches('(?i)^(admin|user|developer)$');
+    }
+
+    function isApprovedFleetViewer() {
+      return signedIn()
+        && isApproved(request.auth.uid)
+        && roleValue().matches('(?i)^(admin|user|developer)$');
+    }
+
+    function fleetDocScope(data) {
+      return  data.dspUid;
+    }
+
+
     function driverTransporterId() {
       return isDriver() ? me().data.transporterId : request.auth.token.transporterId;
     }
@@ -95,6 +124,48 @@ service cloud.firestore {
       // Only admins may update/delete user docs (for now)
       allow update: if isAdmin() || isSelf(userId); 
       allow delete: if isAdmin();
+
+      match /vehicles/{vehicleId} {
+        allow get, list: if isApprovedFleetViewer() && userId == fleetCompanyScope();
+
+        allow create, update: if isApprovedFleetManager()
+          && userId == fleetCompanyScope()
+          && request.resource.data.vehicleNumber == vehicleId
+          && fleetDocScope(request.resource.data) == userId
+          && (!exists(/databases/$(database)/documents/users/$(userId)/vehicles/$(vehicleId))
+            || fleetDocScope(resource.data) == userId)
+          && request.resource.data.status in [
+            'active',
+            'grounded',
+            'in_service',
+            'defleeted',
+          ]
+          && (!('serviceStartDate' in request.resource.data)
+            || request.resource.data.serviceStartDate == null
+            || request.resource.data.serviceStartDate is timestamp)
+          && (!('serviceEndDate' in request.resource.data)
+            || request.resource.data.serviceEndDate == null
+            || request.resource.data.serviceEndDate is timestamp);
+
+        allow delete: if isApprovedFleetManager() && userId == fleetCompanyScope();
+
+        match /documents/{documentId} {
+          allow get, list: if isApprovedFleetViewer() && userId == fleetCompanyScope();
+
+          allow create, update: if isApprovedFleetManager()
+            && userId == fleetCompanyScope()
+            && request.resource.data.type in ['tuv', 'insurance', 'service', 'rc']
+            && request.resource.data.fileUrl is string
+            && request.resource.data.fileName is string
+            && request.resource.data.uploadedAt is timestamp
+            && (!('expiryDate' in request.resource.data)
+              || request.resource.data.expiryDate == null
+              || request.resource.data.expiryDate is timestamp);
+
+          allow delete: if isApprovedFleetManager()
+            && userId == fleetCompanyScope();
+        }
+      }
 
       // ---------- reports (scorecards) ----------
       // users/{userId}/reports/{reportId}
@@ -356,7 +427,6 @@ service cloud.firestore {
             && driverTransporterId() == driverId
             && request.resource.data.driverTransporterId == driverId;
         }
-
 
         // DSP can fully manage its driver list
         allow read: if isSelf(userId) && isApproved(userId);
