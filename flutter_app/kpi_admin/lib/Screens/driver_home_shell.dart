@@ -947,6 +947,7 @@ class _HeaderBar extends StatelessWidget {
 
     await showDialog<void>(
       context: context,
+      
       builder: (ctx) {
         return GestureDetector(
           behavior: HitTestBehavior.opaque,

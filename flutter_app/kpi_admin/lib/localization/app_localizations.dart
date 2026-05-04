@@ -7346,6 +7346,15 @@ class AppLocalizations {
     'notifications_page_menu_delete': 'Delete',
     'notifications_page_title_fallback': 'TITLE',
     'notifications_page_confirmed_by': 'confirmed by',
+    'notifications_page_rules_order_title': 'Rules Order',
+    'notifications_page_rules_order_subtitle':
+        'Drag to change the order drivers see in the Rules tab.',
+    'notifications_page_rules_order_empty':
+        'Rules order will appear here after you publish your first rule.',
+    'notifications_page_rules_order_save_failed':
+        'Failed to save rules order: {error}',
+    'notifications_page_rules_order_rule_fallback': 'Rule',
+    'notifications_page_rules_order_untitled': 'Untitled rule',
   };
 
   static final Map<String, Map<String, String>>
@@ -11348,6 +11357,16 @@ class AppLocalizations {
     'admin_faq_section_custom_title': 'Custom FAQs',
     'admin_faq_section_custom_subtitle':
         'Create your own FAQ questions visible to all drivers.',
+    'admin_faq_order_title': 'FAQ Order',
+    'admin_faq_order_subtitle':
+        'Drag to reorder built-in and custom FAQ sections for drivers.',
+    'admin_faq_order_save': 'Save order',
+    'admin_faq_order_save_failed': 'Failed to save FAQ order: {error}',
+    'admin_faq_order_built_in': 'Built-in section',
+    'admin_faq_order_built_in_with_children':
+        'Built-in section - {count} sub-items',
+    'admin_faq_order_custom': 'Custom FAQ',
+    'admin_faq_order_empty': 'No FAQ entries to order yet.',
   };
 
   static final Map<String, Map<String, String>> _adminFaqLocalizedValues = {

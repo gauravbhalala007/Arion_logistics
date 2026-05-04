@@ -106,6 +106,7 @@ class App extends StatelessWidget {
                 ),
               ),
             ),
+            dialogBackgroundColor: Colors.white,
             dropdownMenuTheme: DropdownMenuThemeData(
               menuStyle: MenuStyle(
                 backgroundColor: WidgetStateProperty.all(Colors.white),

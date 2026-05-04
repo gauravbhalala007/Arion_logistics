@@ -5,10 +5,10 @@ import 'package:flutter/material.dart';
 
 import '../localization/app_localizations.dart';
 import '../data/driver_faq_keys.dart';
+import '../data/faq_ordering.dart';
 import '../widgets/web_preview.dart';
 
 const String _localizedFaqCollection = 'faqs_localized';
-const String _insertAtStart = '__start__';
 const String _insertAtEnd = '__end__';
 
 Future<String?> _resolveFaqImageUrl({
@@ -38,7 +38,9 @@ Future<String?> _resolveFaqImageUrl({
   }
   try {
     if (lower.startsWith('gs://')) {
-      return await fb.FirebaseStorage.instance.refFromURL(value).getDownloadURL();
+      return await fb.FirebaseStorage.instance
+          .refFromURL(value)
+          .getDownloadURL();
     }
     final normalized = value.startsWith('/') ? value.substring(1) : value;
     if (normalized.isNotEmpty) {
@@ -92,6 +94,9 @@ class _DriverFaqPageState extends State<DriverFaqPage> {
               .doc(widget.dspUid)
               .collection(_localizedFaqCollection)
               .snapshots();
+    final faqOrderStream = widget.dspUid.isEmpty
+        ? const Stream<DocumentSnapshot<Map<String, dynamic>>>.empty()
+        : faqContentOrderDoc(widget.dspUid).snapshots();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF3F6F7),
@@ -107,147 +112,119 @@ class _DriverFaqPageState extends State<DriverFaqPage> {
           ),
         ),
       ),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: localizedOverrideStream,
-        builder: (context, overrideSnap) {
-          final overrideDocs = overrideSnap.data?.docs ?? [];
-          final overrides = <String, Map<String, dynamic>>{};
-          for (final doc in overrideDocs) {
-            overrides[doc.id] = doc.data();
-          }
-
+      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: faqOrderStream,
+        builder: (context, orderSnap) {
           return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: customFaqStream,
-            builder: (context, snap) {
-              final docs = snap.data?.docs ?? [];
-              final langCode = Localizations.localeOf(context).languageCode;
-              final customItems = docs
-                  .map(
-                    (d) => _FaqItem(
-                      question: _localizedFaqValue(
-                        d.data(),
-                        'question',
-                        langCode,
-                      ),
-                      answer: _localizedFaqValue(d.data(), 'answer', langCode),
-                      insertAfterKey:
-                          (d.data()['insertAfterKey'] ?? _insertAtEnd)
-                              .toString(),
-                      imageUrl: (d.data()['imageUrl'] ?? '').toString().trim(),
-                      imagePath:
-                          (d.data()['imagePath'] ?? '').toString().trim(),
-                      order:
-                          (d.data()['order'] as num?)?.toInt() ??
-                          DateTime.now().millisecondsSinceEpoch,
-                    ),
-                  )
-                  .toList();
-
-              String resolveText(DriverFaqNode node, bool isQuestion) {
-                final overrideData = overrides[node.qKey];
-                final overrideText = _overrideValue(
-                  overrideData,
-                  isQuestion ? 'question' : 'answer',
-                  langCode,
-                );
-                if (overrideText.isNotEmpty) return overrideText;
-                return t.t(isQuestion ? node.qKey : node.aKey);
+            stream: localizedOverrideStream,
+            builder: (context, overrideSnap) {
+              final overrideDocs =
+                  overrideSnap.data?.docs ??
+                  <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+              final overrides = <String, Map<String, dynamic>>{};
+              for (final doc in overrideDocs) {
+                overrides[doc.id] = doc.data();
               }
 
-              Map<String, String> resolveImage(DriverFaqNode node) {
-                final overrideData = overrides[node.qKey];
-                return {
-                  'imageUrl': (overrideData?['imageUrl'] ?? '').toString().trim(),
-                  'imagePath':
-                      (overrideData?['imagePath'] ?? '').toString().trim(),
-                };
-              }
+              return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: customFaqStream,
+                builder: (context, snap) {
+                  final docs =
+                      snap.data?.docs ??
+                      <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                  final langCode = Localizations.localeOf(context).languageCode;
+                  final customItems = docs
+                      .map(
+                        (d) => _FaqItem(
+                          id: d.id,
+                          question: _localizedFaqValue(
+                            d.data(),
+                            'question',
+                            langCode,
+                          ),
+                          answer: _localizedFaqValue(
+                            d.data(),
+                            'answer',
+                            langCode,
+                          ),
+                          insertAfterKey:
+                              (d.data()['insertAfterKey'] ?? _insertAtEnd)
+                                  .toString(),
+                          imageUrl: (d.data()['imageUrl'] ?? '')
+                              .toString()
+                              .trim(),
+                          imagePath: (d.data()['imagePath'] ?? '')
+                              .toString()
+                              .trim(),
+                          order:
+                              (d.data()['order'] as num?)?.toInt() ??
+                              DateTime.now().millisecondsSinceEpoch,
+                        ),
+                      )
+                      .toList();
 
-              final filteredCustom = _filterFaqItems(customItems, query);
+                  String resolveText(DriverFaqNode node, bool isQuestion) {
+                    final overrideData = overrides[node.qKey];
+                    final overrideText = _overrideValue(
+                      overrideData,
+                      isQuestion ? 'question' : 'answer',
+                      langCode,
+                    );
+                    if (overrideText.isNotEmpty) return overrideText;
+                    return t.t(isQuestion ? node.qKey : node.aKey);
+                  }
 
-              final visibleNodes = _pruneHiddenNodes(
-                DriverFaqKeys.items,
-                overrides,
-              );
+                  Map<String, String> resolveImage(DriverFaqNode node) {
+                    final overrideData = overrides[node.qKey];
+                    return {
+                      'imageUrl': (overrideData?['imageUrl'] ?? '')
+                          .toString()
+                          .trim(),
+                      'imagePath': (overrideData?['imagePath'] ?? '')
+                          .toString()
+                          .trim(),
+                    };
+                  }
 
-              // Filter tree (keeps hierarchy, but prunes to matches)
-              final filteredTree = _filterTree(
-                nodes: visibleNodes,
-                resolveText: resolveText,
-                query: query,
-              );
-
-              final hasResults =
-                  filteredCustom.isNotEmpty || filteredTree.isNotEmpty;
-
-              final customByInsert = <String, List<_FaqItem>>{};
-              for (final item in filteredCustom) {
-                final key = item.insertAfterKey.isEmpty
-                    ? _insertAtEnd
-                    : item.insertAfterKey;
-                customByInsert.putIfAbsent(key, () => []).add(item);
-              }
-
-              for (final items in customByInsert.values) {
-                items.sort((a, b) => a.order.compareTo(b.order));
-              }
-
-              final combinedWidgets = <Widget>[];
-              final usedInsertKeys = <String>{};
-
-              void addCustomGroup(String key) {
-                final items = customByInsert[key];
-                if (items == null || items.isEmpty) return;
-                usedInsertKeys.add(key);
-                combinedWidgets.addAll(
-                  items.map((item) => _FaqItemCard(item: item)),
-                );
-                combinedWidgets.add(const SizedBox(height: 8));
-              }
-
-              addCustomGroup(_insertAtStart);
-
-              if (filteredTree.isNotEmpty) {
-                for (final node in filteredTree) {
-                  combinedWidgets.add(
-                    _FaqNodeCard(
-                      node: node,
-                      depth: 0,
-                      resolveText: resolveText,
-                      resolveImage: resolveImage,
-                    ),
+                  final filteredCustom = _filterFaqItems(customItems, query);
+                  final visibleNodes = _pruneHiddenNodes(
+                    DriverFaqKeys.items,
+                    overrides,
                   );
-                  combinedWidgets.add(const SizedBox(height: 8));
-                  addCustomGroup(node.qKey);
-                }
-              }
+                  final filteredTree = _filterTree(
+                    nodes: visibleNodes,
+                    resolveText: resolveText,
+                    query: query,
+                  );
+                  final combinedWidgets = _buildOrderedFaqWidgets(
+                    filteredTopLevelNodes: filteredTree,
+                    visibleCustomItems: filteredCustom,
+                    allCustomItems: customItems,
+                    savedOrder: parseFaqTopLevelOrder(orderSnap.data?.data()),
+                    resolveText: resolveText,
+                    resolveImage: resolveImage,
+                  );
+                  final hasResults =
+                      filteredCustom.isNotEmpty || filteredTree.isNotEmpty;
 
-              addCustomGroup(_insertAtEnd);
-
-              for (final entry in customByInsert.entries) {
-                if (usedInsertKeys.contains(entry.key)) continue;
-                combinedWidgets.addAll(
-                  entry.value.map((item) => _FaqItemCard(item: item)),
-                );
-                combinedWidgets.add(const SizedBox(height: 8));
-              }
-
-              return ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  _SearchBar(
-                    controller: _searchCtrl,
-                    hint: t.t('faq_search_hint'),
-                    onChanged: (v) => setState(() => _q = v),
-                    onClear: () {
-                      _searchCtrl.clear();
-                      setState(() => _q = '');
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  if (!hasResults) _emptyCard(t.t('faq_empty')),
-                  if (combinedWidgets.isNotEmpty) ...combinedWidgets,
-                ],
+                  return ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      _SearchBar(
+                        controller: _searchCtrl,
+                        hint: t.t('faq_search_hint'),
+                        onChanged: (v) => setState(() => _q = v),
+                        onClear: () {
+                          _searchCtrl.clear();
+                          setState(() => _q = '');
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      if (!hasResults) _emptyCard(t.t('faq_empty')),
+                      if (combinedWidgets.isNotEmpty) ...combinedWidgets,
+                    ],
+                  );
+                },
               );
             },
           );
@@ -322,6 +299,63 @@ class _DriverFaqPageState extends State<DriverFaqPage> {
     }).toList();
   }
 
+  List<Widget> _buildOrderedFaqWidgets({
+    required List<DriverFaqNode> filteredTopLevelNodes,
+    required List<_FaqItem> visibleCustomItems,
+    required List<_FaqItem> allCustomItems,
+    required List<String> savedOrder,
+    required String Function(DriverFaqNode node, bool isQuestion) resolveText,
+    required Map<String, String> Function(DriverFaqNode node) resolveImage,
+  }) {
+    final filteredBuiltInById = {
+      for (final node in filteredTopLevelNodes) node.qKey: node,
+    };
+    final visibleCustomById = {
+      for (final item in visibleCustomItems) item.id: item,
+    };
+
+    final resolvedOrder = resolveFaqTopLevelOrder(
+      builtInTopLevelKeys: topLevelBuiltInFaqKeys(),
+      customFaqs: allCustomItems
+          .map(
+            (item) => CustomFaqOrderSource(
+              docId: item.id,
+              insertAfterKey: item.insertAfterKey,
+              legacyOrder: item.order,
+            ),
+          )
+          .toList(growable: false),
+      savedOrder: savedOrder,
+    );
+
+    final widgets = <Widget>[];
+    for (final id in resolvedOrder) {
+      final builtInNode = filteredBuiltInById[id];
+      if (builtInNode != null) {
+        widgets.add(
+          _FaqNodeCard(
+            key: ValueKey('faq-node-$id'),
+            node: builtInNode,
+            depth: 0,
+            resolveText: resolveText,
+            resolveImage: resolveImage,
+          ),
+        );
+        widgets.add(const SizedBox(height: 8));
+        continue;
+      }
+
+      final customItem = visibleCustomById[id];
+      if (customItem != null) {
+        widgets.add(
+          _FaqItemCard(key: ValueKey('faq-custom-$id'), item: customItem),
+        );
+        widgets.add(const SizedBox(height: 8));
+      }
+    }
+    return widgets;
+  }
+
   String _overrideValue(
     Map<String, dynamic>? data,
     String field,
@@ -383,6 +417,7 @@ class _DriverFaqPageState extends State<DriverFaqPage> {
 }
 
 class _FaqItem {
+  final String id;
   final String question;
   final String answer;
   final String insertAfterKey;
@@ -391,6 +426,7 @@ class _FaqItem {
   final int order;
 
   const _FaqItem({
+    required this.id,
     required this.question,
     required this.answer,
     required this.insertAfterKey,
@@ -460,6 +496,7 @@ class _FaqNodeCard extends StatelessWidget {
   final Map<String, String> Function(DriverFaqNode node) resolveImage;
 
   const _FaqNodeCard({
+    super.key,
     required this.node,
     required this.depth,
     required this.resolveText,
@@ -481,6 +518,8 @@ class _FaqNodeCard extends StatelessWidget {
 
     return Container(
       margin: EdgeInsets.only(bottom: 12, left: leftIndent),
+      alignment: Alignment.centerLeft,
+      width: double.infinity,
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(16),
@@ -492,6 +531,8 @@ class _FaqNodeCard extends StatelessWidget {
           tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
           childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
           iconColor: const Color(0xFF111827),
+                    expandedAlignment: Alignment.centerLeft,
+
           collapsedIconColor: const Color(0xFF6B7280),
           title: Text(
             question,
@@ -506,12 +547,15 @@ class _FaqNodeCard extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               answer,
+
+              textAlign: TextAlign.start,
               style: const TextStyle(
                 height: 1.35,
                 fontWeight: FontWeight.w600,
                 color: Color(0xFF374151),
               ),
             ),
+
             if ((image['imageUrl'] ?? '').isNotEmpty ||
                 (image['imagePath'] ?? '').isNotEmpty) ...[
               const SizedBox(height: 12),
@@ -541,12 +585,13 @@ class _FaqNodeCard extends StatelessWidget {
 class _FaqItemCard extends StatelessWidget {
   final _FaqItem item;
 
-  const _FaqItemCard({required this.item});
+  const _FaqItemCard({super.key, required this.item});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
+      width:double.infinity ,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -559,6 +604,7 @@ class _FaqItemCard extends StatelessWidget {
           childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
           iconColor: const Color(0xFF111827),
           collapsedIconColor: const Color(0xFF6B7280),
+          expandedAlignment: Alignment.centerLeft,
           title: Text(
             item.question.isEmpty ? 'Question' : item.question,
             style: const TextStyle(
@@ -571,6 +617,7 @@ class _FaqItemCard extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               item.answer,
+              textAlign: TextAlign.start,
               style: const TextStyle(
                 height: 1.35,
                 fontWeight: FontWeight.w600,
@@ -595,10 +642,7 @@ class _FaqSampleImage extends StatelessWidget {
   final String imageUrl;
   final String imagePath;
 
-  const _FaqSampleImage({
-    required this.imageUrl,
-    required this.imagePath,
-  });
+  const _FaqSampleImage({required this.imageUrl, required this.imagePath});
 
   @override
   Widget build(BuildContext context) {
@@ -613,10 +657,7 @@ class _FaqSampleImage extends StatelessWidget {
           height: 320,
           width: double.infinity,
           child: FutureBuilder<String?>(
-            future: _resolveFaqImageUrl(
-              rawUrl: imageUrl,
-              rawPath: imagePath,
-            ),
+            future: _resolveFaqImageUrl(rawUrl: imageUrl, rawPath: imagePath),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const ColoredBox(

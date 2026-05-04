@@ -1,6 +1,7 @@
 // lib/screens/notifications_page.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
@@ -1030,6 +1031,10 @@ class _HistoryCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
+          if (dspUid != null) ...[
+            _RulesOrderSection(dspUid: dspUid),
+            const SizedBox(height: 14),
+          ],
           Expanded(
             child: dspUid == null
                 ? Center(
@@ -1132,6 +1137,265 @@ class _HistoryCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _RulesOrderSection extends StatefulWidget {
+  final String dspUid;
+
+  const _RulesOrderSection({required this.dspUid});
+
+  @override
+  State<_RulesOrderSection> createState() => _RulesOrderSectionState();
+}
+
+class _RulesOrderSectionState extends State<_RulesOrderSection> {
+  List<String>? _draftIds;
+  bool _saving = false;
+  bool _pendingRemoteSync = false;
+
+  int _sortOrderFor(Map<String, dynamic> data) {
+    return (data['sortOrder'] as num?)?.toInt() ?? 1 << 30;
+  }
+
+  int _createdMillisFor(Map<String, dynamic> data) {
+    final raw = data['createdAt'];
+    if (raw is Timestamp) return raw.millisecondsSinceEpoch;
+    if (raw is DateTime) return raw.millisecondsSinceEpoch;
+    return 0;
+  }
+
+  Future<void> _saveRulesOrder(List<String> notificationIds) async {
+    setState(() => _saving = true);
+    try {
+      final callable = FirebaseFunctions.instance.httpsCallable(
+        'reorderRulesEverywhere',
+      );
+      await callable.call({
+        'dspUid': widget.dspUid,
+        'notificationIds': notificationIds,
+      });
+    } catch (e) {
+      _pendingRemoteSync = false;
+      if (!mounted) return;
+      final l10n = AppLocalizations.of(context);
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(
+          content: Text(
+            l10n.tf('notifications_page_rules_order_save_failed', {
+              'error': '$e',
+            }),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.dspUid)
+          .collection('notifications')
+          .where('type', isEqualTo: 'rule')
+          .snapshots(),
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
+          return const SizedBox(
+            height: 56,
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final docs =
+            snap.data?.docs ??
+            <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+        if (docs.isEmpty) {
+          return Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF9FAFB),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
+            ),
+            child: Text(
+              l10n.t('notifications_page_rules_order_empty'),
+              style: TextStyle(
+                color: Color(0xFF6B7280),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          );
+        }
+
+        final sortedDocs = [...docs]..sort((a, b) {
+          final bySort = _sortOrderFor(a.data()).compareTo(_sortOrderFor(b.data()));
+          if (bySort != 0) return bySort;
+          return _createdMillisFor(b.data()).compareTo(_createdMillisFor(a.data()));
+        });
+
+        final resolvedIds = sortedDocs
+            .map((doc) => doc.id)
+            .toList(growable: false);
+        final dataById = <String, Map<String, dynamic>>{
+          for (final doc in docs) doc.id: doc.data(),
+        };
+
+        if (_draftIds == null) {
+          _draftIds = List<String>.from(resolvedIds);
+        } else if (_pendingRemoteSync && listEquals(_draftIds, resolvedIds)) {
+          _pendingRemoteSync = false;
+        } else if (!_pendingRemoteSync) {
+          _draftIds = List<String>.from(resolvedIds);
+        }
+
+        final draftIds = _draftIds ?? resolvedIds;
+        final visibleIds = draftIds
+            .where((id) => dataById.containsKey(id))
+            .toList(growable: false);
+        final height = visibleIds.length * 72.0 < 220
+            ? visibleIds.length * 72.0
+            : 220.0;
+
+        return Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF9FAFB),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l10n.t('notifications_page_rules_order_title'),
+                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                l10n.t('notifications_page_rules_order_subtitle'),
+                style: const TextStyle(
+                  color: Color(0xFF6B7280),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (_saving) ...[
+                const SizedBox(height: 10),
+                const LinearProgressIndicator(minHeight: 2),
+              ],
+              const SizedBox(height: 10),
+              SizedBox(
+                height: height,
+                child: ReorderableListView.builder(
+                  buildDefaultDragHandles: false,
+                  itemCount: visibleIds.length,
+                  onReorder: (oldIndex, newIndex) {
+                    final next = List<String>.from(visibleIds);
+                    if (newIndex > oldIndex) newIndex -= 1;
+                    final moved = next.removeAt(oldIndex);
+                    next.insert(newIndex, moved);
+                    setState(() {
+                      _draftIds = next;
+                      _pendingRemoteSync = true;
+                    });
+                    _saveRulesOrder(next);
+                  },
+                  itemBuilder: (context, index) {
+                    final id = visibleIds[index];
+                    final data = dataById[id] ?? const <String, dynamic>{};
+                    final title = (data['title'] ?? '').toString().trim();
+                    final body = (data['body'] ?? '').toString().trim();
+                    final subtitle = body.isEmpty
+                        ? l10n.t('notifications_page_rules_order_rule_fallback')
+                        : body;
+                    return Container(
+                      key: ValueKey(id),
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFE5E7EB)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 34,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF3F6F7),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              '${index + 1}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF1D7F5A),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  title.isEmpty
+                                      ? l10n.t(
+                                          'notifications_page_rules_order_untitled',
+                                        )
+                                      : title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  subtitle.replaceAll('\n', ' '),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Color(0xFF6B7280),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          ReorderableDragStartListener(
+                            index: index,
+                            child: const Icon(
+                              Icons.drag_handle,
+                              color: Color(0xFF6B7280),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

@@ -53,6 +53,11 @@ type DeleteNotificationData = {
   notificationId?: string;
 };
 
+type ReorderRulesData = {
+  dspUid?: string;
+  notificationIds?: unknown;
+};
+
 type DeleteDriverData = {
   dspUid?: string;
   transporterId?: string;
@@ -445,6 +450,9 @@ export const createDriverLogin = onCall(async (request) => {
           readAt: null,
           confirmedAt: null,
           requiresConfirmation: adminData.requiresConfirmation ?? true,
+          sortOrder: typeof adminData.sortOrder === "number" ?
+            adminData.sortOrder :
+            null,
         });
 
         batch.set(
@@ -529,6 +537,25 @@ export const publishNotificationToAllDrivers = onCall(async (request) => {
     return isDriverWorking(data);
   });
   const targetCount = drivers.length;
+  let sortOrder: number | null = null;
+
+  if (type === "rule") {
+    const adminRulesSnap = await db
+      .collection("users")
+      .doc(dspUid)
+      .collection("notifications")
+      .where("type", "==", "rule")
+      .get();
+
+    let maxSortOrder = -1;
+    for (const doc of adminRulesSnap.docs) {
+      const raw = doc.data().sortOrder;
+      if (typeof raw === "number" && raw > maxSortOrder) {
+        maxSortOrder = raw;
+      }
+    }
+    sortOrder = maxSortOrder + 1;
+  }
 
   // Create history record first (single doc)
   const adminNotifRef = db
@@ -551,6 +578,7 @@ export const publishNotificationToAllDrivers = onCall(async (request) => {
     targetCount,
     confirmedCount: 0,
     requiresConfirmation,
+    ...(sortOrder != null ? {sortOrder} : {}),
   });
 
   // Fan-out: chunk commits (batch limit is 500 writes)
@@ -573,6 +601,7 @@ export const publishNotificationToAllDrivers = onCall(async (request) => {
         readAt: null,
         confirmedAt: null,
         requiresConfirmation,
+        ...(sortOrder != null ? {sortOrder} : {}),
       });
     }
 
@@ -939,6 +968,134 @@ export const syncDriverDocExpiryNotifications = onSchedule(
     logger.info("syncDriverDocExpiryNotifications: completed");
   },
 );
+
+/**
+ * Reorders rule notifications for admin history and all driver copies.
+ *
+ * Security:
+ * - caller must be authenticated
+ * - caller uid must equal dspUid
+ */
+export const reorderRulesEverywhere = onCall(async (request) => {
+  const callerUid = requireAuthUid(request.auth);
+  const data = (request.data || {}) as ReorderRulesData;
+
+  const dspUid = (data.dspUid || "").trim();
+  const rawIds = Array.isArray(data.notificationIds) ? data.notificationIds : [];
+  const notificationIds = Array.from(
+    new Set(
+      rawIds
+        .map((value) => (value || "").toString().trim())
+        .filter((value) => value.length > 0),
+    ),
+  );
+
+  if (!dspUid || notificationIds.length === 0) {
+    throw new HttpsError(
+      "invalid-argument",
+      "dspUid and notificationIds are required.",
+    );
+  }
+
+  if (callerUid !== dspUid) {
+    throw new HttpsError(
+      "permission-denied",
+      "You can only reorder rules for your own DSP.",
+    );
+  }
+
+  const adminRulesCol = db
+    .collection("users")
+    .doc(dspUid)
+    .collection("notifications");
+
+  const adminRuleSnaps = await Promise.all(
+    notificationIds.map((id) => adminRulesCol.doc(id).get()),
+  );
+
+  for (const snap of adminRuleSnaps) {
+    if (!snap.exists) {
+      throw new HttpsError("not-found", `Rule ${snap.id} was not found.`);
+    }
+    const type = (snap.data()?.type || "").toString().trim();
+    if (type !== "rule") {
+      throw new HttpsError(
+        "failed-precondition",
+        `Notification ${snap.id} is not a rule.`,
+      );
+    }
+  }
+
+  const now = FieldValue.serverTimestamp();
+  let batch = db.batch();
+  let opCount = 0;
+
+  const flush = async () => {
+    if (opCount === 0) return;
+    await batch.commit();
+    batch = db.batch();
+    opCount = 0;
+  };
+
+  for (let i = 0; i < notificationIds.length; i += 1) {
+    batch.set(
+      adminRulesCol.doc(notificationIds[i]),
+      {sortOrder: i, updatedAt: now},
+      {merge: true},
+    );
+    opCount += 1;
+    if (opCount >= 450) {
+      await flush();
+    }
+  }
+  await flush();
+
+  const idToSortOrder = new Map<string, number>();
+  for (let i = 0; i < notificationIds.length; i += 1) {
+    idToSortOrder.set(notificationIds[i], i);
+  }
+
+  const driversSnap = await db
+    .collection("users")
+    .doc(dspUid)
+    .collection("drivers")
+    .get();
+
+  for (const driverDoc of driversSnap.docs) {
+    const driverRulesSnap = await driverDoc.ref
+      .collection("notifications")
+      .where("type", "==", "rule")
+      .get();
+
+    batch = db.batch();
+    opCount = 0;
+    for (const ruleDoc of driverRulesSnap.docs) {
+      const nextSortOrder = idToSortOrder.get(ruleDoc.id);
+      if (nextSortOrder == null) continue;
+
+      batch.set(
+        ruleDoc.ref,
+        {sortOrder: nextSortOrder, updatedAt: now},
+        {merge: true},
+      );
+      opCount += 1;
+      if (opCount >= 450) {
+        await batch.commit();
+        batch = db.batch();
+        opCount = 0;
+      }
+    }
+
+    if (opCount > 0) {
+      await batch.commit();
+    }
+  }
+
+  logger.info(
+    `reorderRulesEverywhere: reordered ${notificationIds.length} rules for dspUid=${dspUid}`,
+  );
+  return {ok: true, count: notificationIds.length};
+});
 
 /**
  * Deletes a broadcast notification from:

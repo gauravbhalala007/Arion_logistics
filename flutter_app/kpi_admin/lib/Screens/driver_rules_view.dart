@@ -35,7 +35,6 @@ class DriverRulesView extends StatelessWidget {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: _col()
           .where('type', isEqualTo: 'rule')
-          .orderBy('createdAt', descending: true)
           .snapshots(),
       builder: (ctx, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
@@ -59,7 +58,32 @@ class DriverRulesView extends StatelessWidget {
           );
         }
 
-        final items = docs.map((d) => DriverNotification.fromDoc(d)).toList();
+        final sortedDocs = [...docs]..sort((a, b) {
+          final aData = a.data();
+          final bData = b.data();
+
+          final aSort = (aData['sortOrder'] as num?)?.toInt();
+          final bSort = (bData['sortOrder'] as num?)?.toInt();
+          if (aSort != null && bSort != null && aSort != bSort) {
+            return aSort.compareTo(bSort);
+          }
+          if (aSort != null && bSort == null) return -1;
+          if (aSort == null && bSort != null) return 1;
+
+          final aCreated = aData['createdAt'];
+          final bCreated = bData['createdAt'];
+          final aMillis = aCreated is Timestamp
+              ? aCreated.millisecondsSinceEpoch
+              : 0;
+          final bMillis = bCreated is Timestamp
+              ? bCreated.millisecondsSinceEpoch
+              : 0;
+          return bMillis.compareTo(aMillis);
+        });
+
+        final items = sortedDocs
+            .map((d) => DriverNotification.fromDoc(d))
+            .toList(growable: false);
 
         return ListView.separated(
           padding: const EdgeInsets.all(16),

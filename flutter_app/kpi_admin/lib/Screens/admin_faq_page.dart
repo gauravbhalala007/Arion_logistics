@@ -2,12 +2,14 @@ import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart' as fb;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../localization/app_localizations.dart';
 import '../data/driver_faq_keys.dart';
+import '../data/faq_ordering.dart';
 import '../widgets/web_preview.dart';
 
 const String _localizedFaqCollection = 'faqs_localized';
@@ -184,6 +186,22 @@ class _FaqImageUploadResult {
     required this.downloadUrl,
     required this.storagePath,
     required this.bytes,
+  });
+}
+
+class _FaqOrderListItem {
+  final String id;
+  final bool isBuiltIn;
+  final String title;
+  final String subtitle;
+  final int childCount;
+
+  const _FaqOrderListItem({
+    required this.id,
+    required this.isBuiltIn,
+    required this.title,
+    required this.subtitle,
+    required this.childCount,
   });
 }
 
@@ -655,7 +673,8 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
     );
 
     final col = _faqCol;
-    if (col == null) return;
+    final uid = _uid;
+    if (col == null || uid == null) return;
 
     String firstNonEmpty(Map<String, TextEditingController> ctrls) {
       for (final locale in locales) {
@@ -695,7 +714,14 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
 
     try {
       if (docId == null) {
-        await col.add({...payload, 'createdAt': FieldValue.serverTimestamp()});
+        final created = await col.add({
+          ...payload,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+        await appendFaqTopLevelOrderEntryIfConfigured(
+          dspUid: uid,
+          entryId: created.id,
+        );
       } else {
         await col.doc(docId).set(payload, SetOptions(merge: true));
       }
@@ -1068,6 +1094,7 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
 
   Future<void> _confirmDelete(String docId) async {
     final t = AppLocalizations.of(context);
+    final uid = _uid;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1089,9 +1116,10 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
 
     if (ok != true) return;
     final col = _faqCol;
-    if (col == null) return;
+    if (col == null || uid == null) return;
     try {
       await col.doc(docId).delete();
+      await removeFaqTopLevelOrderEntry(dspUid: uid, entryId: docId);
     } on FirebaseException catch (e) {
       _showError(
         t.tf('admin_faq_error_delete', {'error': e.message ?? e.code}),
@@ -1520,8 +1548,9 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final uid = _uid;
     final col = _faqCol;
-    if (col == null) {
+    if (col == null || uid == null) {
       return Center(child: Text(t.t('admin_faq_must_login')));
     }
     final isNarrow = MediaQuery.of(context).size.width < 700;
@@ -1589,6 +1618,8 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
           Expanded(
             child: ListView(
               children: [
+                _FaqOrderSection(dspUid: uid),
+                const SizedBox(height: 16),
                 _FaqSectionCard(
                   title: t.t('admin_faq_section_localized_title'),
                   subtitle: t.t('admin_faq_section_localized_subtitle'),
@@ -1611,16 +1642,371 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
   }
 }
 
+class _FaqOrderSection extends StatefulWidget {
+  final String dspUid;
+
+  const _FaqOrderSection({required this.dspUid});
+
+  @override
+  State<_FaqOrderSection> createState() => _FaqOrderSectionState();
+}
+
+class _FaqOrderSectionState extends State<_FaqOrderSection> {
+  List<String>? _draftOrder;
+  bool _saving = false;
+  bool _pendingRemoteSync = false;
+
+  String _overrideValue(
+    Map<String, dynamic>? data,
+    String field,
+    String langCode,
+  ) {
+    if (data == null) return '';
+    final raw = data['${field}_$langCode'];
+    return raw?.toString().trim() ?? '';
+  }
+
+  String _localizedFaqValue(
+    Map<String, dynamic>? data,
+    String field,
+    String langCode,
+  ) {
+    if (data == null) return '';
+    String? pick(String key) {
+      final raw = data[key];
+      if (raw == null) return null;
+      final text = raw.toString().trim();
+      return text.isEmpty ? null : text;
+    }
+
+    return pick('${field}_$langCode') ??
+        pick('${field}_en') ??
+        pick(field) ??
+        '';
+  }
+
+  int _descendantCount(DriverFaqNode node) {
+    var total = node.children.length;
+    for (final child in node.children) {
+      total += _descendantCount(child);
+    }
+    return total;
+  }
+
+  Future<void> _saveOrder(List<String> order) async {
+    final t = AppLocalizations.of(context);
+    setState(() => _saving = true);
+    try {
+      await saveFaqTopLevelOrder(dspUid: widget.dspUid, order: order);
+    } catch (e) {
+      _pendingRemoteSync = false;
+      if (!mounted) return;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(
+          content: Text(
+            t.tf('admin_faq_order_save_failed', {'error': '$e'}),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final langCode = Localizations.localeOf(context).languageCode;
+    final builtInById = {
+      for (final node in DriverFaqKeys.items) node.qKey: node,
+    };
+
+    return _FaqSectionCard(
+      title: t.t('admin_faq_order_title'),
+      subtitle: t.t('admin_faq_order_subtitle'),
+      icon: Icons.reorder,
+      trailing: FilledButton.icon(
+        onPressed: (_saving || !_pendingRemoteSync || _draftOrder == null)
+            ? null
+            : () => _saveOrder(_draftOrder!),
+        style: FilledButton.styleFrom(
+          backgroundColor: _kFaqGreen,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(999),
+          ),
+        ),
+        icon: _saving
+            ? const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : const Icon(Icons.save_outlined, size: 16),
+        label: Text(t.t('admin_faq_order_save')),
+      ),
+      child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: faqContentOrderDoc(widget.dspUid).snapshots(),
+        builder: (context, orderSnap) {
+          return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: FirebaseFirestore.instance
+                .collection('users')
+                .doc(widget.dspUid)
+                .collection(_localizedFaqCollection)
+                .snapshots(),
+            builder: (context, overrideSnap) {
+              return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(widget.dspUid)
+                    .collection('faqs')
+                    .orderBy('order')
+                    .snapshots(),
+                builder: (context, customSnap) {
+                if (orderSnap.connectionState == ConnectionState.waiting &&
+                    !orderSnap.hasData) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+
+                final overrideDocs =
+                    overrideSnap.data?.docs ??
+                    <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                final overrides = <String, Map<String, dynamic>>{
+                  for (final doc in overrideDocs) doc.id: doc.data(),
+                };
+
+                final customDocs =
+                    customSnap.data?.docs ??
+                    <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                final customById = <String, Map<String, dynamic>>{
+                  for (final doc in customDocs) doc.id: doc.data(),
+                };
+                final customSources = customDocs
+                    .map(
+                      (doc) => CustomFaqOrderSource(
+                        docId: doc.id,
+                        insertAfterKey:
+                            (doc.data()['insertAfterKey'] ?? _insertAtEnd)
+                                .toString(),
+                        legacyOrder:
+                            (doc.data()['order'] as num?)?.toInt() ??
+                            DateTime.now().millisecondsSinceEpoch,
+                      ),
+                    )
+                    .toList(growable: false);
+
+                final resolvedOrder = resolveFaqTopLevelOrder(
+                  builtInTopLevelKeys: topLevelBuiltInFaqKeys(),
+                  customFaqs: customSources,
+                  savedOrder: parseFaqTopLevelOrder(orderSnap.data?.data()),
+                );
+
+                if (_draftOrder == null) {
+                  _draftOrder = List<String>.from(resolvedOrder);
+                } else if (_pendingRemoteSync &&
+                    listEquals(_draftOrder, resolvedOrder)) {
+                  _pendingRemoteSync = false;
+                } else if (!_pendingRemoteSync) {
+                  _draftOrder = List<String>.from(resolvedOrder);
+                }
+
+                final draft = _draftOrder ?? resolvedOrder;
+                final items = draft
+                    .map((id) {
+                      final builtInNode = builtInById[id];
+                      if (builtInNode != null) {
+                        final overrideData = overrides[id];
+                        final title =
+                            _overrideValue(
+                              overrideData,
+                              'question',
+                              langCode,
+                            ).isNotEmpty
+                            ? _overrideValue(overrideData, 'question', langCode)
+                            : t.t(builtInNode.qKey);
+                        final childCount = _descendantCount(builtInNode);
+                        return _FaqOrderListItem(
+                          id: id,
+                          isBuiltIn: true,
+                          title: title,
+                          subtitle: childCount > 0
+                              ? t.tf('admin_faq_order_built_in_with_children', {
+                                  'count': '$childCount',
+                                })
+                              : t.t('admin_faq_order_built_in'),
+                          childCount: childCount,
+                        );
+                      }
+
+                      final customData =
+                          customById[id] ?? const <String, dynamic>{};
+                      final title = _localizedFaqValue(
+                        customData,
+                        'question',
+                        langCode,
+                      );
+                      final answer = _localizedFaqValue(
+                        customData,
+                        'answer',
+                        langCode,
+                      );
+                      return _FaqOrderListItem(
+                        id: id,
+                        isBuiltIn: false,
+                        title: title.isEmpty
+                            ? t.t('admin_faq_untitled')
+                            : title,
+                        subtitle: answer.isEmpty
+                            ? t.t('admin_faq_order_custom')
+                            : '${t.t('admin_faq_order_custom')} - ${answer.replaceAll('\n', ' ')}',
+                        childCount: 0,
+                      );
+                    })
+                    .toList(growable: false);
+
+                if (items.isEmpty) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text(t.t('admin_faq_order_empty')),
+                  );
+                }
+
+                final listHeight = items.length * 78.0;
+                final height = listHeight < 220 ? listHeight : 220.0;
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_saving) ...[
+                      const LinearProgressIndicator(minHeight: 2),
+                      const SizedBox(height: 10),
+                    ],
+                    SizedBox(
+                      height: height,
+                      child: ReorderableListView.builder(
+                        buildDefaultDragHandles: false,
+                        itemCount: items.length,
+                        onReorder: (oldIndex, newIndex) {
+                          final next = List<String>.from(draft);
+                          if (newIndex > oldIndex) newIndex -= 1;
+                          final moved = next.removeAt(oldIndex);
+                          next.insert(newIndex, moved);
+                          setState(() {
+                            _draftOrder = next;
+                            _pendingRemoteSync = true;
+                          });
+                        },
+                        itemBuilder: (context, index) {
+                          final item = items[index];
+                          return Container(
+                            key: ValueKey(item.id),
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _kFaqCardBg,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: _kFaqCardBorder),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 38,
+                                  height: 38,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: _kFaqCardBorder),
+                                  ),
+                                  child: Icon(
+                                    item.isBuiltIn
+                                        ? Icons.language_outlined
+                                        : Icons.quiz_outlined,
+                                    color: _kFaqMuted,
+                                    size: 18,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        item.title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          color: _kFaqText,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        item.subtitle,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: _kFaqMuted,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                ReorderableDragStartListener(
+                                  index: index,
+                                  child: const Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 4,
+                                    ),
+                                    child: Icon(
+                                      Icons.drag_handle,
+                                      color: _kFaqMuted,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+                },
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
 class _FaqSectionCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final IconData icon;
+  final Widget? trailing;
   final Widget child;
 
   const _FaqSectionCard({
     required this.title,
     required this.subtitle,
     required this.icon,
+    this.trailing,
     required this.child,
   });
 
@@ -1657,6 +2043,7 @@ class _FaqSectionCard extends StatelessWidget {
                   ),
                 ),
               ),
+              if (trailing != null) trailing!,
             ],
           ),
           const SizedBox(height: 6),
