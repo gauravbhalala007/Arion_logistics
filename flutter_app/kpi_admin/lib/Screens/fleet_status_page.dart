@@ -686,6 +686,8 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
         padding: const EdgeInsets.symmetric(horizontal: 12),
         child: DropdownButtonHideUnderline(
           child: DropdownButton<String>(
+            borderRadius: BorderRadius.circular(12),
+
             value: _statusFilter,
             onChanged: (value) {
               if (value == null) return;
@@ -717,7 +719,10 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12),
         child: DropdownButtonHideUnderline(
+
           child: DropdownButton<String>(
+            borderRadius: BorderRadius.circular(12),
+
             value: _tuvFilter,
             onChanged: (value) {
               if (value == null) return;
@@ -877,11 +882,9 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
 
   Widget _buildVehicleTable(
     BuildContext context,
-    List<_VehicleRecord> vehicles,
-    {
+    List<_VehicleRecord> vehicles, {
     required double availableWidth,
-    }
-  ) {
+  }) {
     final t = AppLocalizations.of(context);
     final minTableWidth = math.max(availableWidth - 16, 1180.0);
     return Container(
@@ -999,7 +1002,9 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                           ),
                         ),
                       ),
-                      DataCell(Text(_formatDateTime(context, vehicle.updatedAt))),
+                      DataCell(
+                        Text(_formatDateTime(context, vehicle.updatedAt)),
+                      ),
                       DataCell(
                         _canManageVehicles
                             ? Row(
@@ -1009,10 +1014,9 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                                     tooltip: t.t(
                                       'fleet_status_action_view_details',
                                     ),
-                                    onPressed: () => _showVehicleDetails(vehicle),
-                                    icon: const Icon(
-                                      Icons.visibility_outlined,
-                                    ),
+                                    onPressed: () =>
+                                        _showVehicleDetails(vehicle),
+                                    icon: const Icon(Icons.visibility_outlined),
                                   ),
                                   IconButton(
                                     tooltip: t.t('button_edit'),

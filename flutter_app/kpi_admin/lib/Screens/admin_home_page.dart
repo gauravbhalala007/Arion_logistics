@@ -6,42 +6,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../localization/app_localizations.dart';
-
-bool _isDriverWorking(Map<String, dynamic> driverData) {
-  bool? parseBoolish(dynamic raw) {
-    if (raw is bool) return raw;
-    if (raw is num) return raw != 0;
-    if (raw is String) {
-      final v = raw.trim().toLowerCase();
-      if (v == 'false' || v == '0' || v == 'off' || v == 'inactive') {
-        return false;
-      }
-      if (v == 'true' || v == '1' || v == 'on' || v == 'active') {
-        return true;
-      }
-    }
-    return null;
-  }
-
-  final active = parseBoolish(driverData['active']);
-  final working = parseBoolish(driverData['working']);
-  final isWorking = parseBoolish(driverData['isWorking']);
-
-  if (active == false || working == false || isWorking == false) {
-    return false;
-  }
-
-  final status = (driverData['status'] ?? '').toString().trim().toLowerCase();
-  if (status == 'off' || status == 'inactive' || status == 'suspended') {
-    return false;
-  }
-
-  if (active == true || working == true || isWorking == true) {
-    return true;
-  }
-
-  return true; // Backward compatible default
-}
+import '../utils/driver_activity.dart';
 
 class AdminHomePage extends StatefulWidget {
   const AdminHomePage({super.key});
@@ -88,47 +53,15 @@ class _AdminHomePageState extends State<AdminHomePage> {
     final notifBody = (notifDoc.data()?['body'] ?? '').toString();
 
     Future<Map<String, dynamic>> loadMissingDrivers() async {
-      final driversSnap = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(dspUid)
-          .collection('drivers')
-          .get();
-      final missing = <String>[];
-      var total = 0;
-
-      for (final d in driversSnap.docs) {
-        final driverData = d.data();
-        final driverName =
-            (driverData['driverName'] ??
-                    driverData['fullName'] ??
-                    t.t('admin_home_driver_fallback'))
-                .toString();
-
-        final notifSnap = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(dspUid)
-            .collection('drivers')
-            .doc(d.id)
-            .collection('notifications')
-            .doc(notificationId)
-            .get();
-
-        if (!notifSnap.exists) {
-          continue; // Not part of this notification target set
-        }
-
-        total += 1;
-        final status = (notifSnap.data()?['status'] ?? 'unread').toString();
-
-        if (status != 'confirmed') {
-          missing.add(driverName);
-        }
-      }
-
+      final stats = await loadActiveRuleConfirmationStats(
+        dspUid: dspUid,
+        notificationId: notificationId,
+        fallbackDriverLabel: t.t('admin_home_driver_fallback'),
+      );
       return {
-        'missing': missing,
-        'total': total,
-        'confirmed': total - missing.length,
+        'missing': stats.pendingDriverNames,
+        'total': stats.totalCount,
+        'confirmed': stats.confirmedCount,
       };
     }
 
@@ -1542,7 +1475,7 @@ class _NotificationHistoryCardState extends State<_NotificationHistoryCard> {
                         .snapshots()
                         .map(
                           (s) => s.docs
-                              .where((d) => _isDriverWorking(d.data()))
+                              .where((d) => isDriverWorking(d.data()))
                               .length,
                         ),
                     builder: (ctx, driverSnap) {
@@ -1805,7 +1738,7 @@ class _NotificationHistoryTileLive extends StatelessWidget {
 
       final driversSnap = await dspRef.collection('drivers').get();
       final drivers = driversSnap.docs
-          .where((d) => _isDriverWorking(d.data()))
+          .where((d) => isDriverWorking(d.data()))
           .toList(growable: false);
 
       await adminNotifRef.set({
@@ -1931,7 +1864,7 @@ class _NotificationHistoryTileLive extends StatelessWidget {
     final safeConfirmed = safeTotal <= 0
         ? 0
         : (confirmedCount > safeTotal ? safeTotal : confirmedCount);
-    final ratio = '$safeConfirmed / $safeTotal';
+    final fallbackRatio = '$safeConfirmed / $safeTotal';
     final compact = MediaQuery.of(context).size.width < 700;
 
     final menuButton = Theme(
@@ -2020,6 +1953,37 @@ class _NotificationHistoryTileLive extends StatelessWidget {
       ),
     );
 
+    final ratioWidget = type == 'rule'
+        ? FutureBuilder<ActiveRuleConfirmationStats>(
+            future: loadActiveRuleConfirmationStats(
+              dspUid: dspUid,
+              notificationId: notificationId,
+              fallbackDriverLabel: t.t('admin_home_driver_fallback'),
+            ),
+            builder: (context, snapshot) {
+              final stats = snapshot.data;
+              final ratio = stats == null
+                  ? fallbackRatio
+                  : '${stats.confirmedCount} / ${stats.totalCount}';
+              return Text(
+                ratio,
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  color: AdminHomePage._kGreen,
+                  fontSize: _r(12, scale),
+                ),
+              );
+            },
+          )
+        : Text(
+            fallbackRatio,
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              color: AdminHomePage._kGreen,
+              fontSize: _r(12, scale),
+            ),
+          );
+
     return Container(
       padding: EdgeInsets.all(_r(14, scale)),
       decoration: BoxDecoration(
@@ -2095,14 +2059,7 @@ class _NotificationHistoryTileLive extends StatelessWidget {
                 ),
               ),
               SizedBox(width: _r(6, scale)),
-              Text(
-                ratio,
-                style: TextStyle(
-                  fontWeight: FontWeight.w900,
-                  color: AdminHomePage._kGreen,
-                  fontSize: _r(12, scale),
-                ),
-              ),
+              ratioWidget,
               SizedBox(width: _r(10, scale)),
               menuButton,
             ],

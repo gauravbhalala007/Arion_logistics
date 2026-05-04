@@ -5,42 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
 import '../localization/app_localizations.dart';
-
-bool _isDriverWorking(Map<String, dynamic> driverData) {
-  bool? parseBoolish(dynamic raw) {
-    if (raw is bool) return raw;
-    if (raw is num) return raw != 0;
-    if (raw is String) {
-      final v = raw.trim().toLowerCase();
-      if (v == 'false' || v == '0' || v == 'off' || v == 'inactive') {
-        return false;
-      }
-      if (v == 'true' || v == '1' || v == 'on' || v == 'active') {
-        return true;
-      }
-    }
-    return null;
-  }
-
-  final active = parseBoolish(driverData['active']);
-  final working = parseBoolish(driverData['working']);
-  final isWorking = parseBoolish(driverData['isWorking']);
-
-  if (active == false || working == false || isWorking == false) {
-    return false;
-  }
-
-  final status = (driverData['status'] ?? '').toString().trim().toLowerCase();
-  if (status == 'off' || status == 'inactive' || status == 'suspended') {
-    return false;
-  }
-
-  if (active == true || working == true || isWorking == true) {
-    return true;
-  }
-
-  return true; // Backward compatible default
-}
+import '../utils/driver_activity.dart';
 
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
@@ -147,10 +112,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
         final translatedTitle = (row['question'] ?? '').toString().trim();
         final translatedBody = (row['answer'] ?? '').toString().trim();
         if (translatedTitle.isEmpty && translatedBody.isEmpty) continue;
-        mapped[code] = {
-          'title': translatedTitle,
-          'body': translatedBody,
-        };
+        mapped[code] = {'title': translatedTitle, 'body': translatedBody};
       }
 
       if (!mounted) return;
@@ -289,47 +251,15 @@ class _NotificationsPageState extends State<NotificationsPage> {
     final notifBody = (notifDoc.data()?['body'] ?? '').toString();
 
     Future<Map<String, dynamic>> loadMissingDrivers() async {
-      final driversSnap = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(dspUid)
-          .collection('drivers')
-          .get();
-      final missing = <String>[];
-      var total = 0;
-
-      for (final d in driversSnap.docs) {
-        final driverData = d.data();
-        final driverName =
-            (driverData['driverName'] ??
-                    driverData['fullName'] ??
-                    l10n.t('notifications_page_popup_driver_fallback'))
-                .toString();
-
-        final notifSnap = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(dspUid)
-            .collection('drivers')
-            .doc(d.id)
-            .collection('notifications')
-            .doc(notificationId)
-            .get();
-
-        if (!notifSnap.exists) {
-          continue; // Not part of this notification target set
-        }
-
-        total += 1;
-        final status = (notifSnap.data()?['status'] ?? 'unread').toString();
-
-        if (status != 'confirmed') {
-          missing.add(driverName);
-        }
-      }
-
+      final stats = await loadActiveRuleConfirmationStats(
+        dspUid: dspUid,
+        notificationId: notificationId,
+        fallbackDriverLabel: l10n.t('notifications_page_popup_driver_fallback'),
+      );
       return {
-        'missing': missing,
-        'total': total,
-        'confirmed': total - missing.length,
+        'missing': stats.pendingDriverNames,
+        'total': stats.totalCount,
+        'confirmed': stats.confirmedCount,
       };
     }
 
@@ -576,8 +506,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
             onTranslationChanged: _updateTranslation,
             onTypeChanged: (t) => setState(() => _selectedType = t),
             onContentChanged: _clearTranslationsIfAny,
-            onTranslateAll:
-                (_publishing || _translating) ? null : _translateAllLanguages,
+            onTranslateAll: (_publishing || _translating)
+                ? null
+                : _translateAllLanguages,
             onPublish: (_publishing || _translating) ? null : _publish,
           );
 
@@ -756,6 +687,8 @@ class _ComposerCard extends StatelessWidget {
                 ),
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<_NotifType>(
+                    borderRadius: BorderRadius.circular(12),
+
                     value: selectedType,
                     isExpanded: compact,
                     items: types
@@ -863,9 +796,7 @@ class _ComposerCard extends StatelessWidget {
                         )
                       : const Icon(Icons.translate, size: 18),
                   label: Text(
-                    translating
-                        ? 'Translating...'
-                        : 'Translate all languages',
+                    translating ? 'Translating...' : 'Translate all languages',
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),
@@ -914,18 +845,16 @@ class _ComposerCard extends StatelessWidget {
                         final entry = translationsByLang.entries.elementAt(
                           index,
                         );
-                        final translatedTitle =
-                            (entry.value['title'] ?? '').trim();
-                        final translatedBody =
-                            (entry.value['body'] ?? '').trim();
+                        final translatedTitle = (entry.value['title'] ?? '')
+                            .trim();
+                        final translatedBody = (entry.value['body'] ?? '')
+                            .trim();
                         return Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: const Color(0xFFE5E7EB),
-                            ),
+                            border: Border.all(color: const Color(0xFFE5E7EB)),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -948,15 +877,19 @@ class _ComposerCard extends StatelessWidget {
                                   'title',
                                   value,
                                 ),
-                                decoration: _pillField(
-                                  hint: l10n.t('notifications_page_title_hint'),
-                                ).copyWith(
-                                  isDense: true,
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 10,
-                                  ),
-                                ),
+                                decoration:
+                                    _pillField(
+                                      hint: l10n.t(
+                                        'notifications_page_title_hint',
+                                      ),
+                                    ).copyWith(
+                                      isDense: true,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 10,
+                                          ),
+                                    ),
                                 style: const TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
@@ -974,17 +907,19 @@ class _ComposerCard extends StatelessWidget {
                                 ),
                                 minLines: 2,
                                 maxLines: 4,
-                                decoration: _pillField(
-                                  hint: l10n.t(
-                                    'notifications_page_rule_message_hint',
-                                  ),
-                                ).copyWith(
-                                  isDense: true,
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 10,
-                                  ),
-                                ),
+                                decoration:
+                                    _pillField(
+                                      hint: l10n.t(
+                                        'notifications_page_rule_message_hint',
+                                      ),
+                                    ).copyWith(
+                                      isDense: true,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 10,
+                                          ),
+                                    ),
                                 style: const TextStyle(
                                   fontSize: 12,
                                   height: 1.35,
@@ -1108,7 +1043,7 @@ class _HistoryCard extends StatelessWidget {
                         .snapshots()
                         .map(
                           (s) => s.docs
-                              .where((d) => _isDriverWorking(d.data()))
+                              .where((d) => isDriverWorking(d.data()))
                               .length,
                         ),
                     builder: (ctx, driverSnap) {
@@ -1350,12 +1285,13 @@ class _HistoryTile extends StatelessWidget {
       final notifType = (adminData['type'] ?? type).toString();
       final createdAt = adminData['createdAt'];
       final now = FieldValue.serverTimestamp();
-      final sourceLang = Localizations.localeOf(context).languageCode
-          .toLowerCase();
+      final sourceLang = Localizations.localeOf(
+        context,
+      ).languageCode.toLowerCase();
 
       final driversSnap = await dspRef.collection('drivers').get();
       final drivers = driversSnap.docs
-          .where((d) => _isDriverWorking(d.data()))
+          .where((d) => isDriverWorking(d.data()))
           .toList(growable: false);
 
       await adminNotifRef.set({
@@ -1489,7 +1425,7 @@ class _HistoryTile extends StatelessWidget {
     final safeConfirmed = safeTotal <= 0
         ? 0
         : (confirmedCount > safeTotal ? safeTotal : confirmedCount);
-    final ratio = '$safeConfirmed / $safeTotal';
+    final fallbackRatio = '$safeConfirmed / $safeTotal';
 
     final menuButton = Theme(
       data: Theme.of(context).copyWith(
@@ -1577,6 +1513,37 @@ class _HistoryTile extends StatelessWidget {
       ),
     );
 
+    final ratioWidget = type == 'rule'
+        ? FutureBuilder<ActiveRuleConfirmationStats>(
+            future: loadActiveRuleConfirmationStats(
+              dspUid: dspUid,
+              notificationId: notificationId,
+              fallbackDriverLabel: l10n.t(
+                'notifications_page_popup_driver_fallback',
+              ),
+            ),
+            builder: (context, snapshot) {
+              final stats = snapshot.data;
+              final ratio = stats == null
+                  ? fallbackRatio
+                  : '${stats.confirmedCount} / ${stats.totalCount}';
+              return Text(
+                ratio,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF1D7F5A),
+                ),
+              );
+            },
+          )
+        : Text(
+            fallbackRatio,
+            style: const TextStyle(
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF1D7F5A),
+            ),
+          );
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -1650,13 +1617,7 @@ class _HistoryTile extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  Text(
-                    ratio,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF1D7F5A),
-                    ),
-                  ),
+                  ratioWidget,
                 ],
               ),
               const SizedBox(width: 12),

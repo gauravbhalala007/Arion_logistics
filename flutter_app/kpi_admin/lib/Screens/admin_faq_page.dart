@@ -6,7 +6,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart' as fb;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-
 import '../localization/app_localizations.dart';
 import '../data/driver_faq_keys.dart';
 import '../widgets/web_preview.dart';
@@ -48,7 +47,9 @@ Future<String?> _resolveFaqImageUrl({
   }
   try {
     if (lower.startsWith('gs://')) {
-      return await fb.FirebaseStorage.instance.refFromURL(value).getDownloadURL();
+      return await fb.FirebaseStorage.instance
+          .refFromURL(value)
+          .getDownloadURL();
     }
     final normalized = value.startsWith('/') ? value.substring(1) : value;
     if (normalized.isNotEmpty) {
@@ -195,7 +196,9 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
     messenger?.showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Future<_FaqImageUploadResult?> _pickAndUploadFaqImage(String folderKey) async {
+  Future<_FaqImageUploadResult?> _pickAndUploadFaqImage(
+    String folderKey,
+  ) async {
     final uid = _uid;
     if (uid == null) return null;
 
@@ -232,9 +235,7 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
 
       await ref.putData(
         bytes,
-        fb.SettableMetadata(
-          contentType: _faqImageContentType(extension),
-        ),
+        fb.SettableMetadata(contentType: _faqImageContentType(extension)),
       );
       return _FaqImageUploadResult(
         downloadUrl: await ref.getDownloadURL(),
@@ -481,10 +482,9 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
                 SnackBar(
                   content: Text(
                     translatedCount > 0
-                        ? t.tf(
-                            'admin_faq_translate_done',
-                            {'count': '$translatedCount'},
-                          )
+                        ? t.tf('admin_faq_translate_done', {
+                            'count': '$translatedCount',
+                          })
                         : t.t('admin_faq_translate_none'),
                   ),
                 ),
@@ -541,9 +541,7 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
                                   ),
                                 )
                               : const Icon(Icons.translate),
-                          label: Text(
-                            t.t('admin_faq_translate_all_languages'),
-                          ),
+                          label: Text(t.t('admin_faq_translate_all_languages')),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -582,8 +580,8 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
                               ? null
                               : (value) {
                                   setStateDialog(
-                                    () =>
-                                        selectedInsertKey = value ?? _insertAtEnd,
+                                    () => selectedInsertKey =
+                                        value ?? _insertAtEnd,
                                   );
                                 },
                           decoration: InputDecoration(
@@ -723,6 +721,8 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
     final locales = AppLocalizations.supportedLocales;
     final qCtrls = <String, TextEditingController>{};
     final aCtrls = <String, TextEditingController>{};
+    final defaultQuestions = <String, String>{};
+    final defaultAnswers = <String, String>{};
     String imageUrl = (overrideData?['imageUrl'] ?? '').toString().trim();
     String imagePath = (overrideData?['imagePath'] ?? '').toString().trim();
     String imagePreviewUrl =
@@ -737,10 +737,20 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
 
     for (final locale in locales) {
       final code = locale.languageCode;
+      final localeText = AppLocalizations(locale);
       final qOverride = _overrideValue(overrideData, 'question', code);
       final aOverride = _overrideValue(overrideData, 'answer', code);
-      qCtrls[code] = TextEditingController(text: qOverride);
-      aCtrls[code] = TextEditingController(text: aOverride);
+      final defaultQuestion = localeText.t(node.qKey).trim();
+      final defaultAnswer = localeText.t(node.aKey).trim();
+
+      defaultQuestions[code] = defaultQuestion;
+      defaultAnswers[code] = defaultAnswer;
+      qCtrls[code] = TextEditingController(
+        text: qOverride.isNotEmpty ? qOverride : defaultQuestion,
+      );
+      aCtrls[code] = TextEditingController(
+        text: aOverride.isNotEmpty ? aOverride : defaultAnswer,
+      );
     }
 
     var dialogOpen = true;
@@ -773,6 +783,7 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
                 locales: locales,
                 qCtrls: qCtrls,
                 aCtrls: aCtrls,
+                overwriteExisting: true,
               );
               if (!mounted || !dialogOpen) return;
               setStateDialog(() => translating = false);
@@ -781,10 +792,9 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
                 SnackBar(
                   content: Text(
                     translatedCount > 0
-                        ? t.tf(
-                            'admin_faq_translate_done',
-                            {'count': '$translatedCount'},
-                          )
+                        ? t.tf('admin_faq_translate_done', {
+                            'count': '$translatedCount',
+                          })
                         : t.t('admin_faq_translate_none'),
                   ),
                 ),
@@ -841,22 +851,17 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
                                   ),
                                 )
                               : const Icon(Icons.translate),
-                          label: Text(
-                            t.t('admin_faq_translate_all_languages'),
-                          ),
+                          label: Text(t.t('admin_faq_translate_all_languages')),
                         ),
                       ),
                       const SizedBox(height: 12),
                       ...locales.map((locale) {
                         final code = locale.languageCode;
-                        final t = AppLocalizations(locale);
                         return _LocaleFaqFields(
                           label: code.toUpperCase(),
                           questionCtrl: qCtrls[code]!,
                           answerCtrl: aCtrls[code]!,
                           initiallyExpanded: code == 'en',
-                          questionHint: t.t(node.qKey),
-                          answerHint: t.t(node.aKey),
                         );
                       }),
                     ],
@@ -933,15 +938,19 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
       final aText = aCtrls[code]?.text.trim() ?? '';
       final qField = 'question_$code';
       final aField = 'answer_$code';
+      final defaultQuestion = defaultQuestions[code] ?? '';
+      final defaultAnswer = defaultAnswers[code] ?? '';
+      final hasQuestionOverride = qText.isNotEmpty && qText != defaultQuestion;
+      final hasAnswerOverride = aText.isNotEmpty && aText != defaultAnswer;
 
-      if (qText.isNotEmpty) {
+      if (hasQuestionOverride) {
         payload[qField] = qText;
         hasOverride = true;
       } else if (overrideData != null && overrideData.containsKey(qField)) {
         payload[qField] = FieldValue.delete();
       }
 
-      if (aText.isNotEmpty) {
+      if (hasAnswerOverride) {
         payload[aField] = aText;
         hasOverride = true;
       } else if (overrideData != null && overrideData.containsKey(aField)) {
@@ -1731,49 +1740,35 @@ class _FaqImageEditorCard extends StatelessWidget {
         children: [
           const Text(
             'Sample image',
-            style: TextStyle(
-              fontWeight: FontWeight.w900,
-              color: _kFaqText,
-            ),
+            style: TextStyle(fontWeight: FontWeight.w900, color: _kFaqText),
           ),
           const SizedBox(height: 6),
           const Text(
             'Upload one optional image that drivers can view inside this FAQ.',
-            style: TextStyle(
-              color: _kFaqMuted,
-              fontSize: 13,
-              height: 1.35,
-            ),
+            style: TextStyle(color: _kFaqMuted, fontSize: 13, height: 1.35),
           ),
           const SizedBox(height: 12),
           if (imageUrl.isNotEmpty)
             _FaqPreviewFrame(
               child: previewBytes != null
                   ? _FaqZoomableImage(
-                      child: Image.memory(
-                        previewBytes!,
-                        fit: BoxFit.contain,
-                      ),
+                      child: Image.memory(previewBytes!, fit: BoxFit.contain),
                     )
                   : (previewUrl.isNotEmpty)
-                      ? _FaqZoomableImage(
-                          child: buildWebImagePreview(previewUrl),
-                        )
-                      : (imageUrl.startsWith('http://') ||
-                                imageUrl.startsWith('https://'))
-                          ? _FaqZoomableImage(
-                              child: buildWebImagePreview(imageUrl),
-                            )
-                          : const Center(
-                              child: Text(
-                                'Could not load image preview.',
-                                style: TextStyle(
-                                  color: _kFaqMuted,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
+                  ? _FaqZoomableImage(child: buildWebImagePreview(previewUrl))
+                  : (imageUrl.startsWith('http://') ||
+                        imageUrl.startsWith('https://'))
+                  ? _FaqZoomableImage(child: buildWebImagePreview(imageUrl))
+                  : const Center(
+                      child: Text(
+                        'Could not load image preview.',
+                        style: TextStyle(
+                          color: _kFaqMuted,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
             )
           else
             Container(
@@ -1810,7 +1805,9 @@ class _FaqImageEditorCard extends StatelessWidget {
                         ),
                       )
                     : const Icon(Icons.upload_outlined),
-                label: Text(imageUrl.isEmpty ? 'Upload image' : 'Replace image'),
+                label: Text(
+                  imageUrl.isEmpty ? 'Upload image' : 'Replace image',
+                ),
               ),
               if (onRemove != null)
                 OutlinedButton.icon(
@@ -1840,10 +1837,7 @@ class _FaqPreviewFrame extends StatelessWidget {
         color: const Color(0xFFE5E7EB),
         borderRadius: BorderRadius.circular(14),
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: child,
-      ),
+      child: ClipRRect(borderRadius: BorderRadius.circular(14), child: child),
     );
   }
 }

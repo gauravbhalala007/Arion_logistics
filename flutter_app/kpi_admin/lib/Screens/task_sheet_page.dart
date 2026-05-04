@@ -4,8 +4,31 @@ import 'package:flutter/material.dart';
 
 import '../localization/app_localizations.dart';
 import '../models/task_sheet_task.dart';
+import '../utils/driver_activity.dart';
 
 enum _TaskComposerKind { standard, feedbackText, feedbackChoice }
+
+class _FeedbackChoiceSummary {
+  final List<String> optionOrder;
+  final Map<String, List<TaskSheetTask>> tasksByOption;
+  final List<TaskSheetTask> pendingTasks;
+
+  const _FeedbackChoiceSummary({
+    required this.optionOrder,
+    required this.tasksByOption,
+    required this.pendingTasks,
+  });
+
+  int countForOption(String option) => tasksByOption[option]?.length ?? 0;
+
+  int get totalActive {
+    var total = pendingTasks.length;
+    for (final tasks in tasksByOption.values) {
+      total += tasks.length;
+    }
+    return total;
+  }
+}
 
 class TaskSheetPage extends StatefulWidget {
   const TaskSheetPage({super.key});
@@ -161,7 +184,10 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
     try {
       if (_assignToEveryone) {
         final driversSnap = await _driversCol().get();
-        if (driversSnap.docs.isEmpty) {
+        final activeDrivers = driversSnap.docs
+            .where((d) => isDriverWorking(d.data()))
+            .toList(growable: false);
+        if (activeDrivers.isEmpty) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(l10n.t('task_sheet_no_drivers_assign'))),
@@ -175,7 +201,7 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
         var assignedCount = 0;
         final batchId = _newBatchId();
 
-        for (final driverDoc in driversSnap.docs) {
+        for (final driverDoc in activeDrivers) {
           final data = driverDoc.data();
           final tid = (data['transporterId'] ?? driverDoc.id).toString().trim();
           final name = (data['driverName'] ?? data['fullName'] ?? tid)
@@ -430,6 +456,31 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
       return l10n.t('task_sheet_response_feedback_choice');
     }
     return l10n.t('task_sheet_response_standard');
+  }
+
+  _FeedbackChoiceSummary _feedbackChoiceSummary(List<TaskSheetTask> tasks) {
+    final optionOrder = tasks.isNotEmpty
+        ? tasks.first.feedbackOptions
+        : const <String>[];
+    final tasksByOption = {
+      for (final option in optionOrder) option: <TaskSheetTask>[],
+    };
+    final pendingTasks = <TaskSheetTask>[];
+
+    for (final task in tasks) {
+      final selected = task.feedbackSelectedOption.trim();
+      if (selected.isEmpty || !tasksByOption.containsKey(selected)) {
+        pendingTasks.add(task);
+        continue;
+      }
+      tasksByOption[selected]!.add(task);
+    }
+
+    return _FeedbackChoiceSummary(
+      optionOrder: optionOrder,
+      tasksByOption: tasksByOption,
+      pendingTasks: pendingTasks,
+    );
   }
 
   Widget _responseTypeCard({
@@ -710,6 +761,7 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
                       final docs = snapshot.data?.docs ?? const [];
                       final options =
                           docs
+                              .where((d) => isDriverWorking(d.data()))
                               .map((d) {
                                 final data = d.data();
                                 final transporterId =
@@ -1250,6 +1302,12 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
           itemBuilder: (_, i) {
             final item = taskItems[i];
             if (item.isGroup) {
+              return _buildGroupTaskCard(
+                l10n: l10n,
+                groupedTasks: item.tasks,
+              );
+            }
+            if (item.isGroup) {
               final groupedTasks = item.tasks;
               final first = groupedTasks.first;
               final pendingCount = groupedTasks
@@ -1652,6 +1710,447 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
               ),
             );
           },
+        );
+      },
+    );
+  }
+
+  Widget _buildGroupTaskCard({
+    required AppLocalizations l10n,
+    required List<TaskSheetTask> groupedTasks,
+  }) {
+    final first = groupedTasks.first;
+
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: _driversCol().snapshots(),
+      builder: (context, driversSnapshot) {
+        final activeTransporterIds = (driversSnapshot.data?.docs ?? const [])
+            .where((d) => isDriverWorking(d.data()))
+            .map(
+              (d) => (d.data()['transporterId'] ?? d.id)
+                  .toString()
+                  .trim()
+                  .toUpperCase(),
+            )
+            .where((id) => id.isNotEmpty)
+            .toSet();
+        final activeGroupedTasks = groupedTasks
+            .where(
+              (t) => activeTransporterIds.contains(
+                t.assignedTransporterId.trim().toUpperCase(),
+              ),
+            )
+            .toList(growable: false);
+        final pendingCount = activeGroupedTasks
+            .where((t) => t.status == DriverTaskStatus.pending)
+            .length;
+        final inProgressCount = activeGroupedTasks
+            .where((t) => t.status == DriverTaskStatus.inProgress)
+            .length;
+        final completedCount = activeGroupedTasks
+            .where((t) => t.status == DriverTaskStatus.completed)
+            .length;
+        final feedbackSummary = first.isFeedbackChoice
+            ? _feedbackChoiceSummary(activeGroupedTasks)
+            : null;
+
+        return Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF9FAFB),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 560;
+
+              final content = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.tf('task_sheet_everyone_title', {
+                      'title': first.title,
+                    }),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 12,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _formatDate(first.createdAt),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF9CA3AF),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _taskKindLabel(first),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF1D7F5A),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    first.description.isEmpty ? 'â€”' : first.description,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF4B5563),
+                      height: 1.25,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildGroupTaskPills(
+                    l10n: l10n,
+                    firstTask: first,
+                    activeGroupedTasks: activeGroupedTasks,
+                    pendingCount: pendingCount,
+                    inProgressCount: inProgressCount,
+                    completedCount: completedCount,
+                    feedbackSummary: feedbackSummary,
+                  ),
+                ],
+              );
+
+              final meta = Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    l10n.tf('task_sheet_drivers_count', {
+                      'count': '${activeGroupedTasks.length}',
+                    }),
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: Color(0xFF9CA3AF),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: l10n.t('task_sheet_delete_for_everyone_tooltip'),
+                    onPressed: () => _confirmDeleteTaskBatch(
+                      first.title,
+                      groupedTasks,
+                    ),
+                    icon: const Icon(
+                      Icons.delete_outline,
+                      color: Color(0xFFE11D48),
+                    ),
+                  ),
+                ],
+              );
+
+              if (compact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: const Color(0xFFE5E7EB),
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.groups_2_outlined,
+                            color: Color(0xFF6B7280),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(child: content),
+                      ],
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [meta],
+                    ),
+                  ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                    ),
+                    child: const Icon(
+                      Icons.groups_2_outlined,
+                      color: Color(0xFF6B7280),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(child: content),
+                  const SizedBox(width: 10),
+                  meta,
+                ],
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildGroupTaskPills({
+    required AppLocalizations l10n,
+    required TaskSheetTask firstTask,
+    required List<TaskSheetTask> activeGroupedTasks,
+    required int pendingCount,
+    required int inProgressCount,
+    required int completedCount,
+    required _FeedbackChoiceSummary? feedbackSummary,
+  }) {
+    if (firstTask.isFeedbackChoice && feedbackSummary != null) {
+      return Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          ...feedbackSummary.optionOrder.map(
+            (option) => _statusActionPill(
+              label: option,
+              count: feedbackSummary.countForOption(option),
+              textColor: const Color(0xFF1D7F5A),
+              borderColor: const Color(0xFF1D7F5A),
+              onTap: () => _openFeedbackChoiceBreakdownDialog(
+                taskTitle: firstTask.title,
+                focusLabel: option,
+                rows:
+                    feedbackSummary.tasksByOption[option] ??
+                    const <TaskSheetTask>[],
+                summary: feedbackSummary,
+              ),
+            ),
+          ),
+          _statusActionPill(
+            label: l10n.t('driver_tasks_status_pending'),
+            count: feedbackSummary.pendingTasks.length,
+            textColor: const Color(0xFF6B7280),
+            borderColor: const Color(0xFFD1D5DB),
+            onTap: () => _openFeedbackChoiceBreakdownDialog(
+              taskTitle: firstTask.title,
+              focusLabel: l10n.t('driver_tasks_status_pending'),
+              rows: feedbackSummary.pendingTasks,
+              summary: feedbackSummary,
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _statusActionPill(
+          label: l10n.t('driver_tasks_status_pending'),
+          count: pendingCount,
+          textColor: const Color(0xFF6B7280),
+          borderColor: const Color(0xFFD1D5DB),
+          onTap: () => _openDriversByStatusDialog(
+            taskTitle: firstTask.title,
+            statusLabel: l10n.t('driver_tasks_status_pending'),
+            drivers: activeGroupedTasks
+                .where((t) => t.status == DriverTaskStatus.pending)
+                .toList(),
+          ),
+        ),
+        _statusActionPill(
+          label: l10n.t('driver_tasks_status_in_progress'),
+          count: inProgressCount,
+          textColor: const Color(0xFFE9741A),
+          borderColor: const Color(0xFFE9741A),
+          onTap: () => _openDriversByStatusDialog(
+            taskTitle: firstTask.title,
+            statusLabel: l10n.t('driver_tasks_status_in_progress'),
+            drivers: activeGroupedTasks
+                .where((t) => t.status == DriverTaskStatus.inProgress)
+                .toList(),
+          ),
+        ),
+        _statusActionPill(
+          label: l10n.t('driver_tasks_status_completed'),
+          count: completedCount,
+          textColor: const Color(0xFF1D7F5A),
+          borderColor: const Color(0xFF1D7F5A),
+          onTap: () => _openDriversByStatusDialog(
+            taskTitle: firstTask.title,
+            statusLabel: l10n.t('driver_tasks_status_completed'),
+            drivers: activeGroupedTasks
+                .where((t) => t.status == DriverTaskStatus.completed)
+                .toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _openFeedbackChoiceBreakdownDialog({
+    required String taskTitle,
+    required String focusLabel,
+    required List<TaskSheetTask> rows,
+    required _FeedbackChoiceSummary summary,
+  }) async {
+    final l10n = AppLocalizations.of(context);
+    final sortedRows = [...rows]..sort((a, b) {
+      final aLabel = a.assignedDriverName.isEmpty
+          ? a.assignedTransporterId
+          : a.assignedDriverName;
+      final bLabel = b.assignedDriverName.isEmpty
+          ? b.assignedTransporterId
+          : b.assignedDriverName;
+      return aLabel.toLowerCase().compareTo(bLabel.toLowerCase());
+    });
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            width: 560,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.tf('task_sheet_everyone_title', {'title': taskTitle}),
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$focusLabel: ${sortedRows.length}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF4B5563),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    ...summary.optionOrder.map(
+                      (option) => _pill(
+                        '$option: ${summary.countForOption(option)}',
+                        textColor: const Color(0xFF1D7F5A),
+                        borderColor: const Color(0xFF1D7F5A),
+                      ),
+                    ),
+                    _pill(
+                      '${l10n.t('driver_tasks_status_pending')}: ${summary.pendingTasks.length}',
+                      textColor: const Color(0xFF6B7280),
+                      borderColor: const Color(0xFFD1D5DB),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Divider(height: 1),
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 360,
+                  child: sortedRows.isEmpty
+                      ? Center(
+                          child: Text(
+                            l10n.t('task_sheet_no_drivers_in_status'),
+                            style: const TextStyle(color: Colors.black54),
+                          ),
+                        )
+                      : ListView.separated(
+                          itemCount: sortedRows.length,
+                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          itemBuilder: (_, i) {
+                            final task = sortedRows[i];
+                            final name = task.assignedDriverName.trim();
+                            final id = task.assignedTransporterId.trim();
+                            final label = name.isEmpty ? id : '$name ($id)';
+                            final selectedOption =
+                                task.feedbackSelectedOption.trim();
+                            final choiceLabel = selectedOption.isEmpty
+                                ? l10n.t('driver_tasks_status_pending')
+                                : selectedOption;
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    label,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    choiceLabel,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: selectedOption.isEmpty
+                                          ? const Color(0xFF6B7280)
+                                          : const Color(0xFF1D7F5A),
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  if (task.feedbackResponse.isNotEmpty &&
+                                      task.feedbackResponse !=
+                                          selectedOption) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${l10n.t('task_sheet_feedback_response_label')}: ${task.feedbackResponse}',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF1D7F5A),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                ),
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: Text(l10n.t('task_sheet_close')),
+                  ),
+                ),
+              ],
+            ),
+          ),
         );
       },
     );

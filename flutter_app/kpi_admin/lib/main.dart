@@ -85,6 +85,8 @@ class App extends StatelessWidget {
             colorScheme: ColorScheme.fromSeed(
               seedColor: const Color(0xFF16A34A),
             ),
+
+            canvasColor: Colors.white,
             fontFamily: 'SF Pro',
             scaffoldBackgroundColor: const Color(0xFFF6F7F5),
             dialogTheme: DialogThemeData(
@@ -93,6 +95,25 @@ class App extends StatelessWidget {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
                 side: const BorderSide(color: Color(0xFFE5E7EB)),
+              ),
+            ),
+            menuButtonTheme: MenuButtonThemeData(
+              style: ButtonStyle(
+                shape: WidgetStateProperty.all(
+                  RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+            dropdownMenuTheme: DropdownMenuThemeData(
+              menuStyle: MenuStyle(
+                backgroundColor: WidgetStateProperty.all(Colors.white),
+                shape: WidgetStateProperty.all(
+                  RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
               ),
             ),
           ),
