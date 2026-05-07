@@ -972,7 +972,10 @@ class _FeedbackPageState extends State<FeedbackPage> {
                                             if (isStaff || canDelete) ...[
                                               const SizedBox(width: 8),
                                               PopupMenuButton<String>(
-                                                tooltip: 'Actions',
+                                                tooltip: _t(
+                                                  'Actions',
+                                                  'Aktionen',
+                                                ),
                                                 color: Colors.white,
                                                 elevation: 8,
                                                 shape: RoundedRectangleBorder(

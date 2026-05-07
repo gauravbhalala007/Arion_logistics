@@ -79,8 +79,363 @@ service cloud.firestore {
         && roleValue().matches('(?i)^(admin|user|developer)$');
     }
 
+    function fleetScopeMatchesUser(userId) {
+      return signedIn()
+        && (
+          userId == request.auth.uid
+          || (me().data.dspUid != null && me().data.dspUid == userId)
+          || (request.auth.token.dspUid != null && request.auth.token.dspUid == userId)
+        );
+    }
+
+    function isVehicleManager(userId) {
+      return signedIn()
+        && fleetScopeMatchesUser(userId)
+        && isApproved(request.auth.uid)
+        && roleValue().matches('(?i)^(admin|user|developer)$');
+    }
+
+    function isVehicleCategory(value) {
+      return value in [
+        'ARMADA',
+        'AMAZON_PAID_RENTAL',
+        'SELF_SOURCED_RENTAL',
+        'SELF_OWNED_RENTAL',
+      ];
+    }
+
+    function isVehicleFuelType(value) {
+      return value in [
+        'DIESEL',
+        'PETROL',
+        'ELECTRIC',
+        'HYBRID',
+      ];
+    }
+
+    function isVehicleStatusValue(value) {
+      return value in [
+        'ACTIVE',
+        'GROUNDED',
+        'IN_SERVICE',
+        'DEFLEETED',
+      ];
+    }
+
+    function isVehicleDateString(value) {
+      return value is string
+        && value.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    function validVehicleMetadata(data) {
+      return data.metadata is map
+        && (
+          data.category == 'ARMADA'
+            ? data.metadata.keys().hasOnly([
+                'armadaId',
+                'armadaCompanyName',
+                'contractStartDate',
+                'contractEndDate',
+              ])
+              && data.metadata.armadaId is string
+              && data.metadata.armadaId != ''
+              && data.metadata.armadaCompanyName is string
+              && data.metadata.armadaCompanyName != ''
+              && isVehicleDateString(data.metadata.contractStartDate)
+              && isVehicleDateString(data.metadata.contractEndDate)
+            : data.category == 'AMAZON_PAID_RENTAL'
+            ? data.metadata.keys().hasOnly([
+                'rentalCompanyName',
+                'contractNumber',
+                'rentalStartDate',
+                'rentalEndDate',
+              ])
+              && data.metadata.rentalCompanyName is string
+              && data.metadata.rentalCompanyName != ''
+              && data.metadata.contractNumber is string
+              && data.metadata.contractNumber != ''
+              && isVehicleDateString(data.metadata.rentalStartDate)
+              && isVehicleDateString(data.metadata.rentalEndDate)
+            : data.category == 'SELF_SOURCED_RENTAL'
+            ? data.metadata.keys().hasOnly([
+                'ownerName',
+                'ownerContactNumber',
+                'rentalAgreementNumber',
+                'rentalStartDate',
+                'rentalEndDate',
+              ])
+              && data.metadata.ownerName is string
+              && data.metadata.ownerName != ''
+              && data.metadata.ownerContactNumber is string
+              && data.metadata.ownerContactNumber != ''
+              && data.metadata.rentalAgreementNumber is string
+              && data.metadata.rentalAgreementNumber != ''
+              && isVehicleDateString(data.metadata.rentalStartDate)
+              && isVehicleDateString(data.metadata.rentalEndDate)
+            : data.category == 'SELF_OWNED_RENTAL'
+            ? data.metadata.keys().hasOnly([
+                'ownershipType',
+                'purchaseDate',
+              ])
+              && data.metadata.ownershipType is string
+              && data.metadata.ownershipType != ''
+              && isVehicleDateString(data.metadata.purchaseDate)
+            : false
+        );
+    }
+
+    function validVehicleDocument(data, userId, plateNumber) {
+      return data.keys().hasOnly([
+          'dspUid',
+          'plateNumber',
+          'category',
+          'brand',
+          'model',
+          'manufacturingYear',
+          'vinNumber',
+          'fuelType',
+          'status',
+          'serviceEndDate',
+          'metadata',
+          'notes',
+          'isDeleted',
+          'createdAt',
+          'updatedAt',
+        ])
+        && data.dspUid == userId
+        && data.plateNumber == plateNumber
+        && data.category is string
+        && isVehicleCategory(data.category)
+        && data.brand is string
+        && data.brand != ''
+        && data.model is string
+        && data.model != ''
+        && data.manufacturingYear is number
+        && data.vinNumber is string
+        && data.vinNumber != ''
+        && data.fuelType is string
+        && isVehicleFuelType(data.fuelType)
+        && data.status is string
+        && isVehicleStatusValue(data.status)
+        && (!('serviceEndDate' in data)
+          || data.serviceEndDate == null
+          || isVehicleDateString(data.serviceEndDate))
+        && data.notes is string
+        && data.isDeleted is bool
+        && validVehicleMetadata(data);
+    }
+
+    function isVehicleDocumentManager(userId) {
+      return signedIn()
+        && fleetScopeMatchesUser(userId)
+        && isApproved(request.auth.uid)
+        && roleValue().matches('(?i)^(admin|user|developer)$');
+    }
+
+    function validVehicleSubDocumentDate(value) {
+      return value is string
+        && value.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    function validVehicleDocumentRecord(data, userId, plateNumber, documentId) {
+      return data.keys().hasOnly([
+          'documentId',
+          'dspUid',
+          'plateNumber',
+          'documentType',
+          'documentNumber',
+          'expiryDate',
+          'fileUrl',
+          'fileName',
+          'fileType',
+          'notes',
+          'isDeleted',
+          'createdAt',
+          'updatedAt',
+        ])
+        && data.documentId == documentId
+        && data.dspUid == userId
+        && data.plateNumber == plateNumber
+        && data.documentType is string
+        && data.documentType != ''
+        && data.documentNumber is string
+        && validVehicleSubDocumentDate(data.expiryDate)
+        && data.fileUrl is string
+        && data.fileName is string
+        && data.fileName != ''
+        && data.fileType is string
+        && data.fileType != ''
+        && data.notes is string
+        && data.isDeleted is bool;
+    }
+
+    function isVehicleEventManager(userId) {
+      return signedIn()
+        && fleetScopeMatchesUser(userId)
+        && isApproved(request.auth.uid)
+        && roleValue().matches('(?i)^(admin|user|developer)$');
+    }
+
+    function allowedVehicleEventKeys() {
+      return [
+        'eventId',
+        'dspUid',
+        'plateNumber',
+        'eventType',
+        'title',
+        'eventDate',
+        'metadata',
+        'fileUrl',
+        'fileName',
+        'fileType',
+        'notes',
+        'isDeleted',
+        'createdAt',
+        'updatedAt',
+      ];
+    }
+
+    function validAccidentMetadata(metadata) {
+      return metadata is map
+        && metadata.keys().hasOnly([
+          'location',
+          'damageLevel',
+          'policeReportNumber',
+          'insuranceClaimNumber',
+        ])
+        && (!('location' in metadata) || metadata.location is string)
+        && (!('damageLevel' in metadata) || metadata.damageLevel is string)
+        && (!('policeReportNumber' in metadata) || metadata.policeReportNumber is string)
+        && (!('insuranceClaimNumber' in metadata) || metadata.insuranceClaimNumber is string);
+    }
+
+    function validVehicleEventMetadata(data) {
+      return data.metadata is map
+        && (
+          data.eventType == 'ACCIDENT'
+            ? validAccidentMetadata(data.metadata)
+            : data.metadata.keys().size() == 0
+        );
+    }
+
+    function validVehicleEventRecord(data, userId, plateNumber, eventId) {
+      return data.keys().hasOnly(allowedVehicleEventKeys())
+        && data.eventId == eventId
+        && data.dspUid == userId
+        && data.plateNumber == plateNumber
+        && data.eventType is string
+        && data.eventType != ''
+        && data.title is string
+        && data.title != ''
+        && validVehicleSubDocumentDate(data.eventDate)
+        && validVehicleEventMetadata(data)
+        && data.fileUrl is string
+        && data.fileName is string
+        && data.fileType is string
+        && data.notes is string
+        && data.isDeleted is bool;
+    }
+
     function fleetDocScope(data) {
       return  data.dspUid;
+    }
+
+    function isFleetType(value) {
+      return value in [
+        'armada',
+        'amazon_paid_rental',
+        'self_sourced_rental',
+        'self_owned_rental',
+      ];
+    }
+
+    function isFleetEventType(value) {
+      return value in [
+        'registration',
+        'status_change',
+        'tire_change',
+        'service_maintenance',
+        'tuv_inspection',
+        'accident',
+        'damage',
+        'rental_contract_change',
+        'note',
+      ];
+    }
+
+    function optionalString(data, field) {
+      return !(field in data) || data[field] == null || data[field] is string;
+    }
+
+    function optionalTimestamp(data, field) {
+      return !(field in data) || data[field] == null || data[field] is timestamp;
+    }
+
+    function optionalNumber(data, field) {
+      return !(field in data) || data[field] == null || data[field] is number;
+    }
+
+    function validFleetVehicleBase(data, userId, vehicleId) {
+      return data.vehicleNumber == vehicleId
+        && fleetDocScope(data) == userId
+        && data.status in [
+          'active',
+          'grounded',
+          'in_service',
+          'defleeted',
+        ]
+        && (!('model' in data) || data.model is string)
+        && (!('fleetType' in data) || data.fleetType == null || isFleetType(data.fleetType))
+        && optionalString(data, 'providerOrOwnerName')
+        && optionalString(data, 'contractReference')
+        && optionalString(data, 'notes')
+        && optionalTimestamp(data, 'contractStartDate')
+        && optionalTimestamp(data, 'contractEndDate')
+        && optionalTimestamp(data, 'serviceStartDate')
+        && optionalTimestamp(data, 'serviceEndDate')
+        && optionalTimestamp(data, 'createdAt')
+        && optionalTimestamp(data, 'updatedAt')
+        && optionalNumber(data, 'monthlyRateEur')
+        && optionalNumber(data, 'purchaseValueEur');
+    }
+
+    function validFleetVehicleTypeRequirements(data) {
+      return !('fleetType' in data)
+        || data.fleetType == null
+        || (
+          data.fleetType == 'self_owned_rental'
+            ? data.providerOrOwnerName is string
+              && data.providerOrOwnerName != ''
+              && data.purchaseValueEur is number
+            : data.providerOrOwnerName is string
+              && data.providerOrOwnerName != ''
+              && data.contractReference is string
+              && data.contractReference != ''
+              && data.contractStartDate is timestamp
+              && data.monthlyRateEur is number
+        );
+    }
+
+    function validFleetVehicleTypeRequirementsFleetHub(data) {
+      return !('fleetType' in data)
+        || data.fleetType == null
+        || (
+          data.fleetType == 'self_owned_rental'
+            ? optionalString(data, 'providerOrOwnerName')
+              && optionalString(data, 'contractReference')
+              && optionalTimestamp(data, 'contractStartDate')
+              && optionalTimestamp(data, 'contractEndDate')
+              && optionalNumber(data, 'monthlyRateEur')
+              && optionalNumber(data, 'purchaseValueEur')
+            : data.providerOrOwnerName is string
+              && data.providerOrOwnerName != ''
+              && data.contractReference is string
+              && data.contractReference != ''
+              && data.contractStartDate is timestamp
+              && optionalTimestamp(data, 'contractEndDate')
+              && optionalNumber(data, 'monthlyRateEur')
+              && optionalNumber(data, 'purchaseValueEur')
+        );
     }
 
 
@@ -125,45 +480,89 @@ service cloud.firestore {
       allow update: if isAdmin() || isSelf(userId); 
       allow delete: if isAdmin();
 
-      match /vehicles/{vehicleId} {
-        allow get, list: if isApprovedFleetViewer() && userId == fleetCompanyScope();
+      match /vehicles/{plateNumber} {
+        allow get, list: if isVehicleManager(userId);
 
-        allow create, update: if isApprovedFleetManager()
-          && userId == fleetCompanyScope()
-          && request.resource.data.vehicleNumber == vehicleId
-          && fleetDocScope(request.resource.data) == userId
-          && (!exists(/databases/$(database)/documents/users/$(userId)/vehicles/$(vehicleId))
-            || fleetDocScope(resource.data) == userId)
-          && request.resource.data.status in [
-            'active',
-            'grounded',
-            'in_service',
-            'defleeted',
-          ]
-          && (!('serviceStartDate' in request.resource.data)
-            || request.resource.data.serviceStartDate == null
-            || request.resource.data.serviceStartDate is timestamp)
-          && (!('serviceEndDate' in request.resource.data)
-            || request.resource.data.serviceEndDate == null
-            || request.resource.data.serviceEndDate is timestamp);
+        allow create: if isVehicleManager(userId)
+          && validVehicleDocument(request.resource.data, userId, plateNumber)
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.updatedAt == request.time;
 
-        allow delete: if isApprovedFleetManager() && userId == fleetCompanyScope();
+        allow update: if isVehicleManager(userId)
+          && resource.data.dspUid == userId
+          && request.resource.data.dspUid == resource.data.dspUid
+          && request.resource.data.plateNumber == resource.data.plateNumber
+          && validVehicleDocument(request.resource.data, userId, plateNumber)
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.updatedAt == request.time;
+
+        allow delete: if isVehicleManager(userId)
+          && resource.data.dspUid == userId;
 
         match /documents/{documentId} {
-          allow get, list: if isApprovedFleetViewer() && userId == fleetCompanyScope();
+          allow read: if isVehicleDocumentManager(userId);
 
-          allow create, update: if isApprovedFleetManager()
-            && userId == fleetCompanyScope()
-            && request.resource.data.type in ['tuv', 'insurance', 'service', 'rc']
-            && request.resource.data.fileUrl is string
-            && request.resource.data.fileName is string
-            && request.resource.data.uploadedAt is timestamp
-            && (!('expiryDate' in request.resource.data)
-              || request.resource.data.expiryDate == null
-              || request.resource.data.expiryDate is timestamp);
+          allow create: if isVehicleDocumentManager(userId)
+            && validVehicleDocumentRecord(
+              request.resource.data,
+              userId,
+              plateNumber,
+              documentId
+            )
+            && request.resource.data.createdAt == request.time
+            && request.resource.data.updatedAt == request.time;
 
-          allow delete: if isApprovedFleetManager()
-            && userId == fleetCompanyScope();
+          allow update: if isVehicleDocumentManager(userId)
+            && resource.data.dspUid == userId
+            && resource.data.plateNumber == plateNumber
+            && request.resource.data.dspUid == resource.data.dspUid
+            && request.resource.data.plateNumber == resource.data.plateNumber
+            && request.resource.data.documentId == resource.data.documentId
+            && validVehicleDocumentRecord(
+              request.resource.data,
+              userId,
+              plateNumber,
+              documentId
+            )
+            && request.resource.data.createdAt == resource.data.createdAt
+            && request.resource.data.updatedAt == request.time;
+
+          allow delete: if isVehicleDocumentManager(userId)
+            && resource.data.dspUid == userId
+            && resource.data.plateNumber == plateNumber;
+        }
+
+        match /events/{eventId} {
+          allow read: if isVehicleEventManager(userId);
+
+          allow create: if isVehicleEventManager(userId)
+            && validVehicleEventRecord(
+              request.resource.data,
+              userId,
+              plateNumber,
+              eventId
+            )
+            && request.resource.data.createdAt == request.time
+            && request.resource.data.updatedAt == request.time;
+
+          allow update: if isVehicleEventManager(userId)
+            && resource.data.dspUid == userId
+            && resource.data.plateNumber == plateNumber
+            && request.resource.data.dspUid == resource.data.dspUid
+            && request.resource.data.plateNumber == resource.data.plateNumber
+            && request.resource.data.eventId == resource.data.eventId
+            && validVehicleEventRecord(
+              request.resource.data,
+              userId,
+              plateNumber,
+              eventId
+            )
+            && request.resource.data.createdAt == resource.data.createdAt
+            && request.resource.data.updatedAt == request.time;
+
+          allow delete: if isVehicleEventManager(userId)
+            && resource.data.dspUid == userId
+            && resource.data.plateNumber == plateNumber;
         }
       }
 

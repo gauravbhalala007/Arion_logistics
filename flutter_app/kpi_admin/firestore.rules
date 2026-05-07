@@ -51,9 +51,68 @@ service cloud.firestore {
     }
 
     function fleetDocScope(data) {
-      return ('dspUid' in data) && data.dspUid != null && data.dspUid != ''
-        ? data.dspUid
-        : (('companyId' in data) && data.companyId != null && data.companyId != '' ? data.companyId : '');
+      return  data.dspUid;
+        
+    }
+
+    function isFleetStatus(value) {
+      return value in ['active', 'grounded', 'in_service', 'defleeted'];
+    }
+
+    function isFleetType(value) {
+      return value in [
+        'armada',
+        'amazon_paid_rental',
+        'self_sourced_rental',
+        'self_owned_rental',
+      ];
+    }
+
+    function isFleetEventType(value) {
+      return value in [
+        'registration',
+        'status_change',
+        'tire_change',
+        'service_maintenance',
+        'tuv_inspection',
+        'accident',
+        'damage',
+        'rental_contract_change',
+        'note',
+      ];
+    }
+
+    function optionalString(data, field) {
+      return !(field in data) || data[field] == null || data[field] is string;
+    }
+
+    function optionalTimestamp(data, field) {
+      return !(field in data) || data[field] == null || data[field] is timestamp;
+    }
+
+    function optionalNumber(data, field) {
+      return !(field in data) || data[field] == null || data[field] is number;
+    }
+
+    function validFleetVehicleData(data, userId, vehicleId) {
+      return data.vehicleNumber == vehicleId
+        && fleetDocScope(data) == userId
+        && data.model is string
+        && data.status is string
+        && isFleetStatus(data.status)
+        && data.fleetType is string
+        && isFleetType(data.fleetType)
+        && data.providerOrOwnerName is string
+        && data.contractReference is string
+        && data.notes is string
+        && optionalTimestamp(data, 'contractStartDate')
+        && optionalTimestamp(data, 'contractEndDate')
+        && optionalTimestamp(data, 'serviceStartDate')
+        && optionalTimestamp(data, 'serviceEndDate')
+        && optionalNumber(data, 'monthlyRateEur')
+        && optionalNumber(data, 'purchaseValueEur')
+        && optionalTimestamp(data, 'createdAt')
+        && optionalTimestamp(data, 'updatedAt');
     }
 
     // is the caller a driver that belongs to this DSP userId?
@@ -98,19 +157,20 @@ service cloud.firestore {
 
         allow create, update: if isApprovedFleetManager()
           && userId == companyScope()
-          && request.resource.data.vehicleNumber == vehicleId
-          && fleetDocScope(request.resource.data) == userId
+          && validFleetVehicleData(request.resource.data, userId, vehicleId)
           && (!exists(/databases/$(database)/documents/users/$(userId)/vehicles/$(vehicleId))
             || fleetDocScope(resource.data) == userId)
-          && request.resource.data.status in [
-            'active',
-            'grounded',
-            'in_service',
-            'defleeted',
-          ]
-          && request.resource.data.tuvStatus in ['valid', 'expired', 'pending'];
+          && (
+            request.resource.data.fleetType == 'self_owned_rental'
+              ? request.resource.data.providerOrOwnerName != ''
+                && request.resource.data.purchaseValueEur is number
+              : request.resource.data.providerOrOwnerName != ''
+                && request.resource.data.contractReference != ''
+                && request.resource.data.contractStartDate is timestamp
+                && request.resource.data.monthlyRateEur is number
+          );
 
-        allow delete: if false;
+        allow delete: if isApprovedFleetManager() && userId == companyScope();
 
         match /documents/{documentId} {
           allow get, list: if isApprovedFleetViewer() && userId == companyScope();
@@ -126,6 +186,27 @@ service cloud.firestore {
               || request.resource.data.expiryDate is timestamp)
             && (!('storagePath' in request.resource.data)
               || request.resource.data.storagePath is string);
+        }
+
+        match /history/{historyId} {
+          allow get, list: if isApprovedFleetViewer() && userId == companyScope();
+
+          allow create, update: if isApprovedFleetManager()
+            && userId == companyScope()
+            && request.resource.data.eventType is string
+            && isFleetEventType(request.resource.data.eventType)
+            && request.resource.data.eventDate is timestamp
+            && request.resource.data.title is string
+            && request.resource.data.createdByUid is string
+            && optionalString(request.resource.data, 'notes')
+            && optionalString(request.resource.data, 'fileUrl')
+            && optionalString(request.resource.data, 'fileName')
+            && optionalString(request.resource.data, 'storagePath')
+            && optionalTimestamp(request.resource.data, 'createdAt')
+            && optionalTimestamp(request.resource.data, 'updatedAt');
+
+          allow delete: if isApprovedFleetManager()
+            && userId == companyScope();
         }
       }
 

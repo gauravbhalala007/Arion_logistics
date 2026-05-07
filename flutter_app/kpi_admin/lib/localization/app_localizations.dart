@@ -248,6 +248,7 @@ class AppLocalizations {
       'fleet_status_pick_date': 'Pick date',
       'fleet_status_change_date': 'Change date',
       'fleet_status_clear_date': 'Clear date',
+      'fleet_status_loading': 'Loading...',
       'fleet_status_date_not_set': 'No date selected',
       'fleet_status_updated_fallback': 'Never',
       'fleet_status_not_applicable': 'Not applicable',
@@ -283,10 +284,8 @@ class AppLocalizations {
       'fleet_status_vehicle_details_choose_file': 'Choose file',
       'fleet_status_vehicle_details_change_file': 'Change file',
       'fleet_status_vehicle_details_no_file_selected': 'No file selected',
-      'fleet_status_vehicle_details_select_expiry_date':
-          'Select expiry date',
-      'fleet_status_vehicle_details_change_expiry_date':
-          'Change expiry date',
+      'fleet_status_vehicle_details_select_expiry_date': 'Select expiry date',
+      'fleet_status_vehicle_details_change_expiry_date': 'Change expiry date',
       'fleet_status_vehicle_details_no_expiry_date': 'No expiry date',
       'fleet_status_vehicle_details_clear_expiry': 'Clear expiry',
       'fleet_status_vehicle_details_upload_action': 'Upload document',
@@ -311,8 +310,7 @@ class AppLocalizations {
       'fleet_status_vehicle_details_upload_failed':
           'Failed to upload document: {error}',
       'fleet_status_vehicle_details_invalid_url': 'Invalid document URL.',
-      'fleet_status_vehicle_details_open_failed':
-          'Could not open document.',
+      'fleet_status_vehicle_details_open_failed': 'Could not open document.',
       'fleet_status_vehicle_details_delete_success': 'Document deleted.',
       'fleet_status_vehicle_details_delete_failed':
           'Failed to delete document: {error}',
@@ -321,10 +319,8 @@ class AppLocalizations {
       'fleet_status_vehicle_details_page_title': 'Vehicle details',
       'fleet_status_vehicle_details_page_subtitle':
           'Review vehicle information and manage documents.',
-      'fleet_status_vehicle_details_information_title':
-          'Vehicle information',
-      'fleet_status_vehicle_details_compliance_title':
-          'Document compliance',
+      'fleet_status_vehicle_details_information_title': 'Vehicle information',
+      'fleet_status_vehicle_details_compliance_title': 'Document compliance',
       'fleet_status_vehicle_details_compliance_unavailable':
           'Document compliance could not be loaded.',
       'fleet_status_vehicle_details_not_found': 'Vehicle not found.',
@@ -504,20 +500,16 @@ class AppLocalizations {
       'dash_company_section_standard_work_compliance':
           'Standard Work Compliance',
       'dash_metric_fico': 'Safe Driving Metric (FICO)',
-      'dash_metric_speeding_event_rate':
-          'Speeding Event Rate (Per 100 Trips)',
+      'dash_metric_speeding_event_rate': 'Speeding Event Rate (Per 100 Trips)',
       'dash_metric_mentor_adoption_rate': 'Mentor Adoption Rate',
-      'dash_metric_vehicle_audit_compliance':
-          'Vehicle Audit (VSA) Compliance',
+      'dash_metric_vehicle_audit_compliance': 'Vehicle Audit (VSA) Compliance',
       'dash_metric_breach_of_contract': 'Breach of Contract (BOC)',
-      'dash_metric_working_hours_compliance':
-          'Working Hours Compliance (WHC)',
+      'dash_metric_working_hours_compliance': 'Working Hours Compliance (WHC)',
       'dash_metric_comprehensive_audit_score':
           'Comprehensive Audit Score (CAS)',
       'dash_metric_customer_escalation_dpmo': 'Customer Escalation DPMO',
       'dash_metric_customer_delivery_feedback': 'Customer Delivery Feedback',
-      'dash_metric_delivery_completion_rate':
-          'Delivery Completion Rate (DCR)',
+      'dash_metric_delivery_completion_rate': 'Delivery Completion Rate (DCR)',
       'dash_metric_dnr_dpmo': 'DNR DPMO',
       'dash_metric_lor_dpmo': 'LoR DPMO',
       'dash_metric_dsc_dpmo': 'DSC DPMO',
@@ -753,8 +745,7 @@ class AppLocalizations {
       'faq_a4':
           'Quality always comes first. Follow the customer\'s delivery instructions carefully and never leave a package in an unsafe location simply because you are behind schedule.',
 
-      'faq_q5':
-          'What if I focus on quality but then fall behind on my stops?',
+      'faq_q5': 'What if I focus on quality but then fall behind on my stops?',
       'faq_a5':
           'You will complete your route one way or another. We will arrange support when it is reasonable and necessary.',
 
@@ -787,14 +778,12 @@ class AppLocalizations {
           'Use your judgement and common sense. For example, a package left by the mailboxes in a building with 20 to 30 floors is far more likely to be stolen than one left at a private residence.\n'
           'To support you, we post a daily list each morning of addresses that carry a high risk of theft or customer complaints, based on historical delivery data and statistics.',
 
-      'faq_q7_1_4':
-          'How does a lost or stolen package affect my score?',
+      'faq_q7_1_4': 'How does a lost or stolen package affect my score?',
       'faq_a7_1_4':
           'The impact is significant. A single lost package can reduce your score by at least 30% and costs you a minimum of 600 points. Note that the higher the number of points displayed under your name on the scorecard, the worse your performance is considered. The more packages you deliver per week, the fewer points you lose per incident, and the value of the missing item also factors in — more expensive items result in greater point loss. We should keep this metric as low as possible.\n'
           'Equally important: if you consistently record a high number of lost packages, we will be required to terminate your employment, as Amazon may eventually suspect theft. This is a serious risk and cannot be ignored.',
 
-      'faq_q7_2':
-          'CC Tab — Contact Compliance',
+      'faq_q7_2': 'CC Tab — Contact Compliance',
       'faq_a7_2':
           'This metric measures how often you contact the customer about their delivery, whether by text message or phone call. The less you communicate with the customer, the lower your score in this category will be. We should keep this metric as high as possible, as it is one of the easiest categories in which to perform well, and it contributes significantly to your overall score.',
 
@@ -2191,8 +2180,7 @@ class AppLocalizations {
       'faq_a1':
           'Dorëzimi i çdo pakete me kujdes dhe ruajtja e një sjelljeje profesionale në çdo kohë.',
 
-      'faq_q2':
-          'Çfarë duhet të shmangësh nëse lind një problem me një klient?',
+      'faq_q2': 'Çfarë duhet të shmangësh nëse lind një problem me një klient?',
       'faq_a2':
           'Të lutemi, mos u përpiq ta zgjidhësh situatën vetë. Në vend të kësaj, njofto menjëherë dispatcher-in në detyrë. Ne do të komunikojmë me klientin në emrin tënd për të parandaluar përshkallëzimin dhe për të shmangur pasoja negative nga Amazon. Ne jemi këtu për të të mbështetur.',
 
@@ -2321,7 +2309,8 @@ class AppLocalizations {
       'faq_a9':
           'Së pari, sigurohu që je në rregull dhe pa lëndime të rënda. Sa i përket dëmit të automjetit: nëse përcaktojmë se aksidenti u shkaktua nga neglizhenca — për shembull, shpërqendrimi nga përdorimi i telefonit gjatë vozitjes — do të mbash personalisht përgjegjësi për koston e plotë të dëmit. Për më tepër, raporti i policisë që pason mund të rezultojë në pezullimin e patentës, dhe një incident i tillë është bazë për largim të menjëhershëm. Në raste më pak të rënda, do të përjashtohesh nga Bonuset Javore të Scorecard-it për dy muaj. Ti je i detyruar të na njoftosh menjëherë pas çdo incidenti dhe të ofrosh sa vijon: kohën dhe vendndodhjen e incidentit, informacion për çdo dëm të pronës private ose publike (mure, gardhe, shtylla ndriçimi, njerëz ose kafshë), si dhe foto të qarta të dëmeve të automjetit.',
 
-      'faq_q10': 'Çfarë duhet të bëj nëse një paketë është e dëmtuar ose mungon?',
+      'faq_q10':
+          'Çfarë duhet të bëj nëse një paketë është e dëmtuar ose mungon?',
       'faq_a10':
           'Nëse një paketë është e dëmtuar, shënoje si të dëmtuar në sistem dhe ktheje në stacion. Nëse paketa e dëmtuar përmban lëng dhe ka prekur paketa të tjera, bëj një foto të të gjitha paketave të prekura dhe dërgoje te dispatcher-i në detyrë. Ne do ta raportojmë incidentin në emrin tënd në Amazon.\n'
           'Nëse një paketë mungon, mund ta shënosh si të munguar — përveç rastit kur është një paketë OTP, në të cilin rast duhet të na kontaktosh së pari para se ta shënosh. Kjo është thelbësore.',
@@ -2909,13 +2898,11 @@ class AppLocalizations {
       'faq_a1':
           'Minden csomagot gondosan kézbesíteni, és mindvégig professzionálisan viselkedni.',
 
-      'faq_q2':
-          'Mit kerülj el, ha probléma adódik egy ügyféllel?',
+      'faq_q2': 'Mit kerülj el, ha probléma adódik egy ügyféllel?',
       'faq_a2':
           'Kérjük, ne próbáld meg egyedül megoldani a helyzetet. Ehelyett azonnal értesítsd a szolgálatos diszpécsert. Mi fogjuk a kommunikációt az ügyféllel a te nevedben, hogy megelőzzük az eszkalációt és elkerüljük az Amazon felőli negatív következményeket. Itt vagyunk, hogy támogassunk téged.',
 
-      'faq_q3':
-          'Mit tegyek, ha egy ügyféllel való helyzet már eszkalálódott?',
+      'faq_q3': 'Mit tegyek, ha egy ügyféllel való helyzet már eszkalálódott?',
       'faq_a3':
           'Soha nincs túl késő orvosolni egy hibát. Kérjük, vedd fel velünk a kapcsolatot, és megtesszük a tőlünk telhetőt, hogy a problémát közvetlenül az ügyféllel rendezzük.',
 
@@ -2954,7 +2941,8 @@ class AppLocalizations {
           'Amikor csak lehetséges, add át a csomagot közvetlenül az ügyfélnek. Ha ez nem lehetséges, küldj üzenetet az ügyfélnek, amelyben pontosan közlöd, hol hagytad a csomagot — például a garázsban, a lépcső alatt, a fészerben vagy egy virágcserép mögött.\n'
           'Ha úgy érzed, hogy nem biztonságos felügyelet nélkül hagyni a csomagot, ne hagyd ott. Vidd magaddal, és később próbáld meg újra kézbesíteni. Ez kiemelten fontos.',
 
-      'faq_q7_1_3': 'Hogyan tudom megállapítani, hogy egy helyszín biztonságos-e?',
+      'faq_q7_1_3':
+          'Hogyan tudom megállapítani, hogy egy helyszín biztonságos-e?',
       'faq_a7_1_3':
           'Használd az ítélőképességedet és a józan eszedet. Egy 20–30 emeletes épület postaládáinál hagyott csomagot például jóval nagyobb valószínűséggel lopnak el, mint egy családi háznál hagyottat.\n'
           'Támogatásképpen minden reggel közzéteszünk egy listát azokról a címekről, amelyeknél a korábbi kézbesítési adatok és statisztikák alapján magas a lopás vagy az ügyfélpanasz kockázata.',
@@ -3040,8 +3028,7 @@ class AppLocalizations {
       'faq_a9':
           'Először is győződj meg arról, hogy nem sérültél meg súlyosan. A járműkárt illetően: ha megállapítjuk, hogy a balesetet gondatlanság okozta — például vezetés közbeni mobiltelefon-használatból eredő figyelemelterelés —, a teljes kárért személyesen te leszel felelős. Emellett az ezt követő rendőrségi jegyzőkönyv jogosítvány-felfüggesztéshez vezethet, és egy ilyen incidens azonnali elbocsátás alapjául szolgál. Kevésbé súlyos esetekben két hónapra kizárásra kerülsz a Heti Scorecard Bónuszokból. Minden incidensről köteles vagy minket haladéktalanul értesíteni, és a következőket megadni: az incidens időpontja és helyszíne, adatok minden magán- vagy közterületi kárról (falak, kerítések, lámpaoszlopok, személyek vagy állatok), valamint jól látható fényképek a jármű sérüléseiről.',
 
-      'faq_q10':
-          'Mit tegyek, ha egy csomag megsérült vagy hiányzik?',
+      'faq_q10': 'Mit tegyek, ha egy csomag megsérült vagy hiányzik?',
       'faq_a10':
           'Ha egy csomag megsérült, a rendszerben jelöld meg sérültnek, és vidd vissza az állomásra. Ha a sérült csomag folyadékot tartalmaz, és további csomagokat is érintett, készíts fényképet az összes érintett csomagról, és küldd el a szolgálatos diszpécsernek. Az incidenst a nevedben jelentjük az Amazonnak.\n'
           'Ha egy csomag hiányzik, hiányzónak jelölheted — kivéve, ha OTP-csomagról van szó, ebben az esetben előbb fel kell venned velünk a kapcsolatot, mielőtt hiányzónak jelölnéd. Ez döntő fontosságú.',
@@ -3636,8 +3623,7 @@ class AppLocalizations {
       'faq_a1':
           'Livrarea fiecărui colet cu grijă și păstrarea unui comportament profesional în orice moment.',
 
-      'faq_q2':
-          'Ce ar trebui să eviți dacă apare o problemă cu un client?',
+      'faq_q2': 'Ce ar trebui să eviți dacă apare o problemă cu un client?',
       'faq_a2':
           'Te rugăm să nu încerci să rezolvi singur situația. În schimb, anunță imediat dispecerul de serviciu. Noi vom comunica cu clientul în numele tău pentru a preveni escaladarea și a evita orice consecințe negative din partea Amazon. Suntem aici ca să te susținem.',
 
@@ -3686,14 +3672,12 @@ class AppLocalizations {
           'Folosește-ți judecata și bunul-simț. De exemplu, un colet lăsat lângă cutiile poștale ale unei clădiri cu 20–30 de etaje are șanse mult mai mari de a fi furat decât unul lăsat la o reședință privată.\n'
           'Pentru a te sprijini, publicăm în fiecare dimineață o listă de adrese care prezintă un risc ridicat de furt sau de reclamații din partea clienților, pe baza datelor istorice de livrare și a statisticilor.',
 
-      'faq_q7_1_4':
-          'Cum afectează un colet pierdut sau furat scorul meu?',
+      'faq_q7_1_4': 'Cum afectează un colet pierdut sau furat scorul meu?',
       'faq_a7_1_4':
           'Impactul este semnificativ. Un singur colet pierdut îți poate reduce scorul cu cel puțin 30% și te costă minimum 600 de puncte. Reține: cu cât numărul punctelor afișate sub numele tău în scorecard este mai mare, cu atât performanța este considerată mai slabă. Cu cât livrezi mai multe colete pe săptămână, cu atât pierzi mai puține puncte per incident, iar valoarea articolului lipsă este de asemenea relevantă — articolele mai scumpe generează o pierdere mai mare de puncte. Trebuie să menținem acest indicator cât mai scăzut posibil.\n'
           'La fel de important: dacă înregistrezi în mod constant un număr mare de colete pierdute, vom fi obligați să încetăm colaborarea, deoarece Amazon ar putea suspecta în cele din urmă un furt. Este un risc serios și nu poate fi ignorat.',
 
-      'faq_q7_2':
-          'Fila CC — Contact Compliance',
+      'faq_q7_2': 'Fila CC — Contact Compliance',
       'faq_a7_2':
           'Acest indicator măsoară cât de des contactezi clientul în legătură cu livrarea sa, fie prin mesaj, fie prin apel telefonic. Cu cât comunici mai puțin cu clientul, cu atât scorul tău în această categorie va fi mai scăzut. Trebuie să menținem acest indicator cât mai ridicat posibil, întrucât este una dintre cele mai simple categorii în care poți obține performanțe bune, iar contribuția sa la scorul tău general este semnificativă.',
 
@@ -3746,8 +3730,7 @@ class AppLocalizations {
           '6) A fost persoana care a efectuat livrarea politicoasă și profesionistă? (Da / Nu / Nu se aplică — livrare fără contact)\n'
           '7) Ai comentarii despre experiența ta de livrare? (Comentarii suplimentare ale clientului)',
 
-      'faq_q7_8':
-          'Ce ar trebui să țin minte despre scorecard în general?',
+      'faq_q7_8': 'Ce ar trebui să țin minte despre scorecard în general?',
       'faq_a7_8':
           'Calitatea și eficiența fac o diferență semnificativă. Scorurile bune îți aduc beneficii ție, companiei și întregii echipe. Satisfacția clientului este prioritatea noastră principală, iar rezultatele excelente sunt recompensate cu un bonus din partea companiei.\n'
           'Dă ce ai tu mai bun și vei fi recompensat corespunzător.',
@@ -3761,8 +3744,7 @@ class AppLocalizations {
       'faq_a9':
           'Mai întâi, asigură-te că ești în siguranță și că nu ești rănit grav. În privința daunelor vehiculului: dacă stabilim că accidentul a fost cauzat de neglijență — de exemplu, distragerea atenției din cauza utilizării telefonului mobil în timpul condusului — vei fi personal răspunzător pentru întreaga valoare a daunelor. În plus, raportul de poliție care urmează poate conduce la suspendarea permisului, iar un astfel de incident constituie motiv pentru concediere imediată. În cazurile mai puțin grave, vei fi exclus timp de două luni de la Bonusurile Scorecard-ului Săptămânal. Ești obligat să ne informezi imediat după orice incident și să ne furnizezi următoarele: ora și locul incidentului, detalii despre eventualele daune asupra proprietății private sau publice (ziduri, garduri, stâlpi de iluminat, persoane sau animale) și fotografii clare ale daunelor vehiculului.',
 
-      'faq_q10':
-          'Ce ar trebui să fac dacă un colet este deteriorat sau lipsă?',
+      'faq_q10': 'Ce ar trebui să fac dacă un colet este deteriorat sau lipsă?',
       'faq_a10':
           'Dacă un colet este deteriorat, marchează-l ca deteriorat în sistem și returnează-l la stație. Dacă coletul deteriorat conține lichid și a afectat și alte colete, fă o fotografie cu toate coletele afectate și trimite-o dispecerului de serviciu. Noi vom raporta incidentul către Amazon în numele tău.\n'
           'Dacă un colet lipsește, îl poți marca drept lipsă — cu excepția cazului în care este un colet OTP, situație în care trebuie să ne contactezi mai întâi înainte de a-l marca. Acest lucru este esențial.',
@@ -4350,13 +4332,11 @@ class AppLocalizations {
       'faq_a1':
           'Pažljivo dostaviti svaki paket i u svakom trenutku ponašati se profesionalno.',
 
-      'faq_q2':
-          'Što trebaš izbjeći ako se pojavi problem s kupcem?',
+      'faq_q2': 'Što trebaš izbjeći ako se pojavi problem s kupcem?',
       'faq_a2':
           'Molimo te, ne pokušavaj sam riješiti situaciju. Umjesto toga, odmah obavijesti dežurnog dispečera. Mi ćemo komunicirati s kupcem u tvoje ime kako bismo spriječili eskalaciju i izbjegli negativne posljedice od strane Amazona. Tu smo da te podržimo.',
 
-      'faq_q3':
-          'Što trebam učiniti ako je situacija s kupcem već eskalirala?',
+      'faq_q3': 'Što trebam učiniti ako je situacija s kupcem već eskalirala?',
       'faq_a3':
           'Nikada nije prekasno riješiti pogrešku. Molimo te, javi nam se i učinit ćemo sve što je u našoj moći da problem riješimo izravno s kupcem.',
 
@@ -4400,14 +4380,12 @@ class AppLocalizations {
           'Koristi vlastitu prosudbu i zdrav razum. Primjerice, paket ostavljen kraj sandučića u zgradi od 20 do 30 katova puno je vjerojatnije da će biti ukraden nego onaj ostavljen u privatnoj kući.\n'
           'Kao podršku, svako jutro objavljujemo popis adresa koje nose visok rizik od krađe ili pritužbi kupaca, temeljen na povijesnim podacima o dostavama i statistici.',
 
-      'faq_q7_1_4':
-          'Kako izgubljen ili ukraden paket utječe na moj rezultat?',
+      'faq_q7_1_4': 'Kako izgubljen ili ukraden paket utječe na moj rezultat?',
       'faq_a7_1_4':
           'Utjecaj je značajan. Samo jedan izgubljen paket može smanjiti tvoj rezultat za najmanje 30% i košta te minimalno 600 bodova. Imaj na umu: što je broj bodova pod tvojim imenom u scorecardu veći, to se učinak smatra lošijim. Što više paketa dostavljaš tjedno, to manje bodova gubiš po incidentu, a vrijednost nedostajućeg predmeta također ima ulogu — skuplji predmeti rezultiraju većim gubitkom bodova. Ovaj pokazatelj moramo držati što nižim.\n'
           'Jednako važno: ako redovito bilježiš velik broj izgubljenih paketa, bit ćemo prisiljeni prekinuti radni odnos, jer Amazon u nekom trenutku može posumnjati na krađu. To je ozbiljan rizik koji se ne smije zanemariti.',
 
-      'faq_q7_2':
-          'CC kartica — Contact Compliance',
+      'faq_q7_2': 'CC kartica — Contact Compliance',
       'faq_a7_2':
           'Ovaj pokazatelj mjeri koliko često kontaktiraš kupca u vezi s njegovom dostavom, bilo putem poruke bilo telefonskim pozivom. Što manje komuniciraš s kupcem, to će tvoj rezultat u ovoj kategoriji biti niži. Ovaj pokazatelj trebamo držati što višim, budući da je jedna od najlakših kategorija za postizanje dobrih rezultata i značajno doprinosi tvom ukupnom rezultatu.',
 
@@ -4460,8 +4438,7 @@ class AppLocalizations {
           '6) Je li dostavljač bio ljubazan i profesionalan? (Da / Ne / Nije primjenjivo — beskontaktna dostava)\n'
           '7) Imaš li komentare o svom iskustvu dostave? (Dodatni komentari kupca)',
 
-      'faq_q7_8':
-          'Što trebam imati na umu u vezi sa scorecardom općenito?',
+      'faq_q7_8': 'Što trebam imati na umu u vezi sa scorecardom općenito?',
       'faq_a7_8':
           'Kvaliteta i učinkovitost čine značajnu razliku. Snažni rezultati koriste tebi, tvrtki i cijelom timu. Zadovoljstvo kupaca naš je najviši prioritet, a iznimni rezultati nagrađuju se bonusom od strane tvrtke.\n'
           'Daj sve od sebe i bit ćeš odgovarajuće nagrađen.',
@@ -4475,8 +4452,7 @@ class AppLocalizations {
       'faq_a9':
           'Najprije se uvjeri da si siguran i da nisi teško ozlijeđen. Što se tiče oštećenja vozila: ako utvrdimo da je nesreća uzrokovana nemarom — primjerice, ometanjem zbog korištenja mobilnog telefona tijekom vožnje — osobno ćeš biti odgovoran za puni iznos štete. Osim toga, policijski zapisnik koji slijedi može rezultirati suspenzijom vozačke dozvole, a takav incident predstavlja osnovu za trenutni otkaz. U manje ozbiljnim slučajevima bit ćeš isključen iz Tjednih Scorecard Bonusa na dva mjeseca. Obvezan si odmah nas obavijestiti nakon bilo kojeg incidenta i pružiti sljedeće: vrijeme i lokaciju incidenta, podatke o bilo kakvoj šteti na privatnoj ili javnoj imovini (zidovi, ograde, stupovi rasvjete, ljudi ili životinje) te jasne fotografije oštećenja vozila.',
 
-      'faq_q10':
-          'Što trebam učiniti ako je paket oštećen ili nedostaje?',
+      'faq_q10': 'Što trebam učiniti ako je paket oštećen ili nedostaje?',
       'faq_a10':
           'Ako je paket oštećen, označi ga kao oštećen u sustavu i vrati ga u stanicu. Ako oštećeni paket sadrži tekućinu i utjecao je na druge pakete, napravi fotografiju svih pogođenih paketa i pošalji je dežurnom dispečeru. Incident ćemo u tvoje ime prijaviti Amazonu.\n'
           'Ako paket nedostaje, možeš ga označiti kao nedostajući — osim ako se radi o OTP paketu, u kojem nas slučaju moraš prvo kontaktirati prije nego što ga označiš. Ovo je ključno.',
@@ -5042,15 +5018,13 @@ class AppLocalizations {
       'faq_green_book_video_open_failed': 'تعذر فتح رابط فيديو Green Book.',
 
       'faq_q1': 'ما أهم جانب في عملك اليومي؟',
-      'faq_a1':
-          'تسليم كل طرد بعناية والحفاظ على سلوك مهني في جميع الأوقات.',
+      'faq_a1': 'تسليم كل طرد بعناية والحفاظ على سلوك مهني في جميع الأوقات.',
 
       'faq_q2': 'ما الذي ينبغي تجنبه في حال نشوء مشكلة مع الزبون؟',
       'faq_a2':
           'يُرجى عدم محاولة حل الموقف بنفسك. بل أبلغ المشرف المناوب فور وقوع المشكلة. سنتولى التواصل مع الزبون نيابةً عنك لمنع تصاعد الموقف وتفادي أي تبعات سلبية من جانب أمازون. نحن هنا لدعمك.',
 
-      'faq_q3':
-          'ما الذي ينبغي فعله إذا تصاعد الموقف مع الزبون بالفعل؟',
+      'faq_q3': 'ما الذي ينبغي فعله إذا تصاعد الموقف مع الزبون بالفعل؟',
       'faq_a3':
           'لم يفت الأوان أبدًا لمعالجة أي خطأ. يُرجى التواصل معنا وسنبذل قصارى جهدنا لحل المشكلة مباشرةً مع الزبون.',
 
@@ -5059,8 +5033,7 @@ class AppLocalizations {
       'faq_a4':
           'الجودة لها الأولوية دائمًا. اتبع تعليمات التسليم الخاصة بالزبون بدقة، ولا تترك الطرد أبدًا في مكان غير آمن لمجرد أنك متأخر عن الجدول.',
 
-      'faq_q5':
-          'ما الذي يحدث إذا ركّزت على الجودة وتأخرت في التوقفات؟',
+      'faq_q5': 'ما الذي يحدث إذا ركّزت على الجودة وتأخرت في التوقفات؟',
       'faq_a5':
           'ستُنهي مسارك بشكل أو بآخر. سنوفّر لك الدعم حين يكون ذلك معقولًا وضروريًا.',
 
@@ -5093,14 +5066,12 @@ class AppLocalizations {
           'اعتمد على تقديرك الشخصي والحس السليم. فعلى سبيل المثال، يكون احتمال سرقة الطرد المتروك بجانب صناديق البريد في مبنى من 20 إلى 30 طابقًا أعلى بكثير مقارنةً بالطرد المتروك في منزل خاص.\n'
           'ولتقديم الدعم لك، ننشر كل صباح قائمة بالعناوين التي تنطوي على مخاطر عالية للسرقة أو الشكاوى من الزبائن، استنادًا إلى بيانات التسليم السابقة والإحصاءات.',
 
-      'faq_q7_1_4':
-          'كيف يؤثر فقدان طرد أو سرقته على نتيجتي؟',
+      'faq_q7_1_4': 'كيف يؤثر فقدان طرد أو سرقته على نتيجتي؟',
       'faq_a7_1_4':
           'التأثير كبير. قد يؤدي فقدان طرد واحد إلى خفض نتيجتك بنسبة لا تقل عن 30% ويكلفك ما لا يقل عن 600 نقطة. تذكّر: كلما زاد عدد النقاط الظاهرة تحت اسمك في الـ scorecard، كان الأداء أسوأ. وكلما زاد عدد الطرود التي تسلّمها أسبوعيًا، قلّت النقاط التي تفقدها في كل حادث، كما تُؤخذ قيمة الطرد المفقود في الاعتبار — إذ تؤدي البضائع الأكثر تكلفة إلى فقدان نقاط أعلى. علينا إبقاء هذا المؤشر منخفضًا قدر المستطاع.\n'
           'ومن الأهمية بمكان: إذا سجّلت باستمرار عددًا كبيرًا من الطرود المفقودة، سنضطر إلى إنهاء علاقة العمل، لأن أمازون قد تشتبه في النهاية بوقوع سرقة. يُعدّ هذا خطرًا جسيمًا ولا يجوز تجاهله.',
 
-      'faq_q7_2':
-          'تبويب CC — Contact Compliance',
+      'faq_q7_2': 'تبويب CC — Contact Compliance',
       'faq_a7_2':
           'يقيس هذا المؤشر مدى تواصلك مع الزبون بخصوص عملية التسليم، سواءً عن طريق رسائل نصية أو مكالمات هاتفية. كلما قلّ تواصلك مع الزبون، انخفضت نتيجتك في هذه الفئة. علينا إبقاء هذا المؤشر مرتفعًا قدر الإمكان، فهو من أيسر الفئات للتفوق فيها ويُسهم إسهامًا كبيرًا في نتيجتك الإجمالية.',
 
@@ -5168,8 +5139,7 @@ class AppLocalizations {
       'faq_a9':
           'أولًا، تأكّد من أنك بأمان وأنك لم تُصَب بجروح بالغة. أما فيما يخص الضرر الذي لحق بالمركبة: إذا ثبت لدينا أن الحادث قد نجم عن الإهمال — كاستخدام الهاتف المحمول أثناء القيادة — فستتحمّل شخصيًا المسؤولية الكاملة عن تكلفة الضرر. فضلًا عن ذلك، فإن محضر الشرطة اللاحق قد يُفضي إلى تعليق رخصة القيادة، كما يُشكّل هذا الحادث سببًا للفصل الفوري. وفي الحالات الأقل خطورة، ستُستبعد من مكافآت الـ Weekly Scorecard لمدة شهرين. أنت مُلزم بإخطارنا فور وقوع أي حادث، وبتزويدنا بالمعلومات التالية: وقت الحادث وموقعه، وتفاصيل أي ضرر لحق بممتلكات خاصة أو عامة (جدران، أسوار، أعمدة إنارة، أشخاص أو حيوانات)، إلى جانب صور واضحة للأضرار التي لحقت بالمركبة.',
 
-      'faq_q10':
-          'ما الذي ينبغي فعله إذا كان الطرد تالفًا أو مفقودًا؟',
+      'faq_q10': 'ما الذي ينبغي فعله إذا كان الطرد تالفًا أو مفقودًا؟',
       'faq_a10':
           'إذا كان الطرد تالفًا، وسِمه بأنه تالف في النظام وأعِده إلى المحطة. وإذا كان الطرد التالف يحتوي على سائل وألحق الضرر بطرود أخرى، فالتقط صورة لجميع الطرود المتضررة وأرسلها إلى المشرف المناوب. وسنقوم بإبلاغ أمازون بالحادث نيابةً عنك.\n'
           'إذا كان الطرد مفقودًا، فيمكنك وسمه بأنه مفقود — ما لم يكن طرد OTP، ففي هذه الحالة يتعين التواصل معنا أولًا قبل وسمه. يُعدّ ذلك أمرًا جوهريًا.',
@@ -5178,8 +5148,7 @@ class AppLocalizations {
       'faq_a11':
           'يحتوي طرد OTP على صنف عالي القيمة تشترط أمازون بشأنه أن يزود الزبون السائق بكلمة مرور لمرة واحدة قبل التسليم. ويضمن ذلك وصول الطرد إلى المستلِم الصحيح. يجب التعامل مع طرود OTP بأقصى قدر من العناية، وعدم تركها دون مراقبة مطلقًا، وتسليمها فقط إلى الزبون الذي قدّم كلمة المرور الصحيحة.',
 
-      'faq_q12':
-          'لماذا نُكرّر عليك طلب الإبطاء بدلًا من العمل بوتيرة أسرع؟',
+      'faq_q12': 'لماذا نُكرّر عليك طلب الإبطاء بدلًا من العمل بوتيرة أسرع؟',
       'faq_a12':
           'نُدرك أن هذا قد يبدو تكرارًا، إلا أن النظام يستوجبه. يتعيّن علينا الالتزام بمعدّل التوقفات في الساعة الذي حدّدته الخوارزمية مسبقًا، حتى نتمكن من تأمين مسارات إضافية مستقبلًا، ونضمن استمرار حصولك على عمل.\n'
           'إضافةً إلى ذلك، فإن العمل بسرعة مفرطة يرفع من مخاطر الـ DNR، مما يُكلِّفك والشركة نقاطًا في الـ scorecard الأسبوعي.',
@@ -5204,8 +5173,7 @@ class AppLocalizations {
       'faq_a16':
           'أولًا، تحقّق من الدبوس عن طريق البحث عن العنوان في Google Maps، إذ إنه أكثر دقة ومُثبَّت بالفعل على جهازك. إذا لم يتطابق الموقع، فأبلغ المشرف المناوب بالتباين.',
 
-      'faq_q17':
-          'ما هي مهامي اليومية قبل بدء العمل وبعد الانتهاء منه؟',
+      'faq_q17': 'ما هي مهامي اليومية قبل بدء العمل وبعد الانتهاء منه؟',
       'faq_a17':
           '1. تأكّد لدى وصولك إلى الموقف من ارتدائك لحذاء السلامة، وسترة السلامة، وزيّ أمازون.\n'
           '2. تحقّق من أن جهازك مشحون بالكامل. وإذا لم يكن كذلك، فأبلغ المشرف الموجود في الموقع.\n'
@@ -5764,20 +5732,17 @@ class AppLocalizations {
       'faq_q19':
           'Flex uygulamasi surekli yukleniyor ve is akisimi yavaslatiyorsa ne yapmaliyim?',
 
-      'faq_q2':
-          'Bir musteriyle bir sorun yasandiginda nelerden kacinmaliyim?',
+      'faq_q2': 'Bir musteriyle bir sorun yasandiginda nelerden kacinmaliyim?',
 
       'faq_q20':
           'Internet baglantisi aktifken Flex uygulamasi hala duzgun calismiyorsa ne yapmaliyim?',
 
-      'faq_q3':
-          'Musteriyle olan bir durum zaten buyumusse ne yapmaliyim?',
+      'faq_q3': 'Musteriyle olan bir durum zaten buyumusse ne yapmaliyim?',
 
       'faq_q4':
           'Hangisi daha onemli: nicelik (mumkun olan en kisa surede mumkun olan en fazla durak) mi yoksa kalite mi?',
 
-      'faq_q5':
-          'Kaliteye odaklanip duraklarda geriye dustugumde ne olur?',
+      'faq_q5': 'Kaliteye odaklanip duraklarda geriye dustugumde ne olur?',
 
       'faq_q7': 'Haftalik Scorecard',
 
@@ -5788,11 +5753,9 @@ class AppLocalizations {
 
       'faq_q7_1_2': 'Paket kayiplarini nasil onleyebilirim?',
 
-      'faq_q7_1_3':
-          'Bir konumun guvenli olup olmadigini nasil anlarim?',
+      'faq_q7_1_3': 'Bir konumun guvenli olup olmadigini nasil anlarim?',
 
-      'faq_q7_1_4':
-          'Kayip veya calinan bir paket puanimi nasil etkiler?',
+      'faq_q7_1_4': 'Kayip veya calinan bir paket puanimi nasil etkiler?',
 
       'faq_q7_2': 'CC Sekmesi — Contact Compliance',
 
@@ -5810,8 +5773,7 @@ class AppLocalizations {
 
       'faq_q7_6': 'DCR Sekmesi — Teslimat Tamamlama Orani',
 
-      'faq_q7_7':
-          'CDF Sekmesi (onceden DEX) — Musteri Teslimat Geri Bildirimi',
+      'faq_q7_7': 'CDF Sekmesi (onceden DEX) — Musteri Teslimat Geri Bildirimi',
 
       'faq_q7_8':
           'Genel olarak scorecard konusunda aklimda tutmam gerekenler nelerdir?',
@@ -6366,8 +6328,7 @@ class AppLocalizations {
 
       'faq_q1': 'Какой аспект вашей ежедневной работы наиболее важен?',
 
-      'faq_q10':
-          'Что делать, если посылка повреждена или отсутствует?',
+      'faq_q10': 'Что делать, если посылка повреждена или отсутствует?',
 
       'faq_q11': 'Что представляет собой OTP-посылка (One-Time Password)?',
 
@@ -6377,8 +6338,7 @@ class AppLocalizations {
       'faq_q13':
           'Почему диспетчеры иногда интересуются, отстаёте ли вы или что-то идёт не так?',
 
-      'faq_q14':
-          'Почему вас иногда просят помочь коллеге?',
+      'faq_q14': 'Почему вас иногда просят помочь коллеге?',
 
       'faq_q15':
           'Буду ли я с первого дня выполнять стандартные маршруты, как более опытные водители?',
@@ -6395,14 +6355,12 @@ class AppLocalizations {
       'faq_q19':
           'Что делать, если приложение Flex постоянно загружается и замедляет мой рабочий процесс?',
 
-      'faq_q2':
-          'Чего следует избегать при возникновении проблемы с клиентом?',
+      'faq_q2': 'Чего следует избегать при возникновении проблемы с клиентом?',
 
       'faq_q20':
           'Что делать, если интернет-соединение активно, но приложение Flex по-прежнему работает некорректно?',
 
-      'faq_q3':
-          'Что делать, если ситуация с клиентом уже обострилась?',
+      'faq_q3': 'Что делать, если ситуация с клиентом уже обострилась?',
 
       'faq_q4':
           'Что важнее: количество (выполнение как можно большего числа стопов в максимально короткие сроки) или качество?',
@@ -6440,14 +6398,11 @@ class AppLocalizations {
 
       'faq_q7_6': 'Вкладка DCR — Delivery Completion Rate',
 
-      'faq_q7_7':
-          'Вкладка CDF (ранее DEX) — Customer Delivery Feedback',
+      'faq_q7_7': 'Вкладка CDF (ранее DEX) — Customer Delivery Feedback',
 
-      'faq_q7_8':
-          'Что следует помнить о scorecard в целом?',
+      'faq_q7_8': 'Что следует помнить о scorecard в целом?',
 
-      'faq_q8':
-          'Каким ещё аспектам необходимо уделять особое внимание?',
+      'faq_q8': 'Каким ещё аспектам необходимо уделять особое внимание?',
 
       'faq_q9':
           'Что делать, если я попал в ДТП или повредил рабочий автомобиль?',
@@ -6512,12 +6467,10 @@ class AppLocalizations {
       'driver_notification_reading_confirmation': 'Reading confirmation',
       'driver_notification_confirm_success': 'Confirmed',
       'driver_notification_confirm_failed': 'Confirm failed: {error}',
-      'driver_notification_mark_read_failed':
-          'Failed to mark as read: {error}',
+      'driver_notification_mark_read_failed': 'Failed to mark as read: {error}',
     },
     'de': {
-      'driver_notification_confirmation_required':
-          'Bestaetigung erforderlich',
+      'driver_notification_confirmation_required': 'Bestaetigung erforderlich',
       'driver_notification_confirmed': 'bestaetigt',
       'driver_notification_detail_title': 'Detail',
       'driver_notification_reading_confirmation': 'Lesebestaetigung',
@@ -6538,14 +6491,12 @@ class AppLocalizations {
           'Shenjimi si i lexuar deshtoi: {error}',
     },
     'hu': {
-      'driver_notification_confirmation_required':
-          'megerosites szukseges',
+      'driver_notification_confirmation_required': 'megerosites szukseges',
       'driver_notification_confirmed': 'megerositve',
       'driver_notification_detail_title': 'Reszletek',
       'driver_notification_reading_confirmation': 'Olvasas megerositese',
       'driver_notification_confirm_success': 'Megerositve',
-      'driver_notification_confirm_failed':
-          'A megerosites sikertelen: {error}',
+      'driver_notification_confirm_failed': 'A megerosites sikertelen: {error}',
       'driver_notification_mark_read_failed':
           'Sikertelen olvasottkent jeloles: {error}',
     },
@@ -6555,8 +6506,7 @@ class AppLocalizations {
       'driver_notification_detail_title': 'Detalii',
       'driver_notification_reading_confirmation': 'Confirmare citire',
       'driver_notification_confirm_success': 'Confirmat',
-      'driver_notification_confirm_failed':
-          'Confirmarea a esuat: {error}',
+      'driver_notification_confirm_failed': 'Confirmarea a esuat: {error}',
       'driver_notification_mark_read_failed':
           'Marcarea ca citit a esuat: {error}',
     },
@@ -6596,14 +6546,14 @@ class AppLocalizations {
       'driver_notification_detail_title': 'Детали',
       'driver_notification_reading_confirmation': 'Подтверждение прочтения',
       'driver_notification_confirm_success': 'Подтверждено',
-      'driver_notification_confirm_failed':
-          'Не удалось подтвердить: {error}',
+      'driver_notification_confirm_failed': 'Не удалось подтвердить: {error}',
       'driver_notification_mark_read_failed':
           'Не удалось отметить как прочитано: {error}',
     },
   };
 
-  static final Map<String, Map<String, String>> _driverAbsenceLocalizedValues = {
+  static final Map<String, Map<String, String>>
+  _driverAbsenceLocalizedValues = {
     'en': {
       'driver_absence_page_eyebrow': 'Absence',
       'driver_absence_overview_title': 'Absence overview',
@@ -6667,19 +6617,16 @@ class AppLocalizations {
       'driver_absence_reason_hint': 'Kurzen Grund eingeben',
       'driver_absence_submit_label': 'Anfrage senden',
       'driver_absence_submitting_label': 'Wird gesendet...',
-      'driver_absence_empty_vacation_list':
-          'Noch keine Abwesenheitsanfragen.',
+      'driver_absence_empty_vacation_list': 'Noch keine Abwesenheitsanfragen.',
       'driver_absence_submit_success': 'Abwesenheitsanfrage gesendet.',
       'driver_absence_login_required': 'Du musst angemeldet sein.',
       'driver_absence_scope_missing': 'Fahrerbereich fehlt.',
-      'driver_absence_pick_date_validation':
-          'Bitte waehle beide Daten aus.',
+      'driver_absence_pick_date_validation': 'Bitte waehle beide Daten aus.',
       'driver_absence_reason_validation': 'Bitte gib einen Grund ein.',
       'driver_absence_available_vacation_hint_label': 'Verfuegbarer Urlaub',
       'driver_absence_vacation_limit_exceeded_template':
           '{requested} Tage angefragt, aber nur {available} verfuegbar.',
-      'driver_absence_submit_failed_template':
-          'Senden fehlgeschlagen: {error}',
+      'driver_absence_submit_failed_template': 'Senden fehlgeschlagen: {error}',
       'driver_absence_load_failed_template':
           'Laden der Abwesenheitsdaten fehlgeschlagen: {error}',
     },
@@ -6708,17 +6655,13 @@ class AppLocalizations {
       'driver_absence_reason_hint': 'Shkruani nje arsye te shkurter',
       'driver_absence_submit_label': 'Dergo kerkesen',
       'driver_absence_submitting_label': 'Duke u derguar...',
-      'driver_absence_empty_vacation_list':
-          'Ende nuk ka kerkesa per mungese.',
+      'driver_absence_empty_vacation_list': 'Ende nuk ka kerkesa per mungese.',
       'driver_absence_submit_success': 'Kerkesa per mungese u dergua.',
       'driver_absence_login_required': 'Duhet te jesh i kycur.',
       'driver_absence_scope_missing': 'Mungon konteksti i shoferit.',
-      'driver_absence_pick_date_validation':
-          'Ju lutem zgjidhni te dy datat.',
-      'driver_absence_reason_validation':
-          'Ju lutem shkruani nje arsye.',
-      'driver_absence_available_vacation_hint_label':
-          'Pushime te disponueshme',
+      'driver_absence_pick_date_validation': 'Ju lutem zgjidhni te dy datat.',
+      'driver_absence_reason_validation': 'Ju lutem shkruani nje arsye.',
+      'driver_absence_available_vacation_hint_label': 'Pushime te disponueshme',
       'driver_absence_vacation_limit_exceeded_template':
           'U kerkuan {requested} dite, por vetem {available} jane ne dispozicion.',
       'driver_absence_submit_failed_template': 'Dergimi deshtoi: {error}',
@@ -6750,8 +6693,7 @@ class AppLocalizations {
       'driver_absence_reason_hint': 'Adj meg rovid indokot',
       'driver_absence_submit_label': 'Kerelem kuldese',
       'driver_absence_submitting_label': 'Kuldes...',
-      'driver_absence_empty_vacation_list':
-          'Meg nincsenek tavolleti kerelmek.',
+      'driver_absence_empty_vacation_list': 'Meg nincsenek tavolleti kerelmek.',
       'driver_absence_submit_success': 'A tavolleti kerelem elkuldve.',
       'driver_absence_login_required': 'Be kell jelentkezned.',
       'driver_absence_scope_missing': 'A sofor kontextusa hianyzik.',
@@ -6761,8 +6703,7 @@ class AppLocalizations {
       'driver_absence_available_vacation_hint_label': 'Elerheto szabadsag',
       'driver_absence_vacation_limit_exceeded_template':
           '{requested} nap lett igenyelve, de csak {available} erheto el.',
-      'driver_absence_submit_failed_template':
-          'Kuldes sikertelen: {error}',
+      'driver_absence_submit_failed_template': 'Kuldes sikertelen: {error}',
       'driver_absence_load_failed_template':
           'A tavolleti adatok betoltese sikertelen: {error}',
     },
@@ -6795,15 +6736,12 @@ class AppLocalizations {
       'driver_absence_submit_success': 'Cererea de absenta a fost trimisa.',
       'driver_absence_login_required': 'Trebuie sa fii autentificat.',
       'driver_absence_scope_missing': 'Lipseste contextul soferului.',
-      'driver_absence_pick_date_validation':
-          'Te rugam selecteaza ambele date.',
-      'driver_absence_reason_validation':
-          'Te rugam introdu un motiv.',
+      'driver_absence_pick_date_validation': 'Te rugam selecteaza ambele date.',
+      'driver_absence_reason_validation': 'Te rugam introdu un motiv.',
       'driver_absence_available_vacation_hint_label': 'Vacanta disponibila',
       'driver_absence_vacation_limit_exceeded_template':
           'Au fost cerute {requested} zile, dar doar {available} sunt disponibile.',
-      'driver_absence_submit_failed_template':
-          'Trimiterea a esuat: {error}',
+      'driver_absence_submit_failed_template': 'Trimiterea a esuat: {error}',
       'driver_absence_load_failed_template':
           'Incarcarea datelor de absenta a esuat: {error}',
     },
@@ -6832,19 +6770,16 @@ class AppLocalizations {
       'driver_absence_reason_hint': 'Unesite kratak razlog',
       'driver_absence_submit_label': 'Posalji zahtjev',
       'driver_absence_submitting_label': 'Slanje...',
-      'driver_absence_empty_vacation_list':
-          'Jos nema zahtjeva za odsutnost.',
+      'driver_absence_empty_vacation_list': 'Jos nema zahtjeva za odsutnost.',
       'driver_absence_submit_success': 'Zahtjev za odsutnost je poslan.',
       'driver_absence_login_required': 'Morate biti prijavljeni.',
       'driver_absence_scope_missing': 'Nedostaje kontekst vozaca.',
       'driver_absence_pick_date_validation': 'Odaberite oba datuma.',
       'driver_absence_reason_validation': 'Unesite razlog.',
-      'driver_absence_available_vacation_hint_label':
-          'Dostupan godisnji odmor',
+      'driver_absence_available_vacation_hint_label': 'Dostupan godisnji odmor',
       'driver_absence_vacation_limit_exceeded_template':
           'Zatrazeno je {requested} dana, ali dostupno je samo {available}.',
-      'driver_absence_submit_failed_template':
-          'Slanje nije uspjelo: {error}',
+      'driver_absence_submit_failed_template': 'Slanje nije uspjelo: {error}',
       'driver_absence_load_failed_template':
           'Ucitavanje podataka o odsutnosti nije uspjelo: {error}',
     },
@@ -6877,15 +6812,13 @@ class AppLocalizations {
       'driver_absence_submit_success': 'تم إرسال طلب الغياب.',
       'driver_absence_login_required': 'يجب تسجيل الدخول.',
       'driver_absence_scope_missing': 'نطاق السائق مفقود.',
-      'driver_absence_pick_date_validation':
-          'يرجى اختيار التاريخين.',
+      'driver_absence_pick_date_validation': 'يرجى اختيار التاريخين.',
       'driver_absence_reason_validation': 'يرجى إدخال سبب.',
       'driver_absence_available_vacation_hint_label': 'الإجازة المتاحة',
       'driver_absence_vacation_limit_exceeded_template':
           'تم طلب {requested} يومًا ولكن المتاح فقط {available}.',
       'driver_absence_submit_failed_template': 'فشل الإرسال: {error}',
-      'driver_absence_load_failed_template':
-          'فشل تحميل بيانات الغياب: {error}',
+      'driver_absence_load_failed_template': 'فشل تحميل بيانات الغياب: {error}',
     },
     'tr': {
       'driver_absence_page_eyebrow': 'Devamsizlik',
@@ -6912,19 +6845,16 @@ class AppLocalizations {
       'driver_absence_reason_hint': 'Kisa bir neden girin',
       'driver_absence_submit_label': 'Talebi gonder',
       'driver_absence_submitting_label': 'Gonderiliyor...',
-      'driver_absence_empty_vacation_list':
-          'Henuz devamsizlik talebi yok.',
+      'driver_absence_empty_vacation_list': 'Henuz devamsizlik talebi yok.',
       'driver_absence_submit_success': 'Devamsizlik talebi gonderildi.',
       'driver_absence_login_required': 'Giris yapmis olmalisin.',
       'driver_absence_scope_missing': 'Surucu kapsami eksik.',
-      'driver_absence_pick_date_validation':
-          'Lutfen iki tarihi de secin.',
+      'driver_absence_pick_date_validation': 'Lutfen iki tarihi de secin.',
       'driver_absence_reason_validation': 'Lutfen bir neden girin.',
       'driver_absence_available_vacation_hint_label': 'Mevcut izin',
       'driver_absence_vacation_limit_exceeded_template':
           '{requested} gun talep edildi ancak sadece {available} gun mevcut.',
-      'driver_absence_submit_failed_template':
-          'Gonderim basarisiz: {error}',
+      'driver_absence_submit_failed_template': 'Gonderim basarisiz: {error}',
       'driver_absence_load_failed_template':
           'Devamsizlik verileri yuklenemedi: {error}',
     },
@@ -6953,13 +6883,11 @@ class AppLocalizations {
       'driver_absence_reason_hint': 'Введите короткую причину',
       'driver_absence_submit_label': 'Отправить запрос',
       'driver_absence_submitting_label': 'Отправка...',
-      'driver_absence_empty_vacation_list':
-          'Пока нет запросов на отсутствие.',
+      'driver_absence_empty_vacation_list': 'Пока нет запросов на отсутствие.',
       'driver_absence_submit_success': 'Запрос на отсутствие отправлен.',
       'driver_absence_login_required': 'Вы должны войти в систему.',
       'driver_absence_scope_missing': 'Отсутствует контекст водителя.',
-      'driver_absence_pick_date_validation':
-          'Пожалуйста, выберите обе даты.',
+      'driver_absence_pick_date_validation': 'Пожалуйста, выберите обе даты.',
       'driver_absence_reason_validation': 'Пожалуйста, укажите причину.',
       'driver_absence_available_vacation_hint_label': 'Доступный отпуск',
       'driver_absence_vacation_limit_exceeded_template':
@@ -6986,20 +6914,16 @@ class AppLocalizations {
       'dash_company_section_standard_work_compliance':
           'Standard Work Compliance',
       'dash_metric_fico': 'Safe Driving Metric (FICO)',
-      'dash_metric_speeding_event_rate':
-          'Speeding Event Rate (Per 100 Trips)',
+      'dash_metric_speeding_event_rate': 'Speeding Event Rate (Per 100 Trips)',
       'dash_metric_mentor_adoption_rate': 'Mentor Adoption Rate',
-      'dash_metric_vehicle_audit_compliance':
-          'Vehicle Audit (VSA) Compliance',
+      'dash_metric_vehicle_audit_compliance': 'Vehicle Audit (VSA) Compliance',
       'dash_metric_breach_of_contract': 'Breach of Contract (BOC)',
-      'dash_metric_working_hours_compliance':
-          'Working Hours Compliance (WHC)',
+      'dash_metric_working_hours_compliance': 'Working Hours Compliance (WHC)',
       'dash_metric_comprehensive_audit_score':
           'Comprehensive Audit Score (CAS)',
       'dash_metric_customer_escalation_dpmo': 'Customer Escalation DPMO',
       'dash_metric_customer_delivery_feedback': 'Customer Delivery Feedback',
-      'dash_metric_delivery_completion_rate':
-          'Delivery Completion Rate (DCR)',
+      'dash_metric_delivery_completion_rate': 'Delivery Completion Rate (DCR)',
       'dash_metric_dnr_dpmo': 'DNR DPMO',
       'dash_metric_lor_dpmo': 'LoR DPMO',
       'dash_metric_dsc_dpmo': 'DSC DPMO',
@@ -7023,19 +6947,13 @@ class AppLocalizations {
       'dash_metric_speeding_event_rate':
           'Geschwindigkeitsrate (pro 100 Fahrten)',
       'dash_metric_mentor_adoption_rate': 'Mentor-Nutzungsrate',
-      'dash_metric_vehicle_audit_compliance':
-          'Fahrzeugaudit-Compliance (VSA)',
+      'dash_metric_vehicle_audit_compliance': 'Fahrzeugaudit-Compliance (VSA)',
       'dash_metric_breach_of_contract': 'Vertragsverstoss (BOC)',
-      'dash_metric_working_hours_compliance':
-          'Arbeitszeit-Compliance (WHC)',
-      'dash_metric_comprehensive_audit_score':
-          'Umfassender Audit-Score (CAS)',
-      'dash_metric_customer_escalation_dpmo':
-          'Kundeneskalation DPMO',
-      'dash_metric_customer_delivery_feedback':
-          'Kundenfeedback zur Zustellung',
-      'dash_metric_delivery_completion_rate':
-          'Zustellabschlussrate (DCR)',
+      'dash_metric_working_hours_compliance': 'Arbeitszeit-Compliance (WHC)',
+      'dash_metric_comprehensive_audit_score': 'Umfassender Audit-Score (CAS)',
+      'dash_metric_customer_escalation_dpmo': 'Kundeneskalation DPMO',
+      'dash_metric_customer_delivery_feedback': 'Kundenfeedback zur Zustellung',
+      'dash_metric_delivery_completion_rate': 'Zustellabschlussrate (DCR)',
       'dash_metric_dnr_dpmo': 'DNR DPMO',
       'dash_metric_lor_dpmo': 'LoR DPMO',
       'dash_metric_dsc_dpmo': 'DSC DPMO',
@@ -7065,8 +6983,7 @@ class AppLocalizations {
           'Perputhshmeria e oreve te punes (WHC)',
       'dash_metric_comprehensive_audit_score':
           'Rezultati i auditimit gjitheperfshires (CAS)',
-      'dash_metric_customer_escalation_dpmo':
-          'Pershkallezimi i klientit DPMO',
+      'dash_metric_customer_escalation_dpmo': 'Pershkallezimi i klientit DPMO',
       'dash_metric_customer_delivery_feedback':
           'Reagimi i klientit per dorezimin',
       'dash_metric_delivery_completion_rate':
@@ -7094,13 +7011,10 @@ class AppLocalizations {
       'dash_metric_speeding_event_rate':
           'Gyorshajtas esemenyrata (100 utankent)',
       'dash_metric_mentor_adoption_rate': 'Mentor hasznalati arany',
-      'dash_metric_vehicle_audit_compliance':
-          'Jarmuaudit-megfeleles (VSA)',
+      'dash_metric_vehicle_audit_compliance': 'Jarmuaudit-megfeleles (VSA)',
       'dash_metric_breach_of_contract': 'Szerzodesszeges (BOC)',
-      'dash_metric_working_hours_compliance':
-          'Munkaido-megfeleles (WHC)',
-      'dash_metric_comprehensive_audit_score':
-          'Atfogo auditpontszam (CAS)',
+      'dash_metric_working_hours_compliance': 'Munkaido-megfeleles (WHC)',
+      'dash_metric_comprehensive_audit_score': 'Atfogo auditpontszam (CAS)',
       'dash_metric_customer_escalation_dpmo': 'Ugyfeleszkalacio DPMO',
       'dash_metric_customer_delivery_feedback':
           'Ugyfel visszajelzes a kezbesitesrol',
@@ -7116,8 +7030,7 @@ class AppLocalizations {
       'dash_compliance_safety': 'Conformitate & Siguranta',
       'dash_delivery_quality_swc': 'Calitatea livrarii & SWC',
       'dash_company_threshold_hint': '{score}% din minimul de {target}%',
-      'dash_company_threshold_met':
-          '{score}% atinge pragul de {target}%',
+      'dash_company_threshold_met': '{score}% atinge pragul de {target}%',
       'dash_company_section_safety': 'Siguranta',
       'dash_company_section_compliance': 'Conformitate',
       'dash_company_section_customer_delivery_experience':
@@ -7126,19 +7039,15 @@ class AppLocalizations {
       'dash_company_section_standard_work_compliance':
           'Conformitate standard de lucru',
       'dash_metric_fico': 'Indicator de condus sigur (FICO)',
-      'dash_metric_speeding_event_rate':
-          'Rata de viteza (la 100 de curse)',
+      'dash_metric_speeding_event_rate': 'Rata de viteza (la 100 de curse)',
       'dash_metric_mentor_adoption_rate': 'Rata de utilizare Mentor',
       'dash_metric_vehicle_audit_compliance':
           'Conformitate audit vehicul (VSA)',
       'dash_metric_breach_of_contract': 'Incalcare contract (BOC)',
-      'dash_metric_working_hours_compliance':
-          'Conformitate ore de lucru (WHC)',
-      'dash_metric_comprehensive_audit_score':
-          'Scor audit complet (CAS)',
+      'dash_metric_working_hours_compliance': 'Conformitate ore de lucru (WHC)',
+      'dash_metric_comprehensive_audit_score': 'Scor audit complet (CAS)',
       'dash_metric_customer_escalation_dpmo': 'Escaladare client DPMO',
-      'dash_metric_customer_delivery_feedback':
-          'Feedback clienti la livrare',
+      'dash_metric_customer_delivery_feedback': 'Feedback clienti la livrare',
       'dash_metric_delivery_completion_rate':
           'Rata de finalizare a livrarii (DCR)',
       'dash_metric_dnr_dpmo': 'DNR DPMO',
@@ -7151,8 +7060,7 @@ class AppLocalizations {
       'dash_compliance_safety': 'Uskladenost & Sigurnost',
       'dash_delivery_quality_swc': 'Kvaliteta dostave & SWC',
       'dash_company_threshold_hint': '{score}% od minimuma {target}%',
-      'dash_company_threshold_met':
-          '{score}% doseze prag od {target}%',
+      'dash_company_threshold_met': '{score}% doseze prag od {target}%',
       'dash_company_section_safety': 'Sigurnost',
       'dash_company_section_compliance': 'Uskladenost',
       'dash_company_section_customer_delivery_experience':
@@ -7164,19 +7072,16 @@ class AppLocalizations {
       'dash_metric_speeding_event_rate':
           'Stopa prekoracenja brzine (na 100 voznji)',
       'dash_metric_mentor_adoption_rate': 'Stopa koristenja Mentora',
-      'dash_metric_vehicle_audit_compliance':
-          'Uskladenost audita vozila (VSA)',
+      'dash_metric_vehicle_audit_compliance': 'Uskladenost audita vozila (VSA)',
       'dash_metric_breach_of_contract': 'Krsenje ugovora (BOC)',
       'dash_metric_working_hours_compliance':
           'Uskladenost radnog vremena (WHC)',
       'dash_metric_comprehensive_audit_score':
           'Sveobuhvatni rezultat audita (CAS)',
-      'dash_metric_customer_escalation_dpmo':
-          'Eskalacija korisnika DPMO',
+      'dash_metric_customer_escalation_dpmo': 'Eskalacija korisnika DPMO',
       'dash_metric_customer_delivery_feedback':
           'Povratne informacije kupca o dostavi',
-      'dash_metric_delivery_completion_rate':
-          'Stopa dovrsenja dostave (DCR)',
+      'dash_metric_delivery_completion_rate': 'Stopa dovrsenja dostave (DCR)',
       'dash_metric_dnr_dpmo': 'DNR DPMO',
       'dash_metric_lor_dpmo': 'LoR DPMO',
       'dash_metric_dsc_dpmo': 'DSC DPMO',
@@ -7187,31 +7092,23 @@ class AppLocalizations {
       'dash_compliance_safety': 'الالتزام والسلامة',
       'dash_delivery_quality_swc': 'جودة التسليم و SWC',
       'dash_company_threshold_hint': '{score}% من الحد الأدنى {target}%',
-      'dash_company_threshold_met':
-          '{score}% يحقق الحد الأدنى {target}%',
+      'dash_company_threshold_met': '{score}% يحقق الحد الأدنى {target}%',
       'dash_company_section_safety': 'السلامة',
       'dash_company_section_compliance': 'الالتزام',
       'dash_company_section_customer_delivery_experience':
           'تجربة العميل في التسليم',
       'dash_company_section_quality': 'الجودة',
-      'dash_company_section_standard_work_compliance':
-          'الالتزام بمعايير العمل',
+      'dash_company_section_standard_work_compliance': 'الالتزام بمعايير العمل',
       'dash_metric_fico': 'مقياس القيادة الآمنة (FICO)',
-      'dash_metric_speeding_event_rate':
-          'معدل السرعة الزائدة (لكل 100 رحلة)',
+      'dash_metric_speeding_event_rate': 'معدل السرعة الزائدة (لكل 100 رحلة)',
       'dash_metric_mentor_adoption_rate': 'معدل استخدام Mentor',
-      'dash_metric_vehicle_audit_compliance':
-          'التزام تدقيق المركبة (VSA)',
+      'dash_metric_vehicle_audit_compliance': 'التزام تدقيق المركبة (VSA)',
       'dash_metric_breach_of_contract': 'خرق العقد (BOC)',
-      'dash_metric_working_hours_compliance':
-          'الالتزام بساعات العمل (WHC)',
-      'dash_metric_comprehensive_audit_score':
-          'درجة التدقيق الشاملة (CAS)',
+      'dash_metric_working_hours_compliance': 'الالتزام بساعات العمل (WHC)',
+      'dash_metric_comprehensive_audit_score': 'درجة التدقيق الشاملة (CAS)',
       'dash_metric_customer_escalation_dpmo': 'تصعيد العميل DPMO',
-      'dash_metric_customer_delivery_feedback':
-          'ملاحظات العميل على التسليم',
-      'dash_metric_delivery_completion_rate':
-          'معدل إكمال التسليم (DCR)',
+      'dash_metric_customer_delivery_feedback': 'ملاحظات العميل على التسليم',
+      'dash_metric_delivery_completion_rate': 'معدل إكمال التسليم (DCR)',
       'dash_metric_dnr_dpmo': 'DNR DPMO',
       'dash_metric_lor_dpmo': 'LoR DPMO',
       'dash_metric_dsc_dpmo': 'DSC DPMO',
@@ -7222,31 +7119,24 @@ class AppLocalizations {
       'dash_compliance_safety': 'Uyum & Guvenlik',
       'dash_delivery_quality_swc': 'Teslimat kalitesi & SWC',
       'dash_company_threshold_hint': '{score}% / minimum {target}%',
-      'dash_company_threshold_met':
-          '{score}% {target}% esigini karsiliyor',
+      'dash_company_threshold_met': '{score}% {target}% esigini karsiliyor',
       'dash_company_section_safety': 'Guvenlik',
       'dash_company_section_compliance': 'Uyum',
       'dash_company_section_customer_delivery_experience':
           'Musteri teslimat deneyimi',
       'dash_company_section_quality': 'Kalite',
-      'dash_company_section_standard_work_compliance':
-          'Standart calisma uyumu',
+      'dash_company_section_standard_work_compliance': 'Standart calisma uyumu',
       'dash_metric_fico': 'Guvenli surus metrigi (FICO)',
-      'dash_metric_speeding_event_rate':
-          'Hiz asimi orani (100 yolculukta)',
+      'dash_metric_speeding_event_rate': 'Hiz asimi orani (100 yolculukta)',
       'dash_metric_mentor_adoption_rate': 'Mentor kullanim orani',
-      'dash_metric_vehicle_audit_compliance':
-          'Arac denetimi uyumu (VSA)',
+      'dash_metric_vehicle_audit_compliance': 'Arac denetimi uyumu (VSA)',
       'dash_metric_breach_of_contract': 'Sozlesme ihlali (BOC)',
-      'dash_metric_working_hours_compliance':
-          'Calisma saati uyumu (WHC)',
-      'dash_metric_comprehensive_audit_score':
-          'Kapsamli denetim skoru (CAS)',
+      'dash_metric_working_hours_compliance': 'Calisma saati uyumu (WHC)',
+      'dash_metric_comprehensive_audit_score': 'Kapsamli denetim skoru (CAS)',
       'dash_metric_customer_escalation_dpmo': 'Musteri eskalasyonu DPMO',
       'dash_metric_customer_delivery_feedback':
           'Musteri teslimat geri bildirimi',
-      'dash_metric_delivery_completion_rate':
-          'Teslimat tamamlama orani (DCR)',
+      'dash_metric_delivery_completion_rate': 'Teslimat tamamlama orani (DCR)',
       'dash_metric_dnr_dpmo': 'DNR DPMO',
       'dash_metric_lor_dpmo': 'LoR DPMO',
       'dash_metric_dsc_dpmo': 'DSC DPMO',
@@ -7257,8 +7147,7 @@ class AppLocalizations {
       'dash_compliance_safety': 'Соответствие и безопасность',
       'dash_delivery_quality_swc': 'Качество доставки и SWC',
       'dash_company_threshold_hint': '{score}% при минимуме {target}%',
-      'dash_company_threshold_met':
-          '{score}% соответствует порогу {target}%',
+      'dash_company_threshold_met': '{score}% соответствует порогу {target}%',
       'dash_company_section_safety': 'Безопасность',
       'dash_company_section_compliance': 'Соответствие',
       'dash_company_section_customer_delivery_experience':
@@ -7275,12 +7164,9 @@ class AppLocalizations {
       'dash_metric_breach_of_contract': 'Нарушение контракта (BOC)',
       'dash_metric_working_hours_compliance':
           'Соответствие рабочим часам (WHC)',
-      'dash_metric_comprehensive_audit_score':
-          'Итоговый аудит-скор (CAS)',
-      'dash_metric_customer_escalation_dpmo':
-          'Эскалация клиента DPMO',
-      'dash_metric_customer_delivery_feedback':
-          'Отзыв клиента о доставке',
+      'dash_metric_comprehensive_audit_score': 'Итоговый аудит-скор (CAS)',
+      'dash_metric_customer_escalation_dpmo': 'Эскалация клиента DPMO',
+      'dash_metric_customer_delivery_feedback': 'Отзыв клиента о доставке',
       'dash_metric_delivery_completion_rate':
           'Уровень завершения доставки (DCR)',
       'dash_metric_dnr_dpmo': 'DNR DPMO',
@@ -7869,8 +7755,7 @@ class AppLocalizations {
     'task_sheet_feedback_received': 'Feedback submitted',
     'task_sheet_feedback_waiting': 'Waiting for driver feedback',
     'task_sheet_feedback_text_required': 'Please write feedback first.',
-    'task_sheet_feedback_choice_required':
-        'Please select one option first.',
+    'task_sheet_feedback_choice_required': 'Please select one option first.',
     'task_sheet_feedback_submitted': 'Feedback submitted.',
     'task_sheet_publish': 'publish',
     'task_sheet_history': 'History',
@@ -11380,7 +11265,8 @@ class AppLocalizations {
           'Automatische Uebersetzung fehlgeschlagen: {error}',
       'admin_faq_translate_all_languages': 'Alle Sprachen uebersetzen',
       'admin_faq_translate_done': '{count} Felder wurden uebersetzt.',
-      'admin_faq_translate_none': 'Es wurden keine neuen Uebersetzungen erstellt.',
+      'admin_faq_translate_none':
+          'Es wurden keine neuen Uebersetzungen erstellt.',
       'admin_faq_add_title': 'Benutzerdefinierte FAQ hinzufuegen',
       'admin_faq_edit_title': 'Benutzerdefinierte FAQ bearbeiten',
       'admin_faq_insert_after': 'Einfuegen nach',
@@ -11812,6 +11698,589 @@ class AppLocalizations {
         },
       };
 
+  static final Map<String, String> _fleetHubSharedValues = {
+    'fleet_status_nav': 'Fleet Hub',
+    'fleet_status_title': 'Fleet Hub',
+    'fleet_status_subtitle':
+        'Manage truck records, category metadata, and vehicle status in one place.',
+    'fleet_status_add_vehicle': 'Register vehicle',
+    'fleet_status_search_hint': 'Search by vehicle number or model',
+    'fleet_status_filter_all': 'All statuses',
+    'fleet_status_filter_all_categories': 'All categories',
+    'fleet_status_tuv_filter_all': 'All TUV statuses',
+    'fleet_status_empty': 'No vehicles found.',
+    'fleet_status_empty_scope': 'No fleet scope found for vehicles.',
+    'fleet_status_must_login': 'You must be logged in to manage vehicles.',
+    'fleet_status_no_access':
+        'Only approved developer, admin, and user accounts can manage Fleet Hub.',
+    'fleet_status_read_only': 'Read only',
+    'fleet_status_permission_denied':
+        'Fleet Hub access is blocked by Firestore permissions. Deploy the updated Firestore rules and indexes, then refresh this page.',
+    'fleet_status_load_failed': 'Failed to load vehicles: {error}',
+    'fleet_status_column_vehicle_number': 'Vehicle',
+    'fleet_status_column_model': 'Model',
+    'fleet_status_column_fleet_type': 'Fleet type',
+    'fleet_status_column_status': 'Status',
+    'fleet_status_column_registration': 'Registration',
+    'fleet_status_column_provider': 'Provider / Owner',
+    'fleet_status_column_service_start': 'Service start',
+    'fleet_status_column_service_end': 'Service end',
+    'fleet_status_column_tuv_status': 'TUV status',
+    'fleet_status_column_tuv_expiry': 'TUV expiry',
+    'fleet_status_column_updated_at': 'Updated',
+    'fleet_status_column_actions': 'Actions',
+    'fleet_status_form_add_title': 'Register vehicle',
+    'fleet_status_form_edit_title': 'Edit vehicle',
+    'fleet_status_create_action': 'Create vehicle',
+    'fleet_status_save_created_document_failed':
+        'Vehicle {vehicleNumber} was created, but the registration document could not be saved: {error}',
+    'fleet_status_section_general': 'General',
+    'fleet_status_section_business': 'Business / contract data',
+    'fleet_status_section_finance': 'Finance (EUR)',
+    'fleet_status_section_metadata': 'Category metadata',
+    'fleet_status_section_notes': 'Notes',
+    'fleet_status_section_service': 'Service status',
+    'fleet_status_section_registration': 'Registration',
+    'fleet_status_field_plate_number': 'Plate number',
+    'fleet_status_field_vehicle_number': 'Vehicle number',
+    'fleet_status_field_brand': 'Brand',
+    'fleet_status_field_model': 'Model',
+    'fleet_status_field_category': 'Category',
+    'fleet_status_field_manufacturing_year': 'Manufacturing year',
+    'fleet_status_field_vin_number': 'VIN number',
+    'fleet_status_field_fuel_type': 'Fuel type',
+    'fleet_status_field_fleet_type': 'Fleet type',
+    'fleet_status_field_provider_owner_name': 'Provider / owner name',
+    'fleet_status_field_contract_reference': 'Contract / reference number',
+    'fleet_status_field_contract_start_date': 'Contract start date',
+    'fleet_status_field_contract_end_date': 'Contract end date',
+    'fleet_status_field_armada_id': 'Armada ID',
+    'fleet_status_field_armada_company_name': 'Armada company name',
+    'fleet_status_field_rental_company_name': 'Rental company name',
+    'fleet_status_field_contract_number': 'Contract number',
+    'fleet_status_field_rental_start_date': 'Rental start date',
+    'fleet_status_field_rental_end_date': 'Rental end date',
+    'fleet_status_field_owner_name': 'Owner name',
+    'fleet_status_field_owner_contact_number': 'Owner contact number',
+    'fleet_status_field_rental_agreement_number': 'Rental agreement number',
+    'fleet_status_field_ownership_type': 'Ownership type',
+    'fleet_status_field_purchase_date': 'Purchase date',
+    'fleet_status_field_monthly_rate_eur': 'Monthly rate (EUR)',
+    'fleet_status_field_purchase_value_eur': 'Purchase value (EUR)',
+    'fleet_status_field_notes': 'Notes',
+    'fleet_status_field_status': 'Status',
+    'fleet_status_field_service_start_date': 'Service start date',
+    'fleet_status_field_service_end_date': 'Service end date',
+    'fleet_status_field_tuv_status': 'TUV status',
+    'fleet_status_field_tuv_expiry_date': 'TUV expiry date',
+    'fleet_status_pick_date': 'Pick date',
+    'fleet_status_change_date': 'Change date',
+    'fleet_status_clear_date': 'Clear date',
+    'fleet_status_loading': 'Loading...',
+    'fleet_status_date_not_set': 'No date selected',
+    'fleet_status_updated_fallback': 'Never',
+    'fleet_status_not_applicable': 'Not applicable',
+    'fleet_status_service_start_required':
+        'Service start date is required for vehicles in service.',
+    'fleet_status_provider_owner_required':
+        'Provider or owner name is required.',
+    'fleet_status_contract_reference_required':
+        'Contract or reference number is required for rental vehicles.',
+    'fleet_status_contract_start_required':
+        'Contract start date is required for rental vehicles.',
+    'fleet_status_monthly_rate_required':
+        'Monthly rate is required for rental vehicles.',
+    'fleet_status_purchase_value_required':
+        'Purchase value is required for self owned vehicles.',
+    'fleet_status_registration_required':
+        'Upload the Fahrzeugschein before creating the vehicle.',
+    'fleet_status_registration_expiry_required':
+        'Fahrzeugschein expiry date is required.',
+    'fleet_status_registration_pick_file': 'Choose Fahrzeugschein',
+    'fleet_status_registration_change_file': 'Change Fahrzeugschein',
+    'fleet_status_registration_no_file': 'No Fahrzeugschein selected',
+    'fleet_status_registration_ready': 'Registered',
+    'fleet_status_registration_missing': 'Missing registration',
+    'fleet_status_registration_delete_blocked':
+        'The last Fahrzeugschein cannot be deleted without a replacement.',
+    'fleet_status_amount_invalid': 'Enter a valid amount.',
+    'fleet_status_invalid_date': 'Use the date format YYYY-MM-DD.',
+    'fleet_status_number_invalid': 'Enter a valid number.',
+    'fleet_status_save_created': 'Vehicle "{vehicleNumber}" created.',
+    'fleet_status_save_updated': 'Vehicle "{vehicleNumber}" updated.',
+    'fleet_status_save_failed': 'Failed to save vehicle: {error}',
+    'fleet_status_vehicle_exists': 'A vehicle with this number already exists.',
+    'fleet_status_plate_number_locked': 'Plate number cannot be changed.',
+    'fleet_status_delete_title': 'Archive vehicle?',
+    'fleet_status_delete_body':
+        'This will archive {vehicleNumber} and hide it from Fleet Hub.',
+    'fleet_status_delete_success': 'Vehicle "{vehicleNumber}" archived.',
+    'fleet_status_delete_failed': 'Failed to delete vehicle: {error}',
+    'fleet_status_action_delete': 'Delete',
+    'fleet_status_action_view_details': 'View details',
+    'fleet_status_action_defleet': 'Defleet',
+    'fleet_status_status_active': 'Active',
+    'fleet_status_status_grounded': 'Grounded',
+    'fleet_status_status_in_service': 'In service',
+    'fleet_status_status_defleeted': 'Defleeted',
+    'fleet_status_tuv_valid': 'Valid',
+    'fleet_status_tuv_expired': 'Expired',
+    'fleet_status_tuv_pending': 'Pending',
+    'fleet_status_tuv_missing': 'Missing',
+    'fleet_status_missing_documents_count': '{count} missing',
+    'fleet_status_vehicle_details_upload_title': 'Upload document',
+    'fleet_status_vehicle_details_add_document_action': 'Add document',
+    'fleet_status_vehicle_details_add_document_title': 'Add fleet document',
+    'fleet_status_vehicle_details_document_type': 'Document type',
+    'fleet_status_vehicle_details_choose_file': 'Choose file',
+    'fleet_status_vehicle_details_change_file': 'Change file',
+    'fleet_status_vehicle_details_no_file_selected': 'No file selected',
+    'fleet_status_vehicle_details_select_expiry_date': 'Select expiry date',
+    'fleet_status_vehicle_details_change_expiry_date': 'Change expiry date',
+    'fleet_status_vehicle_details_no_expiry_date': 'No expiry date',
+    'fleet_status_vehicle_details_clear_expiry': 'Clear expiry',
+    'fleet_status_vehicle_details_upload_action': 'Upload document',
+    'fleet_status_vehicle_details_uploading_action': 'Uploading...',
+    'fleet_status_vehicle_details_documents_title': 'Documents',
+    'fleet_status_vehicle_details_load_failed':
+        'Failed to load documents{scope}: {error}',
+    'fleet_status_vehicle_details_empty_documents':
+        'No documents uploaded yet.',
+    'fleet_status_vehicle_details_expiry_date': 'Expiry date',
+    'fleet_status_vehicle_details_uploaded': 'Uploaded',
+    'fleet_status_vehicle_details_not_set': 'Not set',
+    'fleet_status_vehicle_details_file_bytes_error':
+        'Could not read file bytes.',
+    'fleet_status_vehicle_details_upload_not_allowed':
+        'This account cannot upload vehicle documents.',
+    'fleet_status_vehicle_details_resolving_scope':
+        'Resolving document access. Please try again.',
+    'fleet_status_vehicle_details_pick_file_first':
+        'Pick a file before uploading.',
+    'fleet_status_vehicle_details_expiry_required': 'Expiry date is required.',
+    'fleet_status_vehicle_details_upload_success': 'Document uploaded.',
+    'fleet_status_vehicle_details_upload_failed':
+        'Failed to upload document: {error}',
+    'fleet_status_vehicle_details_duplicate_valid_blocked':
+        'A valid document already exists for this type. Replace it instead.',
+    'fleet_status_vehicle_details_cleanup_old_failed':
+        'New document saved, but old {fileName} files could not be fully cleaned up.',
+    'fleet_status_vehicle_details_invalid_url': 'Invalid document URL.',
+    'fleet_status_vehicle_details_open_failed': 'Could not open document.',
+    'fleet_status_vehicle_details_delete_success': 'Document deleted.',
+    'fleet_status_vehicle_details_delete_failed':
+        'Failed to delete document: {error}',
+    'fleet_status_vehicle_details_scope_unavailable':
+        'Vehicle scope is unavailable.',
+    'fleet_status_vehicle_details_page_title': 'Fleet Hub details',
+    'fleet_status_vehicle_details_page_subtitle':
+        'Review truck information, category metadata, and timestamps.',
+    'fleet_status_vehicle_details_information_title': 'Vehicle information',
+    'fleet_status_vehicle_documents_title': 'Vehicle documents',
+    'fleet_status_vehicle_documents_add_action': 'Add document',
+    'fleet_status_vehicle_documents_add_title': 'Add vehicle document',
+    'fleet_status_vehicle_documents_edit_title': 'Edit vehicle document',
+    'fleet_status_vehicle_documents_search_hint':
+        'Search by document type or number',
+    'fleet_status_vehicle_documents_empty': 'No vehicle documents yet.',
+    'fleet_status_vehicle_documents_load_failed':
+        'Failed to load vehicle documents: {error}',
+    'fleet_status_vehicle_documents_document_type': 'Document type',
+    'fleet_status_vehicle_documents_document_number': 'Document number',
+    'fleet_status_vehicle_documents_expiry_date': 'Expiry date',
+    'fleet_status_vehicle_documents_file_name': 'File name',
+    'fleet_status_vehicle_documents_file_type': 'File type',
+    'fleet_status_vehicle_documents_pick_file': 'Choose file',
+    'fleet_status_vehicle_documents_change_file': 'Change file',
+    'fleet_status_vehicle_documents_no_file': 'No file selected',
+    'fleet_status_vehicle_documents_file_required': 'Pick a file first.',
+    'fleet_status_vehicle_documents_create_success': 'Document created.',
+    'fleet_status_vehicle_documents_update_success': 'Document updated.',
+    'fleet_status_vehicle_documents_save_failed':
+        'Failed to save vehicle document: {error}',
+    'fleet_status_vehicle_documents_delete_title': 'Delete document?',
+    'fleet_status_vehicle_documents_delete_body':
+        'This will archive the document "{documentName}".',
+    'fleet_status_vehicle_documents_delete_success': 'Document deleted.',
+    'fleet_status_vehicle_documents_delete_failed':
+        'Failed to delete document: {error}',
+    'fleet_status_vehicle_documents_open_failed': 'Could not open document.',
+    'fleet_status_vehicle_documents_missing_file': 'Document file is missing.',
+    'fleet_status_vehicle_documents_status_active': 'Active',
+    'fleet_status_vehicle_documents_status_expiring_soon': 'Expiring soon',
+    'fleet_status_vehicle_documents_status_expired': 'Expired',
+    'fleet_status_vehicle_documents_status_missing': 'Missing',
+    'fleet_status_vehicle_events_title': 'Vehicle events',
+    'fleet_status_vehicle_events_add_action': 'Add event',
+    'fleet_status_vehicle_events_add_title': 'Add vehicle event',
+    'fleet_status_vehicle_events_edit_title': 'Edit vehicle event',
+    'fleet_status_vehicle_events_search_hint': 'Search by event title',
+    'fleet_status_vehicle_events_filter_type': 'Event type',
+    'fleet_status_vehicle_events_filter_all_types': 'All event types',
+    'fleet_status_vehicle_events_empty': 'No vehicle events yet.',
+    'fleet_status_vehicle_events_load_failed':
+        'Failed to load vehicle events: {error}',
+    'fleet_status_vehicle_events_create_success': 'Vehicle event created.',
+    'fleet_status_vehicle_events_update_success': 'Vehicle event updated.',
+    'fleet_status_vehicle_events_save_failed':
+        'Failed to save vehicle event: {error}',
+    'fleet_status_vehicle_events_delete_title': 'Delete vehicle event?',
+    'fleet_status_vehicle_events_delete_body':
+        'This will archive the event "{title}".',
+    'fleet_status_vehicle_events_delete_success':
+        'Vehicle event deleted.',
+    'fleet_status_vehicle_events_delete_failed':
+        'Failed to delete vehicle event: {error}',
+    'fleet_status_vehicle_events_open_failed':
+        'Could not open event file.',
+    'fleet_status_vehicle_events_missing_file':
+        'Event file is missing.',
+    'fleet_status_vehicle_events_title_field': 'Event title',
+    'fleet_status_vehicle_events_type': 'Event type',
+    'fleet_status_vehicle_events_type_service': 'Service',
+    'fleet_status_vehicle_events_type_accident': 'Accident',
+    'fleet_status_vehicle_events_type_tyre_change': 'Tyre change',
+    'fleet_status_vehicle_events_type_inspection': 'Inspection',
+    'fleet_status_vehicle_events_type_breakdown': 'Breakdown',
+    'fleet_status_vehicle_events_type_repair': 'Repair',
+    'fleet_status_vehicle_events_type_document_renewal':
+        'Document renewal',
+    'fleet_status_vehicle_events_type_custom': 'Custom',
+    'fleet_status_vehicle_events_event_date': 'Event date',
+    'fleet_status_vehicle_events_location': 'Location',
+    'fleet_status_vehicle_events_damage_level': 'Damage level',
+    'fleet_status_vehicle_events_police_report_number':
+        'Police report number',
+    'fleet_status_vehicle_events_insurance_claim_number':
+        'Insurance claim number',
+    'fleet_status_vehicle_events_pick_file': 'Choose event file',
+    'fleet_status_vehicle_events_change_file': 'Change event file',
+    'fleet_status_vehicle_events_no_file': 'No event file selected',
+    'fleet_status_vehicle_details_compliance_title': 'Document compliance',
+    'fleet_status_vehicle_details_compliance_unavailable':
+        'Document compliance could not be loaded.',
+    'fleet_status_vehicle_details_not_found': 'Vehicle not found.',
+    'fleet_status_vehicle_details_vehicle_number': 'Vehicle number',
+    'fleet_status_vehicle_details_model': 'Model',
+    'fleet_status_vehicle_details_fleet_type': 'Fleet type',
+    'fleet_status_vehicle_details_status': 'Status',
+    'fleet_status_vehicle_details_provider_owner_name': 'Provider / owner name',
+    'fleet_status_vehicle_details_contract_reference':
+        'Contract / reference number',
+    'fleet_status_vehicle_details_contract_start_date': 'Contract start date',
+    'fleet_status_vehicle_details_contract_end_date': 'Contract end date',
+    'fleet_status_vehicle_details_monthly_rate_eur': 'Monthly rate (EUR)',
+    'fleet_status_vehicle_details_purchase_value_eur': 'Purchase value (EUR)',
+    'fleet_status_vehicle_details_registration': 'Fahrzeugschein',
+    'fleet_status_vehicle_details_service_start': 'Service start',
+    'fleet_status_vehicle_details_service_end': 'Service end',
+    'fleet_status_vehicle_details_notes': 'Notes',
+    'fleet_status_vehicle_details_created_at': 'Created',
+    'fleet_status_vehicle_details_updated_at': 'Updated',
+    'fleet_status_vehicle_details_missing': 'Missing',
+    'fleet_status_vehicle_details_expired': 'Expired',
+    'fleet_status_vehicle_details_edit_expiry': 'Edit expiry date',
+    'fleet_status_vehicle_details_edit_expiry_success':
+        'Document expiry date updated.',
+    'fleet_status_vehicle_details_edit_expiry_failed':
+        'Failed to update document expiry date: {error}',
+    'fleet_status_vehicle_document_type_tuv': 'TUV',
+    'fleet_status_vehicle_document_type_insurance': 'Insurance',
+    'fleet_status_vehicle_document_type_service': 'Service',
+    'fleet_status_vehicle_document_type_rc': 'Fahrzeugschein',
+    'fleet_status_fleet_type_armada': 'Armada',
+    'fleet_status_fleet_type_amazon_paid_rental': 'Amazon Paid Rental',
+    'fleet_status_fleet_type_self_sourced_rental': 'Self Sourced Rental',
+    'fleet_status_fleet_type_self_owned_rental': 'Self Owned Rental',
+    'fleet_status_category_armada': 'Armada',
+    'fleet_status_category_amazon_paid_rental': 'Amazon Paid Rental',
+    'fleet_status_category_self_sourced_rental': 'Self Sourced Rental',
+    'fleet_status_category_self_owned_rental': 'Self Owned Rental',
+    'fleet_status_fuel_type_diesel': 'Diesel',
+    'fleet_status_fuel_type_petrol': 'Petrol',
+    'fleet_status_fuel_type_electric': 'Electric',
+    'fleet_status_fuel_type_hybrid': 'Hybrid',
+    'fleet_status_history_title': 'Vehicle Event',
+    'fleet_status_history_add_action': 'Add event',
+    'fleet_status_history_add_title': 'Add vehicle event',
+    'fleet_status_history_edit_title': 'Edit vehicle event',
+    'fleet_status_history_empty': 'No vehicle events yet.',
+    'fleet_status_history_load_failed':
+        'Failed to load vehicle events: {error}',
+    'fleet_status_history_save_success': 'Vehicle event saved.',
+    'fleet_status_history_update_success': 'Vehicle event updated.',
+    'fleet_status_history_delete_success': 'Vehicle event deleted.',
+    'fleet_status_history_save_failed': 'Failed to save vehicle event: {error}',
+    'fleet_status_history_delete_failed':
+        'Failed to delete vehicle event: {error}',
+    'fleet_status_history_event_type': 'Event type',
+    'fleet_status_history_event_date': 'Event date',
+    'fleet_status_history_event_title': 'Event title',
+    'fleet_status_history_notes': 'Notes',
+    'fleet_status_history_attachment_pick': 'Choose attachment',
+    'fleet_status_history_attachment_change': 'Change attachment',
+    'fleet_status_history_attachment_none': 'No attachment',
+    'fleet_status_history_type_registration': 'Registration',
+    'fleet_status_history_type_status_change': 'Status change',
+    'fleet_status_history_type_tire_change': 'Tire change',
+    'fleet_status_history_type_service_maintenance': 'Service / maintenance',
+    'fleet_status_history_type_tuv_inspection': 'TUV inspection',
+    'fleet_status_history_type_accident': 'Accident',
+    'fleet_status_history_type_damage': 'Damage',
+    'fleet_status_history_type_rental_contract_change':
+        'Rental contract change',
+    'fleet_status_history_type_note': 'Note',
+  };
+
+  static final Map<String, Map<String, String>> _fleetHubLocalizedValues = {
+    'en': _fleetHubSharedValues,
+    'de': {
+      ..._fleetHubSharedValues,
+      'fleet_status_nav': 'Fleet Hub',
+      'fleet_status_title': 'Fleet Hub',
+      'fleet_status_subtitle':
+          'Verwalte LKW-Datensaetze, Kategorien-Metadaten und Fahrzeugstatus an einem Ort.',
+      'fleet_status_add_vehicle': 'Fahrzeug registrieren',
+      'fleet_status_form_add_title': 'Fahrzeug registrieren',
+      'fleet_status_form_edit_title': 'Fahrzeug bearbeiten',
+      'fleet_status_create_action': 'Fahrzeug erstellen',
+      'fleet_status_save_created_document_failed':
+          'Fahrzeug {vehicleNumber} wurde erstellt, aber der Fahrzeugschein konnte nicht gespeichert werden: {error}',
+      'fleet_status_section_general': 'Allgemein',
+      'fleet_status_section_metadata': 'Kategorie-Metadaten',
+      'fleet_status_section_business': 'Geschaefts- / Vertragsdaten',
+      'fleet_status_section_finance': 'Finanzen (EUR)',
+      'fleet_status_section_notes': 'Notizen',
+      'fleet_status_section_service': 'Servicestatus',
+      'fleet_status_section_registration': 'Fahrzeugschein',
+      'fleet_status_filter_all_categories': 'Alle Kategorien',
+      'fleet_status_field_plate_number': 'Kennzeichen',
+      'fleet_status_field_brand': 'Marke',
+      'fleet_status_column_fleet_type': 'Fahrzeugtyp',
+      'fleet_status_column_registration': 'Registrierung',
+      'fleet_status_column_provider': 'Anbieter / Eigentuemer',
+      'fleet_status_field_category': 'Kategorie',
+      'fleet_status_field_manufacturing_year': 'Baujahr',
+      'fleet_status_field_vin_number': 'FIN',
+      'fleet_status_field_fuel_type': 'Kraftstoffart',
+      'fleet_status_field_fleet_type': 'Fahrzeugtyp',
+      'fleet_status_field_provider_owner_name': 'Anbieter / Eigentuemer',
+      'fleet_status_field_contract_reference': 'Vertrags- / Referenznummer',
+      'fleet_status_field_contract_start_date': 'Vertragsbeginn',
+      'fleet_status_field_contract_end_date': 'Vertragsende',
+      'fleet_status_field_armada_id': 'Armada-ID',
+      'fleet_status_field_armada_company_name': 'Armada Firmenname',
+      'fleet_status_field_rental_company_name': 'Mietfirma',
+      'fleet_status_field_contract_number': 'Vertragsnummer',
+      'fleet_status_field_rental_start_date': 'Mietbeginn',
+      'fleet_status_field_rental_end_date': 'Mietende',
+      'fleet_status_field_owner_name': 'Eigentuemername',
+      'fleet_status_field_owner_contact_number': 'Eigentuemer Kontakt',
+      'fleet_status_field_rental_agreement_number': 'Mietvertragsnummer',
+      'fleet_status_field_ownership_type': 'Eigentumsart',
+      'fleet_status_field_purchase_date': 'Kaufdatum',
+      'fleet_status_field_monthly_rate_eur': 'Monatsrate (EUR)',
+      'fleet_status_field_purchase_value_eur': 'Kaufwert (EUR)',
+      'fleet_status_field_notes': 'Notizen',
+      'fleet_status_provider_owner_required':
+          'Anbieter oder Eigentuemer ist erforderlich.',
+      'fleet_status_contract_reference_required':
+          'Vertrags- oder Referenznummer ist fuer Mietfahrzeuge erforderlich.',
+      'fleet_status_contract_start_required':
+          'Vertragsbeginn ist fuer Mietfahrzeuge erforderlich.',
+      'fleet_status_monthly_rate_required':
+          'Monatsrate ist fuer Mietfahrzeuge erforderlich.',
+      'fleet_status_purchase_value_required':
+          'Kaufwert ist fuer eigene Fahrzeuge erforderlich.',
+      'fleet_status_registration_required':
+          'Lade den Fahrzeugschein hoch, bevor du das Fahrzeug erstellst.',
+      'fleet_status_registration_expiry_required':
+          'Das Ablaufdatum vom Fahrzeugschein ist erforderlich.',
+      'fleet_status_registration_pick_file': 'Fahrzeugschein waehlen',
+      'fleet_status_registration_change_file': 'Fahrzeugschein aendern',
+      'fleet_status_registration_no_file': 'Kein Fahrzeugschein ausgewaehlt',
+      'fleet_status_registration_ready': 'Registriert',
+      'fleet_status_registration_missing': 'Registrierung fehlt',
+      'fleet_status_registration_delete_blocked':
+          'Der letzte Fahrzeugschein kann nicht ohne Ersatz geloescht werden.',
+      'fleet_status_invalid_date': 'Verwende das Datumsformat JJJJ-MM-TT.',
+      'fleet_status_number_invalid': 'Gib eine gueltige Zahl ein.',
+      'fleet_status_plate_number_locked':
+          'Das Kennzeichen kann nicht geaendert werden.',
+      'fleet_status_delete_body':
+          'Dies archiviert {vehicleNumber} und blendet es im Fleet Hub aus.',
+      'fleet_status_delete_title': 'Fahrzeug archivieren?',
+      'fleet_status_delete_success': 'Fahrzeug "{vehicleNumber}" archiviert.',
+      'fleet_status_vehicle_document_type_rc': 'Fahrzeugschein',
+      'fleet_status_vehicle_details_page_title': 'Fleet Hub Details',
+      'fleet_status_vehicle_details_page_subtitle':
+          'Pruefe LKW-Daten, Kategorien-Metadaten und Zeitstempel.',
+      'fleet_status_vehicle_documents_title': 'Fahrzeugdokumente',
+      'fleet_status_vehicle_documents_add_action': 'Dokument hinzufuegen',
+      'fleet_status_vehicle_documents_add_title':
+          'Fahrzeugdokument hinzufuegen',
+      'fleet_status_vehicle_documents_edit_title':
+          'Fahrzeugdokument bearbeiten',
+      'fleet_status_vehicle_documents_search_hint':
+          'Nach Dokumenttyp oder Nummer suchen',
+      'fleet_status_loading': 'Wird geladen...',
+      'fleet_status_search_hint':
+          'Nach Fahrzeugnummer oder Modell suchen',
+      'fleet_status_vehicle_documents_empty':
+          'Noch keine Fahrzeugdokumente vorhanden.',
+      'fleet_status_vehicle_documents_load_failed':
+          'Fahrzeugdokumente konnten nicht geladen werden: {error}',
+      'fleet_status_vehicle_documents_document_type': 'Dokumenttyp',
+      'fleet_status_vehicle_documents_document_number': 'Dokumentnummer',
+      'fleet_status_vehicle_documents_expiry_date': 'Ablaufdatum',
+      'fleet_status_vehicle_documents_file_name': 'Dateiname',
+      'fleet_status_vehicle_documents_file_type': 'Dateityp',
+      'fleet_status_vehicle_documents_pick_file': 'Datei auswaehlen',
+      'fleet_status_vehicle_documents_change_file': 'Datei aendern',
+      'fleet_status_vehicle_documents_no_file': 'Keine Datei ausgewaehlt',
+      'fleet_status_vehicle_documents_file_required':
+          'Waehle zuerst eine Datei aus.',
+      'fleet_status_vehicle_documents_create_success':
+          'Dokument erstellt.',
+      'fleet_status_vehicle_documents_update_success':
+          'Dokument aktualisiert.',
+      'fleet_status_vehicle_documents_save_failed':
+          'Fahrzeugdokument konnte nicht gespeichert werden: {error}',
+      'fleet_status_vehicle_documents_delete_title': 'Dokument loeschen?',
+      'fleet_status_vehicle_documents_delete_body':
+          'Dies archiviert das Dokument "{documentName}".',
+      'fleet_status_vehicle_documents_delete_success':
+          'Dokument geloescht.',
+      'fleet_status_vehicle_documents_delete_failed':
+          'Dokument konnte nicht geloescht werden: {error}',
+      'fleet_status_vehicle_documents_open_failed':
+          'Dokument konnte nicht geoeffnet werden.',
+      'fleet_status_vehicle_documents_missing_file':
+          'Dokumentdatei fehlt.',
+      'fleet_status_vehicle_documents_status_active': 'Aktiv',
+      'fleet_status_vehicle_documents_status_expiring_soon':
+          'Laeuft bald ab',
+      'fleet_status_vehicle_documents_status_expired': 'Abgelaufen',
+      'fleet_status_vehicle_documents_status_missing': 'Fehlt',
+      'fleet_status_vehicle_events_title': 'Fahrzeugereignisse',
+      'fleet_status_vehicle_events_add_action': 'Ereignis hinzufuegen',
+      'fleet_status_vehicle_events_add_title':
+          'Fahrzeugereignis hinzufuegen',
+      'fleet_status_vehicle_events_edit_title':
+          'Fahrzeugereignis bearbeiten',
+      'fleet_status_vehicle_events_search_hint':
+          'Nach Ereignistitel suchen',
+      'fleet_status_vehicle_events_filter_type': 'Ereignistyp',
+      'fleet_status_vehicle_events_filter_all_types': 'Alle Ereignistypen',
+      'fleet_status_vehicle_events_empty':
+          'Noch keine Fahrzeugereignisse vorhanden.',
+      'fleet_status_vehicle_events_load_failed':
+          'Fahrzeugereignisse konnten nicht geladen werden: {error}',
+      'fleet_status_vehicle_events_create_success':
+          'Fahrzeugereignis erstellt.',
+      'fleet_status_vehicle_events_update_success':
+          'Fahrzeugereignis aktualisiert.',
+      'fleet_status_vehicle_events_save_failed':
+          'Fahrzeugereignis konnte nicht gespeichert werden: {error}',
+      'fleet_status_vehicle_events_delete_title':
+          'Fahrzeugereignis loeschen?',
+      'fleet_status_vehicle_events_delete_body':
+          'Dies archiviert das Ereignis "{title}".',
+      'fleet_status_vehicle_events_delete_success':
+          'Fahrzeugereignis geloescht.',
+      'fleet_status_vehicle_events_delete_failed':
+          'Fahrzeugereignis konnte nicht geloescht werden: {error}',
+      'fleet_status_vehicle_events_open_failed':
+          'Ereignisdatei konnte nicht geoeffnet werden.',
+      'fleet_status_vehicle_events_missing_file':
+          'Ereignisdatei fehlt.',
+      'fleet_status_vehicle_events_title_field': 'Ereignistitel',
+      'fleet_status_vehicle_events_type': 'Ereignistyp',
+      'fleet_status_vehicle_events_type_service': 'Service',
+      'fleet_status_vehicle_events_type_accident': 'Unfall',
+      'fleet_status_vehicle_events_type_tyre_change': 'Reifenwechsel',
+      'fleet_status_vehicle_events_type_inspection': 'Inspektion',
+      'fleet_status_vehicle_events_type_breakdown': 'Panne',
+      'fleet_status_vehicle_events_type_repair': 'Reparatur',
+      'fleet_status_vehicle_events_type_document_renewal':
+          'Dokumenterneuerung',
+      'fleet_status_vehicle_events_type_custom': 'Benutzerdefiniert',
+      'fleet_status_vehicle_events_event_date': 'Ereignisdatum',
+      'fleet_status_vehicle_events_location': 'Ort',
+      'fleet_status_vehicle_events_damage_level': 'Schadensstufe',
+      'fleet_status_vehicle_events_police_report_number':
+          'Polizeiberichtnummer',
+      'fleet_status_vehicle_events_insurance_claim_number':
+          'Versicherungsfallnummer',
+      'fleet_status_vehicle_events_pick_file': 'Ereignisdatei auswaehlen',
+      'fleet_status_vehicle_events_change_file':
+          'Ereignisdatei aendern',
+      'fleet_status_vehicle_events_no_file':
+          'Keine Ereignisdatei ausgewaehlt',
+      'fleet_status_vehicle_details_expiry_required':
+          'Ein Ablaufdatum ist erforderlich.',
+      'fleet_status_vehicle_details_fleet_type': 'Fahrzeugtyp',
+      'fleet_status_vehicle_details_provider_owner_name':
+          'Anbieter / Eigentuemer',
+      'fleet_status_vehicle_details_contract_reference':
+          'Vertrags- / Referenznummer',
+      'fleet_status_vehicle_details_contract_start_date': 'Vertragsbeginn',
+      'fleet_status_vehicle_details_contract_end_date': 'Vertragsende',
+      'fleet_status_vehicle_details_monthly_rate_eur': 'Monatsrate (EUR)',
+      'fleet_status_vehicle_details_purchase_value_eur': 'Kaufwert (EUR)',
+      'fleet_status_vehicle_details_registration': 'Fahrzeugschein',
+      'fleet_status_vehicle_details_notes': 'Notizen',
+      'fleet_status_category_armada': 'Armada',
+      'fleet_status_category_amazon_paid_rental': 'Amazon Paid Rental',
+      'fleet_status_category_self_sourced_rental': 'Self Sourced Rental',
+      'fleet_status_category_self_owned_rental': 'Self Owned Rental',
+      'fleet_status_fuel_type_diesel': 'Diesel',
+      'fleet_status_fuel_type_petrol': 'Benzin',
+      'fleet_status_fuel_type_electric': 'Elektrisch',
+      'fleet_status_fuel_type_hybrid': 'Hybrid',
+      'fleet_status_history_title': 'Fahrzeugereignisse',
+      'fleet_status_history_add_action': 'Ereignis hinzufuegen',
+      'fleet_status_history_add_title': 'Fahrzeugereignis hinzufuegen',
+      'fleet_status_history_edit_title': 'Fahrzeugereignis bearbeiten',
+      'fleet_status_history_empty': 'Noch keine Fahrzeugereignisse.',
+      'fleet_status_history_load_failed':
+          'Fahrzeugereignisse konnten nicht geladen werden: {error}',
+      'fleet_status_history_save_success': 'Fahrzeugereignis gespeichert.',
+      'fleet_status_history_update_success': 'Fahrzeugereignis aktualisiert.',
+      'fleet_status_history_delete_success': 'Fahrzeugereignis geloescht.',
+      'fleet_status_history_save_failed':
+          'Fahrzeugereignis konnte nicht gespeichert werden: {error}',
+      'fleet_status_history_delete_failed':
+          'Fahrzeugereignis konnte nicht geloescht werden: {error}',
+      'fleet_status_history_event_type': 'Ereignistyp',
+      'fleet_status_history_event_date': 'Ereignisdatum',
+      'fleet_status_history_event_title': 'Ereignistitel',
+      'fleet_status_history_attachment_pick': 'Anhang waehlen',
+      'fleet_status_history_attachment_change': 'Anhang aendern',
+      'fleet_status_history_attachment_none': 'Kein Anhang',
+      'fleet_status_history_type_registration': 'Registrierung',
+      'fleet_status_history_type_status_change': 'Statusaenderung',
+      'fleet_status_history_type_tire_change': 'Reifenwechsel',
+      'fleet_status_history_type_service_maintenance': 'Service / Wartung',
+      'fleet_status_history_type_tuv_inspection': 'TUV-Pruefung',
+      'fleet_status_history_type_accident': 'Unfall',
+      'fleet_status_history_type_damage': 'Schaden',
+      'fleet_status_history_type_rental_contract_change':
+          'Mietvertragsaenderung',
+      'fleet_status_history_type_note': 'Notiz',
+      'fleet_status_fleet_type_amazon_paid_rental': 'Amazon bezahlte Miete',
+      'fleet_status_fleet_type_self_sourced_rental': 'Selbst beschaffte Miete',
+      'fleet_status_fleet_type_self_owned_rental': 'Selbst eigenes Fahrzeug',
+    },
+    'sq': _fleetHubSharedValues,
+    'hu': _fleetHubSharedValues,
+    'ro': _fleetHubSharedValues,
+    'hr': _fleetHubSharedValues,
+    'ar': _fleetHubSharedValues,
+    'tr': _fleetHubSharedValues,
+    'ru': _fleetHubSharedValues,
+  };
+
   static final Map<String, String> _miscSharedValues = {
     'button_close': 'Close',
     'button_open': 'Open',
@@ -11827,7 +12296,8 @@ class AppLocalizations {
     'verify_email_resend': 'Resend verification email',
     'verify_email_reload': 'I verified - Reload',
     'verify_email_back_to_login': 'Back to login',
-    'verify_email_failed_template': 'Failed to resend verification email: {error}',
+    'verify_email_failed_template':
+        'Failed to resend verification email: {error}',
     'driver_shift_plan_missing_scope': 'Missing DSP or driver scope.',
     'driver_shift_plan_title': 'Shift Plan',
     'driver_shift_plan_load_failed_template': 'Failed to load shifts: {error}',
@@ -11852,7 +12322,8 @@ class AppLocalizations {
     'auth_gate_no_profile_found':
         'Your login is active, but no driver/DSP profile could be found.',
     'auth_gate_contact_admin': 'Please contact your DSP or admin.',
-    'auth_gate_awaiting_approval_title': 'Your DSP account is awaiting approval.',
+    'auth_gate_awaiting_approval_title':
+        'Your DSP account is awaiting approval.',
     'auth_gate_awaiting_approval_body':
         'Once an admin approves your account, you can access the dashboard.',
     'auth_gate_awaiting_approval_tab_hint':
@@ -11939,8 +12410,7 @@ class AppLocalizations {
       'notification_pin_close_tooltip': 'Schließen',
       'driver_onboarding_save_failed_template':
           'Speichern fehlgeschlagen: {error}',
-      'driver_onboarding_document_uploaded_template':
-          '{document} hochgeladen.',
+      'driver_onboarding_document_uploaded_template': '{document} hochgeladen.',
       'driver_onboarding_upload_documents_failed_template':
           'Dokumente konnten nicht hochgeladen werden: {error}',
       'driver_onboarding_open_document_tooltip': 'Öffnen',
@@ -12003,8 +12473,7 @@ class AppLocalizations {
       'driver_notifications_filter_ride_along': 'Ride Along',
       'driver_notifications_error_template': 'Gabim: {error}',
       'driver_notifications_empty': 'Nuk ka ende njoftime.',
-      'driver_notifications_filter_empty':
-          'Nuk ka njoftime për këtë filtër.',
+      'driver_notifications_filter_empty': 'Nuk ka njoftime për këtë filtër.',
       'auth_gate_driver_profile_error_template':
           'Gabim gjatë ngarkimit të profilit të shoferit: {error}',
       'auth_gate_no_profile_found':
@@ -12018,10 +12487,8 @@ class AppLocalizations {
       'auth_gate_awaiting_approval_tab_hint':
           'Mund ta mbyllni këtë skedë; qasja do të lejohet pas miratimit.',
       'notification_pin_close_tooltip': 'Mbyll',
-      'driver_onboarding_save_failed_template':
-          'Ruajtja dështoi: {error}',
-      'driver_onboarding_document_uploaded_template':
-          '{document} u ngarkua.',
+      'driver_onboarding_save_failed_template': 'Ruajtja dështoi: {error}',
+      'driver_onboarding_document_uploaded_template': '{document} u ngarkua.',
       'driver_onboarding_upload_documents_failed_template':
           'Ngarkimi i dokumenteve dështoi: {error}',
       'driver_onboarding_open_document_tooltip': 'Hap',
@@ -12084,25 +12551,21 @@ class AppLocalizations {
       'driver_notifications_filter_ride_along': 'Ride Along',
       'driver_notifications_error_template': 'Hiba: {error}',
       'driver_notifications_empty': 'Még nincsenek értesítések.',
-      'driver_notifications_filter_empty':
-          'Ehhez a szűrőhöz nincs értesítés.',
+      'driver_notifications_filter_empty': 'Ehhez a szűrőhöz nincs értesítés.',
       'auth_gate_driver_profile_error_template':
           'Hiba a sofőr profiljának betöltésekor: {error}',
       'auth_gate_no_profile_found':
           'A bejelentkezés aktív, de nem található sofőr/DSP profil.',
       'auth_gate_contact_admin':
           'Kérjük, lépjen kapcsolatba a DSP-vel vagy az adminnal.',
-      'auth_gate_awaiting_approval_title':
-          'A DSP-fiók jóváhagyásra vár.',
+      'auth_gate_awaiting_approval_title': 'A DSP-fiók jóváhagyásra vár.',
       'auth_gate_awaiting_approval_body':
           'Amint egy admin jóváhagyja a fiókját, hozzáférhet az irányítópulthoz.',
       'auth_gate_awaiting_approval_tab_hint':
           'Bezárhatja ezt a lapot; a hozzáférés jóváhagyás után engedélyezett lesz.',
       'notification_pin_close_tooltip': 'Bezárás',
-      'driver_onboarding_save_failed_template':
-          'A mentés sikertelen: {error}',
-      'driver_onboarding_document_uploaded_template':
-          '{document} feltöltve.',
+      'driver_onboarding_save_failed_template': 'A mentés sikertelen: {error}',
+      'driver_onboarding_document_uploaded_template': '{document} feltöltve.',
       'driver_onboarding_upload_documents_failed_template':
           'A dokumentumok feltöltése sikertelen: {error}',
       'driver_onboarding_open_document_tooltip': 'Megnyitás',
@@ -12173,15 +12636,13 @@ class AppLocalizations {
           'Autentificarea este activă, dar nu a fost găsit niciun profil de șofer/DSP.',
       'auth_gate_contact_admin':
           'Vă rugăm să contactați DSP-ul sau administratorul.',
-      'auth_gate_awaiting_approval_title':
-          'Contul DSP așteaptă aprobarea.',
+      'auth_gate_awaiting_approval_title': 'Contul DSP așteaptă aprobarea.',
       'auth_gate_awaiting_approval_body':
           'După ce un administrator aprobă contul, puteți accesa tabloul de bord.',
       'auth_gate_awaiting_approval_tab_hint':
           'Puteți închide această filă; accesul va fi permis după aprobare.',
       'notification_pin_close_tooltip': 'Închide',
-      'driver_onboarding_save_failed_template':
-          'Salvarea a eșuat: {error}',
+      'driver_onboarding_save_failed_template': 'Salvarea a eșuat: {error}',
       'driver_onboarding_document_uploaded_template':
           '{document} a fost încărcat.',
       'driver_onboarding_upload_documents_failed_template':
@@ -12226,8 +12687,7 @@ class AppLocalizations {
       'verify_email_back_to_login': 'Natrag na prijavu',
       'verify_email_failed_template':
           'Ponovno slanje verifikacijskog emaila nije uspjelo: {error}',
-      'driver_shift_plan_missing_scope':
-          'Nedostaje DSP ili vozački kontekst.',
+      'driver_shift_plan_missing_scope': 'Nedostaje DSP ili vozački kontekst.',
       'driver_shift_plan_title': 'Plan smjene',
       'driver_shift_plan_load_failed_template':
           'Učitavanje smjena nije uspjelo: {error}',
@@ -12246,16 +12706,14 @@ class AppLocalizations {
       'driver_notifications_filter_ride_along': 'Ride Along',
       'driver_notifications_error_template': 'Greška: {error}',
       'driver_notifications_empty': 'Još nema obavijesti.',
-      'driver_notifications_filter_empty':
-          'Nema obavijesti za ovaj filter.',
+      'driver_notifications_filter_empty': 'Nema obavijesti za ovaj filter.',
       'auth_gate_driver_profile_error_template':
           'Greška pri učitavanju profila vozača: {error}',
       'auth_gate_no_profile_found':
           'Vaša prijava je aktivna, ali nije pronađen profil vozača/DSP-a.',
       'auth_gate_contact_admin':
           'Molimo kontaktirajte svoj DSP ili administratora.',
-      'auth_gate_awaiting_approval_title':
-          'Vaš DSP račun čeka odobrenje.',
+      'auth_gate_awaiting_approval_title': 'Vaš DSP račun čeka odobrenje.',
       'auth_gate_awaiting_approval_body':
           'Nakon što administrator odobri vaš račun, moći ćete pristupiti nadzornoj ploči.',
       'auth_gate_awaiting_approval_tab_hint':
@@ -12263,8 +12721,7 @@ class AppLocalizations {
       'notification_pin_close_tooltip': 'Zatvori',
       'driver_onboarding_save_failed_template':
           'Spremanje nije uspjelo: {error}',
-      'driver_onboarding_document_uploaded_template':
-          '{document} je prenesen.',
+      'driver_onboarding_document_uploaded_template': '{document} je prenesen.',
       'driver_onboarding_upload_documents_failed_template':
           'Prijenos dokumenata nije uspio: {error}',
       'driver_onboarding_open_document_tooltip': 'Otvori',
@@ -12305,12 +12762,10 @@ class AppLocalizations {
       'verify_email_resend': 'إعادة إرسال بريد التحقق',
       'verify_email_reload': 'لقد تحققت - أعد التحميل',
       'verify_email_back_to_login': 'العودة إلى تسجيل الدخول',
-      'verify_email_failed_template':
-          'فشلت إعادة إرسال بريد التحقق: {error}',
+      'verify_email_failed_template': 'فشلت إعادة إرسال بريد التحقق: {error}',
       'driver_shift_plan_missing_scope': 'نطاق DSP أو السائق مفقود.',
       'driver_shift_plan_title': 'خطة المناوبة',
-      'driver_shift_plan_load_failed_template':
-          'فشل تحميل المناوبات: {error}',
+      'driver_shift_plan_load_failed_template': 'فشل تحميل المناوبات: {error}',
       'driver_shift_plan_empty': 'لا توجد مناوبات مخصصة بعد.',
       'driver_shift_plan_upcoming': 'المناوبات القادمة',
       'driver_shift_plan_upcoming_empty': 'لا توجد مناوبات قادمة.',
@@ -12326,8 +12781,7 @@ class AppLocalizations {
       'driver_notifications_filter_ride_along': 'مرافقة',
       'driver_notifications_error_template': 'خطأ: {error}',
       'driver_notifications_empty': 'لا توجد إشعارات بعد.',
-      'driver_notifications_filter_empty':
-          'لا توجد إشعارات لهذا الفلتر.',
+      'driver_notifications_filter_empty': 'لا توجد إشعارات لهذا الفلتر.',
       'auth_gate_driver_profile_error_template':
           'خطأ أثناء تحميل ملف السائق: {error}',
       'auth_gate_no_profile_found':
@@ -12340,16 +12794,13 @@ class AppLocalizations {
       'auth_gate_awaiting_approval_tab_hint':
           'يمكنك إغلاق هذه الصفحة؛ سيتم السماح بالوصول بعد الموافقة.',
       'notification_pin_close_tooltip': 'إغلاق',
-      'driver_onboarding_save_failed_template':
-          'فشل الحفظ: {error}',
-      'driver_onboarding_document_uploaded_template':
-          'تم رفع {document}.',
+      'driver_onboarding_save_failed_template': 'فشل الحفظ: {error}',
+      'driver_onboarding_document_uploaded_template': 'تم رفع {document}.',
       'driver_onboarding_upload_documents_failed_template':
           'فشل رفع المستندات: {error}',
       'driver_onboarding_open_document_tooltip': 'فتح',
       'driver_onboarding_delete_document_tooltip': 'حذف',
-      'driver_onboarding_open_document_failed':
-          'تعذر فتح رابط المستند',
+      'driver_onboarding_open_document_failed': 'تعذر فتح رابط المستند',
       'driver_onboarding_document_deleted': 'تم حذف المستند.',
       'driver_onboarding_delete_document_failed_template':
           'فشل حذف المستند: {error}',
@@ -12363,8 +12814,7 @@ class AppLocalizations {
       'signup_request_company': 'الشركة',
       'signup_request_station_code': 'رمز المحطة (مثال DE123)',
       'signup_request_required': 'مطلوب',
-      'signup_request_valid_email':
-          'يرجى إدخال بريد إلكتروني صالح',
+      'signup_request_valid_email': 'يرجى إدخال بريد إلكتروني صالح',
       'signup_request_password_min': '6 أحرف على الأقل',
       'signup_request_submitting': 'جارٍ الإرسال...',
       'signup_request_submit': 'إرسال والتحقق من البريد',
@@ -12387,8 +12837,7 @@ class AppLocalizations {
       'verify_email_back_to_login': 'Girise don',
       'verify_email_failed_template':
           'Dogrulama e-postasi yeniden gonderilemedi: {error}',
-      'driver_shift_plan_missing_scope':
-          'DSP veya surucu kapsami eksik.',
+      'driver_shift_plan_missing_scope': 'DSP veya surucu kapsami eksik.',
       'driver_shift_plan_title': 'Vardiya Plani',
       'driver_shift_plan_load_failed_template':
           'Vardiyalar yuklenemedi: {error}',
@@ -12407,31 +12856,26 @@ class AppLocalizations {
       'driver_notifications_filter_ride_along': 'Ride Along',
       'driver_notifications_error_template': 'Hata: {error}',
       'driver_notifications_empty': 'Henuz bildirim yok.',
-      'driver_notifications_filter_empty':
-          'Bu filtre icin bildirim yok.',
+      'driver_notifications_filter_empty': 'Bu filtre icin bildirim yok.',
       'auth_gate_driver_profile_error_template':
           'Surucu profili yuklenirken hata olustu: {error}',
       'auth_gate_no_profile_found':
           'Girisiniz aktif, ancak surucu/DSP profili bulunamadi.',
       'auth_gate_contact_admin':
           'Lutfen DSP veya yonetici ile iletisime gecin.',
-      'auth_gate_awaiting_approval_title':
-          'DSP hesabin onay bekliyor.',
+      'auth_gate_awaiting_approval_title': 'DSP hesabin onay bekliyor.',
       'auth_gate_awaiting_approval_body':
           'Bir yonetici hesabinizi onayladiginda panele erisebilirsiniz.',
       'auth_gate_awaiting_approval_tab_hint':
           'Bu sekmeyi kapatabilirsiniz; onaydan sonra erisim acilacaktir.',
       'notification_pin_close_tooltip': 'Kapat',
-      'driver_onboarding_save_failed_template':
-          'Kaydetme basarisiz: {error}',
-      'driver_onboarding_document_uploaded_template':
-          '{document} yuklendi.',
+      'driver_onboarding_save_failed_template': 'Kaydetme basarisiz: {error}',
+      'driver_onboarding_document_uploaded_template': '{document} yuklendi.',
       'driver_onboarding_upload_documents_failed_template':
           'Belgeler yuklenemedi: {error}',
       'driver_onboarding_open_document_tooltip': 'Ac',
       'driver_onboarding_delete_document_tooltip': 'Sil',
-      'driver_onboarding_open_document_failed':
-          'Belge URLsi acilamadi',
+      'driver_onboarding_open_document_failed': 'Belge URLsi acilamadi',
       'driver_onboarding_document_deleted': 'Belge silindi.',
       'driver_onboarding_delete_document_failed_template':
           'Belge silinemedi: {error}',
@@ -12488,25 +12932,21 @@ class AppLocalizations {
       'driver_notifications_filter_ride_along': 'Ride Along',
       'driver_notifications_error_template': 'Ошибка: {error}',
       'driver_notifications_empty': 'Уведомлений пока нет.',
-      'driver_notifications_filter_empty':
-          'Для этого фильтра уведомлений нет.',
+      'driver_notifications_filter_empty': 'Для этого фильтра уведомлений нет.',
       'auth_gate_driver_profile_error_template':
           'Ошибка загрузки профиля водителя: {error}',
       'auth_gate_no_profile_found':
           'Ваш вход активен, но профиль водителя/DSP не найден.',
       'auth_gate_contact_admin':
           'Пожалуйста, свяжитесь с DSP или администратором.',
-      'auth_gate_awaiting_approval_title':
-          'Ваш аккаунт DSP ожидает одобрения.',
+      'auth_gate_awaiting_approval_title': 'Ваш аккаунт DSP ожидает одобрения.',
       'auth_gate_awaiting_approval_body':
           'Как только администратор одобрит ваш аккаунт, вы получите доступ к панели.',
       'auth_gate_awaiting_approval_tab_hint':
           'Вы можете закрыть эту вкладку; доступ будет открыт после одобрения.',
       'notification_pin_close_tooltip': 'Закрыть',
-      'driver_onboarding_save_failed_template':
-          'Не удалось сохранить: {error}',
-      'driver_onboarding_document_uploaded_template':
-          '{document} загружен.',
+      'driver_onboarding_save_failed_template': 'Не удалось сохранить: {error}',
+      'driver_onboarding_document_uploaded_template': '{document} загружен.',
       'driver_onboarding_upload_documents_failed_template':
           'Не удалось загрузить документы: {error}',
       'driver_onboarding_open_document_tooltip': 'Открыть',
@@ -12538,6 +12978,8 @@ class AppLocalizations {
   String t(String key) {
     final lang = _lang();
     final langMap = _localizedValues[lang] ?? _localizedValues['en']!;
+    final fleetHubMap =
+        _fleetHubLocalizedValues[lang] ?? _fleetHubLocalizedValues['en']!;
     final driverNotificationMap =
         _driverNotificationLocalizedValues[lang] ??
         _driverNotificationLocalizedValues['en']!;
@@ -12565,7 +13007,9 @@ class AppLocalizations {
         _adminApprovalsLocalizedValues[lang] ??
         _adminApprovalsLocalizedValues['en']!;
     final miscMap = _miscLocalizedValues[lang] ?? _miscLocalizedValues['en']!;
-    final text = langMap[key] ??
+    final text =
+        fleetHubMap[key] ??
+        langMap[key] ??
         driverNotificationMap[key] ??
         driverAbsenceMap[key] ??
         driverDashboardMap[key] ??

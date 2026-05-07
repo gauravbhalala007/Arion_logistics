@@ -2716,10 +2716,22 @@ class _FleetDashboardDocument {
     return _FleetDashboardDocument(
       id: doc.id,
       type: (data['type'] ?? '').toString(),
-      expiryDate: (data['expiryDate'] as Timestamp?)?.toDate(),
-      uploadedAt: (data['uploadedAt'] as Timestamp?)?.toDate(),
+      expiryDate: _fleetDashboardDateValue(data['expiryDate']),
+      uploadedAt: _fleetDashboardDateValue(data['uploadedAt']),
     );
   }
+}
+
+DateTime? _fleetDashboardDateValue(dynamic value) {
+  if (value is Timestamp) return value.toDate();
+  if (value is DateTime) return value;
+  if (value is String) {
+    final parsed = DateTime.tryParse(value.trim());
+    return parsed == null
+        ? null
+        : DateTime(parsed.year, parsed.month, parsed.day);
+  }
+  return null;
 }
 
 enum _FleetComplianceState { missing, expired, noExpiry, upcoming }
