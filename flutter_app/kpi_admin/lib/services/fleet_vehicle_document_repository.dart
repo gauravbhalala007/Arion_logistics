@@ -16,6 +16,18 @@ class FleetVehicleDocumentException implements Exception {
   String toString() => message;
 }
 
+class DuplicateVehicleDocumentTypeException implements Exception {
+  const DuplicateVehicleDocumentTypeException(this.documentType);
+
+  final String documentType;
+}
+
+class ImmutableVehicleDocumentTypeException implements Exception {
+  const ImmutableVehicleDocumentTypeException(this.documentType);
+
+  final String documentType;
+}
+
 class FleetVehicleDocumentUploadResult {
   const FleetVehicleDocumentUploadResult({
     required this.fileUrl,
@@ -212,6 +224,10 @@ class FleetVehicleDocumentRepository {
   }) async {
     _validateDraft(draft);
     final docsCol = documentsCollection(dspUid: dspUid, plateNumber: plateNumber);
+    await _ensureUniqueActiveDocumentType(
+      docsCol: docsCol,
+      documentType: draft.documentType,
+    );
     final docRef = docsCol.doc();
     final documentId = docRef.id;
 
@@ -260,6 +276,11 @@ class FleetVehicleDocumentRepository {
     String? originalFileName,
   }) async {
     _validateDraft(draft);
+    final existingType = _canonicalVehicleDocumentType(existingDocument.documentType);
+    final requestedType = _canonicalVehicleDocumentType(draft.documentType);
+    if (requestedType != existingType) {
+      throw ImmutableVehicleDocumentTypeException(existingDocument.documentType);
+    }
 
     var fileUrl = existingDocument.fileUrl;
     FleetVehicleDocumentUploadResult? upload;
@@ -284,7 +305,7 @@ class FleetVehicleDocumentRepository {
             'documentId': documentId,
             'dspUid': dspUid,
             'plateNumber': normalizePlateNumber(plateNumber),
-            'documentType': draft.documentType.trim(),
+            'documentType': existingDocument.documentType.trim(),
             'documentNumber': draft.documentNumber.trim(),
             'expiryDate': draft.expiryDate.trim(),
             'fileUrl': fileUrl,
@@ -296,6 +317,20 @@ class FleetVehicleDocumentRepository {
             'issueDate': FieldValue.delete(),
             'updatedAt': FieldValue.serverTimestamp(),
           });
+      if (upload != null) {
+        final oldStoragePath = _documentStoragePath(
+          dspUid: dspUid,
+          plateNumber: plateNumber,
+          documentId: documentId,
+          fileName: existingDocument.fileName,
+        );
+        if (oldStoragePath.isNotEmpty &&
+            oldStoragePath != upload.storagePath) {
+          try {
+            await _storage.ref().child(oldStoragePath).delete();
+          } catch (_) {}
+        }
+      }
     } catch (e) {
       if (upload != null) {
         try {
@@ -303,6 +338,21 @@ class FleetVehicleDocumentRepository {
         } catch (_) {}
       }
       rethrow;
+    }
+  }
+
+  Future<void> _ensureUniqueActiveDocumentType({
+    required CollectionReference<Map<String, dynamic>> docsCol,
+    required String documentType,
+  }) async {
+    final requestedType = _canonicalVehicleDocumentType(documentType);
+    final snapshot = await docsCol.where('isDeleted', isEqualTo: false).get();
+    for (final doc in snapshot.docs) {
+      final existing = FleetVehicleDocument.fromDoc(doc);
+      final existingType = _canonicalVehicleDocumentType(existing.documentType);
+      if (existingType == requestedType) {
+        throw DuplicateVehicleDocumentTypeException(existing.documentType);
+      }
     }
   }
 
@@ -336,11 +386,14 @@ class FleetVehicleDocumentRepository {
 
     final ref = _storage
         .ref()
-        .child('vehicles')
-        .child(dspUid)
-        .child(normalizePlateNumber(plateNumber))
-        .child('documents')
-        .child('${documentId}_$safeFileName');
+        .child(
+          _documentStoragePath(
+            dspUid: dspUid,
+            plateNumber: plateNumber,
+            documentId: documentId,
+            fileName: safeFileName,
+          ),
+        );
 
     await ref.putData(
       fileBytes,
@@ -370,6 +423,34 @@ class FleetVehicleDocumentRepository {
     if (draft.fileType.trim().isEmpty) {
       throw const FleetVehicleDocumentException('File type is required.');
     }
+  }
+
+  String _documentStoragePath({
+    required String dspUid,
+    required String plateNumber,
+    required String documentId,
+    required String fileName,
+  }) {
+    final trimmedFileName = fileName.trim();
+    if (trimmedFileName.isEmpty) return '';
+    return 'vehicles/'
+        '$dspUid/'
+        '${normalizePlateNumber(plateNumber)}/'
+        'documents/'
+        '${documentId}_$trimmedFileName';
+  }
+
+  String _canonicalVehicleDocumentType(String documentType) {
+    final normalized = documentType.trim().toUpperCase();
+    if (normalized == 'REGISTRATION_CERTIFICATE') {
+      return 'FAHRZEUGSCHEIN';
+    }
+    if (normalized == 'TUV' ||
+        normalized == 'TUV_CERTIFICATE' ||
+        normalized == 'HU_TUV') {
+      return 'HU_TUV_CERTIFICATE';
+    }
+    return normalized;
   }
 
   String _contentTypeForFileType(String fileType, String fileName) {

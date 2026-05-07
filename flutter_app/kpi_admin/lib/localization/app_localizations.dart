@@ -11896,6 +11896,10 @@ class AppLocalizations {
     'fleet_status_vehicle_documents_file_required': 'Pick a file first.',
     'fleet_status_vehicle_documents_create_success': 'Document created.',
     'fleet_status_vehicle_documents_update_success': 'Document updated.',
+    'fleet_status_vehicle_documents_duplicate_type':
+        'A {documentType} document already exists for this vehicle. Edit the existing document instead.',
+    'fleet_status_vehicle_documents_type_locked':
+        '{documentType} cannot be changed after upload.',
     'fleet_status_vehicle_documents_save_failed':
         'Failed to save vehicle document: {error}',
     'fleet_status_vehicle_documents_delete_title': 'Delete document?',
@@ -12144,6 +12148,10 @@ class AppLocalizations {
           'Dokument erstellt.',
       'fleet_status_vehicle_documents_update_success':
           'Dokument aktualisiert.',
+      'fleet_status_vehicle_documents_duplicate_type':
+          'Ein {documentType}-Dokument existiert bereits fuer dieses Fahrzeug. Bearbeite stattdessen das vorhandene Dokument.',
+      'fleet_status_vehicle_documents_type_locked':
+          '{documentType} kann nach dem Upload nicht mehr geaendert werden.',
       'fleet_status_vehicle_documents_save_failed':
           'Fahrzeugdokument konnte nicht gespeichert werden: {error}',
       'fleet_status_vehicle_documents_delete_title': 'Dokument loeschen?',

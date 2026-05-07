@@ -2181,6 +2181,22 @@ class _VehicleDetailsPageState extends State<_VehicleDetailsPage> {
           ).t('fleet_status_vehicle_documents_update_success'),
         );
       }
+    } on DuplicateVehicleDocumentTypeException catch (e) {
+      _showSnack(
+        AppLocalizations.of(context).tf(
+          'fleet_status_vehicle_documents_duplicate_type',
+          {'documentType': _documentTypeLabel(e.documentType)},
+        ),
+        error: true,
+      );
+    } on ImmutableVehicleDocumentTypeException catch (e) {
+      _showSnack(
+        AppLocalizations.of(context).tf(
+          'fleet_status_vehicle_documents_type_locked',
+          {'documentType': _documentTypeLabel(e.documentType)},
+        ),
+        error: true,
+      );
     } on FleetVehicleDocumentException catch (e) {
       _showSnack(e.message, error: true);
     } on FirebaseException catch (e) {
@@ -3885,27 +3901,41 @@ class _VehicleDocumentDialogState extends State<_VehicleDocumentDialog> {
                   ),
                 ),
                 const SizedBox(height: 18),
-                DropdownButtonFormField<String>(
-                  value: _documentType,
-                  decoration: _documentInputDecoration(
-                    t.t('fleet_status_vehicle_documents_document_type'),
+                if (_isEditing)
+                  InputDecorator(
+                    decoration: _documentInputDecoration(
+                      t.t('fleet_status_vehicle_documents_document_type'),
+                    ),
+                    child: Text(
+                      _documentTypeLabel(_documentType),
+                      style: const TextStyle(
+                        color: _FleetStatusPageState._kText,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  )
+                else
+                  DropdownButtonFormField<String>(
+                    value: _documentType,
+                    decoration: _documentInputDecoration(
+                      t.t('fleet_status_vehicle_documents_document_type'),
+                    ),
+                    items: _documentTypeItems()
+                        .map(
+                          (type) => DropdownMenuItem<String>(
+                            value: type,
+                            child: Text(_documentTypeLabel(type)),
+                          ),
+                        )
+                        .toList(),
+                    dropdownColor: Colors.white,
+                    elevation: 8,
+                    borderRadius: BorderRadius.circular(14),
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setState(() => _documentType = value);
+                    },
                   ),
-                  items: _documentTypeItems()
-                      .map(
-                        (type) => DropdownMenuItem<String>(
-                          value: type,
-                          child: Text(_documentTypeLabel(type)),
-                        ),
-                      )
-                      .toList(),
-                  dropdownColor: Colors.white,
-                  elevation: 8,
-                  borderRadius: BorderRadius.circular(14),
-                  onChanged: (value) {
-                    if (value == null) return;
-                    setState(() => _documentType = value);
-                  },
-                ),
                 const SizedBox(height: 14),
                 TextFormField(
                   controller: _documentNumberCtrl,
