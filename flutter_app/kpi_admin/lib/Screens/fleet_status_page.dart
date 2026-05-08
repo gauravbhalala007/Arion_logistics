@@ -1177,12 +1177,14 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                         onPressed: () => _showVehicleDetails(vehicle),
                         icon: const Icon(Icons.visibility_outlined),
                       ),
-                      if (_canManageVehicles)
+                      if (_canManageVehicles) ...[
+                        const SizedBox(width: 4),
                         IconButton(
                           tooltip: t.t('button_edit'),
                           onPressed: () => _showVehicleEditor(vehicle: vehicle),
                           icon: const Icon(Icons.edit_outlined),
                         ),
+                      ],
                     ],
                   ),
                 ],
@@ -2795,6 +2797,9 @@ class _VehicleDetailsPageState extends State<_VehicleDetailsPage> {
                                                   Icons.open_in_new_outlined,
                                                 ),
                                               ),
+                                            if (event.fileUrl.trim().isNotEmpty &&
+                                                widget.canManageDocuments)
+                                              const SizedBox(width: 4),
                                             if (widget.canManageDocuments) ...[
                                               IconButton(
                                                 tooltip: t.t('button_edit'),
@@ -2806,6 +2811,7 @@ class _VehicleDetailsPageState extends State<_VehicleDetailsPage> {
                                                   Icons.edit_outlined,
                                                 ),
                                               ),
+                                              const SizedBox(width: 4),
                                               IconButton(
                                                 tooltip: t.t('button_delete'),
                                                 onPressed: () =>
@@ -3146,6 +3152,8 @@ class _VehicleDetailsPageState extends State<_VehicleDetailsPage> {
                                                 Icons.open_in_new_outlined,
                                               ),
                                             ),
+                                            if (widget.canManageDocuments)
+                                              const SizedBox(width: 4),
                                             if (widget.canManageDocuments) ...[
                                               IconButton(
                                                 tooltip: t.t('button_edit'),
@@ -3157,6 +3165,7 @@ class _VehicleDetailsPageState extends State<_VehicleDetailsPage> {
                                                   Icons.edit_outlined,
                                                 ),
                                               ),
+                                              const SizedBox(width: 4),
                                               IconButton(
                                                 tooltip: t.t('button_delete'),
                                                 onPressed: () =>

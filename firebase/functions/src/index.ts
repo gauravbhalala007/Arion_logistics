@@ -337,7 +337,7 @@ export const createDriverLogin = onCall(async (request) => {
   let userRecord: UserRecord;
 
   try {
-    // If user already exists with this email → update password.
+    // If user already exists with this email â†’ update password.
     const existingUser = await auth.getUserByEmail(loginEmail);
     userRecord = await auth.updateUser(existingUser.uid, {
       password,
@@ -374,7 +374,7 @@ export const createDriverLogin = onCall(async (request) => {
     }
   }
 
-  // Custom claims → used on frontend (AuthGate) to route drivers
+  // Custom claims â†’ used on frontend (AuthGate) to route drivers
   await auth.setCustomUserClaims(userRecord.uid, {
     role: "driver",
     dspUid,
@@ -728,7 +728,7 @@ export const confirmDriverNotification = onCall(async (request) => {
     .doc(notificationId);
 
   await db.runTransaction(async (tx) => {
-    // ✅ ALL READS FIRST
+    // âœ… ALL READS FIRST
     const driverSnap = await tx.get(driverNotifRef);
     const adminSnap = await tx.get(adminNotifRef);
 
@@ -741,7 +741,7 @@ export const confirmDriverNotification = onCall(async (request) => {
       return;
     }
 
-    // ✅ THEN WRITES
+    // âœ… THEN WRITES
     tx.set(
       driverNotifRef,
       {
@@ -1416,6 +1416,267 @@ export const cleanupResolvedFeedback = onSchedule(
     if (totalDeleted > 0) {
       logger.info(
         `cleanupResolvedFeedback: deleted ${totalDeleted} resolved feedback docs older than ${cutoff.toISOString()}`,
+      );
+    }
+  },
+);
+
+const VEHICLE_PURGE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+const VEHICLE_PURGE_VEHICLE_LIMIT = 50;
+const VEHICLE_PURGE_SUBCOLLECTION_LIMIT = 200;
+const VEHICLE_PURGE_MAX_ROUNDS = 8;
+
+type StorageBucketLike = {
+  file: (path: string) => {
+    delete: (options?: {ignoreNotFound?: boolean}) => Promise<unknown>;
+  };
+};
+
+/**
+ * Normalizes plate numbers to match the app's Storage path convention.
+ * @param {string} plateNumber
+ * @return {string}
+ */
+function normalizeVehiclePlateNumberForStorage(plateNumber: string): string {
+  return plateNumber.trim().toUpperCase();
+}
+
+/**
+ * Builds the Storage path for a vehicle document attachment.
+ * @param {{
+ *   dspUid: string,
+ *   plateNumber: string,
+ *   documentId: string,
+ *   fileName: string,
+ * }} params
+ * @return {string}
+ */
+function vehicleDocumentStoragePath({
+  dspUid,
+  plateNumber,
+  documentId,
+  fileName,
+}: {
+  dspUid: string;
+  plateNumber: string;
+  documentId: string;
+  fileName: string;
+}): string {
+  const trimmedFileName = fileName.trim();
+  if (!trimmedFileName) return "";
+  return "vehicles/" +
+    `${dspUid}/` +
+    `${normalizeVehiclePlateNumberForStorage(plateNumber)}/` +
+    "documents/" +
+    `${documentId}_${trimmedFileName}`;
+}
+
+/**
+ * Builds the Storage path for a vehicle event attachment.
+ * @param {{
+ *   dspUid: string,
+ *   plateNumber: string,
+ *   eventId: string,
+ *   fileName: string,
+ * }} params
+ * @return {string}
+ */
+function vehicleEventStoragePath({
+  dspUid,
+  plateNumber,
+  eventId,
+  fileName,
+}: {
+  dspUid: string;
+  plateNumber: string;
+  eventId: string;
+  fileName: string;
+}): string {
+  const trimmedFileName = fileName.trim();
+  if (!trimmedFileName) return "";
+  return "vehicles/" +
+    `${dspUid}/` +
+    `${normalizeVehiclePlateNumberForStorage(plateNumber)}/` +
+    "events/" +
+    `${eventId}_${trimmedFileName}`;
+}
+
+/**
+ * Deletes a vehicle subcollection in chunks and removes any linked storage files.
+ * @param {Object} params
+ * @return {Promise<Object>}
+ */
+async function deleteVehicleSubcollectionWithStorage({
+  collectionRef,
+  bucket,
+  storagePathForDoc,
+  warningPrefix,
+}: {
+  collectionRef: FirebaseFirestore.CollectionReference;
+  bucket: StorageBucketLike;
+  storagePathForDoc: (docId: string, fileName: string) => string;
+  warningPrefix: string;
+}): Promise<{deletedDocs: number; storageDeleteFailures: number}> {
+  let deletedDocs = 0;
+  let storageDeleteFailures = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const snap = await collectionRef.limit(VEHICLE_PURGE_SUBCOLLECTION_LIMIT).get();
+    if (snap.empty) {
+      hasMore = false;
+      continue;
+    }
+
+    const batch = db.batch();
+    const deletes: Promise<unknown>[] = [];
+
+    for (const doc of snap.docs) {
+      const data = doc.data() as Record<string, unknown>;
+      const fileName = (data.fileName ?? "").toString().trim();
+      if (fileName) {
+        const storagePath = storagePathForDoc(doc.id, fileName);
+        if (storagePath) {
+          deletes.push(
+            bucket.file(storagePath).delete({ignoreNotFound: true}).catch((err) => {
+              storageDeleteFailures += 1;
+              logger.warn(`${warningPrefix}: failed to delete storage file ${storagePath}`, err);
+            }),
+          );
+        }
+      }
+
+      batch.delete(doc.ref);
+    }
+
+    await batch.commit();
+    await Promise.all(deletes);
+    deletedDocs += snap.size;
+  }
+
+  return {deletedDocs, storageDeleteFailures};
+}
+
+/**
+ * Permanently purges one soft-deleted vehicle and its nested data.
+ * @param {Object} params
+ * @return {Promise<Object>}
+ */
+async function purgeSoftDeletedVehicle({
+  vehicleDoc,
+  bucket,
+}: {
+  vehicleDoc: FirebaseFirestore.QueryDocumentSnapshot;
+  bucket: StorageBucketLike;
+}): Promise<{documentsDeleted: number; eventsDeleted: number; storageDeleteFailures: number}> {
+  const vehicleRef = vehicleDoc.ref;
+  const dspDoc = vehicleRef.parent.parent;
+  const dspUid = dspDoc?.id.trim() ?? "";
+  const plateNumber = vehicleRef.id.trim();
+
+  if (!dspUid || !plateNumber) {
+    logger.warn(`purgeSoftDeletedVehicles: skipping malformed vehicle path ${vehicleRef.path}`);
+    return {
+      documentsDeleted: 0,
+      eventsDeleted: 0,
+      storageDeleteFailures: 0,
+    };
+  }
+
+  const documentsResult = await deleteVehicleSubcollectionWithStorage({
+    collectionRef: vehicleRef.collection("documents"),
+    bucket,
+    storagePathForDoc: (documentId, fileName) => vehicleDocumentStoragePath({
+      dspUid,
+      plateNumber,
+      documentId,
+      fileName,
+    }),
+    warningPrefix: "purgeSoftDeletedVehicles",
+  });
+
+  const eventsResult = await deleteVehicleSubcollectionWithStorage({
+    collectionRef: vehicleRef.collection("events"),
+    bucket,
+    storagePathForDoc: (eventId, fileName) => vehicleEventStoragePath({
+      dspUid,
+      plateNumber,
+      eventId,
+      fileName,
+    }),
+    warningPrefix: "purgeSoftDeletedVehicles",
+  });
+
+  await vehicleRef.delete();
+
+  return {
+    documentsDeleted: documentsResult.deletedDocs,
+    eventsDeleted: eventsResult.deletedDocs,
+    storageDeleteFailures:
+      documentsResult.storageDeleteFailures + eventsResult.storageDeleteFailures,
+  };
+}
+
+/**
+ * Scheduled job: permanently delete soft-deleted vehicles older than 7 days.
+ * Also attempts to delete nested document/event attachments from Storage.
+ */
+export const purgeSoftDeletedVehicles = onSchedule(
+  {
+    schedule: "every sunday 03:10",
+    region: "us-central1",
+    timeZone: "Europe/Berlin",
+    memory: "256MiB",
+  },
+  async () => {
+    const cutoff = new Date(Date.now() - VEHICLE_PURGE_RETENTION_MS);
+    const bucket = getStorage().bucket();
+
+    let totalVehiclesDeleted = 0;
+    let totalDocumentsDeleted = 0;
+    let totalEventsDeleted = 0;
+    let totalStorageDeleteFailures = 0;
+
+    for (let round = 0; round < VEHICLE_PURGE_MAX_ROUNDS; round += 1) {
+      const snap = await db
+        .collectionGroup("vehicles")
+        .where("isDeleted", "==", true)
+        .where("updatedAt", "<=", cutoff)
+        .orderBy("updatedAt", "asc")
+        .limit(VEHICLE_PURGE_VEHICLE_LIMIT)
+        .get();
+
+      if (snap.empty) break;
+
+      for (const vehicleDoc of snap.docs) {
+        try {
+          const result = await purgeSoftDeletedVehicle({
+            vehicleDoc,
+            bucket,
+          });
+          totalVehiclesDeleted += 1;
+          totalDocumentsDeleted += result.documentsDeleted;
+          totalEventsDeleted += result.eventsDeleted;
+          totalStorageDeleteFailures += result.storageDeleteFailures;
+        } catch (err) {
+          logger.error(
+            `purgeSoftDeletedVehicles: failed to purge vehicle ${vehicleDoc.ref.path}`,
+            err,
+          );
+        }
+      }
+    }
+
+    if (
+      totalVehiclesDeleted > 0 ||
+      totalDocumentsDeleted > 0 ||
+      totalEventsDeleted > 0 ||
+      totalStorageDeleteFailures > 0
+    ) {
+      logger.info(
+        `purgeSoftDeletedVehicles: deleted ${totalVehiclesDeleted} vehicles, ` +
+          `${totalDocumentsDeleted} vehicle documents, ${totalEventsDeleted} vehicle events ` +
+          `older than ${cutoff.toISOString()}; storage delete failures=${totalStorageDeleteFailures}`,
       );
     }
   },
