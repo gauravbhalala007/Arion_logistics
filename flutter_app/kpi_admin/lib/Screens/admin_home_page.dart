@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -6,6 +6,10 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../localization/app_localizations.dart';
+import '../models/fleet_vehicle.dart';
+import '../models/fleet_vehicle_document.dart';
+import '../services/fleet_vehicle_document_service.dart';
+import '../services/fleet_vehicle_repository.dart';
 import '../utils/driver_activity.dart';
 
 class AdminHomePage extends StatefulWidget {
@@ -39,7 +43,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
     required int targetCount,
   }) async {
     final t = AppLocalizations.of(context);
-    // ✅ Load notification details (title/body) once for the popup header
+    // âœ… Load notification details (title/body) once for the popup header
     final notifDoc = await FirebaseFirestore.instance
         .collection('users')
         .doc(dspUid)
@@ -688,7 +692,7 @@ class _ScorecardCardState extends State<_ScorecardCard> {
           if (uid == null) {
             return _ScorecardShellLive(
               scale: scale,
-              companyScore: '—',
+              companyScore: '-',
               dropdownItems: [t.t('admin_home_last_week')],
               dropdownValue: t.t('admin_home_last_week'),
               onDropdownChanged: (_) {},
@@ -701,7 +705,7 @@ class _ScorecardCardState extends State<_ScorecardCard> {
           if (reportSnap.connectionState == ConnectionState.waiting) {
             return _ScorecardShellLive(
               scale: scale,
-              companyScore: '—',
+              companyScore: '-',
               dropdownItems: [t.t('admin_home_last_week')],
               dropdownValue: t.t('admin_home_last_week'),
               onDropdownChanged: (_) {},
@@ -714,7 +718,7 @@ class _ScorecardCardState extends State<_ScorecardCard> {
           if (reportSnap.hasError) {
             return _ScorecardShellLive(
               scale: scale,
-              companyScore: '—',
+              companyScore: '-',
               dropdownItems: [t.t('admin_home_last_week')],
               dropdownValue: t.t('admin_home_last_week'),
               onDropdownChanged: (_) {},
@@ -736,7 +740,7 @@ class _ScorecardCardState extends State<_ScorecardCard> {
           if (reportDocs.isEmpty) {
             return _ScorecardShellLive(
               scale: scale,
-              companyScore: '—',
+              companyScore: '-',
               dropdownItems: [t.t('admin_home_last_week')],
               dropdownValue: t.t('admin_home_last_week'),
               onDropdownChanged: (_) {},
@@ -896,7 +900,7 @@ class _ScorecardCardState extends State<_ScorecardCard> {
               ? (companySum / companyCount)
               : 0.0;
           final companyScoreStr = companyScore <= 0
-              ? '—'
+              ? '-'
               : _fmtScore(companyScore);
 
           final isWeekView = _selectedKey.startsWith('W|');
@@ -1048,7 +1052,7 @@ _BestWorstResult _computeBestWorst(
   Map<String, String> nameMap, {
   required double Function(Map<String, dynamic>) scoreFromDoc,
   bool aggregateAveragePerDriver = false,
-  String fallbackName = '—',
+  String fallbackName = '-',
 }) {
   if (!aggregateAveragePerDriver) {
     final entries = <_ScoreEntry>[];
@@ -1363,7 +1367,7 @@ class _MiniRankingLive extends StatelessWidget {
                 SizedBox(width: _r(10, scale)),
                 Expanded(
                   child: Text(
-                    entry?.name ?? '—',
+                    entry?.name ?? '-',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -1373,7 +1377,7 @@ class _MiniRankingLive extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  entry == null ? '—' : _fmt(entry.score),
+                  entry == null ? '-' : _fmt(entry.score),
                   style: TextStyle(
                     fontWeight: FontWeight.w900,
                     fontSize: _r(12, scale),
@@ -2034,7 +2038,7 @@ class _NotificationHistoryTileLive extends StatelessWidget {
                 ),
               SizedBox(height: _r(8, scale)),
               Text(
-                body.isEmpty ? '—' : body,
+                body.isEmpty ? '-' : body,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -2112,24 +2116,19 @@ class _FleetHubCard extends StatefulWidget {
 }
 
 class _FleetHubCardState extends State<_FleetHubCard> {
-  static const List<String> _requiredDocumentTypes = <String>[
-    'tuv',
-    'insurance',
-    'service',
-    'rc',
-  ];
+  final FleetVehicleRepository _vehicleRepository = FleetVehicleRepository();
+  final FleetVehicleDocumentService _documentService =
+      FleetVehicleDocumentService();
 
-  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _vehicleSubscription;
-  final Map<String, StreamSubscription<QuerySnapshot<Map<String, dynamic>>>>
-  _documentSubscriptions =
-      <String, StreamSubscription<QuerySnapshot<Map<String, dynamic>>>>{};
-  final Map<String, _FleetDashboardVehicle> _vehicles =
-      <String, _FleetDashboardVehicle>{};
-  final Map<String, List<_FleetDashboardDocument>> _documentsByVehicleId =
-      <String, List<_FleetDashboardDocument>>{};
-  final Set<String> _readyDocumentVehicleIds = <String>{};
+  StreamSubscription<List<FleetVehicle>>? _vehicleSubscription;
+  StreamSubscription<List<FleetVehicleDocument>>? _documentSubscription;
+
+  List<FleetVehicle> _vehicles = const <FleetVehicle>[];
+  List<FleetVehicleDocument> _documents = const <FleetVehicleDocument>[];
 
   bool _loading = true;
+  bool _vehiclesReady = false;
+  bool _documentsReady = false;
   Object? _loadError;
 
   @override
@@ -2141,9 +2140,7 @@ class _FleetHubCardState extends State<_FleetHubCard> {
   @override
   void dispose() {
     _vehicleSubscription?.cancel();
-    for (final subscription in _documentSubscriptions.values) {
-      subscription.cancel();
-    }
+    _documentSubscription?.cancel();
     super.dispose();
   }
 
@@ -2175,82 +2172,53 @@ class _FleetHubCardState extends State<_FleetHubCard> {
 
   void _listenToVehicles(String fleetScope) {
     _vehicleSubscription?.cancel();
-    for (final subscription in _documentSubscriptions.values) {
-      subscription.cancel();
+    _documentSubscription?.cancel();
+
+    if (mounted) {
+      setState(() {
+        _vehicles = const <FleetVehicle>[];
+        _documents = const <FleetVehicleDocument>[];
+        _vehiclesReady = false;
+        _documentsReady = false;
+        _loading = true;
+        _loadError = null;
+      });
     }
-    _documentSubscriptions.clear();
-    _vehicles.clear();
-    _documentsByVehicleId.clear();
-    _readyDocumentVehicleIds.clear();
 
-    _vehicleSubscription = FirebaseFirestore.instance
-        .collection('users')
-        .doc(fleetScope)
-        .collection('vehicles')
-        .snapshots()
+    _vehicleSubscription = _vehicleRepository.watchVehicles(dspUid: fleetScope)
         .listen(
-          (snapshot) {
-            final nextVehicles = <String, _FleetDashboardVehicle>{
-              for (final doc in snapshot.docs)
-                doc.id: _FleetDashboardVehicle.fromDoc(doc),
-            };
-
-            final removedVehicleIds = _vehicles.keys
-                .where((vehicleId) => !nextVehicles.containsKey(vehicleId))
-                .toList(growable: false);
-            for (final vehicleId in removedVehicleIds) {
-              _documentSubscriptions.remove(vehicleId)?.cancel();
-              _documentsByVehicleId.remove(vehicleId);
-              _readyDocumentVehicleIds.remove(vehicleId);
-            }
-
-            _vehicles
-              ..clear()
-              ..addAll(nextVehicles);
-
-            for (final entry in nextVehicles.entries) {
-              if (_documentSubscriptions.containsKey(entry.key)) continue;
-              _documentSubscriptions[entry.key] = FirebaseFirestore.instance
-                  .collection('users')
-                  .doc(fleetScope)
-                  .collection('vehicles')
-                  .doc(entry.key)
-                  .collection('documents')
-                  .snapshots()
-                  .listen(
-                    (documentsSnapshot) {
-                      _documentsByVehicleId[entry.key] = documentsSnapshot.docs
-                          .map(_FleetDashboardDocument.fromDoc)
-                          .toList(growable: false);
-                      _readyDocumentVehicleIds.add(entry.key);
-                      if (!mounted) return;
-                      setState(() {
-                        _loading =
-                            _readyDocumentVehicleIds.length < _vehicles.length;
-                      });
-                    },
-                    onError: (error) {
-                      if (!mounted) return;
-                      setState(() {
-                        _readyDocumentVehicleIds.add(entry.key);
-                        _loading =
-                            _readyDocumentVehicleIds.length < _vehicles.length;
-                        _loadError = error;
-                      });
-                    },
-                  );
-            }
-
+          (vehicles) {
             if (!mounted) return;
             setState(() {
-              _loading = nextVehicles.isNotEmpty &&
-                  _readyDocumentVehicleIds.length < nextVehicles.length;
-              _loadError = null;
+              _vehicles = vehicles;
+              _vehiclesReady = true;
+              _loading = !(_vehiclesReady && _documentsReady);
             });
           },
           onError: (error) {
             if (!mounted) return;
             setState(() {
+              _vehiclesReady = true;
+              _loading = false;
+              _loadError = error;
+            });
+          },
+        );
+
+    _documentSubscription = _documentService.watchScopeDocuments(dspUid: fleetScope)
+        .listen(
+          (documents) {
+            if (!mounted) return;
+            setState(() {
+              _documents = documents;
+              _documentsReady = true;
+              _loading = !(_vehiclesReady && _documentsReady);
+            });
+          },
+          onError: (error) {
+            if (!mounted) return;
+            setState(() {
+              _documentsReady = true;
               _loading = false;
               _loadError = error;
             });
@@ -2258,97 +2226,80 @@ class _FleetHubCardState extends State<_FleetHubCard> {
         );
   }
 
-  int _compareDocumentRecency(
-    _FleetDashboardDocument a,
-    _FleetDashboardDocument b,
-  ) {
-    final aTime = a.uploadedAt;
-    final bTime = b.uploadedAt;
-    if (aTime != null && bTime != null) {
-      return aTime.compareTo(bTime);
+  String _friendlyLoadError(AppLocalizations t, Object? error) {
+    if (error is FirebaseException && error.code == 'permission-denied') {
+      return t.t('fleet_status_permission_denied');
     }
-    if (aTime != null) return 1;
-    if (bTime != null) return -1;
-    return a.id.compareTo(b.id);
-  }
-
-  List<_FleetComplianceItem> _buildComplianceItems() {
-    final items = <_FleetComplianceItem>[];
-
-    for (final vehicle in _vehicles.values) {
-      final latestByType = <String, _FleetDashboardDocument>{};
-      final documents =
-          _documentsByVehicleId[vehicle.id] ?? const <_FleetDashboardDocument>[];
-
-      for (final document in documents) {
-        final type = document.type.trim().toLowerCase();
-        if (!_requiredDocumentTypes.contains(type)) continue;
-        final current = latestByType[type];
-        if (current == null ||
-            _compareDocumentRecency(document, current) > 0) {
-          latestByType[type] = document;
-        }
-      }
-
-      for (final type in _requiredDocumentTypes) {
-        items.add(
-          _FleetComplianceItem.fromVehicleDocument(
-            vehicleNumber: vehicle.vehicleNumber,
-            type: type,
-            document: latestByType[type],
-          ),
-        );
-      }
-    }
-
-    items.sort((a, b) {
-      final priorityComparison = a.priority.compareTo(b.priority);
-      if (priorityComparison != 0) return priorityComparison;
-
-      final aDate = a.sortDate;
-      final bDate = b.sortDate;
-      if (aDate != null && bDate != null) {
-        final dateComparison = aDate.compareTo(bDate);
-        if (dateComparison != 0) return dateComparison;
-      } else if (aDate != null) {
-        return -1;
-      } else if (bDate != null) {
-        return 1;
-      }
-
-      final vehicleComparison = a.vehicleNumber.compareTo(b.vehicleNumber);
-      if (vehicleComparison != 0) return vehicleComparison;
-      return a.type.compareTo(b.type);
-    });
-
-    return items.take(6).toList(growable: false);
-  }
-
-  String _expiryText(BuildContext context, _FleetComplianceItem item) {
-    final t = AppLocalizations.of(context);
-    if (item.state == _FleetComplianceState.missing) {
-      return t.t('fleet_status_vehicle_details_missing');
-    }
-    if (item.state == _FleetComplianceState.noExpiry) {
-      return t.t('fleet_status_vehicle_details_not_set');
-    }
-    final expiryDate = item.expiryDate;
-    if (expiryDate == null) {
-      return t.t('fleet_status_vehicle_details_not_set');
-    }
-    return MaterialLocalizations.of(context).formatShortDate(expiryDate);
+    return t.tf('admin_home_error_generic', {'error': '$error'});
   }
 
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final scale = widget.scale;
+    final complianceByPlate = _buildAdminHomeFleetComplianceByPlate(
+      _documents,
+      _documentService,
+    );
     final total = _vehicles.length;
-    final active = _vehicles.values
-        .where((vehicle) => vehicle.status.trim().toLowerCase() == 'active')
+    final active = _vehicles
+        .where((vehicle) => vehicle.status == VehicleStatus.active)
         .length;
     final inactive = total - active;
-    final items = _buildComplianceItems();
+
+    final headerItems = <_FleetSummaryMetric>[
+      _FleetSummaryMetric(
+        label: t.t('admin_home_total'),
+        value: '$total',
+        color: AdminHomePage._kText,
+      ),
+      _FleetSummaryMetric(
+        label: t.t('admin_home_active'),
+        value: '$active',
+        color: AdminHomePage._kGreen,
+      ),
+      _FleetSummaryMetric(
+        label: t.t('admin_home_inactive'),
+        value: '$inactive',
+        color: AdminHomePage._kOrange,
+      ),
+    ];
+
+    final serviceItems = _vehicles
+        .where((vehicle) => vehicle.status == VehicleStatus.inService)
+        .map(
+          (vehicle) => _FleetSummaryListItem(
+            plateNumber: vehicle.plateNumber,
+            valueText: _formatAdminHomeFleetStoredDate(
+              context,
+              vehicle.serviceEndDate,
+            ),
+            valueColor: AdminHomePage._kOrange,
+            sortOrder: 0,
+            sortDate: _tryParseAdminHomeFleetStoredDate(vehicle.serviceEndDate),
+          ),
+        )
+        .toList(growable: false)
+      ..sort(_compareFleetSummaryListItems);
+
+    final tuvItems = _vehicles
+        .map((vehicle) {
+          final summary =
+              complianceByPlate[normalizePlateNumber(vehicle.plateNumber)];
+          final presentation = _adminHomeTuvPresentation(
+            context,
+            summary?.tuvStatus ?? FleetVehicleDocumentStatus.missing,
+          );
+          return _FleetSummaryListItem(
+            plateNumber: vehicle.plateNumber,
+            valueText: presentation.label,
+            valueColor: presentation.color,
+            sortOrder: presentation.sortOrder,
+            sortDate: _tryParseAdminHomeFleetStoredDate(summary?.tuvExpiryDate),
+          );
+        })
+        .toList(growable: false)
+      ..sort(_compareFleetSummaryListItems);
 
     Widget content = Container(
       width: double.infinity,
@@ -2370,10 +2321,10 @@ class _FleetHubCardState extends State<_FleetHubCard> {
                 ),
               ),
             )
-          : _loadError != null || items.isEmpty
+          : _loadError != null
           ? Center(
               child: Text(
-                t.t('admin_home_no_items'),
+                _friendlyLoadError(t, _loadError),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: _r(14, scale),
@@ -2382,11 +2333,13 @@ class _FleetHubCardState extends State<_FleetHubCard> {
                 ),
               ),
             )
-          : _FleetComplianceList(
-              scale: scale,
-              adaptiveHeight: widget.adaptiveHeight,
-              items: items,
-              expiryTextBuilder: (item) => _expiryText(context, item),
+          : SingleChildScrollView(
+              child: _FleetSummaryContent(
+                scale: scale,
+                serviceItems: serviceItems,
+                tuvItems: tuvItems,
+                emptyHint: total == 0 ? t.t('admin_home_no_items') : null,
+              ),
             ),
     );
 
@@ -2399,46 +2352,49 @@ class _FleetHubCardState extends State<_FleetHubCard> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Row(
+                child: Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  runSpacing: _r(10, scale),
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Icon(
-                      Icons.directions_car_filled_outlined,
-                      color: AdminHomePage._kGreen,
-                      size: _r(22, scale),
-                    ),
-                    SizedBox(width: _r(10, scale)),
-                    Flexible(
-                      child: Text(
-                        t.t('admin_home_fleet_hub'),
-                        style: TextStyle(
-                          fontSize: _r(20, scale),
-                          fontWeight: FontWeight.w900,
-                          color: AdminHomePage._kText,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.directions_car_filled_outlined,
+                          color: AdminHomePage._kGreen,
+                          size: _r(22, scale),
                         ),
-                      ),
+                        SizedBox(width: _r(10, scale)),
+                        Text(
+                          t.t('admin_home_fleet_hub'),
+                          style: TextStyle(
+                            fontSize: _r(20, scale),
+                            fontWeight: FontWeight.w900,
+                            color: AdminHomePage._kText,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Wrap(
+                      spacing: _r(18, scale),
+                      runSpacing: _r(6, scale),
+                      alignment: WrapAlignment.end,
+                      children: headerItems
+                          .map(
+                            (item) => _FleetHeaderMetric(
+                              scale: scale,
+                              item: item,
+                            ),
+                          )
+                          .toList(growable: false),
                     ),
                   ],
                 ),
               ),
-              SizedBox(width: _r(12, scale)),
-              _FleetStats(
-                scale: scale,
-                total: total,
-                active: active,
-                inactive: inactive,
-              ),
             ],
           ),
           SizedBox(height: _r(16, scale)),
-          Text(
-            t.t('admin_home_service'),
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: _r(13, scale),
-              color: AdminHomePage._kText,
-            ),
-          ),
-          SizedBox(height: _r(10, scale)),
           if (widget.adaptiveHeight) content else Expanded(child: content),
         ],
       ),
@@ -2446,186 +2402,120 @@ class _FleetHubCardState extends State<_FleetHubCard> {
   }
 }
 
-class _FleetStats extends StatelessWidget {
-  final double scale;
-  final int total;
-  final int active;
-  final int inactive;
-
-  const _FleetStats({
-    required this.scale,
-    required this.total,
-    required this.active,
-    required this.inactive,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final t = AppLocalizations.of(context);
-    return Wrap(
-      spacing: _r(14, scale),
-      runSpacing: _r(6, scale),
-      alignment: WrapAlignment.end,
-      children: [
-        _MiniStat(
-          scale: scale,
-          label: t.t('admin_home_total'),
-          value: '$total',
-          color: AdminHomePage._kText,
-        ),
-        _MiniStat(
-          scale: scale,
-          label: t.t('admin_home_active'),
-          value: '$active',
-          color: AdminHomePage._kGreen,
-        ),
-        _MiniStat(
-          scale: scale,
-          label: t.t('admin_home_inactive'),
-          value: '$inactive',
-          color: AdminHomePage._kOrange,
-        ),
-      ],
-    );
-  }
-}
-
-class _MiniStat extends StatelessWidget {
-  final double scale;
-  final String label;
-  final String value;
-  final Color color;
-
-  const _MiniStat({
-    required this.scale,
+class _FleetSummaryMetric {
+  const _FleetSummaryMetric({
     required this.label,
     required this.value,
     required this.color,
   });
 
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: AdminHomePage._kMuted,
-            fontSize: _r(12, scale),
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        SizedBox(width: _r(6, scale)),
-        Text(
-          value,
-          style: TextStyle(
-            fontWeight: FontWeight.w900,
-            color: color,
-            fontSize: _r(12, scale),
-          ),
-        ),
-      ],
-    );
-  }
+  final String label;
+  final String value;
+  final Color color;
 }
 
-class _FleetComplianceList extends StatelessWidget {
-  final double scale;
-  final bool adaptiveHeight;
-  final List<_FleetComplianceItem> items;
-  final String Function(_FleetComplianceItem item) expiryTextBuilder;
-
-  const _FleetComplianceList({
+class _FleetSummaryContent extends StatelessWidget {
+  const _FleetSummaryContent({
     required this.scale,
-    required this.adaptiveHeight,
-    required this.items,
-    required this.expiryTextBuilder,
+    required this.serviceItems,
+    required this.tuvItems,
+    this.emptyHint,
   });
+
+  final double scale;
+  final List<_FleetSummaryListItem> serviceItems;
+  final List<_FleetSummaryListItem> tuvItems;
+  final String? emptyHint;
 
   @override
   Widget build(BuildContext context) {
-    if (adaptiveHeight) {
-      return Column(
-        children: items
-            .map(
-              (item) => Padding(
-                padding: EdgeInsets.only(bottom: _r(10, scale)),
-                child: _FleetComplianceTile(
-                  scale: scale,
-                  item: item,
-                  expiryText: expiryTextBuilder(item),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= 760;
+        final serviceSection = _FleetSummarySection(
+          scale: scale,
+          title: AppLocalizations.of(context).t('admin_home_service'),
+          items: serviceItems,
+        );
+        final tuvSection = _FleetSummarySection(
+          scale: scale,
+          title: 'TUV',
+          items: tuvItems,
+        );
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isWide)
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: serviceSection),
+                    Container(
+                      width: 1,
+                      margin: EdgeInsets.symmetric(horizontal: _r(18, scale)),
+                      color: const Color(0xFFE5E7EB),
+                    ),
+                    Expanded(child: tuvSection),
+                  ],
+                ),
+              )
+            else
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  serviceSection,
+                  SizedBox(height: _r(14, scale)),
+                  tuvSection,
+                ],
+              ),
+            if (emptyHint != null) ...[
+              SizedBox(height: _r(14, scale)),
+              Text(
+                emptyHint!,
+                style: TextStyle(
+                  fontSize: _r(12, scale),
+                  fontWeight: FontWeight.w700,
+                  color: AdminHomePage._kMuted,
                 ),
               ),
-            )
-            .toList(growable: false),
-      );
-    }
-
-    return ListView.separated(
-      primary: false,
-      itemCount: items.length,
-      separatorBuilder: (_, __) => SizedBox(height: _r(10, scale)),
-      itemBuilder: (_, index) => _FleetComplianceTile(
-        scale: scale,
-        item: items[index],
-        expiryText: expiryTextBuilder(items[index]),
-      ),
+            ],
+          ],
+        );
+      },
     );
   }
 }
 
-class _FleetComplianceTile extends StatelessWidget {
-  final double scale;
-  final _FleetComplianceItem item;
-  final String expiryText;
-
-  const _FleetComplianceTile({
+class _FleetHeaderMetric extends StatelessWidget {
+  const _FleetHeaderMetric({
     required this.scale,
     required this.item,
-    required this.expiryText,
   });
+
+  final double scale;
+  final _FleetSummaryMetric item;
 
   @override
   Widget build(BuildContext context) {
-    final expiryColor = item.state == _FleetComplianceState.expired
-        ? const Color(0xFFDC2626)
-        : item.state == _FleetComplianceState.upcoming
-        ? AdminHomePage._kOrange
-        : AdminHomePage._kMuted;
-
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: _r(12, scale),
-        vertical: _r(10, scale),
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(_r(12, scale)),
-        border: Border.all(color: const Color(0xFFEDEFF3)),
-      ),
-      child: Row(
+    return RichText(
+      text: TextSpan(
+        style: TextStyle(
+          fontSize: _r(13, scale),
+          color: AdminHomePage._kText,
+        ),
         children: [
-          Expanded(
-            child: Text(
-              item.vehicleNumber,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: _r(12, scale),
-                color: AdminHomePage._kText,
-              ),
-            ),
+          TextSpan(
+            text: '${item.label} ',
+            style: const TextStyle(fontWeight: FontWeight.w500),
           ),
-          _FleetDocumentTypeTag(scale: scale, type: item.type),
-          SizedBox(width: _r(10, scale)),
-          Text(
-            expiryText,
+          TextSpan(
+            text: item.value,
             style: TextStyle(
-              fontSize: _r(12, scale),
               fontWeight: FontWeight.w900,
-              color: expiryColor,
+              color: item.color,
             ),
           ),
         ],
@@ -2634,214 +2524,20 @@ class _FleetComplianceTile extends StatelessWidget {
   }
 }
 
-class _FleetDocumentTypeTag extends StatelessWidget {
-  final double scale;
-  final String type;
-
-  const _FleetDocumentTypeTag({required this.scale, required this.type});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = type == 'service'
-        ? AdminHomePage._kOrange
-        : type == 'insurance'
-        ? const Color(0xFF2563EB)
-        : type == 'rc'
-        ? const Color(0xFF7C3AED)
-        : AdminHomePage._kGreen;
-
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: _r(10, scale),
-        vertical: _r(4, scale),
-      ),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.14),
-        borderRadius: BorderRadius.circular(_r(999, scale)),
-        border: Border.all(color: color.withOpacity(0.30)),
-      ),
-      child: Text(
-        _fleetDocumentTypeLabel(context, type),
-        style: TextStyle(
-          fontSize: _r(10, scale),
-          fontWeight: FontWeight.w900,
-          color: color,
-          letterSpacing: 0.2,
-        ),
-      ),
-    );
-  }
-}
-
-class _FleetDashboardVehicle {
-  const _FleetDashboardVehicle({
-    required this.id,
-    required this.vehicleNumber,
-    required this.status,
-  });
-
-  final String id;
-  final String vehicleNumber;
-  final String status;
-
-  factory _FleetDashboardVehicle.fromDoc(
-    QueryDocumentSnapshot<Map<String, dynamic>> doc,
-  ) {
-    final data = doc.data();
-    return _FleetDashboardVehicle(
-      id: doc.id,
-      vehicleNumber: (data['vehicleNumber'] ?? doc.id).toString(),
-      status: (data['status'] ?? 'active').toString(),
-    );
-  }
-}
-
-class _FleetDashboardDocument {
-  const _FleetDashboardDocument({
-    required this.id,
-    required this.type,
-    required this.expiryDate,
-    required this.uploadedAt,
-  });
-
-  final String id;
-  final String type;
-  final DateTime? expiryDate;
-  final DateTime? uploadedAt;
-
-  factory _FleetDashboardDocument.fromDoc(
-    QueryDocumentSnapshot<Map<String, dynamic>> doc,
-  ) {
-    final data = doc.data();
-    return _FleetDashboardDocument(
-      id: doc.id,
-      type: (data['type'] ?? '').toString(),
-      expiryDate: _fleetDashboardDateValue(data['expiryDate']),
-      uploadedAt: _fleetDashboardDateValue(data['uploadedAt']),
-    );
-  }
-}
-
-DateTime? _fleetDashboardDateValue(dynamic value) {
-  if (value is Timestamp) return value.toDate();
-  if (value is DateTime) return value;
-  if (value is String) {
-    final parsed = DateTime.tryParse(value.trim());
-    return parsed == null
-        ? null
-        : DateTime(parsed.year, parsed.month, parsed.day);
-  }
-  return null;
-}
-
-enum _FleetComplianceState { missing, expired, noExpiry, upcoming }
-
-class _FleetComplianceItem {
-  const _FleetComplianceItem({
-    required this.vehicleNumber,
-    required this.type,
-    required this.state,
-    required this.expiryDate,
-  });
-
-  final String vehicleNumber;
-  final String type;
-  final _FleetComplianceState state;
-  final DateTime? expiryDate;
-
-  int get priority {
-    switch (state) {
-      case _FleetComplianceState.missing:
-        return 0;
-      case _FleetComplianceState.expired:
-        return 1;
-      case _FleetComplianceState.noExpiry:
-        return 2;
-      case _FleetComplianceState.upcoming:
-        return 3;
-    }
-  }
-
-  DateTime? get sortDate {
-    if (state == _FleetComplianceState.expired ||
-        state == _FleetComplianceState.upcoming) {
-      return expiryDate;
-    }
-    return null;
-  }
-
-  factory _FleetComplianceItem.fromVehicleDocument({
-    required String vehicleNumber,
-    required String type,
-    required _FleetDashboardDocument? document,
-  }) {
-    if (document == null) {
-      return _FleetComplianceItem(
-        vehicleNumber: vehicleNumber,
-        type: type,
-        state: _FleetComplianceState.missing,
-        expiryDate: null,
-      );
-    }
-
-    final expiryDate = document.expiryDate;
-    if (expiryDate == null) {
-      return _FleetComplianceItem(
-        vehicleNumber: vehicleNumber,
-        type: type,
-        state: _FleetComplianceState.noExpiry,
-        expiryDate: null,
-      );
-    }
-
-    return _FleetComplianceItem(
-      vehicleNumber: vehicleNumber,
-      type: type,
-      state: _isFleetExpiryDateExpired(expiryDate)
-          ? _FleetComplianceState.expired
-          : _FleetComplianceState.upcoming,
-      expiryDate: expiryDate,
-    );
-  }
-}
-
-String _fleetDocumentTypeLabel(BuildContext context, String type) {
-  final t = AppLocalizations.of(context);
-  switch (type) {
-    case 'tuv':
-      return t.t('fleet_status_vehicle_document_type_tuv');
-    case 'insurance':
-      return t.t('fleet_status_vehicle_document_type_insurance');
-    case 'service':
-      return t.t('fleet_status_vehicle_document_type_service');
-    case 'rc':
-      return t.t('fleet_status_vehicle_document_type_rc');
-    default:
-      return type;
-  }
-}
-
-bool _isFleetExpiryDateExpired(DateTime date) {
-  final normalizedDate = DateTime(date.year, date.month, date.day);
-  final now = DateTime.now();
-  final today = DateTime(now.year, now.month, now.day);
-  return normalizedDate.isBefore(today);
-}
-
-class _FleetList extends StatelessWidget {
-  final double scale;
-  final String title;
-  final String tag;
-  const _FleetList({
+class _FleetSummarySection extends StatelessWidget {
+  const _FleetSummarySection({
     required this.scale,
     required this.title,
-    required this.tag,
+    required this.items,
   });
+
+  final double scale;
+  final String title;
+  final List<_FleetSummaryListItem> items;
 
   @override
   Widget build(BuildContext context) {
-    final items = List.generate(6, (i) => i);
-
+    final t = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2850,159 +2546,269 @@ class _FleetList extends StatelessWidget {
           style: TextStyle(
             fontWeight: FontWeight.w800,
             fontSize: _r(13, scale),
+            color: AdminHomePage._kText,
           ),
         ),
-        SizedBox(height: _r(10, scale)),
-        Expanded(
-          child: ListView.separated(
-            primary: false,
-            itemCount: items.length,
-            separatorBuilder: (_, __) => SizedBox(height: _r(10, scale)),
-            itemBuilder: (_, i) {
-              return Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: _r(12, scale),
-                  vertical: _r(10, scale),
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF6F7F9),
-                  borderRadius: BorderRadius.circular(_r(12, scale)),
-                  border: Border.all(color: const Color(0xFFEDEFF3)),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'FÜ DE 319',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: _r(12, scale),
-                        ),
-                      ),
-                    ),
-                    _SmallTag(scale: scale, label: tag),
-                    SizedBox(width: _r(10, scale)),
-                    Text(
-                      '30.03.26',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        color: AdminHomePage._kOrange,
-                        fontSize: _r(12, scale),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _FleetListCompact extends StatelessWidget {
-  final double scale;
-  final String title;
-  final String tag;
-  const _FleetListCompact({
-    required this.scale,
-    required this.title,
-    required this.tag,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final items = List.generate(6, (i) => i);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: _r(13, scale),
-          ),
-        ),
-        SizedBox(height: _r(10, scale)),
-        ...items.map((i) {
-          return Padding(
-            padding: EdgeInsets.only(bottom: _r(10, scale)),
-            child: Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: _r(12, scale),
-                vertical: _r(10, scale),
-              ),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF6F7F9),
-                borderRadius: BorderRadius.circular(_r(12, scale)),
-                border: Border.all(color: const Color(0xFFEDEFF3)),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'FÜ DE 319',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: _r(12, scale),
-                      ),
-                    ),
-                  ),
-                  _SmallTag(scale: scale, label: tag),
-                  SizedBox(width: _r(10, scale)),
-                  Text(
-                    '30.03.26',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w900,
-                      color: AdminHomePage._kOrange,
-                      fontSize: _r(12, scale),
-                    ),
-                  ),
-                ],
+        SizedBox(height: _r(12, scale)),
+        if (items.isEmpty)
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: _r(8, scale)),
+            child: Text(
+              t.t('admin_home_no_items'),
+              style: TextStyle(
+                fontSize: _r(12, scale),
+                fontWeight: FontWeight.w700,
+                color: AdminHomePage._kMuted,
               ),
             ),
-          );
-        }).toList(),
+          )
+        else
+          Column(
+            children: items
+                .map(
+                  (item) => Padding(
+                    padding: EdgeInsets.only(bottom: _r(10, scale)),
+                    child: _FleetSummaryRow(scale: scale, item: item),
+                  ),
+                )
+                .toList(growable: false),
+          ),
       ],
     );
   }
 }
 
-class _SmallTag extends StatelessWidget {
+class _FleetSummaryListItem {
+  const _FleetSummaryListItem({
+    required this.plateNumber,
+    required this.valueText,
+    required this.valueColor,
+    required this.sortOrder,
+    this.sortDate,
+  });
+
+  final String plateNumber;
+  final String valueText;
+  final Color valueColor;
+  final int sortOrder;
+  final DateTime? sortDate;
+}
+
+class _FleetSummaryRow extends StatelessWidget {
+  const _FleetSummaryRow({
+    required this.scale,
+    required this.item,
+  });
+
   final double scale;
-  final String label;
-  const _SmallTag({required this.scale, required this.label});
+  final _FleetSummaryListItem item;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.symmetric(
-        horizontal: _r(10, scale),
-        vertical: _r(4, scale),
+        horizontal: _r(16, scale),
+        vertical: _r(12, scale),
       ),
       decoration: BoxDecoration(
-        color: AdminHomePage._kOrange.withOpacity(0.14),
-        borderRadius: BorderRadius.circular(_r(999, scale)),
-        border: Border.all(color: AdminHomePage._kOrange.withOpacity(0.30)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(_r(14, scale)),
       ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: _r(10, scale),
-          fontWeight: FontWeight.w900,
-          color: AdminHomePage._kOrange,
-          letterSpacing: 0.2,
-        ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Flexible(
+            flex: 5,
+            child: Text(
+              item.plateNumber,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: _r(14, scale),
+                fontWeight: FontWeight.w700,
+                color: AdminHomePage._kText,
+              ),
+            ),
+          ),
+          SizedBox(width: _r(18, scale)),
+          Flexible(
+            flex: 4,
+            child: Text(
+              item.valueText,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.end,
+              style: TextStyle(
+                fontSize: _r(14, scale),
+                fontWeight: FontWeight.w900,
+                color: item.valueColor,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-// ---------------------------
+class _AdminHomeFleetComplianceSummary {
+  const _AdminHomeFleetComplianceSummary({
+    required this.tuvStatus,
+    required this.tuvExpiryDate,
+  });
+
+  final FleetVehicleDocumentStatus tuvStatus;
+  final String tuvExpiryDate;
+}
+
+Map<String, _AdminHomeFleetComplianceSummary>
+_buildAdminHomeFleetComplianceByPlate(
+  List<FleetVehicleDocument> documents,
+  FleetVehicleDocumentService service,
+) {
+  final grouped = <String, Map<String, FleetVehicleDocument>>{};
+
+  for (final document in documents) {
+    final plateNumber = normalizePlateNumber(document.plateNumber);
+    final perType = grouped.putIfAbsent(
+      plateNumber,
+      () => <String, FleetVehicleDocument>{},
+    );
+    final canonicalType = _canonicalAdminHomeVehicleDocumentType(
+      document.documentType,
+    );
+    final current = perType[canonicalType];
+    if (current == null || _isAdminHomeDocumentNewer(document, current)) {
+      perType[canonicalType] = document;
+    }
+  }
+
+  final result = <String, _AdminHomeFleetComplianceSummary>{};
+  for (final entry in grouped.entries) {
+    final tuvDocument = entry.value['HU_TUV_CERTIFICATE'];
+    final tuvStatus = tuvDocument == null
+        ? FleetVehicleDocumentStatus.missing
+        : service.getDocumentStatus(
+            expiryDate: tuvDocument.expiryDate,
+            fileUrl: tuvDocument.fileUrl,
+          );
+
+    result[entry.key] = _AdminHomeFleetComplianceSummary(
+      tuvStatus: tuvStatus,
+      tuvExpiryDate: tuvDocument?.expiryDate ?? '',
+    );
+  }
+
+  return result;
+}
+
+int _compareFleetSummaryListItems(
+  _FleetSummaryListItem a,
+  _FleetSummaryListItem b,
+) {
+  final orderCompare = a.sortOrder.compareTo(b.sortOrder);
+  if (orderCompare != 0) return orderCompare;
+
+  final aDate = a.sortDate;
+  final bDate = b.sortDate;
+  if (aDate != null && bDate != null) {
+    final dateCompare = aDate.compareTo(bDate);
+    if (dateCompare != 0) return dateCompare;
+  } else if (aDate != null) {
+    return -1;
+  } else if (bDate != null) {
+    return 1;
+  }
+
+  return a.plateNumber.compareTo(b.plateNumber);
+}
+
+DateTime? _tryParseAdminHomeFleetStoredDate(String? value) {
+  final trimmed = (value ?? '').trim();
+  if (trimmed.isEmpty) return null;
+  return DateTime.tryParse(trimmed);
+}
+
+String _formatAdminHomeFleetStoredDate(BuildContext context, String? value) {
+  final parsed = _tryParseAdminHomeFleetStoredDate(value);
+  if (parsed == null) {
+    return '-';
+  }
+  return MaterialLocalizations.of(context).formatShortDate(parsed);
+}
+
+class _AdminHomeTuvPresentation {
+  const _AdminHomeTuvPresentation({
+    required this.label,
+    required this.color,
+    required this.sortOrder,
+  });
+
+  final String label;
+  final Color color;
+  final int sortOrder;
+}
+
+_AdminHomeTuvPresentation _adminHomeTuvPresentation(
+  BuildContext context,
+  FleetVehicleDocumentStatus status,
+) {
+  final t = AppLocalizations.of(context);
+  switch (status) {
+    case FleetVehicleDocumentStatus.expiringSoon:
+      return _AdminHomeTuvPresentation(
+        label: t.t('fleet_status_vehicle_documents_status_expiring_soon'),
+        color: AdminHomePage._kOrange,
+        sortOrder: 1,
+      );
+    case FleetVehicleDocumentStatus.expired:
+      return _AdminHomeTuvPresentation(
+        label: t.t('fleet_status_vehicle_documents_status_expired'),
+        color: const Color(0xFFDC2626),
+        sortOrder: 0,
+      );
+    case FleetVehicleDocumentStatus.missing:
+      return _AdminHomeTuvPresentation(
+        label: t.t('fleet_status_vehicle_documents_status_missing'),
+        color: AdminHomePage._kMuted,
+        sortOrder: 2,
+      );
+    case FleetVehicleDocumentStatus.active:
+      return _AdminHomeTuvPresentation(
+        label: 'Valid',
+        color: AdminHomePage._kGreen,
+        sortOrder: 3,
+      );
+  }
+}
+
+bool _isAdminHomeDocumentNewer(
+  FleetVehicleDocument candidate,
+  FleetVehicleDocument current,
+) {
+  final candidateDate = candidate.updatedAt ?? candidate.createdAt;
+  final currentDate = current.updatedAt ?? current.createdAt;
+  if (candidateDate == null && currentDate == null) {
+    return candidate.documentId.compareTo(current.documentId) > 0;
+  }
+  if (candidateDate == null) return false;
+  if (currentDate == null) return true;
+  return candidateDate.isAfter(currentDate);
+}
+
+String _canonicalAdminHomeVehicleDocumentType(String documentType) {
+  final normalized = documentType.trim().toUpperCase();
+  if (normalized == 'REGISTRATION_CERTIFICATE') {
+    return 'FAHRZEUGSCHEIN';
+  }
+  if (normalized == 'TUV' ||
+      normalized == 'TUV_CERTIFICATE' ||
+      normalized == 'HU_TUV') {
+    return 'HU_TUV_CERTIFICATE';
+  }
+  return normalized;
+}
+
 // DRIVER DOCUMENTS (unchanged dummy UI)
 // ---------------------------
 
@@ -3202,7 +3008,7 @@ class _DriverDocumentsCardState extends State<_DriverDocumentsCard> {
   }
 
   String _fmtShortDate(DateTime? dt) {
-    if (dt == null) return '—';
+    if (dt == null) return '-';
     final dd = dt.day.toString().padLeft(2, '0');
     final mm = dt.month.toString().padLeft(2, '0');
     final yy = (dt.year % 100).toString().padLeft(2, '0');
@@ -3513,7 +3319,7 @@ class _DriverDocumentsCardState extends State<_DriverDocumentsCard> {
                   missingDrivers.add(driverName);
                 }
 
-                // ---- Contracts (✅ from onboarding.contractExpiry) ----
+                // ---- Contracts (âœ… from onboarding.contractExpiry) ----
                 final cEnd = _parseDate(onboarding['contractExpiry']);
                 if (cEnd != null) {
                   final isExpired = cEnd.isBefore(today);
@@ -3608,7 +3414,7 @@ class _DriverDocumentsCardState extends State<_DriverDocumentsCard> {
 
                 missingCount: missingDrivers.length,
                 missingNames:
-                    missingNamesUi, // ✅ DO NOT LIMIT (scroll will show all)
+                    missingNamesUi, // âœ… DO NOT LIMIT (scroll will show all)
 
                 contractSoonCount: contractSoonDrivers.length,
                 contractRows: contractRowsUi
@@ -4025,7 +3831,7 @@ class _ExpiredDocTile extends StatelessWidget {
   const _ExpiredDocTile({required this.scale, required this.row});
 
   String _fmt(DateTime? dt) {
-    if (dt == null) return '—';
+    if (dt == null) return '-';
     final dd = dt.day.toString().padLeft(2, '0');
     final mm = dt.month.toString().padLeft(2, '0');
     final yy = (dt.year % 100).toString().padLeft(2, '0');
@@ -4132,7 +3938,7 @@ class _ContractDocTile extends StatelessWidget {
   const _ContractDocTile({required this.scale, required this.row});
 
   String _fmt(DateTime? dt) {
-    if (dt == null) return '—';
+    if (dt == null) return '-';
     final dd = dt.day.toString().padLeft(2, '0');
     final mm = dt.month.toString().padLeft(2, '0');
     final yy = (dt.year % 100).toString().padLeft(2, '0');
@@ -4505,3 +4311,4 @@ double _r(double v, double scale) => v * scale;
 
 double _clampDouble(double v, double min, double max) =>
     math.max(min, math.min(max, v));
+

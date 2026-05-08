@@ -1,4 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+﻿import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -1799,7 +1799,7 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    first.description.isEmpty ? 'â€”' : first.description,
+                    first.description.isEmpty ? '-' : first.description,
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -2375,3 +2375,4 @@ class _TaskListItem {
 
   bool get isGroup => batchId != null;
 }
+
