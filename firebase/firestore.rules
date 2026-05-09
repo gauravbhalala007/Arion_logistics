@@ -587,6 +587,22 @@ service cloud.firestore {
         }
       }
 
+      // ---------- published waveplans ----------
+      // users/{userId}/published_waveplans/{date}
+      // Admin (DSP) writes the daily Waveplan when they hit Publish.
+      // Drivers of this DSP read it to see their assignment + carpool tab.
+      match /published_waveplans/{date} {
+        allow read, write: if isSelf(userId) && isApproved(userId);
+        allow read: if isDriverForUser(userId) && isApproved(userId);
+      }
+
+      // ---------- calendar events ----------
+      // users/{userId}/calendar_events/{eventId}
+      // Admin-only — calendar lives entirely in the admin area.
+      match /calendar_events/{eventId} {
+        allow read, write: if isSelf(userId) && isApproved(userId);
+      }
+
       // ---------- scores for a report ----------
       // users/{userId}/scores/{scoreId}
       match /scores/{scoreId} {
@@ -778,6 +794,21 @@ service cloud.firestore {
             && driverTransporterId() == driverId
             && request.resource.data.driverTransporterId == driverId
             && request.resource.data.testId == testId;
+        }
+
+        // ---------- driver FAQ training ----------
+        // users/{userId}/drivers/{driverId}/faq_training/{date}
+        // Daily completion record written when the driver finishes
+        // the FAQ Training quiz.
+        match /faq_training/{date} {
+          // DSP/admin can read+manage their drivers' progress
+          allow read, create, update, delete:
+            if isSelf(userId) && isApproved(userId);
+
+          // Driver can read + write their own training records
+          allow read, create, update: if isDriverForUser(userId)
+            && isApproved(userId)
+            && driverTransporterId() == driverId;
         }
 
         // ---------- driver shifts ----------

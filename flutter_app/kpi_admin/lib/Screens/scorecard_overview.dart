@@ -16,6 +16,9 @@ import 'scorecard_week.dart';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import '../localization/app_localizations.dart';
+import '../theme/app_button_style.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_elevation.dart';
 
 /// Simple German-style number formatting
 final _pct2 = NumberFormat.decimalPattern('de')
@@ -82,20 +85,19 @@ bool _isNarrow(BuildContext c) => MediaQuery.of(c).size.width < 1100;
 enum _PeriodFilter { week, month, year }
 
 /* ====================  Palette / styles  ==================== */
+/// Maps the legacy `_UI` API onto the new design-system tokens
+/// (lib/theme/*). Keeps internal call-sites unchanged while the
+/// visual layer is migrated.
 class _UI {
-  static const bg = Color(0xFFF6F7F5);
-  static const card = Colors.white;
-  static const textPrimary = Color(0xFF0F172A);
-  static const textSecondary = Color(0xFF64748B);
-  static const green = Color(0xFF5DBB98);
-  static const greenDark = Color(0xFF16A34A);
-  static const border = Color(0xFFE5E7EB);
-  static const dark = Color(0xFF0B1220);
-  static BoxShadow shadow = BoxShadow(
-    color: Colors.black.withOpacity(0.05),
-    blurRadius: 18,
-    offset: Offset(0, 8),
-  );
+  static const bg = AppColors.surfaceLight;
+  static const card = AppColors.surfaceElevatedLight;
+  static const textPrimary = AppColors.codriverGraphite;
+  static const textSecondary = AppColors.labelSecondaryLight;
+  static const green = AppColors.green200;
+  static const greenDark = AppColors.codriverGreen;
+  static const border = AppColors.separatorLight;
+  static const dark = AppColors.codriverDeep;
+  static BoxShadow shadow = AppElevation.level2.first;
 }
 
 /* ====================  Model for view  ==================== */
@@ -127,11 +129,11 @@ class _ReportVM {
   });
 }
 
-const _kFantasticPlusColor = Color(0xFF00B287); // Fantastic Plus
-const _kFantasticColor = Color(0xFF0082AF); // Fantastic
-const _kGreatColor = Color(0xFFF7AA00); // Great
-const _kFairColor = Color(0xFFF47400); // Fair
-const _kPoorColor = Color(0xFFCE4121); // Poor
+const _kFantasticPlusColor = AppColors.tierFantasticPlus;
+const _kFantasticColor = AppColors.tierFantastic;
+const _kGreatColor = AppColors.tierGreat;
+const _kFairColor = AppColors.tierFair;
+const _kPoorColor = AppColors.tierPoor;
 
 class ScorecardOverviewPage extends StatefulWidget {
   const ScorecardOverviewPage({super.key});
@@ -1024,12 +1026,9 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
             child: Text(t.t('admin_home_cancel')),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: AppButtonStyle.of(AppButtonVariant.destructive),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(
-              t.t('admin_home_delete'),
-              style: TextStyle(fontSize: _sp(13, w), color: Colors.white),
-            ),
+            child: Text(t.t('admin_home_delete')),
           ),
         ],
       ),
@@ -1177,23 +1176,14 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                           ),
                           FilledButton.icon(
                             onPressed: _busyCsv ? null : _uploadDriverCsv,
-                            style: FilledButton.styleFrom(
-                              backgroundColor: _UI.textPrimary.withOpacity(.9),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(24 * sc),
-                              ),
-                              elevation: 0,
-                              padding: EdgeInsets.symmetric(
-                                horizontal: _pad(16, w),
-                                vertical: _pad(12, w),
-                              ),
+                            style: AppButtonStyle.of(
+                              AppButtonVariant.secondary,
                             ),
-                            icon: Icon(Icons.upload_file, size: _sp(18, w)),
+                            icon: const Icon(Icons.upload_file),
                             label: Text(
                               _busyCsv
                                   ? t.t('uploading')
                                   : t.t('dash_upload_driver_csv'),
-                              style: TextStyle(fontSize: _sp(14, w)),
                             ),
                           ),
                         ],
@@ -1282,26 +1272,12 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                                             onPressed: _busyUpload
                                                 ? null
                                                 : _uploadWeeklyPdf,
-                                            style: FilledButton.styleFrom(
-                                              backgroundColor: _UI.greenDark,
-                                              elevation: 0,
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(
-                                                      20 * sc,
-                                                    ),
-                                              ),
-                                              padding: EdgeInsets.symmetric(
-                                                horizontal: _pad(16, w),
-                                                vertical: _pad(10, w),
-                                              ),
+                                            style: AppButtonStyle.of(
+                                              AppButtonVariant.primary,
                                             ),
                                             child: Text(
                                               t.t(
                                                 'scorecard_overview_choose_file',
-                                              ),
-                                              style: TextStyle(
-                                                fontSize: _sp(14, w),
                                               ),
                                             ),
                                           ),
@@ -1450,6 +1426,7 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                                             'W${p.week.toString().padLeft(2, '0')}',
                                         value: p.overall ?? 0,
                                         ref: p.ref,
+                                        overallStatus: p.overallStatus,
                                       ),
                                     )
                                     .toList(),
@@ -1516,26 +1493,12 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                                             onPressed: _busyUpload
                                                 ? null
                                                 : _uploadWeeklyPdf,
-                                            style: FilledButton.styleFrom(
-                                              backgroundColor: _UI.greenDark,
-                                              elevation: 0,
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(
-                                                      20 * sc,
-                                                    ),
-                                              ),
-                                              padding: EdgeInsets.symmetric(
-                                                horizontal: _pad(16, w),
-                                                vertical: _pad(10, w),
-                                              ),
+                                            style: AppButtonStyle.of(
+                                              AppButtonVariant.primary,
                                             ),
                                             child: Text(
                                               t.t(
                                                 'scorecard_overview_choose_file',
-                                              ),
-                                              style: TextStyle(
-                                                fontSize: _sp(14, w),
                                               ),
                                             ),
                                           ),
@@ -1826,11 +1789,10 @@ class _Panel extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: _UI.card,
-        borderRadius: BorderRadius.circular(16 * _scaleForWidth(w)),
-        boxShadow: [_UI.shadow],
-        border: Border.all(color: _UI.border),
+        borderRadius: BorderRadius.circular(18 * _scaleForWidth(w)),
+        boxShadow: AppElevation.level1,
       ),
-      padding: EdgeInsets.all(_pad(16, w)),
+      padding: EdgeInsets.all(_pad(20, w)),
       child: Column(
         children: [
           Row(
@@ -1838,15 +1800,17 @@ class _Panel extends StatelessWidget {
               Text(
                 title,
                 style: TextStyle(
-                  fontSize: _sp(18, w),
-                  fontWeight: FontWeight.w800,
+                  fontSize: _sp(17, w),
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -0.43,
+                  color: _UI.textPrimary,
                 ),
               ),
               const Spacer(),
               if (trailing != null) trailing!,
             ],
           ),
-          SizedBox(height: _pad(12, w)),
+          SizedBox(height: _pad(16, w)),
           child,
         ],
       ),
@@ -2127,11 +2091,10 @@ class _StatCard extends StatelessWidget {
       width: double.infinity,
       decoration: BoxDecoration(
         color: _UI.card,
-        borderRadius: BorderRadius.circular(16 * sc),
-        boxShadow: [_UI.shadow],
-        border: Border.all(color: _UI.border),
+        borderRadius: BorderRadius.circular(18 * sc),
+        boxShadow: AppElevation.level1,
       ),
-      padding: EdgeInsets.all(_pad(16, w)),
+      padding: EdgeInsets.all(_pad(20, w)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         mainAxisAlignment: MainAxisAlignment.center,
@@ -2142,7 +2105,7 @@ class _StatCard extends StatelessWidget {
             style: TextStyle(
               fontSize: _sp(12, w),
               color: _UI.textSecondary,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w600,
               letterSpacing: .6,
             ),
           ),
@@ -2153,7 +2116,7 @@ class _StatCard extends StatelessWidget {
             style: TextStyle(
               fontSize: _sp(12, w),
               color: _UI.textSecondary,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w500,
             ),
           ),
           SizedBox(height: _pad(8, w)),
@@ -2162,8 +2125,9 @@ class _StatCard extends StatelessWidget {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: _sp(28, w),
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               color: _UI.textPrimary,
+              letterSpacing: -0.5,
             ),
           ),
           SizedBox(height: _pad(8, w)),
@@ -2216,12 +2180,54 @@ class _BarPoint {
   final String label;
   final double value;
   final DocumentReference<Map<String, dynamic>> ref;
-  _BarPoint({required this.label, required this.value, required this.ref});
+  final String? overallStatus;
+  _BarPoint({
+    required this.label,
+    required this.value,
+    required this.ref,
+    this.overallStatus,
+  });
 }
 
 class _MiniBarChart extends StatelessWidget {
   final List<_BarPoint> points;
   const _MiniBarChart({required this.points});
+
+  /// Tier color from the scorecard `overallStatus` code as used elsewhere
+  /// in this file. Falls back to neutral when the status is unknown.
+  Color _colorForStatus(String? status) {
+    switch (_s(status).trim().toUpperCase()) {
+      case 'FANTASTIC_PLUS':
+        return _kFantasticPlusColor;
+      case 'FANTASTIC':
+        return _kFantasticColor;
+      case 'GREAT':
+        return _kGreatColor;
+      case 'FAIR':
+        return _kFairColor;
+      case 'POOR':
+        return _kPoorColor;
+      default:
+        return AppColors.labelTertiaryLight;
+    }
+  }
+
+  String _labelForStatus(String? status) {
+    switch (_s(status).trim().toUpperCase()) {
+      case 'FANTASTIC_PLUS':
+        return 'FANTASTIC +';
+      case 'FANTASTIC':
+        return 'FANTASTIC';
+      case 'GREAT':
+        return 'GREAT';
+      case 'FAIR':
+        return 'FAIR';
+      case 'POOR':
+        return 'POOR';
+      default:
+        return '';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2231,39 +2237,52 @@ class _MiniBarChart extends StatelessWidget {
     const axisMax = 100.0;
     final isNarrow = _isNarrow(context);
 
-    final xLabelAreaH = (_pad(34, w)).clamp(28.0, 56.0);
-    final chartH = (isNarrow ? _pad(240, w) : _pad(300, w));
+    final xLabelAreaH = (_pad(36, w)).clamp(28.0, 56.0);
+    final valueLabelH = _pad(22, w).clamp(18.0, 30.0);
+    final chartH = (isNarrow ? _pad(280, w) : _pad(340, w));
 
     return SizedBox(
       height: chartH,
       child: LayoutBuilder(
         builder: (context, c) {
-          final targetSlots = (points.length * 2.2).clamp(10, 36).toDouble();
-          final barW = (c.maxWidth / targetSlots).clamp(8, 18).toDouble() * sc;
+          // Width per slot grows/shrinks with available space and bar count.
+          final slotW =
+              ((c.maxWidth - _pad(60, w)) / points.length).clamp(14.0, 44.0);
+          final barW = (slotW * 0.55).clamp(8.0, 22.0) * sc;
 
           return Container(
             decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border.all(color: _UI.border),
-              borderRadius: BorderRadius.circular(16 * sc),
+              color: AppColors.surfaceElevatedLight,
+              borderRadius: BorderRadius.circular(18 * sc),
+              boxShadow: AppElevation.level1,
             ),
-            padding: EdgeInsets.all(_pad(16, w)),
+            padding: EdgeInsets.all(_pad(20, w)),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Y-axis labels
-                SizedBox(
-                  width: _pad(36, w),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: const [100, 80, 60, 40, 20, 0]
-                        .map(
-                          (v) => Text(
-                            '$v',
-                            style: TextStyle(color: _UI.textSecondary),
-                          ),
-                        )
-                        .toList(),
+                // Y-axis labels (aligned with the bar area only)
+                Padding(
+                  padding: EdgeInsets.only(
+                    top: valueLabelH,
+                    bottom: xLabelAreaH,
+                  ),
+                  child: SizedBox(
+                    width: _pad(34, w),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: const [100, 80, 60, 40, 20, 0]
+                          .map(
+                            (v) => Text(
+                              '$v',
+                              style: TextStyle(
+                                color: AppColors.labelTertiaryLight,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    ),
                   ),
                 ),
                 SizedBox(width: _pad(8, w)),
@@ -2272,13 +2291,14 @@ class _MiniBarChart extends StatelessWidget {
                 Expanded(
                   child: LayoutBuilder(
                     builder: (context, area) {
-                      final usableH = area.maxHeight - xLabelAreaH;
+                      final barsAreaH =
+                          area.maxHeight - xLabelAreaH - valueLabelH;
 
                       return Stack(
                         children: [
-                          // Grid
+                          // Grid lines (5 horizontal lines)
                           Positioned.fill(
-                            top: 0,
+                            top: valueLabelH,
                             bottom: xLabelAreaH,
                             child: Column(
                               children: List.generate(
@@ -2288,8 +2308,9 @@ class _MiniBarChart extends StatelessWidget {
                                     decoration: BoxDecoration(
                                       border: Border(
                                         top: BorderSide(
-                                          color: _UI.border.withOpacity(0.8),
-                                          width: 1,
+                                          color: AppColors.separatorLight
+                                              .withOpacity(0.6),
+                                          width: 0.5,
                                         ),
                                       ),
                                     ),
@@ -2298,82 +2319,174 @@ class _MiniBarChart extends StatelessWidget {
                               ),
                             ),
                           ),
-                          // Bottom baseline
+                          // Bottom baseline (slightly stronger)
                           Positioned(
                             left: 0,
                             right: 0,
-                            bottom: xLabelAreaH - 1,
+                            bottom: xLabelAreaH - 0.5,
                             child: Container(
                               height: 1,
-                              color: _UI.border.withOpacity(0.8),
+                              color: AppColors.separatorLight,
                             ),
                           ),
 
-                          // Bars
+                          // Bars + value labels (each slot uses Expanded
+                          // so any number of bars fits the available width)
                           Positioned.fill(
                             top: 0,
                             bottom: xLabelAreaH,
-                            child: Align(
-                              alignment: Alignment.bottomCenter,
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceEvenly,
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: points.map((p) {
-                                  final v = p.value.clamp(0, axisMax);
-                                  final h =
-                                      (v / axisMax) * (usableH - _pad(8, w));
-                                  return GestureDetector(
-                                    onTap: () => Navigator.of(context).push(
-                                      PageRouteBuilder(
-                                        pageBuilder: (_, __, ___) =>
-                                            ScorecardWeekShellPage(
-                                              reportRef: p.ref,
-                                            ),
-                                        transitionDuration: Duration.zero,
-                                        reverseTransitionDuration:
-                                            Duration.zero,
-                                      ),
-                                    ),
-                                    child: AnimatedContainer(
-                                      duration: const Duration(
-                                        milliseconds: 220,
-                                      ),
-                                      curve: Curves.easeOutCubic,
-                                      height: h,
-                                      width: barW,
-                                      decoration: BoxDecoration(
-                                        color: _UI.green,
-                                        borderRadius: BorderRadius.circular(
-                                          8 * sc,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: points.map((p) {
+                                final v = p.value.clamp(0, axisMax).toDouble();
+                                final h = (v / axisMax) * barsAreaH;
+                                final barColor = _colorForStatus(
+                                  p.overallStatus,
+                                );
+                                return Expanded(
+                                  child: MouseRegion(
+                                    cursor: SystemMouseCursors.click,
+                                    child: GestureDetector(
+                                      onTap: () => Navigator.of(context).push(
+                                        PageRouteBuilder(
+                                          pageBuilder: (_, __, ___) =>
+                                              ScorecardWeekShellPage(
+                                                reportRef: p.ref,
+                                              ),
+                                          transitionDuration: Duration.zero,
+                                          reverseTransitionDuration:
+                                              Duration.zero,
                                         ),
                                       ),
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.end,
+                                        children: [
+                                          // Value label above the bar
+                                          SizedBox(
+                                            height: valueLabelH,
+                                            child: Center(
+                                              child: FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                child: Text(
+                                                  v.toStringAsFixed(0),
+                                                  style: TextStyle(
+                                                    fontSize: _sp(12, w),
+                                                    fontWeight: FontWeight.w700,
+                                                    color: barColor,
+                                                    letterSpacing: -0.3,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          // The bar itself (centered in its slot)
+                                          AnimatedContainer(
+                                            duration: const Duration(
+                                              milliseconds: 320,
+                                            ),
+                                            curve: Curves.easeOutCubic,
+                                            height: h,
+                                            width: barW,
+                                            clipBehavior: Clip.antiAlias,
+                                            decoration: BoxDecoration(
+                                              gradient: LinearGradient(
+                                                begin: Alignment.topCenter,
+                                                end: Alignment.bottomCenter,
+                                                colors: [
+                                                  barColor.withOpacity(0.85),
+                                                  barColor,
+                                                ],
+                                              ),
+                                              borderRadius:
+                                                  const BorderRadius.vertical(
+                                                    top: Radius.circular(8),
+                                                    bottom: Radius.circular(2),
+                                                  ),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: barColor.withOpacity(
+                                                    0.25,
+                                                  ),
+                                                  blurRadius: 12,
+                                                  offset: const Offset(0, 4),
+                                                ),
+                                              ],
+                                            ),
+                                            // Vertical status label inside the bar
+                                            // Only render when the bar is tall
+                                            // enough to comfortably fit the text.
+                                            child: h < 70
+                                                ? null
+                                                : Padding(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          vertical: 10,
+                                                        ),
+                                                    child: Center(
+                                                      child: RotatedBox(
+                                                        quarterTurns: 3,
+                                                        child: FittedBox(
+                                                          fit: BoxFit.scaleDown,
+                                                          child: Text(
+                                                            _labelForStatus(
+                                                              p.overallStatus,
+                                                            ),
+                                                            maxLines: 1,
+                                                            softWrap: false,
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .clip,
+                                                            style: TextStyle(
+                                                              color: Colors
+                                                                  .white
+                                                                  .withOpacity(
+                                                                    0.55,
+                                                                  ),
+                                                              fontSize: 9,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w800,
+                                                              letterSpacing:
+                                                                  1.4,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                  );
-                                }).toList(),
-                              ),
+                                  ),
+                                );
+                              }).toList(),
                             ),
                           ),
 
-                          // X labels strip
+                          // X labels strip — each slot uses Expanded so
+                          // every column fits without horizontal overflow
                           Positioned(
                             left: 0,
                             right: 0,
                             bottom: 0,
                             height: xLabelAreaH,
                             child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                               children: points.map((p) {
-                                return SizedBox(
-                                  width: barW * 2.2,
-                                  child: Text(
-                                    p.label,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: _sp(11, w),
-                                      color: _UI.textSecondary,
+                                return Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(top: 8),
+                                    child: Text(
+                                      p.label,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: _sp(11, w),
+                                        color: AppColors.labelSecondaryLight,
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
                                   ),
                                 );

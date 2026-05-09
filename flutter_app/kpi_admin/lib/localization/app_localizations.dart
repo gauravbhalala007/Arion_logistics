@@ -12981,6 +12981,274 @@ class AppLocalizations {
     },
   };
 
+  /// FAQ Training — driver-side quiz built on top of the FAQ entries.
+  /// Each card shows the FAQ answer as an explanation, then asks
+  /// "is this statement correct?" with True/False buttons.
+  static final Map<String, Map<String, String>> _faqTrainingLocalizedValues = {
+    'en': {
+      'faq_training_title': 'FAQ Training',
+      'faq_training_subtitle': 'Test what you remember from the FAQ',
+      'faq_training_loading': 'Loading…',
+      'faq_training_no_questions':
+          'No FAQ entries yet. Ask your dispatcher to add some.',
+      'faq_training_progress': '{current} / {total}',
+      'faq_training_explanation_label': 'Explanation',
+      'faq_training_test_label': 'Quick check',
+      'faq_training_understood_btn': 'I understood',
+      'faq_training_test_prompt': 'Is this statement correct?',
+      'faq_training_btn_true': 'Correct',
+      'faq_training_btn_false': 'Incorrect',
+      'faq_training_correct_feedback': 'Right!',
+      'faq_training_incorrect_feedback':
+          'Not quite — read the explanation again.',
+      'faq_training_back_to_explanation': 'Back to explanation',
+      'faq_training_continue': 'Next',
+      'faq_training_done_title': 'Training complete!',
+      'faq_training_done_score': '{correct} of {total} correct',
+      'faq_training_score_excellent': 'Excellent — you got everything right!',
+      'faq_training_score_good': 'Well done — keep it up.',
+      'faq_training_score_keep_practicing': 'Keep practising — read the FAQs.',
+      'faq_training_btn_retake': 'Retake',
+      'faq_training_btn_close': 'Close',
+      'faq_training_card_intro':
+          'Below is the original FAQ entry. Read it, then confirm '
+          'the statement on the next card.',
+    },
+    'de': {
+      'faq_training_title': 'FAQ-Training',
+      'faq_training_subtitle': 'Teste dein Wissen aus den FAQs',
+      'faq_training_loading': 'Lade…',
+      'faq_training_no_questions':
+          'Noch keine FAQs vorhanden. Bitte den Dispatcher, welche anzulegen.',
+      'faq_training_progress': '{current} / {total}',
+      'faq_training_explanation_label': 'Erklärung',
+      'faq_training_test_label': 'Kurz-Check',
+      'faq_training_understood_btn': 'Verstanden',
+      'faq_training_test_prompt': 'Stimmt diese Aussage?',
+      'faq_training_btn_true': 'Richtig',
+      'faq_training_btn_false': 'Falsch',
+      'faq_training_correct_feedback': 'Genau!',
+      'faq_training_incorrect_feedback':
+          'Nicht ganz — lies die Erklärung noch einmal.',
+      'faq_training_back_to_explanation': 'Zurück zur Erklärung',
+      'faq_training_continue': 'Weiter',
+      'faq_training_done_title': 'Training abgeschlossen!',
+      'faq_training_done_score': '{correct} von {total} richtig',
+      'faq_training_score_excellent': 'Top — alles richtig!',
+      'faq_training_score_good': 'Gut gemacht — bleib dran.',
+      'faq_training_score_keep_practicing':
+          'Übe weiter — lies die FAQs nochmal.',
+      'faq_training_btn_retake': 'Neu starten',
+      'faq_training_btn_close': 'Schließen',
+      'faq_training_card_intro':
+          'Hier ist der Original-FAQ-Eintrag. Lies ihn aufmerksam und '
+          'bestätige die Aussage auf der nächsten Karte.',
+    },
+    'sq': {
+      'faq_training_title': 'Trajnim FAQ',
+      'faq_training_subtitle': 'Provo atë që mban mend nga FAQ-të',
+      'faq_training_loading': 'Po ngarkohet…',
+      'faq_training_no_questions':
+          'Ende nuk ka FAQ. Kërkoji dispeçerit të shtojë.',
+      'faq_training_progress': '{current} / {total}',
+      'faq_training_explanation_label': 'Shpjegim',
+      'faq_training_test_label': 'Kontroll i shpejtë',
+      'faq_training_understood_btn': 'E kuptova',
+      'faq_training_test_prompt': 'A është i saktë ky pohim?',
+      'faq_training_btn_true': 'I saktë',
+      'faq_training_btn_false': 'I pasaktë',
+      'faq_training_correct_feedback': 'Saktë!',
+      'faq_training_incorrect_feedback':
+          'Jo plotësisht — lexoje sërish shpjegimin.',
+      'faq_training_back_to_explanation': 'Kthehu te shpjegimi',
+      'faq_training_continue': 'Vazhdo',
+      'faq_training_done_title': 'Trajnimi përfundoi!',
+      'faq_training_done_score': '{correct} nga {total} të sakta',
+      'faq_training_score_excellent': 'Shkëlqyeshëm — i ke të gjitha sakta!',
+      'faq_training_score_good': 'Punë e mirë — vazhdo kështu.',
+      'faq_training_score_keep_practicing':
+          'Vazhdo të ushtrosh — rilexo FAQ-të.',
+      'faq_training_btn_retake': 'Rifillo',
+      'faq_training_btn_close': 'Mbyll',
+      'faq_training_card_intro':
+          'Më poshtë është hyrja origjinale e FAQ-së. Lexoje, '
+          'pastaj konfirmo pohimin në kartën tjetër.',
+    },
+    'hu': {
+      'faq_training_title': 'GYIK Tréning',
+      'faq_training_subtitle': 'Próbáld ki, mit jegyeztél meg a GYIK-ből',
+      'faq_training_loading': 'Betöltés…',
+      'faq_training_no_questions':
+          'Még nincs GYIK. Kérd meg a diszpécsert, hogy adjon hozzá.',
+      'faq_training_progress': '{current} / {total}',
+      'faq_training_explanation_label': 'Magyarázat',
+      'faq_training_test_label': 'Gyors ellenőrzés',
+      'faq_training_understood_btn': 'Értem',
+      'faq_training_test_prompt': 'Helyes ez az állítás?',
+      'faq_training_btn_true': 'Helyes',
+      'faq_training_btn_false': 'Helytelen',
+      'faq_training_correct_feedback': 'Pontosan!',
+      'faq_training_incorrect_feedback': 'Nem egészen — olvasd el újra.',
+      'faq_training_back_to_explanation': 'Vissza a magyarázathoz',
+      'faq_training_continue': 'Tovább',
+      'faq_training_done_title': 'Tréning kész!',
+      'faq_training_done_score': '{correct} / {total} helyes',
+      'faq_training_score_excellent': 'Kiváló — minden helyes volt!',
+      'faq_training_score_good': 'Szép munka — így tovább.',
+      'faq_training_score_keep_practicing':
+          'Gyakorolj tovább — olvasd a GYIK-et.',
+      'faq_training_btn_retake': 'Újrakezdés',
+      'faq_training_btn_close': 'Bezárás',
+      'faq_training_card_intro':
+          'Lent az eredeti GYIK-bejegyzés. Olvasd el, majd erősítsd '
+          'meg az állítást a következő kártyán.',
+    },
+    'ro': {
+      'faq_training_title': 'Antrenament FAQ',
+      'faq_training_subtitle': 'Verifică ce ai reținut din FAQ',
+      'faq_training_loading': 'Se încarcă…',
+      'faq_training_no_questions':
+          'Încă nu există FAQ-uri. Cere dispecerului să adauge.',
+      'faq_training_progress': '{current} / {total}',
+      'faq_training_explanation_label': 'Explicație',
+      'faq_training_test_label': 'Verificare rapidă',
+      'faq_training_understood_btn': 'Am înțeles',
+      'faq_training_test_prompt': 'Această afirmație este corectă?',
+      'faq_training_btn_true': 'Corect',
+      'faq_training_btn_false': 'Greșit',
+      'faq_training_correct_feedback': 'Exact!',
+      'faq_training_incorrect_feedback':
+          'Nu chiar — citește încă o dată explicația.',
+      'faq_training_back_to_explanation': 'Înapoi la explicație',
+      'faq_training_continue': 'Continuă',
+      'faq_training_done_title': 'Antrenament încheiat!',
+      'faq_training_done_score': '{correct} din {total} corecte',
+      'faq_training_score_excellent': 'Excelent — totul corect!',
+      'faq_training_score_good': 'Bună treabă — ține-o tot așa.',
+      'faq_training_score_keep_practicing':
+          'Continuă să exersezi — citește FAQ-urile.',
+      'faq_training_btn_retake': 'Reia',
+      'faq_training_btn_close': 'Închide',
+      'faq_training_card_intro':
+          'Mai jos este intrarea originală din FAQ. Citește-o și '
+          'confirmă afirmația pe cardul următor.',
+    },
+    'hr': {
+      'faq_training_title': 'FAQ trening',
+      'faq_training_subtitle': 'Provjeri što si zapamtio iz FAQ-a',
+      'faq_training_loading': 'Učitavanje…',
+      'faq_training_no_questions':
+          'Još nema FAQ-ova. Zamoli dispečera da ih doda.',
+      'faq_training_progress': '{current} / {total}',
+      'faq_training_explanation_label': 'Objašnjenje',
+      'faq_training_test_label': 'Brza provjera',
+      'faq_training_understood_btn': 'Razumijem',
+      'faq_training_test_prompt': 'Je li ova izjava točna?',
+      'faq_training_btn_true': 'Točno',
+      'faq_training_btn_false': 'Netočno',
+      'faq_training_correct_feedback': 'Točno!',
+      'faq_training_incorrect_feedback': 'Ne baš — pročitaj ponovo.',
+      'faq_training_back_to_explanation': 'Natrag na objašnjenje',
+      'faq_training_continue': 'Dalje',
+      'faq_training_done_title': 'Trening završen!',
+      'faq_training_done_score': '{correct} od {total} točno',
+      'faq_training_score_excellent': 'Odlično — sve točno!',
+      'faq_training_score_good': 'Dobro odrađeno — samo tako nastavi.',
+      'faq_training_score_keep_practicing':
+          'Nastavi vježbati — pročitaj FAQ-ove.',
+      'faq_training_btn_retake': 'Ponovi',
+      'faq_training_btn_close': 'Zatvori',
+      'faq_training_card_intro':
+          'Ispod je izvorni FAQ unos. Pročitaj ga i potvrdi izjavu '
+          'na sljedećoj kartici.',
+    },
+    'ar': {
+      'faq_training_title': 'تدريب الأسئلة الشائعة',
+      'faq_training_subtitle': 'اختبر ما تتذكره من الأسئلة الشائعة',
+      'faq_training_loading': 'جارٍ التحميل…',
+      'faq_training_no_questions':
+          'لا توجد أسئلة شائعة بعد. اطلب من المنسّق إضافتها.',
+      'faq_training_progress': '{current} / {total}',
+      'faq_training_explanation_label': 'الشرح',
+      'faq_training_test_label': 'فحص سريع',
+      'faq_training_understood_btn': 'فهمت',
+      'faq_training_test_prompt': 'هل هذه العبارة صحيحة؟',
+      'faq_training_btn_true': 'صحيح',
+      'faq_training_btn_false': 'خطأ',
+      'faq_training_correct_feedback': 'بالضبط!',
+      'faq_training_incorrect_feedback': 'ليس تماماً — اقرأ الشرح مجدداً.',
+      'faq_training_back_to_explanation': 'الرجوع إلى الشرح',
+      'faq_training_continue': 'التالي',
+      'faq_training_done_title': 'انتهى التدريب!',
+      'faq_training_done_score': '{correct} من {total} إجابات صحيحة',
+      'faq_training_score_excellent': 'ممتاز — كل شيء صحيح!',
+      'faq_training_score_good': 'أحسنت — استمر هكذا.',
+      'faq_training_score_keep_practicing':
+          'تابع التدريب — اقرأ الأسئلة الشائعة.',
+      'faq_training_btn_retake': 'إعادة',
+      'faq_training_btn_close': 'إغلاق',
+      'faq_training_card_intro':
+          'أدناه السؤال الشائع الأصلي. اقرأه ثم أكِّد العبارة في البطاقة التالية.',
+    },
+    'tr': {
+      'faq_training_title': 'SSS Eğitimi',
+      'faq_training_subtitle': 'SSS\'lerden hatırladığını test et',
+      'faq_training_loading': 'Yükleniyor…',
+      'faq_training_no_questions':
+          'Henüz SSS yok. Sevk memurundan eklemesini iste.',
+      'faq_training_progress': '{current} / {total}',
+      'faq_training_explanation_label': 'Açıklama',
+      'faq_training_test_label': 'Hızlı kontrol',
+      'faq_training_understood_btn': 'Anladım',
+      'faq_training_test_prompt': 'Bu ifade doğru mu?',
+      'faq_training_btn_true': 'Doğru',
+      'faq_training_btn_false': 'Yanlış',
+      'faq_training_correct_feedback': 'Aynen öyle!',
+      'faq_training_incorrect_feedback': 'Tam değil — açıklamayı tekrar oku.',
+      'faq_training_back_to_explanation': 'Açıklamaya dön',
+      'faq_training_continue': 'Devam',
+      'faq_training_done_title': 'Eğitim tamamlandı!',
+      'faq_training_done_score': '{total} sorudan {correct} doğru',
+      'faq_training_score_excellent': 'Mükemmel — hepsi doğru!',
+      'faq_training_score_good': 'Aferin — böyle devam.',
+      'faq_training_score_keep_practicing': 'Çalışmaya devam — SSS\'leri oku.',
+      'faq_training_btn_retake': 'Tekrar başla',
+      'faq_training_btn_close': 'Kapat',
+      'faq_training_card_intro':
+          'Aşağıda orijinal SSS girişi var. Oku ve sonraki kartta '
+          'ifadeyi onayla.',
+    },
+    'ru': {
+      'faq_training_title': 'Тренинг по FAQ',
+      'faq_training_subtitle': 'Проверь, что ты запомнил из FAQ',
+      'faq_training_loading': 'Загрузка…',
+      'faq_training_no_questions':
+          'Пока нет вопросов. Попроси диспетчера добавить.',
+      'faq_training_progress': '{current} / {total}',
+      'faq_training_explanation_label': 'Объяснение',
+      'faq_training_test_label': 'Быстрая проверка',
+      'faq_training_understood_btn': 'Понятно',
+      'faq_training_test_prompt': 'Это утверждение верно?',
+      'faq_training_btn_true': 'Верно',
+      'faq_training_btn_false': 'Неверно',
+      'faq_training_correct_feedback': 'Точно!',
+      'faq_training_incorrect_feedback':
+          'Не совсем — перечитай объяснение.',
+      'faq_training_back_to_explanation': 'Назад к объяснению',
+      'faq_training_continue': 'Дальше',
+      'faq_training_done_title': 'Тренинг завершён!',
+      'faq_training_done_score': '{correct} из {total} правильно',
+      'faq_training_score_excellent': 'Отлично — всё правильно!',
+      'faq_training_score_good': 'Молодец — так держать.',
+      'faq_training_score_keep_practicing': 'Продолжай — перечитай FAQ.',
+      'faq_training_btn_retake': 'Заново',
+      'faq_training_btn_close': 'Закрыть',
+      'faq_training_card_intro':
+          'Ниже исходная запись FAQ. Прочти её, затем подтверди '
+          'утверждение на следующей карточке.',
+    },
+  };
+
   String _lang() => locale.languageCode.toLowerCase();
 
   String t(String key) {
@@ -13015,6 +13283,8 @@ class AppLocalizations {
         _adminApprovalsLocalizedValues[lang] ??
         _adminApprovalsLocalizedValues['en']!;
     final miscMap = _miscLocalizedValues[lang] ?? _miscLocalizedValues['en']!;
+    final faqTrainingMap = _faqTrainingLocalizedValues[lang] ??
+        _faqTrainingLocalizedValues['en']!;
     final text =
         fleetHubMap[key] ??
         langMap[key] ??
@@ -13029,6 +13299,7 @@ class AppLocalizations {
         adminFaqMap[key] ??
         adminApprovalsMap[key] ??
         miscMap[key] ??
+        faqTrainingMap[key] ??
         _localizedValues['en']![key] ??
         _driverNotificationLocalizedValues['en']![key] ??
         _driverAbsenceLocalizedValues['en']![key] ??
@@ -13040,6 +13311,7 @@ class AppLocalizations {
         _adminFaqLocalizedValues['en']![key] ??
         _adminApprovalsLocalizedValues['en']![key] ??
         _miscLocalizedValues['en']![key] ??
+        _faqTrainingLocalizedValues['en']![key] ??
         key;
     return _normalizeScorecardTerms(text);
   }

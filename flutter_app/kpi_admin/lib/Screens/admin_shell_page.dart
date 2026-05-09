@@ -12,6 +12,8 @@ import 'admin_home_page.dart';
 import 'scorecard_overview.dart';
 import 'pod_quality_overview.dart';
 import 'drivers_hub_page.dart';
+import 'admin_waveplan_page.dart';
+import 'admin_calendar_page.dart';
 import 'task_sheet_page.dart';
 import 'admin_shift_absence_page.dart';
 import 'admin_incident_reports_page.dart';
@@ -134,6 +136,8 @@ class _AdminShellPageState extends State<AdminShellPage> {
               ScorecardOverviewPage(),
               PodQualityOverviewPage(),
               DriversHubPage(),
+              AdminWaveplanPage(),
+              AdminCalendarPage(),
               FleetStatusPage(),
               TaskSheetPage(),
               AdminShiftAbsencePage(),
@@ -162,28 +166,32 @@ class _AdminShellPageState extends State<AdminShellPage> {
         return 2;
       case AppNav.drivers:
         return 3;
-      case AppNav.fleetStatus:
+      case AppNav.waveplan:
         return 4;
-      case AppNav.tasks:
+      case AppNav.calendar:
         return 5;
-      case AppNav.shiftAbsence:
+      case AppNav.fleetStatus:
         return 6;
-      case AppNav.incidentReports:
+      case AppNav.tasks:
         return 7;
-      case AppNav.academy:
+      case AppNav.shiftAbsence:
         return 8;
-      case AppNav.dispatcherPill:
+      case AppNav.incidentReports:
         return 9;
-      case AppNav.notifications:
+      case AppNav.academy:
         return 10;
-      case AppNav.feedback:
+      case AppNav.dispatcherPill:
         return 11;
-      case AppNav.faqs:
+      case AppNav.notifications:
         return 12;
-      case AppNav.adminApprovals:
+      case AppNav.feedback:
         return 13;
-      case AppNav.profile:
+      case AppNav.faqs:
         return 14;
+      case AppNav.adminApprovals:
+        return 15;
+      case AppNav.profile:
+        return 16;
       default:
         return 0;
     }

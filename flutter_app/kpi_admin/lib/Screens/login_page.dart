@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+
+import '../theme/app_button_style.dart';
 import '../services/auth_service.dart';
 
 // --- Codriver Design Tokens (from CODRIVER_STYLEGUIDE.md) ---
@@ -437,20 +439,9 @@ class _LoginPageState extends State<LoginPage> {
 
   Widget _buildPrimaryButton() {
     return SizedBox(
-      height: 50,
-      child: ElevatedButton(
+      child: FilledButton(
         onPressed: _busy ? null : _submit,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _codriverGreen,
-          foregroundColor: Colors.white,
-          disabledBackgroundColor: _codriverGreen.withOpacity(0.5),
-          disabledForegroundColor: Colors.white,
-          shape: const StadiumBorder(),
-          elevation: 0,
-          shadowColor: _codriverGreen.withOpacity(0.4),
-          padding: const EdgeInsets.symmetric(horizontal: _spXxl),
-          textStyle: _headline,
-        ),
+        style: AppButtonStyle.of(AppButtonVariant.primary),
         child: _busy
             ? Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -571,6 +562,8 @@ class _CodriverTextField extends StatefulWidget {
 }
 
 class _CodriverTextFieldState extends State<_CodriverTextField> {
+  bool _hovered = false;
+
   late final FocusNode _node;
   bool _ownsNode = false;
 
@@ -598,60 +591,80 @@ class _CodriverTextFieldState extends State<_CodriverTextField> {
   @override
   Widget build(BuildContext context) {
     final focused = _node.hasFocus;
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 150),
-      curve: Curves.easeInOut,
-      decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: const BorderRadius.all(Radius.circular(999)), // pill
-        border: Border.all(
-          color: focused ? _codriverGreen : _separator.withOpacity(0.0),
-          width: focused ? 1.5 : 1,
+
+    // Border color: subtle at rest, slightly stronger on hover, brand on focus.
+    final borderColor = focused
+        ? _codriverGreen
+        : _hovered
+        ? _separator
+        : _separator.withOpacity(0.55);
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.text,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOut,
+        decoration: BoxDecoration(
+          color: _surfaceElevated, // white — sits on the gray scaffold cleanly
+          borderRadius: const BorderRadius.all(Radius.circular(999)),
+          // Constant border width avoids any layout jump or
+          // half-disappearing edges when focus changes.
+          border: Border.all(color: borderColor, width: 1.5),
         ),
-      ),
-      child: Row(
-        children: [
-          if (widget.prefixIcon != null) ...[
-            const SizedBox(width: _spMd),
-            Icon(
-              widget.prefixIcon,
-              size: 20,
-              color: focused ? _codriverGreen : _labelSecondary,
-            ),
-          ],
-          Expanded(
-            child: TextField(
-              controller: widget.controller,
-              focusNode: _node,
-              obscureText: widget.obscureText,
-              enableSuggestions: widget.enableSuggestions,
-              autocorrect: widget.autocorrect,
-              keyboardType: widget.keyboardType,
-              textInputAction: widget.textInputAction,
-              autofillHints: widget.autofillHints,
-              onChanged: widget.onChanged,
-              onSubmitted: widget.onSubmitted,
-              cursorColor: _codriverGreen,
-              style: _body,
-              decoration: InputDecoration(
-                isDense: true,
-                hintText: widget.hintText,
-                hintStyle: _body.copyWith(color: _labelTertiary),
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: widget.prefixIcon == null ? _spMd : _spSm,
-                  vertical: _spMd,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => _node.requestFocus(),
+          child: Row(
+            children: [
+              if (widget.prefixIcon != null) ...[
+                const SizedBox(width: _spMd),
+                Icon(
+                  widget.prefixIcon,
+                  size: 20,
+                  color: focused ? _codriverGreen : _labelSecondary,
+                ),
+              ],
+              Expanded(
+                child: TextField(
+                  controller: widget.controller,
+                  focusNode: _node,
+                  obscureText: widget.obscureText,
+                  enableSuggestions: widget.enableSuggestions,
+                  autocorrect: widget.autocorrect,
+                  keyboardType: widget.keyboardType,
+                  textInputAction: widget.textInputAction,
+                  autofillHints: widget.autofillHints,
+                  onChanged: widget.onChanged,
+                  onSubmitted: widget.onSubmitted,
+                  cursorColor: _codriverGreen,
+                  style: _body,
+                  decoration: InputDecoration(
+                    isDense: true,
+                    hintText: widget.hintText,
+                    hintStyle: _body.copyWith(color: _labelTertiary),
+                    filled: false,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    focusedErrorBorder: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: widget.prefixIcon == null ? _spMd : _spSm,
+                      vertical: _spMd,
+                    ),
+                  ),
                 ),
               ),
-            ),
+              if (widget.suffix != null) ...[
+                widget.suffix!,
+                const SizedBox(width: _spXs),
+              ],
+            ],
           ),
-          if (widget.suffix != null) ...[
-            widget.suffix!,
-            const SizedBox(width: _spXs),
-          ],
-        ],
+        ),
       ),
     );
   }

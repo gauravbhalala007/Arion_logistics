@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../localization/app_localizations.dart';
 import 'driver_green_book_page.dart';
 import 'driver_academy_module_page.dart';
+import 'driver_faq_training_page.dart';
 
 class DriverAcademyPage extends StatelessWidget {
   final String dspUid;
@@ -91,6 +92,30 @@ class DriverAcademyPage extends StatelessWidget {
                         Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (_) => DriverGreenBookPage(
+                              dspUid: dspUid,
+                              driverTransporterId: driverTransporterId,
+                              onBack: () => Navigator.of(context).pop(),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  // FAQ Training — quiz built on top of the existing
+                  // FAQ entries (`users/{dspUid}/faqs`). Sits next to
+                  // the Green Book at the top of the academy list.
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _AcademyTile(
+                      title: t.t('faq_training_title'),
+                      subtitle: t.t('faq_training_subtitle'),
+                      icon: Icons.fact_check_rounded,
+                      iconColor: const Color(0xFFFF8A1F),
+                      iconBg: const Color(0xFFFFF0E4),
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => DriverFaqTrainingPage(
                               dspUid: dspUid,
                               driverTransporterId: driverTransporterId,
                               onBack: () => Navigator.of(context).pop(),

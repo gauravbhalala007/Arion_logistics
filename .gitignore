@@ -11,3 +11,29 @@
 # Build and local OS artifacts
 firebase/build/
 **/.DS_Store
+
+# Flutter / Dart caches
+**/.dart-tool/
+**/.dartServer/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/build/
+
+# Python caches
+**/__pycache__/
+**/*.pyc
+**/.venv/
+**/venv/
+
+# Logs and debug output
+*.log
+firebase-debug.log*
+firestore-debug.log*
+
+# Reference material / sample inputs (large binaries — keep local only)
+samples/
+
+# Editor / IDE
+.idea/
+.vscode/
+*.iml

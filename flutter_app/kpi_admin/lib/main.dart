@@ -15,6 +15,7 @@ import 'widgets/app_side_menu.dart'; // for AppNav
 
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'localization/app_localizations.dart';
+import 'theme/app_theme.dart';
 
 /// Use emulators only in debug/profile, never in release.
 bool get useEmulators => !kReleaseMode;
@@ -80,44 +81,7 @@ class App extends StatelessWidget {
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
-          theme: ThemeData(
-            useMaterial3: true,
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: const Color(0xFF16A34A),
-            ),
-
-            canvasColor: Colors.white,
-            fontFamily: 'SF Pro',
-            scaffoldBackgroundColor: const Color(0xFFF6F7F5),
-            dialogTheme: DialogThemeData(
-              elevation: 8,
-              backgroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-                side: const BorderSide(color: Color(0xFFE5E7EB)),
-              ),
-            ),
-            menuButtonTheme: MenuButtonThemeData(
-              style: ButtonStyle(
-                shape: WidgetStateProperty.all(
-                  RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-            dialogBackgroundColor: Colors.white,
-            dropdownMenuTheme: DropdownMenuThemeData(
-              menuStyle: MenuStyle(
-                backgroundColor: WidgetStateProperty.all(Colors.white),
-                shape: WidgetStateProperty.all(
-                  RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-          ),
+          theme: AppTheme.light(),
 
           home: _wrapSelectable(const AuthGate()),
           routes: {
@@ -139,6 +103,12 @@ class App extends StatelessWidget {
             ),
             '/drivers': (_) => _wrapSelectable(
               const AdminShellPage(initialNav: AppNav.drivers),
+            ),
+            '/waveplan': (_) => _wrapSelectable(
+              const AdminShellPage(initialNav: AppNav.waveplan),
+            ),
+            '/calendar': (_) => _wrapSelectable(
+              const AdminShellPage(initialNav: AppNav.calendar),
             ),
             '/fleet-status': (_) => _wrapSelectable(
               const AdminShellPage(initialNav: AppNav.fleetStatus),

@@ -6,6 +6,8 @@ import 'package:firebase_storage/firebase_storage.dart' as fb;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../theme/app_button_style.dart';
+import '../theme/app_colors.dart';
 import '../widgets/web_preview.dart'
     if (dart.library.html) '../widgets/web_preview_web.dart';
 
@@ -371,11 +373,8 @@ class _FeedbackPageState extends State<FeedbackPage> {
               onPressed: () => Navigator.of(ctx).pop(false),
               child: Text(_t('Cancel', 'Abbrechen')),
             ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFE11D48),
-                foregroundColor: Colors.white,
-              ),
+            FilledButton(
+              style: AppButtonStyle.of(AppButtonVariant.destructive),
               onPressed: () => Navigator.of(ctx).pop(true),
               child: Text(_t('Delete', 'Löschen')),
             ),
@@ -671,17 +670,12 @@ class _FeedbackPageState extends State<FeedbackPage> {
                             const SizedBox(height: 16),
                             SizedBox(
                               width: double.infinity,
-                              height: 54,
                               child: FilledButton(
                                 onPressed: _submitting
                                     ? null
                                     : () => _submit(role: role),
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: _kPrimary,
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(18),
-                                  ),
+                                style: AppButtonStyle.of(
+                                  AppButtonVariant.primary,
                                 ),
                                 child: _submitting
                                     ? const SizedBox(
@@ -1438,24 +1432,26 @@ class _PriorityButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Tri-state priority toggle — uses semantic status tokens so the
+    // colours match the rest of the app's success/warning/error usage.
     Color border;
     Color fg;
     Color bg;
     switch (kind) {
       case _PriorityKind.low:
-        border = const Color(0xFF22C55E);
-        fg = const Color(0xFF16A34A);
-        bg = selected ? const Color(0xFFECFDF5) : Colors.white;
+        border = AppColors.success;
+        fg = AppColors.success;
+        bg = selected ? AppColors.green50 : Colors.white;
         break;
       case _PriorityKind.medium:
-        border = const Color(0xFFEAB308);
-        fg = const Color(0xFFB45309);
-        bg = selected ? const Color(0xFFFDE68A) : Colors.white;
+        border = AppColors.warning;
+        fg = AppColors.warning;
+        bg = selected ? const Color(0xFFFFF4E0) : Colors.white;
         break;
       case _PriorityKind.high:
-        border = const Color(0xFFEF4444);
-        fg = const Color(0xFFDC2626);
-        bg = selected ? const Color(0xFFFEE2E2) : Colors.white;
+        border = AppColors.error;
+        fg = AppColors.error;
+        bg = selected ? const Color(0xFFFFE5E3) : Colors.white;
         break;
     }
 
