@@ -1920,1082 +1920,628 @@ class _DriversHubPageState extends State<DriversHubPage> {
                       onboarding,
                     );
 
+                    final driverRef = snap.data!.reference;
+
+                    final workPermitType = _normalizeWorkPermitType(
+                      onboarding['workPermitType'],
+                      fallbackExpiry: onboarding['residencePermitExpiry'],
+                    );
+                    final workVisaExpiryValue =
+                        (onboarding['workVisaExpiry'] ??
+                                onboarding['residencePermitExpiry'])
+                            .toString();
+
                     return Container(
                       color: const Color(0xFFF4F5FB),
                       padding: const EdgeInsets.all(20),
                       child: Column(
                         children: [
-                          // Scrollable content
                           Expanded(
                             child: SingleChildScrollView(
-                              child: Column(
-                                children: [
-                                  // ------------------------------------------------------------------
-                                  // TOP CARD (responsive)
-                                  // ------------------------------------------------------------------
-                                  Container(
+                              child: LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final isNarrow = constraints.maxWidth < 1100;
+
+                                  Widget gridRow(Widget l, Widget r) =>
+                                      isNarrow
+                                          ? Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.stretch,
+                                              children: [
+                                                l,
+                                                const SizedBox(height: 12),
+                                                r,
+                                              ],
+                                            )
+                                          : Row(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Expanded(child: l),
+                                                const SizedBox(width: 16),
+                                                Expanded(child: r),
+                                              ],
+                                            );
+
+                                  // ─── Hero card ────────────────────────
+                                  final avatar = ClipRRect(
+                                    borderRadius: BorderRadius.circular(20),
+                                    child: Container(
+                                      width: 88,
+                                      height: 88,
+                                      color: const Color(0xFFE5E7EB),
+                                      child: profileImage == null
+                                          ? const Icon(
+                                              Icons.person,
+                                              size: 44,
+                                              color: Color(0xFF9CA3AF),
+                                            )
+                                          : Image(
+                                              image: profileImage,
+                                              fit: BoxFit.cover,
+                                            ),
+                                    ),
+                                  );
+
+                                  final identityCol = Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      SelectableText(
+                                        name.isEmpty
+                                            ? t.t('dash_no_name')
+                                            : name,
+                                        style: const TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w800,
+                                          color: Color(0xFF111827),
+                                        ),
+                                      ),
+                                      if (email.isNotEmpty)
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            top: 2,
+                                          ),
+                                          child: SelectableText(
+                                            email,
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              color: Color(0xFF6B7280),
+                                            ),
+                                          ),
+                                        ),
+                                      if (tid.isNotEmpty)
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            top: 2,
+                                          ),
+                                          child: SelectableText(
+                                            t.tf(
+                                              'drivers_hub_transporter_id_line',
+                                              {'id': tid},
+                                            ),
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Color(0xFF9CA3AF),
+                                            ),
+                                          ),
+                                        ),
+                                      const SizedBox(height: 8),
+                                      Wrap(
+                                        spacing: 6,
+                                        runSpacing: 6,
+                                        children: [
+                                          _statusChipFromData(data, ctx2),
+                                          _loginChipFromData(data, ctx2),
+                                          _expiryChipDetailedFromOnboardingRaw(
+                                            onboarding,
+                                            ctx2,
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  );
+
+                                  final pinCard = Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 10,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF9FAFB),
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(
+                                        color: const Color(0xFFE5E7EB),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              t.t(
+                                                'drivers_hub_notification_pin',
+                                              ),
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w700,
+                                                letterSpacing: 0.5,
+                                                color: Color(0xFF6B7280),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              pin.isEmpty
+                                                  ? t.t('drivers_hub_not_set')
+                                                  : (showPin ? pin : '••••'),
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w800,
+                                                letterSpacing: 2,
+                                                color: Color(0xFF111827),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        if (pin.isNotEmpty) ...[
+                                          const SizedBox(width: 10),
+                                          IconButton(
+                                            tooltip: showPin
+                                                ? t.t('drivers_hub_hide_pin')
+                                                : t.t('drivers_hub_show_pin'),
+                                            iconSize: 18,
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                            onPressed: () => setStateDialog(
+                                              () => showPin = !showPin,
+                                            ),
+                                            icon: Icon(
+                                              showPin
+                                                  ? Icons.visibility_off
+                                                  : Icons.visibility,
+                                              color: const Color(0xFF6B7280),
+                                            ),
+                                          ),
+                                        ],
+                                        const SizedBox(width: 4),
+                                        OutlinedButton(
+                                          onPressed: !canEditPin
+                                              ? null
+                                              : () async {
+                                                  await showDialog<void>(
+                                                    context: ctx2,
+                                                    barrierDismissible: false,
+                                                    builder: (_) =>
+                                                        SetNotificationPinDialog(
+                                                          dspUid: _uid!,
+                                                          transporterId: tid
+                                                              .toUpperCase(),
+                                                          force: true,
+                                                        ),
+                                                  );
+                                                },
+                                          child: Text(
+                                            pin.isEmpty
+                                                ? t.t('drivers_hub_set_pin')
+                                                : t.t(
+                                                    'drivers_hub_change_pin',
+                                                  ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+
+                                  final hero = Container(
                                     padding: const EdgeInsets.all(20),
                                     decoration: BoxDecoration(
                                       color: Colors.white,
                                       borderRadius: BorderRadius.circular(20),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.black.withOpacity(0.03),
+                                          color: Colors.black.withOpacity(
+                                            0.03,
+                                          ),
                                           blurRadius: 8,
                                           offset: const Offset(0, 3),
                                         ),
                                       ],
                                     ),
-                                    child: LayoutBuilder(
-                                      builder: (context, constraints) {
-                                        final isNarrow =
-                                            constraints.maxWidth < 720;
-
-                                        // LEFT: avatar + ID/licence preview
-                                        final left = SizedBox(
-                                          width: isNarrow
-                                              ? double.infinity
-                                              : 230,
-                                          child: Column(
+                                    child: isNarrow
+                                        ? Column(
                                             crossAxisAlignment:
                                                 CrossAxisAlignment.start,
                                             children: [
-                                              ClipRRect(
-                                                borderRadius:
-                                                    BorderRadius.circular(18),
-                                                child: Container(
-                                                  height: 180,
-                                                  width: double.infinity,
-                                                  color: const Color(
-                                                    0xFFE5E7EB,
-                                                  ),
-                                                  child: profileImage == null
-                                                      ? const Icon(
-                                                          Icons.person,
-                                                          size: 72,
-                                                          color: Color(
-                                                            0xFF9CA3AF,
-                                                          ),
-                                                        )
-                                                      : Image(
-                                                          image: profileImage,
-                                                          fit: BoxFit.cover,
-                                                        ),
-                                                ),
-                                              ),
-                                              const SizedBox(height: 12),
-                                              ClipRRect(
-                                                borderRadius:
-                                                    BorderRadius.circular(14),
-                                                child:
-                                                    StreamBuilder<
-                                                      DocumentSnapshot<
-                                                        Map<String, dynamic>
-                                                      >
-                                                    >(
-                                                      stream: snap
-                                                          .data!
-                                                          .reference
-                                                          .collection(
-                                                            'documents',
-                                                          )
-                                                          .doc(
-                                                            'driver_license_front',
-                                                          )
-                                                          .snapshots(),
-                                                      builder: (context, docSnap) {
-                                                        final docData =
-                                                            docSnap.data
-                                                                ?.data() ??
-                                                            const <
-                                                              String,
-                                                              dynamic
-                                                            >{};
-                                                        final url =
-                                                            (docData['downloadUrl'] ??
-                                                                    '')
-                                                                .toString();
-                                                        final fileName =
-                                                            (docData['fileName'] ??
-                                                                    '')
-                                                                .toString();
-                                                        final hasUrl =
-                                                            url.isNotEmpty;
-                                                        final path =
-                                                            Uri.tryParse(url)
-                                                                ?.path
-                                                                .toLowerCase() ??
-                                                            '';
-                                                        final isImage =
-                                                            path.endsWith(
-                                                              '.png',
-                                                            ) ||
-                                                            path.endsWith(
-                                                              '.jpg',
-                                                            ) ||
-                                                            path.endsWith(
-                                                              '.jpeg',
-                                                            ) ||
-                                                            path.endsWith(
-                                                              '.webp',
-                                                            );
-
-                                                        Widget child;
-                                                        if (!hasUrl) {
-                                                          child = Row(
-                                                            children: [
-                                                              Container(
-                                                                padding:
-                                                                    const EdgeInsets.all(
-                                                                      6,
-                                                                    ),
-                                                                decoration: BoxDecoration(
-                                                                  color:
-                                                                      const Color(
-                                                                        0xFFE5E7EB,
-                                                                      ).withOpacity(
-                                                                        0.9,
-                                                                      ),
-                                                                  borderRadius:
-                                                                      BorderRadius.circular(
-                                                                        10,
-                                                                      ),
-                                                                ),
-                                                                child: const Icon(
-                                                                  Icons.badge,
-                                                                  size: 24,
-                                                                  color: Color(
-                                                                    0xFF4B5563,
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                              const SizedBox(
-                                                                width: 10,
-                                                              ),
-                                                              Expanded(
-                                                                child: Text(
-                                                                  t.t(
-                                                                    'drivers_hub_driving_licence_front_preview',
-                                                                  ),
-                                                                  style: TextStyle(
-                                                                    fontSize:
-                                                                        11,
-                                                                    color: Color(
-                                                                      0xFF6B7280,
-                                                                    ),
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                            ],
-                                                          );
-                                                        } else if (isImage) {
-                                                          child = kIsWeb
-                                                              ? buildWebImagePreview(
-                                                                  url,
-                                                                )
-                                                              : Image.network(
-                                                                  url,
-                                                                  fit: BoxFit
-                                                                      .cover,
-                                                                  loadingBuilder:
-                                                                      (
-                                                                        context,
-                                                                        child,
-                                                                        loadingProgress,
-                                                                      ) {
-                                                                        if (loadingProgress ==
-                                                                            null) {
-                                                                          return child;
-                                                                        }
-                                                                        return const Center(
-                                                                          child: CircularProgressIndicator(
-                                                                            strokeWidth:
-                                                                                2,
-                                                                          ),
-                                                                        );
-                                                                      },
-                                                                  errorBuilder:
-                                                                      (
-                                                                        context,
-                                                                        error,
-                                                                        stackTrace,
-                                                                      ) {
-                                                                        return const Center(
-                                                                          child: Icon(
-                                                                            Icons.image_not_supported_outlined,
-                                                                            color: Color(
-                                                                              0xFF9CA3AF,
-                                                                            ),
-                                                                          ),
-                                                                        );
-                                                                      },
-                                                                );
-                                                        } else {
-                                                          child = Row(
-                                                            children: [
-                                                              const Icon(
-                                                                Icons
-                                                                    .insert_drive_file,
-                                                                size: 18,
-                                                                color: Color(
-                                                                  0xFF6B7280,
-                                                                ),
-                                                              ),
-                                                              const SizedBox(
-                                                                width: 8,
-                                                              ),
-                                                              Expanded(
-                                                                child: Text(
-                                                                  fileName.isEmpty
-                                                                      ? t.t(
-                                                                          'driver_license_front',
-                                                                        )
-                                                                      : fileName,
-                                                                  maxLines: 1,
-                                                                  overflow:
-                                                                      TextOverflow
-                                                                          .ellipsis,
-                                                                  style: const TextStyle(
-                                                                    fontSize:
-                                                                        11,
-                                                                    color: Color(
-                                                                      0xFF6B7280,
-                                                                    ),
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                            ],
-                                                          );
-                                                        }
-
-                                                        return Container(
-                                                          height: 80,
-                                                          width:
-                                                              double.infinity,
-                                                          color: const Color(
-                                                            0xFFF3F4F6,
-                                                          ),
-                                                          padding:
-                                                              hasUrl && isImage
-                                                              ? EdgeInsets.zero
-                                                              : const EdgeInsets.all(
-                                                                  10,
-                                                                ),
-                                                          child: child,
-                                                        );
-                                                      },
-                                                    ),
-                                              ),
-                                            ],
-                                          ),
-                                        );
-
-                                        // ---------- Onboarding details with sections ----------
-                                        Widget buildOnboardingDetails(
-                                          bool narrow,
-                                        ) {
-                                          // ----- full list of fields, grouped into sections -----
-
-                                          final personalSection = Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                t.t(
-                                                  'drivers_hub_section_personal_details',
-                                                ),
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Color(0xFFA8a29e),
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              _detailRowEditable(
-                                                driverRef: snap.data!.reference,
-                                                label: t.t(
-                                                  'drivers_hub_field_full_name',
-                                                ),
-                                                value: onboarding['fullName'],
-                                                fieldKey: 'fullName',
-                                              ),
-
-                                              _detailRowEditable(
-                                                driverRef: snap.data!.reference,
-                                                label: t.t(
-                                                  'drivers_hub_field_name_at_birth',
-                                                ),
-                                                value:
-                                                    onboarding['nameAtBirth'],
-                                                fieldKey: 'nameAtBirth',
-                                              ),
-                                              _detailRowEditable(
-                                                driverRef: snap.data!.reference,
-                                                label: t.t(
-                                                  'drivers_hub_field_date_of_birth',
-                                                ),
-                                                value:
-                                                    onboarding['dateOfBirth'],
-                                                fieldKey: 'dateOfBirth',
-                                                isDate: true,
-                                              ),
-                                              _detailRowEditable(
-                                                driverRef: snap.data!.reference,
-                                                label: t.t(
-                                                  'drivers_hub_field_phone',
-                                                ),
-                                                value: onboarding['phone'],
-                                                fieldKey: 'phone',
-                                              ),
-                                            ],
-                                          );
-
-                                          final originSection = Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              const SizedBox(height: 10),
-                                              Text(
-                                                t.t(
-                                                  'drivers_hub_section_origin',
-                                                ),
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Color(0xFFA8a29e),
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              _detailRowEditable(
-                                                driverRef: snap.data!.reference,
-                                                label: t.t(
-                                                  'drivers_hub_field_city_of_birth',
-                                                ),
-                                                value: onboarding['birthCity'],
-                                                fieldKey: 'birthCity',
-                                              ),
-                                              _detailRowEditable(
-                                                driverRef: snap.data!.reference,
-                                                label: t.t(
-                                                  'drivers_hub_field_state_of_birth',
-                                                ),
-                                                value: onboarding['birthState'],
-                                                fieldKey: 'birthState',
-                                              ),
-                                              _detailRowEditable(
-                                                driverRef: snap.data!.reference,
-                                                label: t.t(
-                                                  'drivers_hub_field_nationality_id_card',
-                                                ),
-                                                value:
-                                                    onboarding['nationalityIdCard'],
-                                                fieldKey: 'nationalityIdCard',
-                                              ),
-                                            ],
-                                          );
-
-                                          final addressSection = Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              const SizedBox(height: 10),
-                                              Text(
-                                                t.t(
-                                                  'drivers_hub_section_address',
-                                                ),
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Color(0xFFA8a29e),
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              _detailRowEditable(
-                                                driverRef: snap.data!.reference,
-                                                label: t.t(
-                                                  'drivers_hub_field_street_address',
-                                                ),
-                                                value: onboarding['address'],
-                                                fieldKey: 'address',
-                                              ),
-                                              _detailRowEditable(
-                                                driverRef: snap.data!.reference,
-                                                label: t.t(
-                                                  'drivers_hub_field_city',
-                                                ),
-                                                value: onboarding['city'],
-                                                fieldKey: 'city',
-                                              ),
-                                              _detailRowEditable(
-                                                driverRef: snap.data!.reference,
-                                                label: t.t(
-                                                  'drivers_hub_field_postal_code',
-                                                ),
-                                                value: onboarding['postalCode'],
-                                                fieldKey: 'postalCode',
-                                              ),
-                                              _detailRowEditable(
-                                                driverRef: snap.data!.reference,
-                                                label: t.t(
-                                                  'drivers_hub_field_country',
-                                                ),
-                                                value: onboarding['country'],
-                                                fieldKey: 'country',
-                                              ),
-                                            ],
-                                          );
-
-                                          final workPermitType =
-                                              _normalizeWorkPermitType(
-                                                onboarding['workPermitType'],
-                                                fallbackExpiry:
-                                                    onboarding['residencePermitExpiry'],
-                                              );
-                                          final workVisaExpiryValue =
-                                              (onboarding['workVisaExpiry'] ??
-                                                      onboarding['residencePermitExpiry'])
-                                                  .toString();
-
-                                          final documentsDatesSection = Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              const SizedBox(height: 10),
-                                              Text(
-                                                t.t(
-                                                  'drivers_hub_section_document_expiry_dates',
-                                                ),
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Color(0xFFA8a29e),
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-
-                                              _detailRowEditable(
-                                                driverRef: snap.data!.reference,
-                                                label: t.t(
-                                                  'drivers_hub_field_work_permit_type',
-                                                ),
-                                                value: workPermitType,
-                                                fieldKey: 'workPermitType',
-                                                displayValueBuilder: (_) =>
-                                                    _workPermitTypeLabel(
-                                                      t,
-                                                      workPermitType,
-                                                      fallbackExpiry:
-                                                          onboarding['residencePermitExpiry'],
-                                                    ),
-                                                onEdit: () => _adminEditWorkPermitType(
-                                                  driverRef:
-                                                      snap.data!.reference,
-                                                  initialValue:
-                                                      onboarding['workPermitType'],
-                                                  fallbackExpiry:
-                                                      onboarding['residencePermitExpiry'],
-                                                ),
-                                              ),
-
-                                              _detailRowEditable(
-                                                driverRef: snap.data!.reference,
-                                                label: t.t(
-                                                  'drivers_hub_field_work_start_date',
-                                                ),
-                                                value:
-                                                    onboarding['workStartDate'],
-                                                fieldKey: 'workStartDate',
-                                                isDate: true,
-                                              ),
-
-                                              _detailRowEditable(
-                                                driverRef: snap.data!.reference,
-                                                label: t.t(
-                                                  'drivers_hub_field_annual_vacation_days',
-                                                ),
-                                                value:
-                                                    onboarding['annualVacationDays'] ??
-                                                    20,
-                                                fieldKey: 'annualVacationDays',
-                                                isNumeric: true,
-                                              ),
-
-                                              _remainingVacationDaysRow(
-                                                driverRef: snap.data!.reference,
-                                                onboarding: onboarding,
-                                              ),
-
-                                              _detailRowReadOnly(
-                                                label: t.t(
-                                                  'drivers_hub_field_probezeit_end',
-                                                ),
-                                                value: (() {
-                                                  final start = _parseIsoDate(
-                                                    onboarding['workStartDate']
-                                                        ?.toString(),
-                                                  );
-                                                  final end =
-                                                      _probationEndFromStart(
-                                                        start,
-                                                      );
-                                                  return end == null
-                                                      ? ''
-                                                      : _formatDate(end);
-                                                })(),
-                                              ),
-
-                                              // ✅ Contract expiry now visible
-                                              _detailRowEditable(
-                                                driverRef: snap.data!.reference,
-                                                label: t.t(
-                                                  'drivers_hub_field_contract_expiry',
-                                                ),
-                                                value:
-                                                    onboarding['contractExpiry'],
-                                                fieldKey: 'contractExpiry',
-                                                isDate: true,
-                                              ),
-
-                                              if (workPermitType ==
-                                                  'working_visa')
-                                                _detailRowEditable(
-                                                  driverRef:
-                                                      snap.data!.reference,
-                                                  label: t.t(
-                                                    'drivers_hub_field_work_visa_expiry',
-                                                  ),
-                                                  value: workVisaExpiryValue,
-                                                  fieldKey: 'workVisaExpiry',
-                                                  isDate: true,
-                                                ),
-                                              if (workPermitType ==
-                                                  'working_visa')
-                                                _detailRowEditable(
-                                                  driverRef:
-                                                      snap.data!.reference,
-                                                  label: t.t(
-                                                    'drivers_hub_field_zusatzblatt_expiry',
-                                                  ),
-                                                  value:
-                                                      onboarding['zusatzblattExpiry'],
-                                                  fieldKey: 'zusatzblattExpiry',
-                                                  isDate: true,
-                                                ),
-                                              _detailRowEditable(
-                                                driverRef: snap.data!.reference,
-                                                label: t.t(
-                                                  'drivers_hub_field_id_card_passport_expiry',
-                                                ),
-                                                value:
-                                                    onboarding['idDocExpiry'],
-                                                fieldKey: 'idDocExpiry',
-                                                isDate: true,
-                                              ),
-                                            ],
-                                          );
-
-                                          final licenseSection = Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              const SizedBox(height: 10),
-                                              Text(
-                                                t.t(
-                                                  'drivers_hub_section_driving_license',
-                                                ),
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Color(0xFFA8a29e),
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              _detailRowEditable(
-                                                driverRef: snap.data!.reference,
-                                                label: t.t(
-                                                  'drivers_hub_field_driving_license_number',
-                                                ),
-                                                value:
-                                                    onboarding['licenseNumber'],
-                                                fieldKey: 'licenseNumber',
-                                              ),
-                                              _detailRowEditable(
-                                                driverRef: snap.data!.reference,
-                                                label: t.t(
-                                                  'drivers_hub_field_license_expiry_date',
-                                                ),
-                                                value:
-                                                    onboarding['licenseExpiry'],
-                                                fieldKey: 'licenseExpiry',
-                                                isDate: true,
-                                              ),
-                                            ],
-                                          );
-
-                                          final emergencySection = Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              const SizedBox(height: 10),
-                                              Text(
-                                                t.t(
-                                                  'drivers_hub_section_emergency_contact',
-                                                ),
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Color(0xFFA8a29e),
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              _detailRowEditable(
-                                                driverRef: snap.data!.reference,
-                                                label: t.t(
-                                                  'drivers_hub_field_emergency_contact_name',
-                                                ),
-                                                value:
-                                                    onboarding['emergencyContactName'],
-                                                fieldKey:
-                                                    'emergencyContactName',
-                                              ),
-                                              _detailRowEditable(
-                                                driverRef: snap.data!.reference,
-                                                label: t.t(
-                                                  'drivers_hub_field_emergency_contact_phone',
-                                                ),
-                                                value:
-                                                    onboarding['emergencyContactPhone'],
-                                                fieldKey:
-                                                    'emergencyContactPhone',
-                                              ),
-                                            ],
-                                          );
-
-                                          final paymentSection = Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              const SizedBox(height: 10),
-                                              Text(
-                                                t.t(
-                                                  'drivers_hub_section_payment_tax',
-                                                ),
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Color(0xFFA8a29e),
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              _detailRowEditable(
-                                                driverRef: snap.data!.reference,
-                                                label: t.t(
-                                                  'drivers_hub_field_bank_iban',
-                                                ),
-                                                value: onboarding['bankIban'],
-                                                fieldKey: 'bankIban',
-                                              ),
-                                              _detailRowEditable(
-                                                driverRef: snap.data!.reference,
-                                                label: t.t(
-                                                  'drivers_hub_field_insurance_company',
-                                                ),
-                                                value:
-                                                    onboarding['insuranceCompany'],
-                                                fieldKey: 'insuranceCompany',
-                                              ),
-                                              _detailRowEditable(
-                                                driverRef: snap.data!.reference,
-                                                label: t.t(
-                                                  'drivers_hub_field_tax_id',
-                                                ),
-                                                value: onboarding['taxId'],
-                                                fieldKey: 'taxId',
-                                              ),
-                                            ],
-                                          );
-
-                                          final uniformSection = Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              const SizedBox(height: 10),
-                                              Text(
-                                                t.t(
-                                                  'drivers_hub_section_uniform',
-                                                ),
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Color(0xFFA8a29e),
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              _detailRowEditable(
-                                                driverRef: snap.data!.reference,
-                                                label: t.t(
-                                                  'drivers_hub_field_tshirt_size',
-                                                ),
-                                                value: onboarding['tShirtSize'],
-                                                fieldKey: 'tShirtSize',
-                                              ),
-                                              _detailRowEditable(
-                                                driverRef: snap.data!.reference,
-                                                label: t.t(
-                                                  'drivers_hub_field_shoe_size',
-                                                ),
-                                                value: onboarding['shoeSize'],
-                                                fieldKey: 'shoeSize',
-                                              ),
-                                            ],
-                                          );
-
-                                          final notesSection = Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              const SizedBox(height: 10),
-                                              Text(
-                                                t.t(
-                                                  'drivers_hub_section_other_notes',
-                                                ),
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Color(0xFFA8a29e),
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              _detailRowEditable(
-                                                driverRef: snap.data!.reference,
-                                                label: t.t(
-                                                  'drivers_hub_field_notes',
-                                                ),
-                                                value: onboarding['notes'],
-                                                fieldKey: 'notes',
-                                              ),
-                                            ],
-                                          );
-
-                                          if (narrow) {
-                                            // Mobile / narrow: all sections in ONE column
-                                            return Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                personalSection,
-                                                originSection,
-                                                addressSection,
-                                                documentsDatesSection,
-                                                licenseSection,
-                                                emergencySection,
-                                                paymentSection,
-                                                uniformSection,
-                                                notesSection,
-                                              ],
-                                            );
-                                          } else {
-                                            // Wide: split sections into two columns
-                                            return Row(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Expanded(
-                                                  child: Column(
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
-                                                    children: [
-                                                      personalSection,
-                                                      originSection,
-                                                      addressSection,
-                                                      // emergencySection,
-                                                    ],
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 20),
-                                                Expanded(
-                                                  child: Column(
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
-                                                    children: [
-                                                      documentsDatesSection,
-                                                      licenseSection,
-                                                      paymentSection,
-                                                      uniformSection,
-                                                      // notesSection,
-                                                    ],
-                                                  ),
-                                                ),
-                                              ],
-                                            );
-                                          }
-                                        }
-
-                                        // ---------- RIGHT column: header + onboarding details ----------
-                                        final rightColumn = Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Expanded(
-                                                  child: Column(
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
-                                                    children: [
-                                                      SelectableText(
-                                                        name.isEmpty
-                                                            ? t.t(
-                                                                'dash_no_name',
-                                                              )
-                                                            : name,
-                                                        style: const TextStyle(
-                                                          fontSize: 20,
-                                                          fontWeight:
-                                                              FontWeight.w700,
-                                                        ),
-                                                      ),
-                                                      if (email.isNotEmpty)
-                                                        SelectableText(
-                                                          email,
-                                                          style:
-                                                              const TextStyle(
-                                                                fontSize: 13,
-                                                                color: Color(
-                                                                  0xFF6B7280,
-                                                                ),
-                                                              ),
-                                                        ),
-                                                      if (tid.isNotEmpty)
-                                                        SelectableText(
-                                                          t.tf(
-                                                            'drivers_hub_transporter_id_line',
-                                                            {'id': tid},
-                                                          ),
-                                                          style:
-                                                              const TextStyle(
-                                                                fontSize: 12,
-                                                                color: Color(
-                                                                  0xFF9CA3AF,
-                                                                ),
-                                                              ),
-                                                        ),
-                                                    ],
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 12),
-                                                Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.end,
-                                                  children: [
-                                                    _statusChipFromData(
-                                                      data,
-                                                      ctx2,
-                                                    ),
-                                                    const SizedBox(height: 6),
-                                                    _loginChipFromData(
-                                                      data,
-                                                      ctx2,
-                                                    ),
-                                                    const SizedBox(height: 6),
-                                                    _expiryChipDetailedFromOnboardingRaw(
-                                                      onboarding,
-                                                      ctx2,
-                                                    ),
-                                                  ],
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 12),
-                                            Container(
-                                              width: double.infinity,
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 14,
-                                                    vertical: 12,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: Colors.white,
-                                                borderRadius:
-                                                    BorderRadius.circular(16),
-                                                border: Border.all(
-                                                  color: const Color(
-                                                    0xFFE5E7EB,
-                                                  ),
-                                                ),
-                                              ),
-                                              child: Row(
+                                              Row(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
                                                 children: [
-                                                  Expanded(
-                                                    child: Column(
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .start,
-                                                      children: [
-                                                        Text(
-                                                          t.t(
-                                                            'drivers_hub_notification_pin',
-                                                          ),
-                                                          style: TextStyle(
-                                                            fontSize: 12,
-                                                            fontWeight:
-                                                                FontWeight.w700,
-                                                            color: Color(
-                                                              0xFF6B7280,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        const SizedBox(
-                                                          height: 6,
-                                                        ),
-                                                        Text(
-                                                          pin.isEmpty
-                                                              ? t.t(
-                                                                  'drivers_hub_not_set',
-                                                                )
-                                                              : (showPin
-                                                                    ? pin
-                                                                    : '••••'),
-                                                          style:
-                                                              const TextStyle(
-                                                                fontSize: 16,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w800,
-                                                                color: Color(
-                                                                  0xFF111827,
-                                                                ),
-                                                                letterSpacing:
-                                                                    2,
-                                                              ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                  if (pin.isNotEmpty)
-                                                    IconButton(
-                                                      tooltip: showPin
-                                                          ? t.t(
-                                                              'drivers_hub_hide_pin',
-                                                            )
-                                                          : t.t(
-                                                              'drivers_hub_show_pin',
-                                                            ),
-                                                      onPressed: () =>
-                                                          setStateDialog(
-                                                            () => showPin =
-                                                                !showPin,
-                                                          ),
-                                                      icon: Icon(
-                                                        showPin
-                                                            ? Icons
-                                                                  .visibility_off
-                                                            : Icons.visibility,
-                                                        color: const Color(
-                                                          0xFF6B7280,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  const SizedBox(width: 6),
-                                                  OutlinedButton(
-                                                    onPressed: !canEditPin
-                                                        ? null
-                                                        : () async {
-                                                            await showDialog<
-                                                              void
-                                                            >(
-                                                              context: ctx2,
-                                                              barrierDismissible:
-                                                                  false,
-                                                              builder: (_) =>
-                                                                  SetNotificationPinDialog(
-                                                                    dspUid:
-                                                                        _uid!,
-                                                                    transporterId:
-                                                                        tid.toUpperCase(),
-                                                                    force: true,
-                                                                  ),
-                                                            );
-                                                          },
-                                                    child: Text(
-                                                      pin.isEmpty
-                                                          ? t.t(
-                                                              'drivers_hub_set_pin',
-                                                            )
-                                                          : t.t(
-                                                              'drivers_hub_change_pin',
-                                                            ),
-                                                    ),
-                                                  ),
+                                                  avatar,
+                                                  const SizedBox(width: 14),
+                                                  Expanded(child: identityCol),
                                                 ],
                                               ),
+                                              const SizedBox(height: 14),
+                                              pinCard,
+                                            ],
+                                          )
+                                        : Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              avatar,
+                                              const SizedBox(width: 16),
+                                              Expanded(child: identityCol),
+                                              const SizedBox(width: 16),
+                                              pinCard,
+                                            ],
+                                          ),
+                                  );
+
+                                  // ─── Kacheln ──────────────────────────
+                                  Widget originHeader() => Padding(
+                                        padding: const EdgeInsets.only(
+                                          top: 6,
+                                          bottom: 4,
+                                        ),
+                                        child: Text(
+                                          t.t('drivers_hub_section_origin'),
+                                          style: const TextStyle(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w700,
+                                            letterSpacing: 0.5,
+                                            color: Color(0xFFA8A29E),
+                                          ),
+                                        ),
+                                      );
+
+                                  final personalKachel = _DetailKachel(
+                                    title: t.t(
+                                      'drivers_hub_section_personal_details',
+                                    ),
+                                    icon: Icons.person_rounded,
+                                    children: [
+                                      _detailRowEditable(
+                                        driverRef: driverRef,
+                                        label: t.t(
+                                          'drivers_hub_field_full_name',
+                                        ),
+                                        value: onboarding['fullName'],
+                                        fieldKey: 'fullName',
+                                      ),
+                                      _detailRowEditable(
+                                        driverRef: driverRef,
+                                        label: t.t(
+                                          'drivers_hub_field_name_at_birth',
+                                        ),
+                                        value: onboarding['nameAtBirth'],
+                                        fieldKey: 'nameAtBirth',
+                                      ),
+                                      _detailRowEditable(
+                                        driverRef: driverRef,
+                                        label: t.t(
+                                          'drivers_hub_field_date_of_birth',
+                                        ),
+                                        value: onboarding['dateOfBirth'],
+                                        fieldKey: 'dateOfBirth',
+                                        isDate: true,
+                                      ),
+                                      _detailRowEditable(
+                                        driverRef: driverRef,
+                                        label: t.t('drivers_hub_field_phone'),
+                                        value: onboarding['phone'],
+                                        fieldKey: 'phone',
+                                      ),
+                                      originHeader(),
+                                      _detailRowEditable(
+                                        driverRef: driverRef,
+                                        label: t.t(
+                                          'drivers_hub_field_city_of_birth',
+                                        ),
+                                        value: onboarding['birthCity'],
+                                        fieldKey: 'birthCity',
+                                      ),
+                                      _detailRowEditable(
+                                        driverRef: driverRef,
+                                        label: t.t(
+                                          'drivers_hub_field_state_of_birth',
+                                        ),
+                                        value: onboarding['birthState'],
+                                        fieldKey: 'birthState',
+                                      ),
+                                      _detailRowEditable(
+                                        driverRef: driverRef,
+                                        label: t.t(
+                                          'drivers_hub_field_nationality_id_card',
+                                        ),
+                                        value:
+                                            onboarding['nationalityIdCard'],
+                                        fieldKey: 'nationalityIdCard',
+                                      ),
+                                    ],
+                                  );
+
+                                  final addressKachel = _DetailKachel(
+                                    title:
+                                        t.t('drivers_hub_section_address'),
+                                    icon: Icons.home_rounded,
+                                    children: [
+                                      _detailRowEditable(
+                                        driverRef: driverRef,
+                                        label: t.t(
+                                          'drivers_hub_field_street_address',
+                                        ),
+                                        value: onboarding['address'],
+                                        fieldKey: 'address',
+                                      ),
+                                      _detailRowEditable(
+                                        driverRef: driverRef,
+                                        label: t.t('drivers_hub_field_city'),
+                                        value: onboarding['city'],
+                                        fieldKey: 'city',
+                                      ),
+                                      _detailRowEditable(
+                                        driverRef: driverRef,
+                                        label: t.t(
+                                          'drivers_hub_field_postal_code',
+                                        ),
+                                        value: onboarding['postalCode'],
+                                        fieldKey: 'postalCode',
+                                      ),
+                                      _detailRowEditable(
+                                        driverRef: driverRef,
+                                        label:
+                                            t.t('drivers_hub_field_country'),
+                                        value: onboarding['country'],
+                                        fieldKey: 'country',
+                                      ),
+                                    ],
+                                  );
+
+                                  final licenseKachel = _DetailKachel(
+                                    title: t.t(
+                                      'drivers_hub_section_driving_license',
+                                    ),
+                                    icon: Icons.badge_rounded,
+                                    children: [
+                                      _detailRowEditable(
+                                        driverRef: driverRef,
+                                        label: t.t(
+                                          'drivers_hub_field_driving_license_number',
+                                        ),
+                                        value: onboarding['licenseNumber'],
+                                        fieldKey: 'licenseNumber',
+                                      ),
+                                      _detailRowEditable(
+                                        driverRef: driverRef,
+                                        label: t.t(
+                                          'drivers_hub_field_license_expiry_date',
+                                        ),
+                                        value: onboarding['licenseExpiry'],
+                                        fieldKey: 'licenseExpiry',
+                                        isDate: true,
+                                      ),
+                                    ],
+                                  );
+
+                                  final permitsKachel = _DetailKachel(
+                                    title: t.t(
+                                      'drivers_hub_section_document_expiry_dates',
+                                    ),
+                                    icon: Icons.assignment_rounded,
+                                    children: [
+                                      _detailRowEditable(
+                                        driverRef: driverRef,
+                                        label: t.t(
+                                          'drivers_hub_field_work_permit_type',
+                                        ),
+                                        value: workPermitType,
+                                        fieldKey: 'workPermitType',
+                                        displayValueBuilder: (_) =>
+                                            _workPermitTypeLabel(
+                                              t,
+                                              workPermitType,
+                                              fallbackExpiry: onboarding[
+                                                  'residencePermitExpiry'],
                                             ),
-                                            const SizedBox(height: 18),
-                                            buildOnboardingDetails(isNarrow),
-                                          ],
-                                        );
-
-                                        // ---------- Layout: one column on narrow, side-by-side on wide ----------
-                                        if (isNarrow) {
-                                          return Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              left,
-                                              const SizedBox(height: 16),
-                                              rightColumn, // no Expanded here → avoids the flex error in scroll
-                                            ],
+                                        onEdit: () =>
+                                            _adminEditWorkPermitType(
+                                              driverRef: driverRef,
+                                              initialValue: onboarding[
+                                                  'workPermitType'],
+                                              fallbackExpiry: onboarding[
+                                                  'residencePermitExpiry'],
+                                            ),
+                                      ),
+                                      _detailRowEditable(
+                                        driverRef: driverRef,
+                                        label: t.t(
+                                          'drivers_hub_field_work_start_date',
+                                        ),
+                                        value: onboarding['workStartDate'],
+                                        fieldKey: 'workStartDate',
+                                        isDate: true,
+                                      ),
+                                      _detailRowEditable(
+                                        driverRef: driverRef,
+                                        label: t.t(
+                                          'drivers_hub_field_annual_vacation_days',
+                                        ),
+                                        value: onboarding[
+                                                'annualVacationDays'] ??
+                                            20,
+                                        fieldKey: 'annualVacationDays',
+                                        isNumeric: true,
+                                      ),
+                                      _remainingVacationDaysRow(
+                                        driverRef: driverRef,
+                                        onboarding: onboarding,
+                                      ),
+                                      _detailRowReadOnly(
+                                        label: t.t(
+                                          'drivers_hub_field_probezeit_end',
+                                        ),
+                                        value: (() {
+                                          final start = _parseIsoDate(
+                                            onboarding['workStartDate']
+                                                ?.toString(),
                                           );
-                                        } else {
-                                          return Row(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              left,
-                                              const SizedBox(width: 24),
-                                              Expanded(child: rightColumn),
-                                            ],
-                                          );
-                                        }
-                                      },
+                                          final end =
+                                              _probationEndFromStart(start);
+                                          return end == null
+                                              ? ''
+                                              : _formatDate(end);
+                                        })(),
+                                      ),
+                                      _detailRowEditable(
+                                        driverRef: driverRef,
+                                        label: t.t(
+                                          'drivers_hub_field_contract_expiry',
+                                        ),
+                                        value: onboarding['contractExpiry'],
+                                        fieldKey: 'contractExpiry',
+                                        isDate: true,
+                                      ),
+                                      if (workPermitType == 'working_visa')
+                                        _detailRowEditable(
+                                          driverRef: driverRef,
+                                          label: t.t(
+                                            'drivers_hub_field_work_visa_expiry',
+                                          ),
+                                          value: workVisaExpiryValue,
+                                          fieldKey: 'workVisaExpiry',
+                                          isDate: true,
+                                        ),
+                                      if (workPermitType == 'working_visa')
+                                        _detailRowEditable(
+                                          driverRef: driverRef,
+                                          label: t.t(
+                                            'drivers_hub_field_zusatzblatt_expiry',
+                                          ),
+                                          value: onboarding[
+                                              'zusatzblattExpiry'],
+                                          fieldKey: 'zusatzblattExpiry',
+                                          isDate: true,
+                                        ),
+                                      _detailRowEditable(
+                                        driverRef: driverRef,
+                                        label: t.t(
+                                          'drivers_hub_field_id_card_passport_expiry',
+                                        ),
+                                        value: onboarding['idDocExpiry'],
+                                        fieldKey: 'idDocExpiry',
+                                        isDate: true,
+                                      ),
+                                    ],
+                                  );
+
+                                  final paymentKachel = _DetailKachel(
+                                    title: t.t(
+                                      'drivers_hub_section_payment_tax',
                                     ),
-                                  ),
+                                    icon: Icons.account_balance_rounded,
+                                    children: [
+                                      _detailRowEditable(
+                                        driverRef: driverRef,
+                                        label: t.t(
+                                          'drivers_hub_field_bank_iban',
+                                        ),
+                                        value: onboarding['bankIban'],
+                                        fieldKey: 'bankIban',
+                                      ),
+                                      _detailRowEditable(
+                                        driverRef: driverRef,
+                                        label: t.t(
+                                          'drivers_hub_field_insurance_company',
+                                        ),
+                                        value:
+                                            onboarding['insuranceCompany'],
+                                        fieldKey: 'insuranceCompany',
+                                      ),
+                                      _detailRowEditable(
+                                        driverRef: driverRef,
+                                        label:
+                                            t.t('drivers_hub_field_tax_id'),
+                                        value: onboarding['taxId'],
+                                        fieldKey: 'taxId',
+                                      ),
+                                    ],
+                                  );
 
-                                  const SizedBox(height: 16),
-
-                                  if (tid.isNotEmpty)
-                                    _buildWeeklyScoreSummaryCard(
-                                      transporterId: tid,
-                                      t: t,
-                                      onToggleExpanded: () {
-                                        setStateDialog(() {
-                                          if (_expandedWeeklySummaries.contains(
-                                            tid.trim().toUpperCase(),
-                                          )) {
-                                            _expandedWeeklySummaries.remove(
-                                              tid.trim().toUpperCase(),
-                                            );
-                                          } else {
-                                            _expandedWeeklySummaries.add(
-                                              tid.trim().toUpperCase(),
-                                            );
-                                          }
-                                        });
-                                      },
+                                  final emergencyKachel = _DetailKachel(
+                                    title: t.t(
+                                      'drivers_hub_section_emergency_contact',
                                     ),
+                                    icon: Icons.emergency_rounded,
+                                    children: [
+                                      _detailRowEditable(
+                                        driverRef: driverRef,
+                                        label: t.t(
+                                          'drivers_hub_field_emergency_contact_name',
+                                        ),
+                                        value: onboarding[
+                                            'emergencyContactName'],
+                                        fieldKey: 'emergencyContactName',
+                                      ),
+                                      _detailRowEditable(
+                                        driverRef: driverRef,
+                                        label: t.t(
+                                          'drivers_hub_field_emergency_contact_phone',
+                                        ),
+                                        value: onboarding[
+                                            'emergencyContactPhone'],
+                                        fieldKey: 'emergencyContactPhone',
+                                      ),
+                                    ],
+                                  );
 
-                                  if (tid.isNotEmpty)
-                                    const SizedBox(height: 16),
+                                  final uniformKachel = _DetailKachel(
+                                    title:
+                                        t.t('drivers_hub_section_uniform'),
+                                    icon: Icons.checkroom_rounded,
+                                    children: [
+                                      _detailRowEditable(
+                                        driverRef: driverRef,
+                                        label: t.t(
+                                          'drivers_hub_field_tshirt_size',
+                                        ),
+                                        value: onboarding['tShirtSize'],
+                                        fieldKey: 'tShirtSize',
+                                      ),
+                                      _detailRowEditable(
+                                        driverRef: driverRef,
+                                        label: t.t(
+                                          'drivers_hub_field_shoe_size',
+                                        ),
+                                        value: onboarding['shoeSize'],
+                                        fieldKey: 'shoeSize',
+                                      ),
+                                    ],
+                                  );
 
-                                  // ------------------------------------------------------------------
-                                  // DOCUMENTS CARD
-                                  // ------------------------------------------------------------------
-                                  Container(
+                                  final notesKachel = _DetailKachel(
+                                    title: t.t(
+                                      'drivers_hub_section_other_notes',
+                                    ),
+                                    icon: Icons.sticky_note_2_rounded,
+                                    children: [
+                                      _detailRowEditable(
+                                        driverRef: driverRef,
+                                        label:
+                                            t.t('drivers_hub_field_notes'),
+                                        value: onboarding['notes'],
+                                        fieldKey: 'notes',
+                                      ),
+                                    ],
+                                  );
+
+                                  // ─── Documents card ───────────────────
+                                  final documentsCard = Container(
                                     width: double.infinity,
                                     padding: const EdgeInsets.all(18),
                                     decoration: BoxDecoration(
@@ -3003,7 +2549,9 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                       borderRadius: BorderRadius.circular(20),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.black.withOpacity(0.02),
+                                          color: Colors.black.withOpacity(
+                                            0.02,
+                                          ),
                                           blurRadius: 6,
                                           offset: const Offset(0, 2),
                                         ),
@@ -3016,27 +2564,75 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                         _AdminDriverToolsRow(
                                           onUploadDoc: () =>
                                               _showAdminUploadDocDialog(
-                                                snap.data!.reference,
+                                                driverRef,
                                               ),
                                         ),
                                         const SizedBox(height: 12),
                                         _DriverDocumentsList(
-                                          driverRef: snap.data!.reference,
+                                          driverRef: driverRef,
                                           driverName: name,
                                           onUploadDoc: (docType) =>
                                               _adminPickAndUploadDriverDoc(
-                                                driverRef: snap.data!.reference,
+                                                driverRef: driverRef,
                                                 docType: docType,
                                               ),
                                         ),
                                       ],
                                     ),
-                                  ),
-                                ],
+                                  );
+
+                                  return Column(
+                                    children: [
+                                      hero,
+                                      const SizedBox(height: 16),
+                                      gridRow(
+                                        personalKachel,
+                                        addressKachel,
+                                      ),
+                                      const SizedBox(height: 16),
+                                      gridRow(
+                                        licenseKachel,
+                                        permitsKachel,
+                                      ),
+                                      const SizedBox(height: 16),
+                                      gridRow(
+                                        paymentKachel,
+                                        emergencyKachel,
+                                      ),
+                                      const SizedBox(height: 16),
+                                      gridRow(uniformKachel, notesKachel),
+                                      const SizedBox(height: 16),
+                                      if (tid.isNotEmpty)
+                                        _buildWeeklyScoreSummaryCard(
+                                          transporterId: tid,
+                                          t: t,
+                                          onToggleExpanded: () {
+                                            setStateDialog(() {
+                                              if (_expandedWeeklySummaries
+                                                  .contains(
+                                                tid.trim().toUpperCase(),
+                                              )) {
+                                                _expandedWeeklySummaries
+                                                    .remove(
+                                                  tid.trim().toUpperCase(),
+                                                );
+                                              } else {
+                                                _expandedWeeklySummaries.add(
+                                                  tid.trim().toUpperCase(),
+                                                );
+                                              }
+                                            });
+                                          },
+                                        ),
+                                      if (tid.isNotEmpty)
+                                        const SizedBox(height: 16),
+                                      documentsCard,
+                                    ],
+                                  );
+                                },
                               ),
                             ),
                           ),
-
                           const SizedBox(height: 8),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.end,
@@ -4185,6 +3781,77 @@ String _driversHubWorkPermitTypeLabel(
     case 'eu':
     default:
       return t.t('drivers_hub_work_permit_eu');
+  }
+}
+
+/// One category card on the driver-detail dashboard. Renders a header
+/// row (icon + uppercase title + optional trailing) and a stack of
+/// detail rows below. Used by `_openDriverDetails` to group the
+/// onboarding fields into "Kacheln" — Personal, Address, Driving
+/// Licence, Documents & Permits, Payment / Tax, Emergency, Uniform,
+/// Notes.
+class _DetailKachel extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final List<Widget> children;
+
+  const _DetailKachel({
+    required this.title,
+    required this.icon,
+    required this.children,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.025),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6F2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, size: 16, color: const Color(0xFF0E5C45)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.6,
+                    color: Color(0xFF6B7280),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ...children,
+        ],
+      ),
+    );
   }
 }
 

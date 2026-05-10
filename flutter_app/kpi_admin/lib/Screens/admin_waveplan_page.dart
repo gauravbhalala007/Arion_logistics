@@ -13,6 +13,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../localization/app_localizations.dart';
 import '../models/waveplan_route.dart';
 import '../theme/app_button_style.dart';
 import '../theme/app_colors.dart';
@@ -87,8 +88,6 @@ class _ProgramSnapshot {
   bool atlasConfirmed;
   bool isPublished;
   DateTime? publishedAt;
-  List<String> selectedDispatchers;
-  Map<String, _ShiftRange> shiftByDispatcher;
   String generalNotes;
 
   _ProgramSnapshot({
@@ -98,14 +97,10 @@ class _ProgramSnapshot {
     this.atlasConfirmed = false,
     this.isPublished = false,
     this.publishedAt,
-    List<String>? selectedDispatchers,
-    Map<String, _ShiftRange>? shiftByDispatcher,
     this.generalNotes = '',
   })  : routes = routes ?? [],
         unassigned = unassigned ?? [],
-        atlasByRoute = atlasByRoute ?? {},
-        selectedDispatchers = selectedDispatchers ?? [],
-        shiftByDispatcher = shiftByDispatcher ?? {};
+        atlasByRoute = atlasByRoute ?? {};
 }
 
 const List<Map<String, String>> _programs = [
@@ -115,10 +110,10 @@ const List<Map<String, String>> _programs = [
 ];
 
 class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
-  // Per-program saved state. Default to the sample data on Sameday A
-  // so the dispatcher has something to play with after first load.
+  // Per-program saved state. Each program starts empty — the dispatcher
+  // imports a fresh waveplan every day via the paste-box.
   final Map<String, _ProgramSnapshot> _saved = {
-    'sameday_a': _ProgramSnapshot(routes: List.of(_sampleRoutes)),
+    'sameday_a': _ProgramSnapshot(),
     'nextday': _ProgramSnapshot(),
     'sameday_c': _ProgramSnapshot(),
   };
@@ -171,6 +166,9 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
 
   /// Replace all visible state with the snapshot of [programKey].
   /// Caller should `setState` so the UI rebuilds.
+  ///
+  /// Dispatchers and shift brackets are intentionally NOT swapped —
+  /// they are page-level state shared across all three programs.
   void _loadProgram(String programKey) {
     final snap = _saved[programKey] ?? _ProgramSnapshot();
     _routes = snap.routes;
@@ -183,18 +181,13 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
     _atlasConfirmed = snap.atlasConfirmed;
     _isPublished = snap.isPublished;
     _publishedAt = snap.publishedAt;
-    _selectedDispatchers
-      ..clear()
-      ..addAll(snap.selectedDispatchers);
-    _shiftByDispatcher
-      ..clear()
-      ..addAll(snap.shiftByDispatcher);
     _generalNotes = snap.generalNotes;
     _waveAnchors.clear();
   }
 
   /// Persist the visible state back into the snapshot for [programKey]
-  /// before the user navigates to another program.
+  /// before the user navigates to another program. Dispatcher state
+  /// is shared and stored at page level, not in the snapshot.
   void _saveProgram(String programKey) {
     _saved[programKey] = _ProgramSnapshot(
       routes: List.of(_routes),
@@ -205,8 +198,6 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
       atlasConfirmed: _atlasConfirmed,
       isPublished: _isPublished,
       publishedAt: _publishedAt,
-      selectedDispatchers: List.of(_selectedDispatchers),
-      shiftByDispatcher: Map.of(_shiftByDispatcher),
       generalNotes: _generalNotes,
     );
   }
@@ -246,17 +237,6 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
 
   GlobalKey _anchorFor(String wave) =>
       _waveAnchors.putIfAbsent(wave, () => GlobalKey());
-
-  void _jumpToWave(String wave) {
-    final ctx = _waveAnchors[wave]?.currentContext;
-    if (ctx == null) return;
-    Scrollable.ensureVisible(
-      ctx,
-      duration: const Duration(milliseconds: 320),
-      curve: Curves.easeOutCubic,
-      alignment: 0,
-    );
-  }
 
   /// Streams the same Firestore source the **Drivers Hub** writes to:
   /// `users/{uid}/drivers/{doc}` with fields `transporterId` (stored
@@ -306,12 +286,6 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
   }
 
   // ─── Wave helpers ───────────────────────────────────────────────────────
-
-  List<String> _wavesOf(List<WaveplanRoute> rs) {
-    final set = <String>{for (final r in rs) r.dispatchTime};
-    final list = set.toList()..sort();
-    return list;
-  }
 
   /// Routes ordered by wave (ascending) and then by dispatch slot.
   List<WaveplanRoute> _routesSorted() {
@@ -390,7 +364,6 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
 
   @override
   Widget build(BuildContext context) {
-    final waves = _wavesOf(_routes);
     final routes = _routesSorted();
     final isNarrow = MediaQuery.of(context).size.width < 1100;
 
@@ -406,14 +379,64 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _ProgramTabs(
-                    active: _activeProgram,
-                    onSelect: _switchProgram,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      _ProgramTabs(
+                        active: _activeProgram,
+                        onSelect: _switchProgram,
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: StreamBuilder<List<String>>(
+                          stream: _dispatcherNamesStream,
+                          builder: (context, dispSnap) {
+                            final available =
+                                dispSnap.data ?? const <String>[];
+                            return _DispatcherBar(
+                              available: available,
+                              selected: _selectedDispatchers,
+                              shiftByDispatcher: _shiftByDispatcher,
+                              maxSelectable: _maxDispatchers,
+                              onAddDispatcher: (name) {
+                                if (_selectedDispatchers.contains(name)) return;
+                                if (_selectedDispatchers.length >=
+                                    _maxDispatchers) {
+                                  return;
+                                }
+                                setState(() {
+                                  _selectedDispatchers.add(name);
+                                  _shiftByDispatcher[name] = _defaultShiftFor(
+                                    _selectedDispatchers.length - 1,
+                                  );
+                                });
+                              },
+                              onRemoveDispatcher: (name) {
+                                setState(() {
+                                  _selectedDispatchers.remove(name);
+                                  _shiftByDispatcher.remove(name);
+                                });
+                              },
+                              onShiftChanged: (name, range) {
+                                setState(() {
+                                  _shiftByDispatcher[name] = range;
+                                });
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   _Header(
+                    programLabel: _programs.firstWhere(
+                      (p) => p['key'] == _activeProgram,
+                      orElse: () => _programs[0],
+                    )['label']!,
                     onPaste: _showPasteDialog,
                     onAtlasPaste: _showAtlasPasteDialog,
+                    onNotesEdit: _showNotesDialog,
                     onClear: _routes.isEmpty ? null : _clearWaveplan,
                     onPublishToggle:
                         (_routes.isEmpty || !_atlasConfirmed) && !_isPublished
@@ -426,57 +449,7 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
                     atlasTotal: _atlasByRoute.values
                         .fold<int>(0, (s, l) => s + l.length),
                     atlasConfirmed: _atlasConfirmed,
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  StreamBuilder<List<String>>(
-                    stream: _dispatcherNamesStream,
-                    builder: (context, dispSnap) {
-                      final available = dispSnap.data ?? const <String>[];
-                      return _DispatcherBar(
-                        available: available,
-                        selected: _selectedDispatchers,
-                        shiftByDispatcher: _shiftByDispatcher,
-                        maxSelectable: _maxDispatchers,
-                        onAddDispatcher: (name) {
-                          if (_selectedDispatchers.contains(name)) return;
-                          if (_selectedDispatchers.length >=
-                              _maxDispatchers) {
-                            return;
-                          }
-                          setState(() {
-                            _selectedDispatchers.add(name);
-                            _shiftByDispatcher[name] = _defaultShiftFor(
-                              _selectedDispatchers.length - 1,
-                            );
-                          });
-                        },
-                        onRemoveDispatcher: (name) {
-                          setState(() {
-                            _selectedDispatchers.remove(name);
-                            _shiftByDispatcher.remove(name);
-                          });
-                        },
-                        onShiftChanged: (name, range) {
-                          setState(() {
-                            _shiftByDispatcher[name] = range;
-                          });
-                        },
-                      );
-                    },
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  _NotesBar(
-                    initial: _generalNotes,
-                    onChanged: (v) => _generalNotes = v,
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  _WaveJumpBar(
-                    waves: waves,
-                    routesPerWave: {
-                      for (final w in waves)
-                        w: _routes.where((r) => r.dispatchTime == w).length,
-                    },
-                    onJump: _jumpToWave,
+                    notesLength: _generalNotes.trim().length,
                   ),
                   const SizedBox(height: AppSpacing.md),
                   Expanded(
@@ -518,19 +491,20 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
   // ─── Import / paste ───────────────────────────────────────────────────
 
   Future<void> _showAtlasPasteDialog() async {
+    final t = AppLocalizations.of(context);
     final controller = TextEditingController();
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(
+            const Icon(
               Icons.inventory_2_rounded,
               color: AppColors.warning,
               size: 20,
             ),
-            SizedBox(width: 8),
-            Text('Atlas-Pakete einfügen'),
+            const SizedBox(width: 8),
+            Text(t.t('waveplan_atlas_dialog_title')),
           ],
         ),
         content: SizedBox(
@@ -540,11 +514,7 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Aus der E-Mail kopieren und hier einfügen. Erwartet: '
-                'eine Zeile pro Paket im Format '
-                '"Tracking-ID - Route-Code - Transporter-ID". '
-                'Der Fahrer sieht den Hinweis, das Paket beim Dispatcher '
-                'abzuholen.',
+                t.t('waveplan_atlas_dialog_intro'),
                 style: AppTypography.footnote.copyWith(
                   color: AppColors.labelSecondaryLight,
                 ),
@@ -573,16 +543,16 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Abbrechen'),
+            child: Text(t.t('waveplan_btn_cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(_kAtlasNoneToday),
-            child: const Text('Keine Atlas-Pakete für heute'),
+            child: Text(t.t('waveplan_atlas_dialog_btn_none_today')),
           ),
           FilledButton(
             style: AppButtonStyle.of(AppButtonVariant.primary),
             onPressed: () => Navigator.of(ctx).pop(controller.text),
-            child: const Text('Importieren'),
+            child: Text(t.t('waveplan_btn_import')),
           ),
         ],
       ),
@@ -597,10 +567,8 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
       });
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Keine Atlas-Pakete für heute bestätigt — Publish ist freigegeben.',
-          ),
+        SnackBar(
+          content: Text(t.t('waveplan_snack_atlas_none_confirmed')),
         ),
       );
       return;
@@ -612,8 +580,8 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
     if (parsed.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Konnte keine gültigen Atlas-Pakete erkennen.'),
+        SnackBar(
+          content: Text(t.t('waveplan_snack_atlas_invalid')),
         ),
       );
       return;
@@ -629,7 +597,10 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          '$total Atlas-Pakete für ${parsed.length} Routen importiert.',
+          t.tf('waveplan_snack_atlas_imported', {
+            'total': '$total',
+            'routes': '${parsed.length}',
+          }),
         ),
       ),
     );
@@ -657,12 +628,85 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
     return out;
   }
 
+  /// Notes editor for the active program. Each program (Sameday A,
+  /// Nextday, Sameday C) carries its own notes line — switching tabs
+  /// swaps the persisted draft.
+  Future<void> _showNotesDialog() async {
+    final t = AppLocalizations.of(context);
+    final controller = TextEditingController(text: _generalNotes);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(
+              Icons.campaign_rounded,
+              color: AppColors.codriverDeep,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Text(t.t('waveplan_notes_dialog_title')),
+          ],
+        ),
+        content: SizedBox(
+          width: 520,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                t.t('waveplan_notes_dialog_intro'),
+                style: AppTypography.footnote.copyWith(
+                  color: AppColors.labelSecondaryLight,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              TextField(
+                controller: controller,
+                minLines: 4,
+                maxLines: 10,
+                autofocus: true,
+                style: AppTypography.footnote.copyWith(
+                  color: AppColors.codriverGraphite,
+                  fontWeight: FontWeight.w600,
+                  height: 1.4,
+                ),
+                decoration: InputDecoration(
+                  hintText: t.t('waveplan_notes_dialog_hint'),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(t.t('waveplan_btn_cancel')),
+          ),
+          FilledButton(
+            style: AppButtonStyle.of(AppButtonVariant.primary),
+            onPressed: () => Navigator.of(ctx).pop(controller.text),
+            child: Text(t.t('waveplan_btn_save')),
+          ),
+        ],
+      ),
+    );
+    if (result == null) return;
+    setState(() {
+      _generalNotes = result;
+    });
+  }
+
   Future<void> _showPasteDialog() async {
+    final t = AppLocalizations.of(context);
     final controller = TextEditingController();
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Waveplan einfügen'),
+        title: Text(t.t('waveplan_paste_dialog_title')),
         content: SizedBox(
           width: 560,
           child: Column(
@@ -670,10 +714,7 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Tabelle aus Excel oder Webseite kopieren und hier einfügen. '
-                'Erwartet: 9 Felder pro Route in dieser Reihenfolge — '
-                'dispatchTime, shiftEnd, routeCode, routeId, dispatchArea, '
-                'spur, "TID / DSP / TID", DSP, serviceType.',
+                t.t('waveplan_paste_dialog_intro'),
                 style: AppTypography.footnote.copyWith(
                   color: AppColors.labelSecondaryLight,
                 ),
@@ -699,12 +740,12 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Abbrechen'),
+            child: Text(t.t('waveplan_btn_cancel')),
           ),
           FilledButton(
             style: AppButtonStyle.of(AppButtonVariant.primary),
             onPressed: () => Navigator.of(ctx).pop(controller.text),
-            child: const Text('Importieren'),
+            child: Text(t.t('waveplan_btn_import')),
           ),
         ],
       ),
@@ -714,7 +755,7 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
     if (parsed.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Konnte keine gültigen Routen erkennen.')),
+        SnackBar(content: Text(t.t('waveplan_snack_routes_invalid'))),
       );
       return;
     }
@@ -725,7 +766,11 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
     });
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${parsed.length} Routen importiert.')),
+      SnackBar(
+        content: Text(
+          t.tf('waveplan_snack_routes_imported', {'count': '${parsed.length}'}),
+        ),
+      ),
     );
   }
 
@@ -810,10 +855,11 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
   /// `users/{adminUid}/published_waveplans/{date}`. The driver app
   /// streams that doc and shows the assignment + carpool tab live.
   Future<void> _togglePublish(Map<String, String> namesMap) async {
+    final t = AppLocalizations.of(context);
     final ref = _publishedDocRef();
     if (ref == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Bitte erst einloggen.')),
+        SnackBar(content: Text(t.t('waveplan_snack_login_required'))),
       );
       return;
     }
@@ -825,7 +871,11 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Unpublish fehlgeschlagen: $e')),
+          SnackBar(
+            content: Text(
+              t.tf('waveplan_snack_unpublish_failed', {'error': '$e'}),
+            ),
+          ),
         );
         return;
       }
@@ -835,10 +885,8 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
         _publishedAt = null;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Veröffentlichung zurückgenommen — Fahrer sehen nichts mehr.',
-          ),
+        SnackBar(
+          content: Text(t.t('waveplan_snack_unpublished')),
         ),
       );
       return;
@@ -881,7 +929,11 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Publish fehlgeschlagen: $e')),
+        SnackBar(
+          content: Text(
+            t.tf('waveplan_snack_publish_failed', {'error': '$e'}),
+          ),
+        ),
       );
       return;
     }
@@ -891,32 +943,28 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
       _publishedAt = DateTime.now();
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Waveplan veröffentlicht — Fahrer sehen jetzt ihre Wave.',
-        ),
+      SnackBar(
+        content: Text(t.t('waveplan_snack_published')),
       ),
     );
   }
 
   Future<void> _clearWaveplan() async {
+    final t = AppLocalizations.of(context);
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Waveplan leeren?'),
-        content: const Text(
-          'Alle Routen und Zuweisungen werden gelöscht. '
-          'Diese Aktion kann nicht rückgängig gemacht werden.',
-        ),
+        title: Text(t.t('waveplan_clear_dialog_title')),
+        content: Text(t.t('waveplan_clear_dialog_body')),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Abbrechen'),
+            child: Text(t.t('waveplan_btn_cancel')),
           ),
           FilledButton(
             style: AppButtonStyle.of(AppButtonVariant.destructive),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Leeren'),
+            child: Text(t.t('waveplan_btn_clear')),
           ),
         ],
       ),
@@ -1050,8 +1098,10 @@ class _StackedLayout extends StatelessWidget {
 // ════════════════════════════════════════════════════════════════════════════
 
 class _Header extends StatelessWidget {
+  final String programLabel;
   final VoidCallback onPaste;
   final VoidCallback onAtlasPaste;
+  final VoidCallback onNotesEdit;
   final VoidCallback? onClear;
   final VoidCallback? onPublishToggle;
   final bool isPublished;
@@ -1060,10 +1110,13 @@ class _Header extends StatelessWidget {
   final int assignedCount;
   final int atlasTotal;
   final bool atlasConfirmed;
+  final int notesLength;
 
   const _Header({
+    required this.programLabel,
     required this.onPaste,
     required this.onAtlasPaste,
+    required this.onNotesEdit,
     required this.onClear,
     required this.onPublishToggle,
     required this.isPublished,
@@ -1072,19 +1125,33 @@ class _Header extends StatelessWidget {
     required this.assignedCount,
     required this.atlasTotal,
     required this.atlasConfirmed,
+    required this.notesLength,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final t = AppLocalizations.of(context);
+    // Order:
+    //   1. Wave data (title + paste + stats)
+    //   2. Atlas
+    //   3. Note
+    //   (Spacer)
+    //   Clear · Publish
+    //
+    // Wrapped in a Row so the right-aligned items stay flush right on
+    // wide screens; the left side uses a Wrap so it line-breaks on
+    // narrow screens instead of clipping.
+    final left = Wrap(
+      spacing: AppSpacing.xs,
+      runSpacing: AppSpacing.xs,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         Text(
-          'Waveplan',
+          'Waveplan · $programLabel',
           style: AppTypography.title2.copyWith(
             color: AppColors.codriverGraphite,
           ),
         ),
-        const SizedBox(width: AppSpacing.sm),
         Container(
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.sm,
@@ -1093,47 +1160,80 @@ class _Header extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.green50,
             borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: AppColors.codriverGreen,
+              width: 1,
+            ),
           ),
           child: Text(
-            '$assignedCount / $routeCount zugewiesen',
+            t.tf('waveplan_assigned_count', {
+              'assigned': '$assignedCount',
+              'total': '$routeCount',
+            }),
             style: AppTypography.caption1.copyWith(
               color: AppColors.codriverDeep,
               fontWeight: FontWeight.w600,
             ),
           ),
         ),
-        const Spacer(),
+        const SizedBox(width: AppSpacing.sm),
         _SmallActionButton(
           icon: Icons.content_paste_rounded,
-          label: 'Wave einfügen',
+          label: t.t('waveplan_btn_paste_wave'),
           onTap: onPaste,
         ),
-        const SizedBox(width: AppSpacing.xs),
         _SmallActionButton(
           icon: atlasConfirmed && atlasTotal == 0
               ? Icons.check_circle_outline_rounded
               : Icons.inventory_2_rounded,
           label: atlasTotal > 0
-              ? 'Atlas · $atlasTotal'
-              : (atlasConfirmed ? 'Atlas · keine' : 'Atlas'),
+              ? t.tf('waveplan_btn_atlas_count', {'count': '$atlasTotal'})
+              : (atlasConfirmed
+                  ? t.t('waveplan_btn_atlas_none')
+                  : t.t('waveplan_btn_atlas')),
           onTap: onAtlasPaste,
           accent: atlasConfirmed && atlasTotal == 0
               ? AppColors.success
               : AppColors.warning,
         ),
-        const SizedBox(width: AppSpacing.xs),
+        _SmallActionButton(
+          icon: notesLength > 0
+              ? Icons.sticky_note_2_rounded
+              : Icons.edit_note_rounded,
+          label: notesLength > 0
+              ? t.tf('waveplan_btn_notes_count', {'count': '$notesLength'})
+              : t.t('waveplan_btn_notes'),
+          onTap: onNotesEdit,
+          accent: notesLength > 0 ? AppColors.codriverDeep : null,
+        ),
+      ],
+    );
+
+    final right = Wrap(
+      spacing: AppSpacing.xs,
+      runSpacing: AppSpacing.xs,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
         _SmallActionButton(
           icon: Icons.delete_outline_rounded,
-          label: 'Leeren',
+          label: t.t('waveplan_btn_clear'),
           onTap: onClear,
           danger: true,
         ),
-        const SizedBox(width: AppSpacing.sm),
         _PublishButton(
           isPublished: isPublished,
           publishedAt: publishedAt,
           onToggle: onPublishToggle,
         ),
+      ],
+    );
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(child: left),
+        const SizedBox(width: AppSpacing.sm),
+        right,
       ],
     );
   }
@@ -1187,6 +1287,7 @@ class _PublishButtonState extends State<_PublishButton>
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context);
     final published = widget.isPublished;
     final disabled = widget.onToggle == null;
     final bg = disabled
@@ -1203,7 +1304,7 @@ class _PublishButtonState extends State<_PublishButton>
       onExit: (_) => setState(() => _hovered = false),
       child: Tooltip(
         message: disabled
-            ? 'Erst Wave-Daten und Atlas-Status setzen.'
+            ? loc.t('waveplan_publish_disabled_tooltip')
             : '',
         child: GestureDetector(
           onTap: widget.onToggle,
@@ -1258,8 +1359,10 @@ class _PublishButtonState extends State<_PublishButton>
                 duration: const Duration(milliseconds: 200),
                 child: Text(
                   published
-                      ? 'Veröffentlicht  ·  ${_timeLabel()}  ·  Unpublish'
-                      : 'Waveplan veröffentlichen',
+                      ? loc.tf('waveplan_published_label', {
+                          'time': _timeLabel(),
+                        })
+                      : loc.t('waveplan_publish_label'),
                   key: ValueKey(published),
                   style: AppTypography.subheadline.copyWith(
                     color: Colors.white,
@@ -1426,106 +1529,6 @@ class _ProgramTab extends StatelessWidget {
   }
 }
 
-/// A row of jump-to-wave buttons. Tapping a button scrolls the list
-/// to the corresponding wave heading. Replaces the earlier tab pattern
-/// — every wave is visible at once, the buttons are just shortcuts.
-class _WaveJumpBar extends StatelessWidget {
-  final List<String> waves;
-  final Map<String, int> routesPerWave;
-  final ValueChanged<String> onJump;
-
-  const _WaveJumpBar({
-    required this.waves,
-    required this.routesPerWave,
-    required this.onJump,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: AppSpacing.xs,
-      runSpacing: AppSpacing.xs,
-      children: [
-        for (final w in waves)
-          _WaveJumpChip(
-            label: 'Wave ${w.substring(0, 5)}',
-            count: routesPerWave[w] ?? 0,
-            onTap: () => onJump(w),
-          ),
-      ],
-    );
-  }
-}
-
-class _WaveJumpChip extends StatelessWidget {
-  final String label;
-  final int count;
-  final VoidCallback onTap;
-
-  const _WaveJumpChip({
-    required this.label,
-    required this.count,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: 8,
-          ),
-          decoration: BoxDecoration(
-            color: AppColors.surfaceElevatedLight,
-            borderRadius: BorderRadius.circular(999),
-            boxShadow: AppElevation.level1,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.arrow_downward_rounded,
-                size: 14,
-                color: AppColors.codriverDeep,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: AppTypography.subheadline.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.codriverGraphite,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 2,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.green50,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  '$count',
-                  style: AppTypography.caption2.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.codriverDeep,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 // ════════════════════════════════════════════════════════════════════════════
 //  Route list + Route card
 // ════════════════════════════════════════════════════════════════════════════
@@ -1553,18 +1556,23 @@ class _RouteList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Build a flat list of (header / route) entries grouped by wave.
+    // routeIndex carries an alternate-row flag for the zebra striping —
+    // we restart the count at each new wave so the first route under
+    // a header always gets the same band.
     final items = <_ListItem>[];
     String? currentWave;
     int waveCount = 0;
+    int routeIndex = 0;
     for (var i = 0; i < routes.length; i++) {
       final r = routes[i];
       if (r.dispatchTime != currentWave) {
         currentWave = r.dispatchTime;
-        // Count routes for this wave to display in the header.
         waveCount = routes.where((x) => x.dispatchTime == currentWave).length;
         items.add(_HeaderItem(currentWave!, waveCount));
+        routeIndex = 0;
       }
-      items.add(_RouteItem(r));
+      items.add(_RouteItem(r, routeIndex.isOdd));
+      routeIndex++;
     }
 
     return ListView.builder(
@@ -1582,16 +1590,14 @@ class _RouteList extends StatelessWidget {
             child: _WaveSectionHeader(wave: it.wave, count: it.count),
           );
         }
-        final route = (it as _RouteItem).route;
-        return Padding(
-          padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-          child: _RouteCard(
-            route: route,
-            atlasTrackingIds: atlasFor(route.routeCode),
-            resolveName: resolveName,
-            onAssign: (tid) => onAssign(route.routeId, tid),
-            onUnassign: () => onUnassign(route.routeId),
-          ),
+        final routeItem = it as _RouteItem;
+        return _RouteCard(
+          route: routeItem.route,
+          atlasTrackingIds: atlasFor(routeItem.route.routeCode),
+          resolveName: resolveName,
+          onAssign: (tid) => onAssign(routeItem.route.routeId, tid),
+          onUnassign: () => onUnassign(routeItem.route.routeId),
+          isAlternate: routeItem.isAlternate,
         );
       },
     );
@@ -1623,101 +1629,83 @@ class _DispatcherBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     final remaining = available.where((n) => !selected.contains(n)).toList();
     final canAddMore = selected.length < maxSelectable;
 
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.sm),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: 4,
+      ),
       decoration: BoxDecoration(
         color: AppColors.surfaceElevatedLight,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(999),
         boxShadow: AppElevation.level1,
         border: Border.all(
           color: AppColors.separatorLight.withOpacity(0.4),
           width: 0.5,
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.headset_mic_rounded,
-                size: 16,
-                color: AppColors.codriverDeep,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                'Dispatcher',
-                style: AppTypography.caption2.copyWith(
-                  color: AppColors.labelSecondaryLight,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.4,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                '· ${selected.length} / $maxSelectable',
-                style: AppTypography.caption2.copyWith(
-                  color: AppColors.labelTertiaryLight,
-                ),
-              ),
-            ],
+          const SizedBox(width: 4),
+          const Icon(
+            Icons.headset_mic_rounded,
+            size: 16,
+            color: AppColors.codriverDeep,
           ),
-          const SizedBox(height: AppSpacing.xs),
-          if (available.isEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 4, bottom: 4),
-              child: Text(
-                'Keine Dispatcher konfiguriert — auf der '
-                '"Dispatcher Pill"-Seite anlegen.',
-                style: AppTypography.footnote.copyWith(
-                  color: AppColors.labelSecondaryLight,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            )
-          else
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (final name in selected)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: _DispatcherRow(
-                      name: name,
-                      range: shiftByDispatcher[name] ??
-                          _defaultShiftFor(selected.indexOf(name)),
-                      onShiftChanged: (r) => onShiftChanged(name, r),
-                      onRemove: () => onRemoveDispatcher(name),
+          const SizedBox(width: 6),
+          Text(
+            t.t('waveplan_dispatcher_label'),
+            style: AppTypography.caption2.copyWith(
+              color: AppColors.labelSecondaryLight,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.4,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: available.isEmpty
+                ? Text(
+                    t.t('waveplan_dispatcher_empty'),
+                    style: AppTypography.footnote.copyWith(
+                      color: AppColors.labelSecondaryLight,
+                      fontStyle: FontStyle.italic,
                     ),
-                  ),
-                if (canAddMore && remaining.isNotEmpty)
-                  Wrap(
+                  )
+                : Wrap(
                     spacing: 6,
                     runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      for (final name in remaining)
-                        _AddDispatcherChip(
+                      for (final name in selected)
+                        _DispatcherRow(
                           name: name,
-                          onTap: () => onAddDispatcher(name),
+                          range: shiftByDispatcher[name] ??
+                              _defaultShiftFor(selected.indexOf(name)),
+                          onShiftChanged: (r) => onShiftChanged(name, r),
+                          onRemove: () => onRemoveDispatcher(name),
+                        ),
+                      if (canAddMore && remaining.isNotEmpty)
+                        for (final name in remaining)
+                          _AddDispatcherChip(
+                            name: name,
+                            onTap: () => onAddDispatcher(name),
+                          ),
+                      if (!canAddMore)
+                        Text(
+                          t.tf('waveplan_dispatcher_max', {
+                            'n': '$maxSelectable',
+                          }),
+                          style: AppTypography.caption2.copyWith(
+                            color: AppColors.labelTertiaryLight,
+                            fontStyle: FontStyle.italic,
+                          ),
                         ),
                     ],
-                  )
-                else if (!canAddMore)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Text(
-                      'Maximal $maxSelectable Dispatcher erreicht.',
-                      style: AppTypography.caption2.copyWith(
-                        color: AppColors.labelTertiaryLight,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
                   ),
-              ],
-            ),
+          ),
         ],
       ),
     );
@@ -1790,6 +1778,7 @@ class _DispatcherRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         // Selected pill — name + inline X. Clicking the X (or the
         // whole pill) removes the dispatcher from the selection.
@@ -1798,7 +1787,7 @@ class _DispatcherRow extends StatelessWidget {
           child: GestureDetector(
             onTap: onRemove,
             child: Container(
-              padding: const EdgeInsets.fromLTRB(10, 6, 4, 6),
+              padding: const EdgeInsets.fromLTRB(10, 5, 4, 5),
               decoration: BoxDecoration(
                 color: AppColors.codriverGreen,
                 borderRadius: BorderRadius.circular(999),
@@ -1822,8 +1811,8 @@ class _DispatcherRow extends StatelessWidget {
                   ),
                   const SizedBox(width: 6),
                   Container(
-                    width: 20,
-                    height: 20,
+                    width: 18,
+                    height: 18,
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.22),
                       shape: BoxShape.circle,
@@ -1831,7 +1820,7 @@ class _DispatcherRow extends StatelessWidget {
                     alignment: Alignment.center,
                     child: const Icon(
                       Icons.close_rounded,
-                      size: 13,
+                      size: 12,
                       color: Colors.white,
                     ),
                   ),
@@ -1840,13 +1829,7 @@ class _DispatcherRow extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(width: AppSpacing.sm),
-        const Icon(
-          Icons.schedule_rounded,
-          size: 14,
-          color: AppColors.codriverDeep,
-        ),
-        const SizedBox(width: 4),
+        const SizedBox(width: 6),
         _TimeDropdown(
           value: range.start,
           onChanged: (v) => onShiftChanged(
@@ -1854,7 +1837,7 @@ class _DispatcherRow extends StatelessWidget {
           ),
         ),
         const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 4),
+          padding: EdgeInsets.symmetric(horizontal: 2),
           child: Text('–'),
         ),
         _TimeDropdown(
@@ -1863,7 +1846,6 @@ class _DispatcherRow extends StatelessWidget {
             _ShiftRange(start: range.start, end: v),
           ),
         ),
-        const Spacer(),
       ],
     );
   }
@@ -1923,121 +1905,6 @@ class _TimeDropdown extends StatelessWidget {
   }
 }
 
-/// Free-form info shown to all drivers — e.g. "Stau auf A3" or
-/// "Maximale Zustellzeit verkürzt".
-class _NotesBar extends StatefulWidget {
-  final String initial;
-  final ValueChanged<String> onChanged;
-  const _NotesBar({required this.initial, required this.onChanged});
-
-  @override
-  State<_NotesBar> createState() => _NotesBarState();
-}
-
-class _NotesBarState extends State<_NotesBar> {
-  late final TextEditingController _ctrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = TextEditingController(text: widget.initial);
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.sm),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceElevatedLight,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: AppElevation.level1,
-        border: Border.all(
-          color: AppColors.separatorLight.withOpacity(0.4),
-          width: 0.5,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.campaign_rounded,
-                size: 16,
-                color: AppColors.codriverDeep,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                'Hinweis',
-                style: AppTypography.caption2.copyWith(
-                  color: AppColors.labelSecondaryLight,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.4,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                '· wird auf jedem Fahrer-Handy angezeigt',
-                style: AppTypography.caption2.copyWith(
-                  color: AppColors.labelTertiaryLight,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          TextField(
-            controller: _ctrl,
-            onChanged: widget.onChanged,
-            minLines: 3,
-            maxLines: 6,
-            style: AppTypography.footnote.copyWith(
-              color: AppColors.codriverGraphite,
-              fontWeight: FontWeight.w600,
-              height: 1.4,
-            ),
-            decoration: InputDecoration(
-              isDense: true,
-              contentPadding: const EdgeInsets.symmetric(
-                vertical: 10,
-                horizontal: 12,
-              ),
-              hintText:
-                  'Hinweis für alle Fahrer — z.B. "Stau auf A3", '
-                  '"Maximale Zustellzeit 18:00", "Briefing 10:45 in der Halle".',
-              hintStyle: AppTypography.footnote.copyWith(
-                color: AppColors.labelTertiaryLight,
-                fontWeight: FontWeight.w500,
-              ),
-              filled: true,
-              fillColor: AppColors.surfaceLight,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide.none,
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide.none,
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(
-                  color: AppColors.codriverGreen,
-                  width: 1.5,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 abstract class _ListItem {
   const _ListItem();
@@ -2051,7 +1918,8 @@ class _HeaderItem extends _ListItem {
 
 class _RouteItem extends _ListItem {
   final WaveplanRoute route;
-  const _RouteItem(this.route);
+  final bool isAlternate;
+  const _RouteItem(this.route, this.isAlternate);
 }
 
 class _WaveSectionHeader extends StatelessWidget {
@@ -2061,6 +1929,7 @@ class _WaveSectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     return Row(
       children: [
         Container(
@@ -2081,7 +1950,7 @@ class _WaveSectionHeader extends StatelessWidget {
         ),
         const SizedBox(width: AppSpacing.xs),
         Text(
-          '· $count Routen',
+          t.tf('waveplan_wave_routes_count', {'count': '$count'}),
           style: AppTypography.subheadline.copyWith(
             color: AppColors.labelSecondaryLight,
             fontWeight: FontWeight.w500,
@@ -2101,6 +1970,7 @@ class _RouteCard extends StatelessWidget {
   final String Function(String? transporterId) resolveName;
   final ValueChanged<String> onAssign;
   final VoidCallback onUnassign;
+  final bool isAlternate;
 
   const _RouteCard({
     required this.route,
@@ -2108,6 +1978,7 @@ class _RouteCard extends StatelessWidget {
     required this.resolveName,
     required this.onAssign,
     required this.onUnassign,
+    required this.isAlternate,
   });
 
   bool _isLeft() => route.waitingAreaSpur.toLowerCase() == 'links';
@@ -2127,16 +1998,20 @@ class _RouteCard extends StatelessWidget {
         return AnimatedContainer(
           duration: const Duration(milliseconds: 160),
           padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.sm,
-            vertical: 8,
+            horizontal: AppSpacing.md,
+            vertical: 10,
           ),
           decoration: BoxDecoration(
-            color: AppColors.surfaceElevatedLight,
-            borderRadius: BorderRadius.circular(14),
-            boxShadow: AppElevation.level1,
-            border: Border.all(
-              color: hovered ? AppColors.codriverGreen : Colors.transparent,
-              width: 1.5,
+            color: hovered
+                ? AppColors.green50
+                : (isAlternate
+                    ? AppColors.surfaceLight
+                    : AppColors.surfaceElevatedLight),
+            border: Border(
+              left: BorderSide(
+                color: hovered ? AppColors.codriverGreen : Colors.transparent,
+                width: 3,
+              ),
             ),
           ),
           child: Row(
@@ -2232,6 +2107,7 @@ class _AtlasBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
       decoration: BoxDecoration(
@@ -2252,7 +2128,7 @@ class _AtlasBadge extends StatelessWidget {
           ),
           const SizedBox(width: 3),
           Text(
-            'Atlas · $count',
+            t.tf('waveplan_btn_atlas_count', {'count': '$count'}),
             style: AppTypography.caption2.copyWith(
               color: AppColors.warning,
               fontWeight: FontWeight.w800,
@@ -2311,6 +2187,7 @@ class _EmptyDropZone extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     return Container(
       height: 36,
       width: double.infinity,
@@ -2328,7 +2205,7 @@ class _EmptyDropZone extends StatelessWidget {
       ),
       alignment: Alignment.center,
       child: Text(
-        active ? 'Hier ablegen' : 'Driver ablegen',
+        active ? t.t('waveplan_drop_here') : t.t('waveplan_drop_driver'),
         style: AppTypography.caption1.copyWith(
           color: active
               ? AppColors.codriverDeep
@@ -2597,6 +2474,7 @@ class _UnassignedPool extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     return DragTarget<String>(
       onWillAcceptWithDetails: (d) => !transporterIds.contains(d.data),
       onAcceptWithDetails: (d) => onDropToPool(d.data),
@@ -2660,7 +2538,7 @@ class _UnassignedPool extends StatelessWidget {
                         child: Padding(
                           padding: const EdgeInsets.all(AppSpacing.md),
                           child: Text(
-                            'Driver hier hinziehen,\num zu unzuweisen.',
+                            t.t('waveplan_pool_empty'),
                             textAlign: TextAlign.center,
                             style: AppTypography.footnote.copyWith(
                               color: AppColors.labelTertiaryLight,
@@ -2692,386 +2570,3 @@ class _UnassignedPool extends StatelessWidget {
   }
 }
 
-// ════════════════════════════════════════════════════════════════════════════
-//  Sample data — Phase 1 only. Replaced by CSV/paste import in Phase 2.
-// ════════════════════════════════════════════════════════════════════════════
-
-const List<WaveplanRoute> _sampleRoutes = [
-  // Wave 1 — 11:00:00, STG-B_RED
-  WaveplanRoute(
-    routeCode: 'CA_A169',
-    routeId: '7503578-169',
-    dispatchArea: 'STG-B_RED.7',
-    waitingAreaSpur: 'rechts',
-    dispatchTime: '11:00:00',
-    shiftEndTime: '20:00:00',
-    serviceType: 'Standardpaket',
-    transporterId: 'A3L9NTUOLVYR8O',
-    assignedDsp: 'AION',
-  ),
-  WaveplanRoute(
-    routeCode: 'CA_A174',
-    routeId: '7503578-174',
-    dispatchArea: 'STG-B_RED.8',
-    waitingAreaSpur: 'links',
-    dispatchTime: '11:00:00',
-    shiftEndTime: '20:00:00',
-    serviceType: 'Standardpaket Mittlerer Lieferwagen',
-    transporterId: 'A3ALROM073LW44',
-    assignedDsp: 'AION',
-  ),
-  WaveplanRoute(
-    routeCode: 'CA_A175',
-    routeId: '7503578-175',
-    dispatchArea: 'STG-B_RED.9',
-    waitingAreaSpur: 'rechts',
-    dispatchTime: '11:00:00',
-    shiftEndTime: '20:00:00',
-    serviceType: 'Standardpaket',
-    transporterId: 'A3H11XF1SVS84O',
-    assignedDsp: 'AION',
-  ),
-  WaveplanRoute(
-    routeCode: 'CA_A168',
-    routeId: '7503578-168',
-    dispatchArea: 'STG-B_RED.10',
-    waitingAreaSpur: 'links',
-    dispatchTime: '11:00:00',
-    shiftEndTime: '20:00:00',
-    serviceType: 'Standardpaket Mittlerer Lieferwagen',
-    transporterId: 'A1PPLQX8HTZC2D',
-    assignedDsp: 'AION',
-  ),
-  WaveplanRoute(
-    routeCode: 'CA_A136',
-    routeId: '7503578-136',
-    dispatchArea: 'STG-B_RED.11',
-    waitingAreaSpur: 'rechts',
-    dispatchTime: '11:00:00',
-    shiftEndTime: '20:00:00',
-    serviceType: 'Standardpaket Mittlerer Lieferwagen',
-    transporterId: 'A19DAZ4K79PT84',
-    assignedDsp: 'AION',
-  ),
-  WaveplanRoute(
-    routeCode: 'CA_A152',
-    routeId: '7503578-152',
-    dispatchArea: 'STG-B_RED.12',
-    waitingAreaSpur: 'links',
-    dispatchTime: '11:00:00',
-    shiftEndTime: '20:00:00',
-    serviceType: 'Standardpaket Mittlerer Lieferwagen',
-    transporterId: 'A2IEHJ434ZM6TX',
-    assignedDsp: 'AION',
-  ),
-  WaveplanRoute(
-    routeCode: 'CA_A145',
-    routeId: '7503578-145',
-    dispatchArea: 'STG-B_RED.13',
-    waitingAreaSpur: 'rechts',
-    dispatchTime: '11:00:00',
-    shiftEndTime: '20:00:00',
-    serviceType: 'Standardpaket',
-    transporterId: 'A1OGWC6I2AH4CB',
-    assignedDsp: 'AION',
-  ),
-  WaveplanRoute(
-    routeCode: 'CA_A162',
-    routeId: '7503578-162',
-    dispatchArea: 'STG-B_RED.14',
-    waitingAreaSpur: 'links',
-    dispatchTime: '11:00:00',
-    shiftEndTime: '20:00:00',
-    serviceType: 'Standardpaket Mittlerer Lieferwagen',
-    transporterId: 'A280XZLU3W0S5Q',
-    assignedDsp: 'AION',
-  ),
-  WaveplanRoute(
-    routeCode: 'CA_A161',
-    routeId: '7503578-161',
-    dispatchArea: 'STG-B_RED.15',
-    waitingAreaSpur: 'rechts',
-    dispatchTime: '11:00:00',
-    shiftEndTime: '20:00:00',
-    serviceType: 'Standardpaket Mittlerer Lieferwagen',
-    transporterId: 'A3H3RK2YQB79UX',
-    assignedDsp: 'AION',
-  ),
-  WaveplanRoute(
-    routeCode: 'CA_A163',
-    routeId: '7503578-163',
-    dispatchArea: 'STG-B_RED.16',
-    waitingAreaSpur: 'links',
-    dispatchTime: '11:00:00',
-    shiftEndTime: '20:00:00',
-    serviceType: 'Standardpaket',
-    transporterId: 'A25BTUGWTZWSXO',
-    assignedDsp: 'AION',
-  ),
-  WaveplanRoute(
-    routeCode: 'CA_A170',
-    routeId: '7503578-170',
-    dispatchArea: 'STG-B_RED.17',
-    waitingAreaSpur: 'rechts',
-    dispatchTime: '11:00:00',
-    shiftEndTime: '20:00:00',
-    serviceType: 'Nursery Route Level 4',
-    transporterId: 'AADFQ28NJOVTZ',
-    assignedDsp: 'AION',
-  ),
-  WaveplanRoute(
-    routeCode: 'CA_A159',
-    routeId: '7503578-159',
-    dispatchArea: 'STG-B_RED.18',
-    waitingAreaSpur: 'links',
-    dispatchTime: '11:00:00',
-    shiftEndTime: '20:00:00',
-    serviceType: 'Kinderzimmer-Route Stufe 3',
-    transporterId: 'AS997F0VRMPCU',
-    assignedDsp: 'AION',
-  ),
-  WaveplanRoute(
-    routeCode: 'CA_A166',
-    routeId: '7503578-166',
-    dispatchArea: 'STG-B_RED.19',
-    waitingAreaSpur: 'rechts',
-    dispatchTime: '11:00:00',
-    shiftEndTime: '20:00:00',
-    serviceType: 'Kinderzimmer-Route Stufe 1',
-    transporterId: 'A3TPIEIBUSUYT',
-    assignedDsp: 'AION',
-  ),
-  WaveplanRoute(
-    routeCode: 'CA_A148',
-    routeId: '7503578-148',
-    dispatchArea: 'STG-B_RED.20',
-    waitingAreaSpur: 'links',
-    dispatchTime: '11:00:00',
-    shiftEndTime: '20:00:00',
-    serviceType: 'Kinderzimmer-Route Stufe 1',
-    transporterId: 'A32HYJY6YR0GO9',
-    assignedDsp: 'AION',
-  ),
-  WaveplanRoute(
-    routeCode: 'CA_A154',
-    routeId: '7503578-154',
-    dispatchArea: 'STG-B_RED.21',
-    waitingAreaSpur: 'rechts',
-    dispatchTime: '11:00:00',
-    shiftEndTime: '20:00:00',
-    serviceType: 'Kinderzimmer-Route Stufe 1',
-    transporterId: 'A3LN0IILNR3WUN',
-    assignedDsp: 'AION',
-  ),
-  WaveplanRoute(
-    routeCode: 'CA_A165',
-    routeId: '7503578-165',
-    dispatchArea: 'STG-B_RED.22',
-    waitingAreaSpur: 'links',
-    dispatchTime: '11:00:00',
-    shiftEndTime: '20:00:00',
-    serviceType: 'Kinderzimmer-Route Stufe 1',
-    transporterId: 'ABECJ3GWAFJZ',
-    assignedDsp: 'AION',
-  ),
-  WaveplanRoute(
-    routeCode: 'CA_A164',
-    routeId: '7503578-164',
-    dispatchArea: 'STG-B_RED.23',
-    waitingAreaSpur: 'rechts',
-    dispatchTime: '11:00:00',
-    shiftEndTime: '20:00:00',
-    serviceType: 'Kinderzimmer-Route Stufe 1',
-    transporterId: 'A30JN9TQJHIV1R',
-    assignedDsp: 'AION',
-  ),
-  WaveplanRoute(
-    routeCode: 'CA_A160',
-    routeId: '7503578-160',
-    dispatchArea: 'STG-B_RED.24',
-    waitingAreaSpur: 'links',
-    dispatchTime: '11:00:00',
-    shiftEndTime: '20:00:00',
-    serviceType: 'Kinderzimmer-Route Stufe 1',
-    transporterId: 'A2KC3U90DIZFMR',
-    assignedDsp: 'AION',
-  ),
-
-  // Wave 2 — 11:20:00, STG-C_YELLOW
-  WaveplanRoute(
-    routeCode: 'CA_A143',
-    routeId: '7503578-143',
-    dispatchArea: 'STG-C_YELLOW.1',
-    waitingAreaSpur: 'rechts',
-    dispatchTime: '11:20:00',
-    shiftEndTime: '20:20:00',
-    serviceType: 'Standard Parcel - Low Emission Vehicle',
-    transporterId: 'A5A6I65TGFZ5R',
-    assignedDsp: 'AION',
-  ),
-  WaveplanRoute(
-    routeCode: 'CA_A142',
-    routeId: '7503578-142',
-    dispatchArea: 'STG-C_YELLOW.2',
-    waitingAreaSpur: 'links',
-    dispatchTime: '11:20:00',
-    shiftEndTime: '20:20:00',
-    serviceType: 'Standard Parcel - Low Emission Vehicle',
-    transporterId: 'A1NMK9VZFYROPQ',
-    assignedDsp: 'AION',
-  ),
-  WaveplanRoute(
-    routeCode: 'CA_A173',
-    routeId: '7503578-173',
-    dispatchArea: 'STG-C_YELLOW.3',
-    waitingAreaSpur: 'rechts',
-    dispatchTime: '11:20:00',
-    shiftEndTime: '20:20:00',
-    serviceType: 'Standard Parcel - Low Emission Vehicle',
-    transporterId: 'A1ISAABLH0O0ES',
-    assignedDsp: 'AION',
-  ),
-  WaveplanRoute(
-    routeCode: 'CA_A167',
-    routeId: '7503578-167',
-    dispatchArea: 'STG-C_YELLOW.4',
-    waitingAreaSpur: 'links',
-    dispatchTime: '11:20:00',
-    shiftEndTime: '20:20:00',
-    serviceType: 'Standard Parcel - Low Emission Vehicle',
-    transporterId: 'A1FUK8W5UWQSF9',
-    assignedDsp: 'AION',
-  ),
-  WaveplanRoute(
-    routeCode: 'CA_A138',
-    routeId: '7503578-138',
-    dispatchArea: 'STG-C_YELLOW.5',
-    waitingAreaSpur: 'rechts',
-    dispatchTime: '11:20:00',
-    shiftEndTime: '20:20:00',
-    serviceType: 'Standard Parcel - Low Emission Vehicle',
-    transporterId: 'A2I58T8EHFRIEO',
-    assignedDsp: 'AION',
-  ),
-  WaveplanRoute(
-    routeCode: 'CA_A144',
-    routeId: '7503578-144',
-    dispatchArea: 'STG-C_YELLOW.6',
-    waitingAreaSpur: 'links',
-    dispatchTime: '11:20:00',
-    shiftEndTime: '20:20:00',
-    serviceType: 'Standard Parcel - Low Emission Vehicle',
-    transporterId: 'A1P7WR7XVP66BE',
-    assignedDsp: 'AION',
-  ),
-  WaveplanRoute(
-    routeCode: 'CA_A146',
-    routeId: '7503578-146',
-    dispatchArea: 'STG-C_YELLOW.7',
-    waitingAreaSpur: 'rechts',
-    dispatchTime: '11:20:00',
-    shiftEndTime: '20:20:00',
-    serviceType: 'Standard Parcel - Low Emission Vehicle',
-    transporterId: 'A2MZ9R6Z5RTM0K',
-    assignedDsp: 'AION',
-  ),
-  WaveplanRoute(
-    routeCode: 'CA_A153',
-    routeId: '7503578-153',
-    dispatchArea: 'STG-C_YELLOW.8',
-    waitingAreaSpur: 'links',
-    dispatchTime: '11:20:00',
-    shiftEndTime: '20:20:00',
-    serviceType: 'Standard Parcel - Low Emission Vehicle',
-    transporterId: 'A3VBUAN22RR3XX',
-    assignedDsp: 'AION',
-  ),
-  WaveplanRoute(
-    routeCode: 'CA_A156',
-    routeId: '7503578-156',
-    dispatchArea: 'STG-C_YELLOW.9',
-    waitingAreaSpur: 'rechts',
-    dispatchTime: '11:20:00',
-    shiftEndTime: '20:20:00',
-    serviceType: 'Standard Parcel - Low Emission Vehicle',
-    transporterId: 'APRZ8PWWNT126',
-    assignedDsp: 'AION',
-  ),
-  WaveplanRoute(
-    routeCode: 'CA_A150',
-    routeId: '7503578-150',
-    dispatchArea: 'STG-C_YELLOW.10',
-    waitingAreaSpur: 'links',
-    dispatchTime: '11:20:00',
-    shiftEndTime: '20:20:00',
-    serviceType: 'Standard Parcel - Low Emission Vehicle',
-    transporterId: 'A3VX1BN9SXV2X4',
-    assignedDsp: 'AION',
-  ),
-  WaveplanRoute(
-    routeCode: 'CA_A149',
-    routeId: '7503578-149',
-    dispatchArea: 'STG-C_YELLOW.11',
-    waitingAreaSpur: 'rechts',
-    dispatchTime: '11:20:00',
-    shiftEndTime: '20:20:00',
-    serviceType: 'Standard Parcel - Low Emission Vehicle',
-    transporterId: 'A3FTNUP0KX138H',
-    assignedDsp: 'AION',
-  ),
-  WaveplanRoute(
-    routeCode: 'CA_A151',
-    routeId: '7503578-151',
-    dispatchArea: 'STG-C_YELLOW.12',
-    waitingAreaSpur: 'links',
-    dispatchTime: '11:20:00',
-    shiftEndTime: '20:20:00',
-    serviceType: 'Standard Parcel - Low Emission Vehicle',
-    transporterId: 'ASMX0VHXOGCDW',
-    assignedDsp: 'AION',
-  ),
-  WaveplanRoute(
-    routeCode: 'CA_A155',
-    routeId: '7503578-155',
-    dispatchArea: 'STG-C_YELLOW.13',
-    waitingAreaSpur: 'rechts',
-    dispatchTime: '11:20:00',
-    shiftEndTime: '20:20:00',
-    serviceType: 'Standard Parcel - Low Emission Vehicle',
-    transporterId: 'A11QQXKOJRNZUJ',
-    assignedDsp: 'AION',
-  ),
-  WaveplanRoute(
-    routeCode: 'CA_A157',
-    routeId: '7503578-157',
-    dispatchArea: 'STG-C_YELLOW.14',
-    waitingAreaSpur: 'links',
-    dispatchTime: '11:20:00',
-    shiftEndTime: '20:20:00',
-    serviceType: 'Standard Parcel - Low Emission Vehicle',
-    transporterId: 'A20YHLI0TJ9VIM',
-    assignedDsp: 'AION',
-  ),
-  WaveplanRoute(
-    routeCode: 'CA_A158',
-    routeId: '7503578-158',
-    dispatchArea: 'STG-C_YELLOW.15',
-    waitingAreaSpur: 'rechts',
-    dispatchTime: '11:20:00',
-    shiftEndTime: '20:20:00',
-    serviceType: 'Standard Parcel - Low Emission Vehicle',
-    transporterId: 'A33UCX3JZMWN76',
-    assignedDsp: 'AION',
-  ),
-  WaveplanRoute(
-    routeCode: 'CA_A147',
-    routeId: '7503578-147',
-    dispatchArea: 'STG-C_YELLOW.16',
-    waitingAreaSpur: 'links',
-    dispatchTime: '11:20:00',
-    shiftEndTime: '20:20:00',
-    serviceType: 'Kinderzimmer Route Stufe 1 - LEV',
-    transporterId: 'A1SPHJKW2GCFAJ',
-    assignedDsp: 'AION',
-  ),
-];

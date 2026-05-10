@@ -15,6 +15,8 @@
 // panel lists every event in the next 7 days. Events are read live
 // from `users/{uid}/calendar_events` (Phase 2 will add admin CRUD).
 
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -68,38 +70,7 @@ class _AdminCalendarPageState extends State<AdminCalendarSection> {
     _eventsStream = _streamEvents();
   }
 
-  Stream<List<_CalEvent>> _streamEvents() {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return Stream.value(_demoEvents());
-    return FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .collection('calendar_events')
-        .snapshots()
-        .map((snap) {
-          final out = <_CalEvent>[];
-          for (final d in snap.docs) {
-            final data = d.data();
-            final start = (data['start'] as Timestamp?)?.toDate();
-            if (start == null) continue;
-            final end = (data['end'] as Timestamp?)?.toDate();
-            out.add(
-              _CalEvent(
-                id: d.id,
-                start: start,
-                end: end,
-                title: (data['title'] ?? '').toString(),
-                category: (data['category'] ?? '').toString(),
-                location: (data['location'] ?? '').toString(),
-                dispatcher: (data['dispatcher'] ?? '').toString(),
-              ),
-            );
-          }
-          if (out.isEmpty) return _demoEvents();
-          out.sort((a, b) => a.start.compareTo(b.start));
-          return out;
-        });
-  }
+  Stream<List<_CalEvent>> _streamEvents() => _streamAllCalendarEvents();
 
   Future<void> _addEvent({DateTime? prefillStart}) async {
     final result = await showDialog<_NewEventResult>(
@@ -1011,35 +982,7 @@ class _CalendarUpcomingCardState extends State<CalendarUpcomingCard> {
   }
 
   Stream<List<_CalEvent>> _streamEvents() {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return Stream.value(const []);
-    return FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .collection('calendar_events')
-        .snapshots()
-        .map((snap) {
-          final out = <_CalEvent>[];
-          for (final d in snap.docs) {
-            final data = d.data();
-            final start = (data['start'] as Timestamp?)?.toDate();
-            if (start == null) continue;
-            final end = (data['end'] as Timestamp?)?.toDate();
-            out.add(
-              _CalEvent(
-                id: d.id,
-                start: start,
-                end: end,
-                title: (data['title'] ?? '').toString(),
-                category: (data['category'] ?? '').toString(),
-                location: (data['location'] ?? '').toString(),
-                dispatcher: (data['dispatcher'] ?? '').toString(),
-              ),
-            );
-          }
-          out.sort((a, b) => a.start.compareTo(b.start));
-          return out;
-        });
+    return _streamAllCalendarEvents();
   }
 
   @override
@@ -1051,6 +994,238 @@ class _CalendarUpcomingCardState extends State<CalendarUpcomingCard> {
         return _UpcomingPanel(events: events);
       },
     );
+  }
+}
+
+/// Top-level unified event stream — demo baseline + manual calendar
+/// entries + Fleet-Hub events. Each source contributes independently;
+/// if the Fleet collection-group query is denied (no rule yet) or the
+/// user has no vehicles, demos + manual events still show.
+Stream<List<_CalEvent>> _streamAllCalendarEvents() {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return Stream.value(_topLevelDemoEvents());
+  final uid = user.uid;
+
+  late StreamController<List<_CalEvent>> ctrl;
+  var calendar = <_CalEvent>[];
+  var fleet = <_CalEvent>[];
+  StreamSubscription? subCal, subFleet;
+
+  void emit() {
+    // Only real Codriver data — manual calendar entries + Fleet-Hub events.
+    // No demo / placeholder content.
+    final out = <_CalEvent>[
+      ...calendar,
+      ...fleet,
+    ]..sort((a, b) => a.start.compareTo(b.start));
+    if (!ctrl.isClosed) ctrl.add(out);
+  }
+
+  ctrl = StreamController<List<_CalEvent>>(
+    onListen: () {
+      // Emit demos immediately so the screen is never blank.
+      emit();
+
+      // Manual calendar entries
+      subCal = FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('calendar_events')
+          .snapshots()
+          .listen(
+        (snap) {
+          calendar = [
+            for (final d in snap.docs)
+              if ((d.data()['start'] as Timestamp?) != null)
+                _CalEvent(
+                  id: 'cal:${d.id}',
+                  start: (d.data()['start'] as Timestamp).toDate(),
+                  end: (d.data()['end'] as Timestamp?)?.toDate(),
+                  title: (d.data()['title'] ?? '').toString(),
+                  category: (d.data()['category'] ?? '').toString(),
+                  location: (d.data()['location'] ?? '').toString(),
+                  dispatcher: (d.data()['dispatcher'] ?? '').toString(),
+                ),
+          ];
+          emit();
+        },
+        onError: (_) {
+          // Permission/connection issue — keep demos.
+          calendar = const [];
+          emit();
+        },
+      );
+
+      // Fleet-Hub events (TÜV, service, accidents, …) via collection group.
+      subFleet = FirebaseFirestore.instance
+          .collectionGroup('events')
+          .where('dspUid', isEqualTo: uid)
+          .where('isDeleted', isEqualTo: false)
+          .snapshots()
+          .listen(
+        (snap) {
+          final out = <_CalEvent>[];
+          for (final d in snap.docs) {
+            final data = d.data();
+            final parsed = _topLevelParseFleetDate(
+              (data['eventDate'] ?? '').toString().trim(),
+            );
+            if (parsed == null) continue;
+            final type = (data['eventType'] ?? '').toString();
+            final plate = (data['plateNumber'] ?? '').toString();
+            final title = (data['title'] ?? '').toString().trim();
+            out.add(
+              _CalEvent(
+                id: 'fleet:${d.id}',
+                start: parsed,
+                end: null,
+                title: title.isNotEmpty
+                    ? '$plate · $title'
+                    : '$plate · ${_topLevelPrettyFleetType(type)}',
+                category: _topLevelFleetCategoryFor(type),
+                location: '',
+                dispatcher: '',
+              ),
+            );
+          }
+          fleet = out;
+          emit();
+        },
+        onError: (_) {
+          // Collection-group rule may be missing — gracefully ignore.
+          fleet = const [];
+          emit();
+        },
+      );
+    },
+    onCancel: () async {
+      await subCal?.cancel();
+      await subFleet?.cancel();
+    },
+  );
+
+  return ctrl.stream;
+}
+
+List<_CalEvent> _topLevelDemoEvents() {
+  final now = DateTime.now();
+  DateTime at(int dayOffset, int h, int m) =>
+      DateTime(now.year, now.month, now.day + dayOffset, h, m);
+  DateTime day(int dayOffset, [int h = 9, int m = 0]) =>
+      DateTime(now.year, now.month, now.day + dayOffset, h, m);
+  return [
+    _CalEvent(
+      id: 'demo1',
+      start: at(0, 9, 0),
+      end: null,
+      title: 'Morning briefing',
+      category: 'Meeting',
+      location: 'DBY5 — Halle 3',
+    ),
+    _CalEvent(
+      id: 'demo2',
+      start: at(0, 14, 30),
+      end: null,
+      title: 'TÜV Sprinter M-XF 4219',
+      category: 'Service',
+      location: 'Werkstatt Müller',
+    ),
+    _CalEvent(
+      id: 'demo_rental',
+      start: day(2, 8, 0),
+      end: day(13, 18, 0),
+      title: 'Mietfahrzeug-Abholung Sixt',
+      category: 'Mietfahrzeug',
+      location: 'Sixt Stuttgart Hbf',
+    ),
+    _CalEvent(
+      id: 'demo3',
+      start: at(1, 10, 0),
+      end: null,
+      title: 'Driver-Onboarding Maria',
+      category: 'HR',
+      location: 'Büro 2. OG',
+    ),
+    _CalEvent(
+      id: 'demo4',
+      start: at(2, 8, 0),
+      end: null,
+      title: 'DSP-Meeting',
+      category: 'Meeting',
+      location: 'Online',
+    ),
+    _CalEvent(
+      id: 'demo5',
+      start: at(4, 15, 0),
+      end: null,
+      title: 'Wartung Sprinter Flotte',
+      category: 'Service',
+      location: 'Werkstatt',
+    ),
+    _CalEvent(
+      id: 'demo6',
+      start: at(6, 11, 0),
+      end: null,
+      title: 'Quartalsplanung',
+      category: 'Planning',
+      location: 'Konferenzraum',
+    ),
+  ];
+}
+
+DateTime? _topLevelParseFleetDate(String raw) {
+  if (raw.isEmpty) return null;
+  final iso = DateTime.tryParse(raw);
+  if (iso != null) return DateTime(iso.year, iso.month, iso.day, 9);
+  final m = RegExp(r'^(\d{1,2})\.(\d{1,2})\.(\d{4})').firstMatch(raw);
+  if (m != null) {
+    return DateTime(
+      int.parse(m.group(3)!),
+      int.parse(m.group(2)!),
+      int.parse(m.group(1)!),
+      9,
+    );
+  }
+  return null;
+}
+
+String _topLevelPrettyFleetType(String type) {
+  switch (type.trim().toUpperCase()) {
+    case 'SERVICE':
+      return 'Service';
+    case 'ACCIDENT':
+      return 'Unfall';
+    case 'TYRE_CHANGE':
+      return 'Reifenwechsel';
+    case 'INSPECTION':
+      return 'Inspektion';
+    case 'BREAKDOWN':
+      return 'Panne';
+    case 'REPAIR':
+      return 'Reparatur';
+    case 'DOCUMENT_RENEWAL':
+      return 'TÜV / Dokumente';
+    case 'CUSTOM':
+      return 'Sonstiges';
+    default:
+      return type;
+  }
+}
+
+String _topLevelFleetCategoryFor(String type) {
+  switch (type.trim().toUpperCase()) {
+    case 'INSPECTION':
+    case 'DOCUMENT_RENEWAL':
+      return 'TÜV';
+    case 'SERVICE':
+    case 'TYRE_CHANGE':
+    case 'REPAIR':
+      return 'Service';
+    case 'ACCIDENT':
+    case 'BREAKDOWN':
+      return 'Sonstiges';
+    default:
+      return 'Service';
   }
 }
 
@@ -1136,6 +1311,54 @@ List<List<DateTime>> _buildWeeks(DateTime visibleMonth) {
 String _localeForFormat(BuildContext context) {
   final code = Localizations.localeOf(context).languageCode;
   return code.isEmpty ? 'en' : code;
+}
+
+/// Merge two streams and emit a combined value whenever either side
+/// updates. Avoids pulling in rxdart for one call site.
+Stream<R> _combineLatest2<A, B, R>(
+  Stream<A> a,
+  Stream<B> b,
+  R Function(A, B) combiner,
+) {
+  late StreamController<R> ctrl;
+  A? lastA;
+  B? lastB;
+  bool hasA = false;
+  bool hasB = false;
+  StreamSubscription<A>? subA;
+  StreamSubscription<B>? subB;
+
+  void emit() {
+    if (hasA && hasB) {
+      ctrl.add(combiner(lastA as A, lastB as B));
+    }
+  }
+
+  ctrl = StreamController<R>(
+    onListen: () {
+      subA = a.listen(
+        (v) {
+          lastA = v;
+          hasA = true;
+          emit();
+        },
+        onError: ctrl.addError,
+      );
+      subB = b.listen(
+        (v) {
+          lastB = v;
+          hasB = true;
+          emit();
+        },
+        onError: ctrl.addError,
+      );
+    },
+    onCancel: () async {
+      await subA?.cancel();
+      await subB?.cancel();
+    },
+  );
+  return ctrl.stream;
 }
 
 // ════════════════════════════════════════════════════════════════════════════
