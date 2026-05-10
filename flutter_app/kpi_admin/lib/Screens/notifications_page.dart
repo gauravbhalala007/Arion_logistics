@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
 import '../localization/app_localizations.dart';
+import '../theme/app_button_style.dart';
 import '../utils/driver_activity.dart';
 
 class NotificationsPage extends StatefulWidget {
@@ -943,17 +944,10 @@ class _ComposerCard extends StatelessWidget {
           Align(
             alignment: Alignment.center,
             child: SizedBox(
-              height: 44,
               width: 220,
-              child: ElevatedButton(
+              child: FilledButton(
                 onPressed: onPublish,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1D7F5A),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
+                style: AppButtonStyle.of(AppButtonVariant.primary),
                 child: publishing
                     ? const SizedBox(
                         width: 18,

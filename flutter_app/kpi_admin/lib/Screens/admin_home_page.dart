@@ -11,6 +11,7 @@ import '../models/fleet_vehicle_document.dart';
 import '../services/fleet_vehicle_document_service.dart';
 import '../services/fleet_vehicle_repository.dart';
 import '../utils/driver_activity.dart';
+import 'admin_calendar_page.dart';
 
 class AdminHomePage extends StatefulWidget {
   const AdminHomePage({super.key});
@@ -342,39 +343,55 @@ class _DesktopLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Expanded(
-          child: Row(
-            children: [
-              Expanded(
-                flex: 7,
-                child: Column(
-                  children: [
-                    _ScorecardCard(scale: scale),
-                    SizedBox(height: gap),
-                    Expanded(child: _FleetHubCard(scale: scale)),
-                  ],
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          SizedBox(
+            height: 600,
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 7,
+                  child: Column(
+                    children: [
+                      _ScorecardCard(scale: scale),
+                      SizedBox(height: gap),
+                      Expanded(child: _FleetHubCard(scale: scale)),
+                    ],
+                  ),
                 ),
-              ),
-              SizedBox(width: gap),
-              Expanded(
-                flex: 5,
-                child: _NotificationHistoryCard(
-                  scale: scale,
-                  dspUid: dspUid,
-                  onOpenMissing: onOpenMissing,
+                SizedBox(width: gap),
+                Expanded(
+                  flex: 5,
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: _NotificationHistoryCard(
+                          scale: scale,
+                          dspUid: dspUid,
+                          onOpenMissing: onOpenMissing,
+                        ),
+                      ),
+                      SizedBox(height: gap),
+                      // Slim upcoming-events overview — full calendar
+                      // lives on its own nav page.
+                      const SizedBox(
+                        height: 280,
+                        child: CalendarUpcomingCard(),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        SizedBox(height: gap),
-        SizedBox(
-          height: _r(280, scale),
-          child: _DriverDocumentsCard(scale: scale),
-        ),
-      ],
+          SizedBox(height: gap),
+          SizedBox(
+            height: _r(280, scale),
+            child: _DriverDocumentsCard(scale: scale),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -411,6 +428,13 @@ class _StackedLayout extends StatelessWidget {
     return SingleChildScrollView(
       child: Column(
         children: [
+          // Slim upcoming-events overview — full calendar lives on
+          // its own nav page.
+          const SizedBox(
+            height: 280,
+            child: CalendarUpcomingCard(),
+          ),
+          SizedBox(height: gap),
           if (veryNarrow)
             _ScorecardCard(scale: scale)
           else

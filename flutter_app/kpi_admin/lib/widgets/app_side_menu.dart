@@ -11,6 +11,8 @@ enum AppNav {
   dashboard,
   podQuality,
   drivers,
+  waveplan,
+  calendar,
   fleetStatus,
   tasks,
   shiftAbsence,
@@ -87,6 +89,18 @@ class AppSideMenu extends StatelessWidget {
         label: 'Drivers Hub',
         active: active == AppNav.drivers,
         onTap: () => _handleNav(context, AppNav.drivers, '/drivers'),
+      ),
+      _MenuItem(
+        icon: Icons.waves_rounded,
+        label: 'Waveplan',
+        active: active == AppNav.waveplan,
+        onTap: () => _handleNav(context, AppNav.waveplan, '/waveplan'),
+      ),
+      _MenuItem(
+        icon: Icons.calendar_month_rounded,
+        label: 'Kalender',
+        active: active == AppNav.calendar,
+        onTap: () => _handleNav(context, AppNav.calendar, '/calendar'),
       ),
       StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
         stream: _userDocStream(),

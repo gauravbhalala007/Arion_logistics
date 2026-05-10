@@ -12459,6 +12459,600 @@ class AppLocalizations {
     'signup_request_submit': 'Submit & Verify Email',
   };
 
+  // Shared English defaults for the Waveplan admin page. The literal
+  // word "Waveplan" is intentionally left untranslated everywhere — it
+  // is the page's brand name (per product owner).
+  static const Map<String, String> _waveplanSharedValues = {
+    // Header buttons
+    'waveplan_btn_paste_wave': 'Paste wave',
+    'waveplan_btn_atlas': 'Atlas',
+    'waveplan_btn_atlas_count': 'Atlas · {count}',
+    'waveplan_btn_atlas_none': 'Atlas · none',
+    'waveplan_btn_notes': 'Note',
+    'waveplan_btn_notes_count': 'Note · {count}',
+    'waveplan_btn_clear': 'Clear',
+    'waveplan_assigned_count': '{assigned} / {total} assigned',
+    // Publish button
+    'waveplan_publish_disabled_tooltip':
+        'Add wave data and confirm Atlas first.',
+    'waveplan_publish_label': 'Publish Waveplan',
+    'waveplan_published_label': 'Published  ·  {time}  ·  Unpublish',
+    // Dispatcher bar
+    'waveplan_dispatcher_label': 'Dispatcher',
+    'waveplan_dispatcher_empty':
+        'No dispatchers configured — add them on the "Dispatcher Pill" page.',
+    'waveplan_dispatcher_max': 'Max. {n}',
+    // Wave list
+    'waveplan_wave_routes_count': '· {count} routes',
+    'waveplan_drop_here': 'Drop here',
+    'waveplan_drop_driver': 'Drop driver',
+    'waveplan_pool_empty': 'Drag a driver here\nto unassign.',
+    // Atlas dialog
+    'waveplan_atlas_dialog_title': 'Paste Atlas packages',
+    'waveplan_atlas_dialog_intro':
+        'Copy from the email and paste here. Expected: one line per '
+        'package as "Tracking-ID - Route-Code - Transporter-ID". The '
+        'driver sees a note to pick the package up from the dispatcher.',
+    'waveplan_atlas_dialog_btn_none_today': 'No Atlas packages today',
+    // Notes dialog
+    'waveplan_notes_dialog_title': 'Note for drivers',
+    'waveplan_notes_dialog_intro':
+        'Shown on every driver phone as soon as the wave is published.',
+    'waveplan_notes_dialog_hint':
+        'e.g. "Traffic on A3", "Latest delivery 6 PM", '
+        '"Briefing 10:45 in the hall".',
+    // Paste-wave dialog
+    'waveplan_paste_dialog_title': 'Paste Waveplan',
+    'waveplan_paste_dialog_intro':
+        'Copy the table from Excel or a website and paste here. Expected: '
+        '9 fields per route in this order — dispatchTime, shiftEnd, '
+        'routeCode, routeId, dispatchArea, spur, "TID / DSP / TID", DSP, '
+        'serviceType.',
+    // Clear dialog
+    'waveplan_clear_dialog_title': 'Clear Waveplan?',
+    'waveplan_clear_dialog_body':
+        'All routes and assignments will be deleted. This action cannot '
+        'be undone.',
+    // Common dialog buttons
+    'waveplan_btn_cancel': 'Cancel',
+    'waveplan_btn_import': 'Import',
+    'waveplan_btn_save': 'Save',
+    // Snackbars
+    'waveplan_snack_atlas_none_confirmed':
+        'No Atlas packages today confirmed — publishing is enabled.',
+    'waveplan_snack_atlas_invalid': 'Could not detect any valid Atlas packages.',
+    'waveplan_snack_atlas_imported':
+        '{total} Atlas packages imported for {routes} routes.',
+    'waveplan_snack_routes_invalid': 'Could not detect any valid routes.',
+    'waveplan_snack_routes_imported': '{count} routes imported.',
+    'waveplan_snack_unpublish_failed': 'Unpublish failed: {error}',
+    'waveplan_snack_unpublished':
+        'Publishing reverted — drivers see nothing anymore.',
+    'waveplan_snack_publish_failed': 'Publish failed: {error}',
+    'waveplan_snack_published':
+        'Waveplan published — drivers can see their wave now.',
+    'waveplan_snack_login_required': 'Please log in first.',
+  };
+
+  static final Map<String, Map<String, String>> _waveplanLocalizedValues = {
+    'en': _waveplanSharedValues,
+    'de': {
+      ..._waveplanSharedValues,
+      'waveplan_btn_paste_wave': 'Wave einfügen',
+      'waveplan_btn_atlas': 'Atlas',
+      'waveplan_btn_atlas_count': 'Atlas · {count}',
+      'waveplan_btn_atlas_none': 'Atlas · keine',
+      'waveplan_btn_notes': 'Notiz',
+      'waveplan_btn_notes_count': 'Notiz · {count}',
+      'waveplan_btn_clear': 'Leeren',
+      'waveplan_assigned_count': '{assigned} / {total} zugewiesen',
+      'waveplan_publish_disabled_tooltip':
+          'Erst Wave-Daten und Atlas-Status setzen.',
+      'waveplan_publish_label': 'Waveplan veröffentlichen',
+      'waveplan_published_label': 'Veröffentlicht  ·  {time}  ·  Unpublish',
+      'waveplan_dispatcher_label': 'Dispatcher',
+      'waveplan_dispatcher_empty':
+          'Keine Dispatcher konfiguriert — auf der "Dispatcher Pill"-Seite anlegen.',
+      'waveplan_dispatcher_max': 'Max. {n}',
+      'waveplan_wave_routes_count': '· {count} Routen',
+      'waveplan_drop_here': 'Hier ablegen',
+      'waveplan_drop_driver': 'Driver ablegen',
+      'waveplan_pool_empty': 'Driver hier hinziehen,\num zu unzuweisen.',
+      'waveplan_atlas_dialog_title': 'Atlas-Pakete einfügen',
+      'waveplan_atlas_dialog_intro':
+          'Aus der E-Mail kopieren und hier einfügen. Erwartet: eine Zeile '
+          'pro Paket im Format "Tracking-ID - Route-Code - Transporter-ID". '
+          'Der Fahrer sieht den Hinweis, das Paket beim Dispatcher abzuholen.',
+      'waveplan_atlas_dialog_btn_none_today': 'Keine Atlas-Pakete für heute',
+      'waveplan_notes_dialog_title': 'Notiz für Fahrer',
+      'waveplan_notes_dialog_intro':
+          'Wird auf jedem Fahrer-Handy angezeigt, sobald die Wave '
+          'veröffentlicht ist.',
+      'waveplan_notes_dialog_hint':
+          'z.B. "Stau auf A3", "Maximale Zustellzeit 18:00", '
+          '"Briefing 10:45 in der Halle".',
+      'waveplan_paste_dialog_title': 'Waveplan einfügen',
+      'waveplan_paste_dialog_intro':
+          'Tabelle aus Excel oder Webseite kopieren und hier einfügen. '
+          'Erwartet: 9 Felder pro Route in dieser Reihenfolge — '
+          'dispatchTime, shiftEnd, routeCode, routeId, dispatchArea, spur, '
+          '"TID / DSP / TID", DSP, serviceType.',
+      'waveplan_clear_dialog_title': 'Waveplan leeren?',
+      'waveplan_clear_dialog_body':
+          'Alle Routen und Zuweisungen werden gelöscht. Diese Aktion kann '
+          'nicht rückgängig gemacht werden.',
+      'waveplan_btn_cancel': 'Abbrechen',
+      'waveplan_btn_import': 'Importieren',
+      'waveplan_btn_save': 'Speichern',
+      'waveplan_snack_atlas_none_confirmed':
+          'Keine Atlas-Pakete für heute bestätigt — Publish ist freigegeben.',
+      'waveplan_snack_atlas_invalid':
+          'Konnte keine gültigen Atlas-Pakete erkennen.',
+      'waveplan_snack_atlas_imported':
+          '{total} Atlas-Pakete für {routes} Routen importiert.',
+      'waveplan_snack_routes_invalid': 'Konnte keine gültigen Routen erkennen.',
+      'waveplan_snack_routes_imported': '{count} Routen importiert.',
+      'waveplan_snack_unpublish_failed': 'Unpublish fehlgeschlagen: {error}',
+      'waveplan_snack_unpublished':
+          'Veröffentlichung zurückgenommen — Fahrer sehen nichts mehr.',
+      'waveplan_snack_publish_failed': 'Publish fehlgeschlagen: {error}',
+      'waveplan_snack_published':
+          'Waveplan veröffentlicht — Fahrer sehen jetzt ihre Wave.',
+      'waveplan_snack_login_required': 'Bitte erst einloggen.',
+    },
+    'sq': {
+      ..._waveplanSharedValues,
+      'waveplan_btn_paste_wave': 'Ngjit waven',
+      'waveplan_btn_atlas': 'Atlas',
+      'waveplan_btn_atlas_count': 'Atlas · {count}',
+      'waveplan_btn_atlas_none': 'Atlas · asnje',
+      'waveplan_btn_notes': 'Shenim',
+      'waveplan_btn_notes_count': 'Shenim · {count}',
+      'waveplan_btn_clear': 'Pastro',
+      'waveplan_assigned_count': '{assigned} / {total} caktuar',
+      'waveplan_publish_disabled_tooltip':
+          'Shto te dhenat e waves dhe konfirmo Atlas perpara.',
+      'waveplan_publish_label': 'Publiko Waveplan',
+      'waveplan_published_label': 'Publikuar  ·  {time}  ·  Hiq publikimin',
+      'waveplan_dispatcher_label': 'Dispeçer',
+      'waveplan_dispatcher_empty':
+          'Asnje dispeçer i konfiguruar — shtoji ne faqen "Dispatcher Pill".',
+      'waveplan_dispatcher_max': 'Maks. {n}',
+      'waveplan_wave_routes_count': '· {count} rruge',
+      'waveplan_drop_here': 'Lesho ketu',
+      'waveplan_drop_driver': 'Lesho shoferin',
+      'waveplan_pool_empty':
+          'Terhiqe shoferin ketu\nper te hequr caktimin.',
+      'waveplan_atlas_dialog_title': 'Ngjit pakot Atlas',
+      'waveplan_atlas_dialog_intro':
+          'Kopjo nga emaili dhe ngjit ketu. Pritet: nje rresht per pako, '
+          'formati "Tracking-ID - Route-Code - Transporter-ID". Shoferi '
+          'sheh nje shenim ta marri pakon te dispeçeri.',
+      'waveplan_atlas_dialog_btn_none_today': 'Pa pako Atlas sot',
+      'waveplan_notes_dialog_title': 'Shenim per shoferet',
+      'waveplan_notes_dialog_intro':
+          'Shfaqet ne çdo telefon shoferi sapo wave-i te publikohet.',
+      'waveplan_notes_dialog_hint':
+          'p.sh. "Bllokim ne A3", "Dorezimi i fundit 18:00", '
+          '"Briefing 10:45 ne salle".',
+      'waveplan_paste_dialog_title': 'Ngjit Waveplan',
+      'waveplan_paste_dialog_intro':
+          'Kopjo tabelen nga Excel ose web dhe ngjit ketu. Pritet: 9 fusha '
+          'per rruge sipas ketij rendi — dispatchTime, shiftEnd, routeCode, '
+          'routeId, dispatchArea, spur, "TID / DSP / TID", DSP, serviceType.',
+      'waveplan_clear_dialog_title': 'Pastro Waveplan?',
+      'waveplan_clear_dialog_body':
+          'Te gjitha rruget dhe caktimet do te fshihen. Ky veprim nuk mund '
+          'te zhbehet.',
+      'waveplan_btn_cancel': 'Anulo',
+      'waveplan_btn_import': 'Importo',
+      'waveplan_btn_save': 'Ruaj',
+      'waveplan_snack_atlas_none_confirmed':
+          'Pa pako Atlas sot u konfirmua — publikimi eshte i lejuar.',
+      'waveplan_snack_atlas_invalid':
+          'Nuk u dalluan pako Atlas te vlefshme.',
+      'waveplan_snack_atlas_imported':
+          '{total} pako Atlas u importuan per {routes} rruge.',
+      'waveplan_snack_routes_invalid': 'Nuk u dalluan rruge te vlefshme.',
+      'waveplan_snack_routes_imported': '{count} rruge u importuan.',
+      'waveplan_snack_unpublish_failed':
+          'Heqja e publikimit deshtoi: {error}',
+      'waveplan_snack_unpublished':
+          'Publikimi u terhoq — shoferet nuk shohin asgje me.',
+      'waveplan_snack_publish_failed': 'Publikimi deshtoi: {error}',
+      'waveplan_snack_published':
+          'Waveplan u publikua — shoferet tani e shohin waven e tyre.',
+      'waveplan_snack_login_required': 'Ju lutem identifikohuni fillimisht.',
+    },
+    'hu': {
+      ..._waveplanSharedValues,
+      'waveplan_btn_paste_wave': 'Wave beillesztese',
+      'waveplan_btn_atlas': 'Atlas',
+      'waveplan_btn_atlas_count': 'Atlas · {count}',
+      'waveplan_btn_atlas_none': 'Atlas · nincs',
+      'waveplan_btn_notes': 'Megjegyzes',
+      'waveplan_btn_notes_count': 'Megjegyzes · {count}',
+      'waveplan_btn_clear': 'Torles',
+      'waveplan_assigned_count': '{assigned} / {total} hozzarendelve',
+      'waveplan_publish_disabled_tooltip':
+          'Eloszor add meg a wave adatait es az Atlas allapotot.',
+      'waveplan_publish_label': 'Waveplan kozzetetele',
+      'waveplan_published_label':
+          'Kozzeteve  ·  {time}  ·  Visszavonas',
+      'waveplan_dispatcher_label': 'Diszpecser',
+      'waveplan_dispatcher_empty':
+          'Nincs diszpecser beallitva — a "Dispatcher Pill" oldalon hozhatod letre.',
+      'waveplan_dispatcher_max': 'Max. {n}',
+      'waveplan_wave_routes_count': '· {count} utvonal',
+      'waveplan_drop_here': 'Tedd ide',
+      'waveplan_drop_driver': 'Sofor ide',
+      'waveplan_pool_empty':
+          'Huzd ide a sofort\na hozzarendeles megszunteteshez.',
+      'waveplan_atlas_dialog_title': 'Atlas csomagok beillesztese',
+      'waveplan_atlas_dialog_intro':
+          'Masold ki az emailbol es illeszd be ide. Elvart: egy sor csomagonkent '
+          '"Tracking-ID - Route-Code - Transporter-ID" formatumban. A sofor '
+          'figyelmeztetest kap a csomag atvetelerol a diszpecsernel.',
+      'waveplan_atlas_dialog_btn_none_today': 'Nincs Atlas csomag ma',
+      'waveplan_notes_dialog_title': 'Megjegyzes a soforoknek',
+      'waveplan_notes_dialog_intro':
+          'Megjelenik minden sofor telefonjan, amint a wave kozzeteve.',
+      'waveplan_notes_dialog_hint':
+          'pl. "Dugo az A3-on", "Legkesobbi kezbesites 18:00", '
+          '"Eligazitas 10:45 a csarnokban".',
+      'waveplan_paste_dialog_title': 'Waveplan beillesztese',
+      'waveplan_paste_dialog_intro':
+          'Masold a tablat Excelbol vagy weboldalrol es illeszd be ide. '
+          'Elvart: 9 mezo utvonalanként ebben a sorrendben — dispatchTime, '
+          'shiftEnd, routeCode, routeId, dispatchArea, spur, '
+          '"TID / DSP / TID", DSP, serviceType.',
+      'waveplan_clear_dialog_title': 'Waveplan torlese?',
+      'waveplan_clear_dialog_body':
+          'Az osszes utvonal es hozzarendeles torlodik. Ez a muvelet nem '
+          'vonhato vissza.',
+      'waveplan_btn_cancel': 'Megse',
+      'waveplan_btn_import': 'Importalas',
+      'waveplan_btn_save': 'Mentes',
+      'waveplan_snack_atlas_none_confirmed':
+          'Mai napra nincs Atlas csomag megerositve — kozzeteendo.',
+      'waveplan_snack_atlas_invalid':
+          'Nem talaltak ervenyes Atlas csomagok.',
+      'waveplan_snack_atlas_imported':
+          '{total} Atlas csomag importalva {routes} utvonalra.',
+      'waveplan_snack_routes_invalid': 'Nem talaltak ervenyes utvonalak.',
+      'waveplan_snack_routes_imported': '{count} utvonal importalva.',
+      'waveplan_snack_unpublish_failed':
+          'A visszavonas sikertelen: {error}',
+      'waveplan_snack_unpublished':
+          'Kozzetetel visszavonva — a soforok mar semmit sem latnak.',
+      'waveplan_snack_publish_failed': 'Kozzetetel sikertelen: {error}',
+      'waveplan_snack_published':
+          'Waveplan kozzeteve — a soforok mar latjak a wave-ukat.',
+      'waveplan_snack_login_required': 'Kerlek, eloszor jelentkezz be.',
+    },
+    'ro': {
+      ..._waveplanSharedValues,
+      'waveplan_btn_paste_wave': 'Lipeste wave',
+      'waveplan_btn_atlas': 'Atlas',
+      'waveplan_btn_atlas_count': 'Atlas · {count}',
+      'waveplan_btn_atlas_none': 'Atlas · niciunul',
+      'waveplan_btn_notes': 'Nota',
+      'waveplan_btn_notes_count': 'Nota · {count}',
+      'waveplan_btn_clear': 'Goleste',
+      'waveplan_assigned_count': '{assigned} / {total} alocate',
+      'waveplan_publish_disabled_tooltip':
+          'Mai intai adauga datele wave si confirma Atlas.',
+      'waveplan_publish_label': 'Publica Waveplan',
+      'waveplan_published_label':
+          'Publicat  ·  {time}  ·  Anuleaza publicarea',
+      'waveplan_dispatcher_label': 'Dispecer',
+      'waveplan_dispatcher_empty':
+          'Niciun dispecer configurat — adauga in pagina "Dispatcher Pill".',
+      'waveplan_dispatcher_max': 'Max. {n}',
+      'waveplan_wave_routes_count': '· {count} rute',
+      'waveplan_drop_here': 'Plaseaza aici',
+      'waveplan_drop_driver': 'Plaseaza soferul',
+      'waveplan_pool_empty':
+          'Trage soferul aici\npentru a anula alocarea.',
+      'waveplan_atlas_dialog_title': 'Lipeste pachete Atlas',
+      'waveplan_atlas_dialog_intro':
+          'Copiaza din email si lipeste aici. Format asteptat: o linie pe '
+          'pachet "Tracking-ID - Route-Code - Transporter-ID". Soferul '
+          'primeste o nota sa ridice pachetul de la dispecer.',
+      'waveplan_atlas_dialog_btn_none_today': 'Fara pachete Atlas astazi',
+      'waveplan_notes_dialog_title': 'Nota pentru soferi',
+      'waveplan_notes_dialog_intro':
+          'Apare pe telefonul fiecarui sofer imediat ce wave este publicat.',
+      'waveplan_notes_dialog_hint':
+          'ex. "Trafic pe A3", "Livrare maxima 18:00", '
+          '"Briefing 10:45 in hala".',
+      'waveplan_paste_dialog_title': 'Lipeste Waveplan',
+      'waveplan_paste_dialog_intro':
+          'Copiaza tabelul din Excel sau de pe web si lipeste aici. Format '
+          'asteptat: 9 campuri pe ruta, in aceasta ordine — dispatchTime, '
+          'shiftEnd, routeCode, routeId, dispatchArea, spur, '
+          '"TID / DSP / TID", DSP, serviceType.',
+      'waveplan_clear_dialog_title': 'Goleste Waveplan?',
+      'waveplan_clear_dialog_body':
+          'Toate rutele si alocarile vor fi sterse. Aceasta actiune nu '
+          'poate fi anulata.',
+      'waveplan_btn_cancel': 'Anuleaza',
+      'waveplan_btn_import': 'Importa',
+      'waveplan_btn_save': 'Salveaza',
+      'waveplan_snack_atlas_none_confirmed':
+          'Niciun pachet Atlas astazi confirmat — publicarea este permisa.',
+      'waveplan_snack_atlas_invalid':
+          'Nu s-au detectat pachete Atlas valide.',
+      'waveplan_snack_atlas_imported':
+          '{total} pachete Atlas importate pentru {routes} rute.',
+      'waveplan_snack_routes_invalid': 'Nu s-au detectat rute valide.',
+      'waveplan_snack_routes_imported': '{count} rute importate.',
+      'waveplan_snack_unpublish_failed':
+          'Anularea publicarii a esuat: {error}',
+      'waveplan_snack_unpublished':
+          'Publicare anulata — soferii nu mai vad nimic.',
+      'waveplan_snack_publish_failed': 'Publicarea a esuat: {error}',
+      'waveplan_snack_published':
+          'Waveplan publicat — soferii pot vedea wave-ul lor acum.',
+      'waveplan_snack_login_required': 'Te rugam sa te autentifici mai intai.',
+    },
+    'hr': {
+      ..._waveplanSharedValues,
+      'waveplan_btn_paste_wave': 'Zalijepi wave',
+      'waveplan_btn_atlas': 'Atlas',
+      'waveplan_btn_atlas_count': 'Atlas · {count}',
+      'waveplan_btn_atlas_none': 'Atlas · nista',
+      'waveplan_btn_notes': 'Biljeska',
+      'waveplan_btn_notes_count': 'Biljeska · {count}',
+      'waveplan_btn_clear': 'Ocisti',
+      'waveplan_assigned_count': '{assigned} / {total} dodijeljeno',
+      'waveplan_publish_disabled_tooltip':
+          'Najprije dodaj podatke wave-a i potvrdi Atlas.',
+      'waveplan_publish_label': 'Objavi Waveplan',
+      'waveplan_published_label': 'Objavljeno  ·  {time}  ·  Povuci objavu',
+      'waveplan_dispatcher_label': 'Dispecer',
+      'waveplan_dispatcher_empty':
+          'Nema dispecera — dodaj ih na stranici "Dispatcher Pill".',
+      'waveplan_dispatcher_max': 'Maks. {n}',
+      'waveplan_wave_routes_count': '· {count} ruta',
+      'waveplan_drop_here': 'Spusti ovdje',
+      'waveplan_drop_driver': 'Spusti vozaca',
+      'waveplan_pool_empty':
+          'Povuci vozaca ovamo\nza ponistavanje dodjele.',
+      'waveplan_atlas_dialog_title': 'Zalijepi Atlas pakete',
+      'waveplan_atlas_dialog_intro':
+          'Kopiraj iz emaila i zalijepi ovdje. Ocekivano: jedan red po '
+          'paketu "Tracking-ID - Route-Code - Transporter-ID". Vozac vidi '
+          'biljesku da preuzme paket od dispecera.',
+      'waveplan_atlas_dialog_btn_none_today': 'Nema Atlas paketa danas',
+      'waveplan_notes_dialog_title': 'Biljeska za vozace',
+      'waveplan_notes_dialog_intro':
+          'Prikazuje se na svakom vozackom telefonu cim je wave objavljen.',
+      'waveplan_notes_dialog_hint':
+          'npr. "Guzva na A3", "Najkasnija dostava 18:00", '
+          '"Brifing 10:45 u hali".',
+      'waveplan_paste_dialog_title': 'Zalijepi Waveplan',
+      'waveplan_paste_dialog_intro':
+          'Kopiraj tablicu iz Excela ili weba i zalijepi ovdje. Ocekivano: '
+          '9 polja po ruti, ovim redom — dispatchTime, shiftEnd, routeCode, '
+          'routeId, dispatchArea, spur, "TID / DSP / TID", DSP, serviceType.',
+      'waveplan_clear_dialog_title': 'Ocisti Waveplan?',
+      'waveplan_clear_dialog_body':
+          'Sve rute i dodjele bit ce izbrisane. Ova radnja se ne moze '
+          'ponistiti.',
+      'waveplan_btn_cancel': 'Odustani',
+      'waveplan_btn_import': 'Uvezi',
+      'waveplan_btn_save': 'Spremi',
+      'waveplan_snack_atlas_none_confirmed':
+          'Potvrdjeno: nema Atlas paketa danas — objava je dopustena.',
+      'waveplan_snack_atlas_invalid':
+          'Nisu pronadjeni valjani Atlas paketi.',
+      'waveplan_snack_atlas_imported':
+          '{total} Atlas paketa uvezeno za {routes} ruta.',
+      'waveplan_snack_routes_invalid': 'Nisu pronadjene valjane rute.',
+      'waveplan_snack_routes_imported': '{count} ruta uvezeno.',
+      'waveplan_snack_unpublish_failed': 'Povlacenje objave nije uspjelo: {error}',
+      'waveplan_snack_unpublished':
+          'Objava povucena — vozaci vise nista ne vide.',
+      'waveplan_snack_publish_failed': 'Objava nije uspjela: {error}',
+      'waveplan_snack_published':
+          'Waveplan objavljen — vozaci sada vide svoj wave.',
+      'waveplan_snack_login_required': 'Najprije se prijavi.',
+    },
+    'ar': {
+      ..._waveplanSharedValues,
+      'waveplan_btn_paste_wave': 'لصق الموجة',
+      'waveplan_btn_atlas': 'أطلس',
+      'waveplan_btn_atlas_count': 'أطلس · {count}',
+      'waveplan_btn_atlas_none': 'أطلس · لا شيء',
+      'waveplan_btn_notes': 'ملاحظة',
+      'waveplan_btn_notes_count': 'ملاحظة · {count}',
+      'waveplan_btn_clear': 'مسح',
+      'waveplan_assigned_count': '{assigned} / {total} مُعيَّن',
+      'waveplan_publish_disabled_tooltip':
+          'أضف بيانات الموجة وأكد حالة أطلس أولاً.',
+      'waveplan_publish_label': 'نشر Waveplan',
+      'waveplan_published_label': 'منشور  ·  {time}  ·  إلغاء النشر',
+      'waveplan_dispatcher_label': 'موزع',
+      'waveplan_dispatcher_empty':
+          'لا يوجد موزعون — أضفهم من صفحة "Dispatcher Pill".',
+      'waveplan_dispatcher_max': 'الأقصى {n}',
+      'waveplan_wave_routes_count': '· {count} مسار',
+      'waveplan_drop_here': 'أفلت هنا',
+      'waveplan_drop_driver': 'أفلت السائق',
+      'waveplan_pool_empty':
+          'اسحب السائق إلى هنا\nلإلغاء التعيين.',
+      'waveplan_atlas_dialog_title': 'لصق طرود أطلس',
+      'waveplan_atlas_dialog_intro':
+          'انسخ من البريد والصق هنا. المتوقع: سطر واحد لكل طرد بصيغة '
+          '"Tracking-ID - Route-Code - Transporter-ID". يرى السائق ملاحظة '
+          'لاستلام الطرد من الموزع.',
+      'waveplan_atlas_dialog_btn_none_today': 'لا توجد طرود أطلس اليوم',
+      'waveplan_notes_dialog_title': 'ملاحظة للسائقين',
+      'waveplan_notes_dialog_intro':
+          'تظهر على هاتف كل سائق فور نشر الموجة.',
+      'waveplan_notes_dialog_hint':
+          'مثل "ازدحام على A3"، "آخر تسليم 18:00"، '
+          '"اجتماع 10:45 في الصالة".',
+      'waveplan_paste_dialog_title': 'لصق Waveplan',
+      'waveplan_paste_dialog_intro':
+          'انسخ الجدول من Excel أو من موقع والصق هنا. المتوقع: 9 حقول لكل '
+          'مسار بهذا الترتيب — dispatchTime, shiftEnd, routeCode, routeId, '
+          'dispatchArea, spur, "TID / DSP / TID", DSP, serviceType.',
+      'waveplan_clear_dialog_title': 'مسح Waveplan؟',
+      'waveplan_clear_dialog_body':
+          'سيتم حذف جميع المسارات والتعيينات. لا يمكن التراجع عن هذا الإجراء.',
+      'waveplan_btn_cancel': 'إلغاء',
+      'waveplan_btn_import': 'استيراد',
+      'waveplan_btn_save': 'حفظ',
+      'waveplan_snack_atlas_none_confirmed':
+          'تم تأكيد عدم وجود طرود أطلس اليوم — النشر مسموح.',
+      'waveplan_snack_atlas_invalid':
+          'تعذّر اكتشاف طرود أطلس صالحة.',
+      'waveplan_snack_atlas_imported':
+          'تم استيراد {total} طرد أطلس لـ {routes} مسار.',
+      'waveplan_snack_routes_invalid': 'تعذّر اكتشاف مسارات صالحة.',
+      'waveplan_snack_routes_imported': 'تم استيراد {count} مسار.',
+      'waveplan_snack_unpublish_failed': 'فشل إلغاء النشر: {error}',
+      'waveplan_snack_unpublished':
+          'تم التراجع عن النشر — لم يعد السائقون يرون شيئاً.',
+      'waveplan_snack_publish_failed': 'فشل النشر: {error}',
+      'waveplan_snack_published':
+          'تم نشر Waveplan — يستطيع السائقون رؤية موجتهم الآن.',
+      'waveplan_snack_login_required': 'يرجى تسجيل الدخول أولاً.',
+    },
+    'tr': {
+      ..._waveplanSharedValues,
+      'waveplan_btn_paste_wave': 'Wave yapistir',
+      'waveplan_btn_atlas': 'Atlas',
+      'waveplan_btn_atlas_count': 'Atlas · {count}',
+      'waveplan_btn_atlas_none': 'Atlas · yok',
+      'waveplan_btn_notes': 'Not',
+      'waveplan_btn_notes_count': 'Not · {count}',
+      'waveplan_btn_clear': 'Temizle',
+      'waveplan_assigned_count': '{assigned} / {total} atandi',
+      'waveplan_publish_disabled_tooltip':
+          'Once wave verilerini ekle ve Atlas durumunu onayla.',
+      'waveplan_publish_label': 'Waveplan yayinla',
+      'waveplan_published_label':
+          'Yayinda  ·  {time}  ·  Yayindan kaldir',
+      'waveplan_dispatcher_label': 'Dispecher',
+      'waveplan_dispatcher_empty':
+          'Dispecher yok — "Dispatcher Pill" sayfasindan ekleyin.',
+      'waveplan_dispatcher_max': 'Maks. {n}',
+      'waveplan_wave_routes_count': '· {count} rota',
+      'waveplan_drop_here': 'Buraya birak',
+      'waveplan_drop_driver': 'Suruyu birak',
+      'waveplan_pool_empty':
+          'Suruyu buraya surukle\natamayi kaldirmak icin.',
+      'waveplan_atlas_dialog_title': 'Atlas paketlerini yapistir',
+      'waveplan_atlas_dialog_intro':
+          'E-postadan kopyalayin ve buraya yapistirin. Beklenen: paket basina '
+          'bir satir "Tracking-ID - Route-Code - Transporter-ID" formatinda. '
+          'Surucu, paketi dispecherden almasi icin bir not gorur.',
+      'waveplan_atlas_dialog_btn_none_today': 'Bugun Atlas paketi yok',
+      'waveplan_notes_dialog_title': 'Suruculer icin not',
+      'waveplan_notes_dialog_intro':
+          'Wave yayinlanir yayinlanmaz her surucu telefonunda gorulur.',
+      'waveplan_notes_dialog_hint':
+          'orn. "A3\'te trafik", "Son teslimat 18:00", '
+          '"Brifing 10:45 holde".',
+      'waveplan_paste_dialog_title': 'Waveplan yapistir',
+      'waveplan_paste_dialog_intro':
+          'Tabloyu Excel\'den veya web\'den kopyalayip buraya yapistirin. '
+          'Beklenen: rota basina 9 alan, su sirayla — dispatchTime, '
+          'shiftEnd, routeCode, routeId, dispatchArea, spur, '
+          '"TID / DSP / TID", DSP, serviceType.',
+      'waveplan_clear_dialog_title': 'Waveplan temizlensin mi?',
+      'waveplan_clear_dialog_body':
+          'Tum rotalar ve atamalar silinecek. Bu islem geri alinamaz.',
+      'waveplan_btn_cancel': 'Iptal',
+      'waveplan_btn_import': 'Iceri aktar',
+      'waveplan_btn_save': 'Kaydet',
+      'waveplan_snack_atlas_none_confirmed':
+          'Bugun Atlas paketi yok onaylandi — yayinlama serbest.',
+      'waveplan_snack_atlas_invalid':
+          'Gecerli Atlas paketi tespit edilemedi.',
+      'waveplan_snack_atlas_imported':
+          '{total} Atlas paketi {routes} rota icin iceri aktarildi.',
+      'waveplan_snack_routes_invalid': 'Gecerli rota tespit edilemedi.',
+      'waveplan_snack_routes_imported': '{count} rota iceri aktarildi.',
+      'waveplan_snack_unpublish_failed':
+          'Yayindan kaldirma basarisiz: {error}',
+      'waveplan_snack_unpublished':
+          'Yayin geri alindi — suruculer artik bir sey gormuyor.',
+      'waveplan_snack_publish_failed': 'Yayinlama basarisiz: {error}',
+      'waveplan_snack_published':
+          'Waveplan yayinlandi — suruculer artik wave\'lerini gorebilir.',
+      'waveplan_snack_login_required': 'Lutfen once giris yapin.',
+    },
+    'ru': {
+      ..._waveplanSharedValues,
+      'waveplan_btn_paste_wave': 'Вставить wave',
+      'waveplan_btn_atlas': 'Атлас',
+      'waveplan_btn_atlas_count': 'Атлас · {count}',
+      'waveplan_btn_atlas_none': 'Атлас · нет',
+      'waveplan_btn_notes': 'Заметка',
+      'waveplan_btn_notes_count': 'Заметка · {count}',
+      'waveplan_btn_clear': 'Очистить',
+      'waveplan_assigned_count': '{assigned} / {total} назначено',
+      'waveplan_publish_disabled_tooltip':
+          'Сначала добавьте данные wave и подтвердите статус Атлас.',
+      'waveplan_publish_label': 'Опубликовать Waveplan',
+      'waveplan_published_label': 'Опубликовано  ·  {time}  ·  Снять',
+      'waveplan_dispatcher_label': 'Диспетчер',
+      'waveplan_dispatcher_empty':
+          'Диспетчеры не настроены — добавьте на странице "Dispatcher Pill".',
+      'waveplan_dispatcher_max': 'Макс. {n}',
+      'waveplan_wave_routes_count': '· {count} маршрутов',
+      'waveplan_drop_here': 'Отпустить здесь',
+      'waveplan_drop_driver': 'Отпустить водителя',
+      'waveplan_pool_empty':
+          'Перетащите водителя сюда,\nчтобы снять назначение.',
+      'waveplan_atlas_dialog_title': 'Вставить пакеты Атлас',
+      'waveplan_atlas_dialog_intro':
+          'Скопируйте из письма и вставьте сюда. Ожидается: одна строка на '
+          'пакет в формате "Tracking-ID - Route-Code - Transporter-ID". '
+          'Водитель увидит примечание забрать пакет у диспетчера.',
+      'waveplan_atlas_dialog_btn_none_today': 'Сегодня нет пакетов Атлас',
+      'waveplan_notes_dialog_title': 'Заметка для водителей',
+      'waveplan_notes_dialog_intro':
+          'Отображается на телефоне каждого водителя сразу после публикации wave.',
+      'waveplan_notes_dialog_hint':
+          'напр. "Пробка на A3", "Доставка до 18:00", '
+          '"Брифинг 10:45 в зале".',
+      'waveplan_paste_dialog_title': 'Вставить Waveplan',
+      'waveplan_paste_dialog_intro':
+          'Скопируйте таблицу из Excel или с сайта и вставьте сюда. '
+          'Ожидается: 9 полей на маршрут в порядке — dispatchTime, '
+          'shiftEnd, routeCode, routeId, dispatchArea, spur, '
+          '"TID / DSP / TID", DSP, serviceType.',
+      'waveplan_clear_dialog_title': 'Очистить Waveplan?',
+      'waveplan_clear_dialog_body':
+          'Все маршруты и назначения будут удалены. Это действие нельзя '
+          'отменить.',
+      'waveplan_btn_cancel': 'Отмена',
+      'waveplan_btn_import': 'Импорт',
+      'waveplan_btn_save': 'Сохранить',
+      'waveplan_snack_atlas_none_confirmed':
+          'Подтверждено: сегодня нет пакетов Атлас — публикация разрешена.',
+      'waveplan_snack_atlas_invalid':
+          'Не удалось распознать действительные пакеты Атлас.',
+      'waveplan_snack_atlas_imported':
+          'Импортировано {total} пакетов Атлас для {routes} маршрутов.',
+      'waveplan_snack_routes_invalid': 'Не удалось распознать действительные маршруты.',
+      'waveplan_snack_routes_imported': 'Импортировано {count} маршрутов.',
+      'waveplan_snack_unpublish_failed':
+          'Снятие публикации не удалось: {error}',
+      'waveplan_snack_unpublished':
+          'Публикация снята — водители больше ничего не видят.',
+      'waveplan_snack_publish_failed': 'Публикация не удалась: {error}',
+      'waveplan_snack_published':
+          'Waveplan опубликован — водители теперь видят свой wave.',
+      'waveplan_snack_login_required': 'Пожалуйста, сначала войдите.',
+    },
+  };
+
   static final Map<String, Map<String, String>> _miscLocalizedValues = {
     'en': _miscSharedValues,
     'de': {
@@ -13077,6 +13671,274 @@ class AppLocalizations {
     },
   };
 
+  /// FAQ Training — driver-side quiz built on top of the FAQ entries.
+  /// Each card shows the FAQ answer as an explanation, then asks
+  /// "is this statement correct?" with True/False buttons.
+  static final Map<String, Map<String, String>> _faqTrainingLocalizedValues = {
+    'en': {
+      'faq_training_title': 'FAQ Training',
+      'faq_training_subtitle': 'Test what you remember from the FAQ',
+      'faq_training_loading': 'Loading…',
+      'faq_training_no_questions':
+          'No FAQ entries yet. Ask your dispatcher to add some.',
+      'faq_training_progress': '{current} / {total}',
+      'faq_training_explanation_label': 'Explanation',
+      'faq_training_test_label': 'Quick check',
+      'faq_training_understood_btn': 'I understood',
+      'faq_training_test_prompt': 'Is this statement correct?',
+      'faq_training_btn_true': 'Correct',
+      'faq_training_btn_false': 'Incorrect',
+      'faq_training_correct_feedback': 'Right!',
+      'faq_training_incorrect_feedback':
+          'Not quite — read the explanation again.',
+      'faq_training_back_to_explanation': 'Back to explanation',
+      'faq_training_continue': 'Next',
+      'faq_training_done_title': 'Training complete!',
+      'faq_training_done_score': '{correct} of {total} correct',
+      'faq_training_score_excellent': 'Excellent — you got everything right!',
+      'faq_training_score_good': 'Well done — keep it up.',
+      'faq_training_score_keep_practicing': 'Keep practising — read the FAQs.',
+      'faq_training_btn_retake': 'Retake',
+      'faq_training_btn_close': 'Close',
+      'faq_training_card_intro':
+          'Below is the original FAQ entry. Read it, then confirm '
+          'the statement on the next card.',
+    },
+    'de': {
+      'faq_training_title': 'FAQ-Training',
+      'faq_training_subtitle': 'Teste dein Wissen aus den FAQs',
+      'faq_training_loading': 'Lade…',
+      'faq_training_no_questions':
+          'Noch keine FAQs vorhanden. Bitte den Dispatcher, welche anzulegen.',
+      'faq_training_progress': '{current} / {total}',
+      'faq_training_explanation_label': 'Erklärung',
+      'faq_training_test_label': 'Kurz-Check',
+      'faq_training_understood_btn': 'Verstanden',
+      'faq_training_test_prompt': 'Stimmt diese Aussage?',
+      'faq_training_btn_true': 'Richtig',
+      'faq_training_btn_false': 'Falsch',
+      'faq_training_correct_feedback': 'Genau!',
+      'faq_training_incorrect_feedback':
+          'Nicht ganz — lies die Erklärung noch einmal.',
+      'faq_training_back_to_explanation': 'Zurück zur Erklärung',
+      'faq_training_continue': 'Weiter',
+      'faq_training_done_title': 'Training abgeschlossen!',
+      'faq_training_done_score': '{correct} von {total} richtig',
+      'faq_training_score_excellent': 'Top — alles richtig!',
+      'faq_training_score_good': 'Gut gemacht — bleib dran.',
+      'faq_training_score_keep_practicing':
+          'Übe weiter — lies die FAQs nochmal.',
+      'faq_training_btn_retake': 'Neu starten',
+      'faq_training_btn_close': 'Schließen',
+      'faq_training_card_intro':
+          'Hier ist der Original-FAQ-Eintrag. Lies ihn aufmerksam und '
+          'bestätige die Aussage auf der nächsten Karte.',
+    },
+    'sq': {
+      'faq_training_title': 'Trajnim FAQ',
+      'faq_training_subtitle': 'Provo atë që mban mend nga FAQ-të',
+      'faq_training_loading': 'Po ngarkohet…',
+      'faq_training_no_questions':
+          'Ende nuk ka FAQ. Kërkoji dispeçerit të shtojë.',
+      'faq_training_progress': '{current} / {total}',
+      'faq_training_explanation_label': 'Shpjegim',
+      'faq_training_test_label': 'Kontroll i shpejtë',
+      'faq_training_understood_btn': 'E kuptova',
+      'faq_training_test_prompt': 'A është i saktë ky pohim?',
+      'faq_training_btn_true': 'I saktë',
+      'faq_training_btn_false': 'I pasaktë',
+      'faq_training_correct_feedback': 'Saktë!',
+      'faq_training_incorrect_feedback':
+          'Jo plotësisht — lexoje sërish shpjegimin.',
+      'faq_training_back_to_explanation': 'Kthehu te shpjegimi',
+      'faq_training_continue': 'Vazhdo',
+      'faq_training_done_title': 'Trajnimi përfundoi!',
+      'faq_training_done_score': '{correct} nga {total} të sakta',
+      'faq_training_score_excellent': 'Shkëlqyeshëm — i ke të gjitha sakta!',
+      'faq_training_score_good': 'Punë e mirë — vazhdo kështu.',
+      'faq_training_score_keep_practicing':
+          'Vazhdo të ushtrosh — rilexo FAQ-të.',
+      'faq_training_btn_retake': 'Rifillo',
+      'faq_training_btn_close': 'Mbyll',
+      'faq_training_card_intro':
+          'Më poshtë është hyrja origjinale e FAQ-së. Lexoje, '
+          'pastaj konfirmo pohimin në kartën tjetër.',
+    },
+    'hu': {
+      'faq_training_title': 'GYIK Tréning',
+      'faq_training_subtitle': 'Próbáld ki, mit jegyeztél meg a GYIK-ből',
+      'faq_training_loading': 'Betöltés…',
+      'faq_training_no_questions':
+          'Még nincs GYIK. Kérd meg a diszpécsert, hogy adjon hozzá.',
+      'faq_training_progress': '{current} / {total}',
+      'faq_training_explanation_label': 'Magyarázat',
+      'faq_training_test_label': 'Gyors ellenőrzés',
+      'faq_training_understood_btn': 'Értem',
+      'faq_training_test_prompt': 'Helyes ez az állítás?',
+      'faq_training_btn_true': 'Helyes',
+      'faq_training_btn_false': 'Helytelen',
+      'faq_training_correct_feedback': 'Pontosan!',
+      'faq_training_incorrect_feedback': 'Nem egészen — olvasd el újra.',
+      'faq_training_back_to_explanation': 'Vissza a magyarázathoz',
+      'faq_training_continue': 'Tovább',
+      'faq_training_done_title': 'Tréning kész!',
+      'faq_training_done_score': '{correct} / {total} helyes',
+      'faq_training_score_excellent': 'Kiváló — minden helyes volt!',
+      'faq_training_score_good': 'Szép munka — így tovább.',
+      'faq_training_score_keep_practicing':
+          'Gyakorolj tovább — olvasd a GYIK-et.',
+      'faq_training_btn_retake': 'Újrakezdés',
+      'faq_training_btn_close': 'Bezárás',
+      'faq_training_card_intro':
+          'Lent az eredeti GYIK-bejegyzés. Olvasd el, majd erősítsd '
+          'meg az állítást a következő kártyán.',
+    },
+    'ro': {
+      'faq_training_title': 'Antrenament FAQ',
+      'faq_training_subtitle': 'Verifică ce ai reținut din FAQ',
+      'faq_training_loading': 'Se încarcă…',
+      'faq_training_no_questions':
+          'Încă nu există FAQ-uri. Cere dispecerului să adauge.',
+      'faq_training_progress': '{current} / {total}',
+      'faq_training_explanation_label': 'Explicație',
+      'faq_training_test_label': 'Verificare rapidă',
+      'faq_training_understood_btn': 'Am înțeles',
+      'faq_training_test_prompt': 'Această afirmație este corectă?',
+      'faq_training_btn_true': 'Corect',
+      'faq_training_btn_false': 'Greșit',
+      'faq_training_correct_feedback': 'Exact!',
+      'faq_training_incorrect_feedback':
+          'Nu chiar — citește încă o dată explicația.',
+      'faq_training_back_to_explanation': 'Înapoi la explicație',
+      'faq_training_continue': 'Continuă',
+      'faq_training_done_title': 'Antrenament încheiat!',
+      'faq_training_done_score': '{correct} din {total} corecte',
+      'faq_training_score_excellent': 'Excelent — totul corect!',
+      'faq_training_score_good': 'Bună treabă — ține-o tot așa.',
+      'faq_training_score_keep_practicing':
+          'Continuă să exersezi — citește FAQ-urile.',
+      'faq_training_btn_retake': 'Reia',
+      'faq_training_btn_close': 'Închide',
+      'faq_training_card_intro':
+          'Mai jos este intrarea originală din FAQ. Citește-o și '
+          'confirmă afirmația pe cardul următor.',
+    },
+    'hr': {
+      'faq_training_title': 'FAQ trening',
+      'faq_training_subtitle': 'Provjeri što si zapamtio iz FAQ-a',
+      'faq_training_loading': 'Učitavanje…',
+      'faq_training_no_questions':
+          'Još nema FAQ-ova. Zamoli dispečera da ih doda.',
+      'faq_training_progress': '{current} / {total}',
+      'faq_training_explanation_label': 'Objašnjenje',
+      'faq_training_test_label': 'Brza provjera',
+      'faq_training_understood_btn': 'Razumijem',
+      'faq_training_test_prompt': 'Je li ova izjava točna?',
+      'faq_training_btn_true': 'Točno',
+      'faq_training_btn_false': 'Netočno',
+      'faq_training_correct_feedback': 'Točno!',
+      'faq_training_incorrect_feedback': 'Ne baš — pročitaj ponovo.',
+      'faq_training_back_to_explanation': 'Natrag na objašnjenje',
+      'faq_training_continue': 'Dalje',
+      'faq_training_done_title': 'Trening završen!',
+      'faq_training_done_score': '{correct} od {total} točno',
+      'faq_training_score_excellent': 'Odlično — sve točno!',
+      'faq_training_score_good': 'Dobro odrađeno — samo tako nastavi.',
+      'faq_training_score_keep_practicing':
+          'Nastavi vježbati — pročitaj FAQ-ove.',
+      'faq_training_btn_retake': 'Ponovi',
+      'faq_training_btn_close': 'Zatvori',
+      'faq_training_card_intro':
+          'Ispod je izvorni FAQ unos. Pročitaj ga i potvrdi izjavu '
+          'na sljedećoj kartici.',
+    },
+    'ar': {
+      'faq_training_title': 'تدريب الأسئلة الشائعة',
+      'faq_training_subtitle': 'اختبر ما تتذكره من الأسئلة الشائعة',
+      'faq_training_loading': 'جارٍ التحميل…',
+      'faq_training_no_questions':
+          'لا توجد أسئلة شائعة بعد. اطلب من المنسّق إضافتها.',
+      'faq_training_progress': '{current} / {total}',
+      'faq_training_explanation_label': 'الشرح',
+      'faq_training_test_label': 'فحص سريع',
+      'faq_training_understood_btn': 'فهمت',
+      'faq_training_test_prompt': 'هل هذه العبارة صحيحة؟',
+      'faq_training_btn_true': 'صحيح',
+      'faq_training_btn_false': 'خطأ',
+      'faq_training_correct_feedback': 'بالضبط!',
+      'faq_training_incorrect_feedback': 'ليس تماماً — اقرأ الشرح مجدداً.',
+      'faq_training_back_to_explanation': 'الرجوع إلى الشرح',
+      'faq_training_continue': 'التالي',
+      'faq_training_done_title': 'انتهى التدريب!',
+      'faq_training_done_score': '{correct} من {total} إجابات صحيحة',
+      'faq_training_score_excellent': 'ممتاز — كل شيء صحيح!',
+      'faq_training_score_good': 'أحسنت — استمر هكذا.',
+      'faq_training_score_keep_practicing':
+          'تابع التدريب — اقرأ الأسئلة الشائعة.',
+      'faq_training_btn_retake': 'إعادة',
+      'faq_training_btn_close': 'إغلاق',
+      'faq_training_card_intro':
+          'أدناه السؤال الشائع الأصلي. اقرأه ثم أكِّد العبارة في البطاقة التالية.',
+    },
+    'tr': {
+      'faq_training_title': 'SSS Eğitimi',
+      'faq_training_subtitle': 'SSS\'lerden hatırladığını test et',
+      'faq_training_loading': 'Yükleniyor…',
+      'faq_training_no_questions':
+          'Henüz SSS yok. Sevk memurundan eklemesini iste.',
+      'faq_training_progress': '{current} / {total}',
+      'faq_training_explanation_label': 'Açıklama',
+      'faq_training_test_label': 'Hızlı kontrol',
+      'faq_training_understood_btn': 'Anladım',
+      'faq_training_test_prompt': 'Bu ifade doğru mu?',
+      'faq_training_btn_true': 'Doğru',
+      'faq_training_btn_false': 'Yanlış',
+      'faq_training_correct_feedback': 'Aynen öyle!',
+      'faq_training_incorrect_feedback': 'Tam değil — açıklamayı tekrar oku.',
+      'faq_training_back_to_explanation': 'Açıklamaya dön',
+      'faq_training_continue': 'Devam',
+      'faq_training_done_title': 'Eğitim tamamlandı!',
+      'faq_training_done_score': '{total} sorudan {correct} doğru',
+      'faq_training_score_excellent': 'Mükemmel — hepsi doğru!',
+      'faq_training_score_good': 'Aferin — böyle devam.',
+      'faq_training_score_keep_practicing': 'Çalışmaya devam — SSS\'leri oku.',
+      'faq_training_btn_retake': 'Tekrar başla',
+      'faq_training_btn_close': 'Kapat',
+      'faq_training_card_intro':
+          'Aşağıda orijinal SSS girişi var. Oku ve sonraki kartta '
+          'ifadeyi onayla.',
+    },
+    'ru': {
+      'faq_training_title': 'Тренинг по FAQ',
+      'faq_training_subtitle': 'Проверь, что ты запомнил из FAQ',
+      'faq_training_loading': 'Загрузка…',
+      'faq_training_no_questions':
+          'Пока нет вопросов. Попроси диспетчера добавить.',
+      'faq_training_progress': '{current} / {total}',
+      'faq_training_explanation_label': 'Объяснение',
+      'faq_training_test_label': 'Быстрая проверка',
+      'faq_training_understood_btn': 'Понятно',
+      'faq_training_test_prompt': 'Это утверждение верно?',
+      'faq_training_btn_true': 'Верно',
+      'faq_training_btn_false': 'Неверно',
+      'faq_training_correct_feedback': 'Точно!',
+      'faq_training_incorrect_feedback':
+          'Не совсем — перечитай объяснение.',
+      'faq_training_back_to_explanation': 'Назад к объяснению',
+      'faq_training_continue': 'Дальше',
+      'faq_training_done_title': 'Тренинг завершён!',
+      'faq_training_done_score': '{correct} из {total} правильно',
+      'faq_training_score_excellent': 'Отлично — всё правильно!',
+      'faq_training_score_good': 'Молодец — так держать.',
+      'faq_training_score_keep_practicing': 'Продолжай — перечитай FAQ.',
+      'faq_training_btn_retake': 'Заново',
+      'faq_training_btn_close': 'Закрыть',
+      'faq_training_card_intro':
+          'Ниже исходная запись FAQ. Прочти её, затем подтверди '
+          'утверждение на следующей карточке.',
+    },
+  };
+
   String _lang() => locale.languageCode.toLowerCase();
 
   String t(String key) {
@@ -13110,7 +13972,11 @@ class AppLocalizations {
     final adminApprovalsMap =
         _adminApprovalsLocalizedValues[lang] ??
         _adminApprovalsLocalizedValues['en']!;
+    final waveplanMap =
+        _waveplanLocalizedValues[lang] ?? _waveplanLocalizedValues['en']!;
     final miscMap = _miscLocalizedValues[lang] ?? _miscLocalizedValues['en']!;
+    final faqTrainingMap = _faqTrainingLocalizedValues[lang] ??
+        _faqTrainingLocalizedValues['en']!;
     final text =
         fleetHubMap[key] ??
         langMap[key] ??
@@ -13124,7 +13990,9 @@ class AppLocalizations {
         driversHubMap[key] ??
         adminFaqMap[key] ??
         adminApprovalsMap[key] ??
+        waveplanMap[key] ??
         miscMap[key] ??
+        faqTrainingMap[key] ??
         _localizedValues['en']![key] ??
         _driverNotificationLocalizedValues['en']![key] ??
         _driverAbsenceLocalizedValues['en']![key] ??
@@ -13135,7 +14003,9 @@ class AppLocalizations {
         _driversHubLocalizedValues['en']![key] ??
         _adminFaqLocalizedValues['en']![key] ??
         _adminApprovalsLocalizedValues['en']![key] ??
+        _waveplanLocalizedValues['en']![key] ??
         _miscLocalizedValues['en']![key] ??
+        _faqTrainingLocalizedValues['en']![key] ??
         key;
     return _normalizeScorecardTerms(text);
   }
