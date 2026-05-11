@@ -14,6 +14,7 @@ import '../services/fleet_vehicle_document_service.dart';
 import '../services/fleet_vehicle_event_repository.dart';
 import '../services/fleet_vehicle_event_service.dart';
 import '../services/fleet_vehicle_repository.dart';
+import 'seso_overview_page.dart';
 
 class FleetStatusPage extends StatefulWidget {
   const FleetStatusPage({super.key});
@@ -429,6 +430,38 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
       return Center(child: Text(t.t('fleet_status_empty_scope')));
     }
 
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        children: [
+          Material(
+            color: _kPageBg,
+            child: TabBar(
+              indicatorColor: _kGreen,
+              labelColor: _kText,
+              unselectedLabelColor: _kMuted,
+              labelStyle: const TextStyle(fontWeight: FontWeight.w700),
+              tabs: const [
+                Tab(text: 'Fahrzeuge'),
+                Tab(text: 'SESO'),
+              ],
+            ),
+          ),
+          Expanded(
+            child: TabBarView(
+              children: [
+                _buildVehiclesTab(context, scope),
+                SesoOverviewPage(dspUid: scope),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVehiclesTab(BuildContext context, String scope) {
+    final t = AppLocalizations.of(context);
     return LayoutBuilder(
       builder: (context, constraints) {
         final isNarrow = constraints.maxWidth < 1024;

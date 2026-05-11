@@ -1,5 +1,9 @@
 // lib/Screens/driver_waveplan_view.dart
 //
+// Driver-facing waveplan. All user-visible labels go through
+// `AppLocalizations.of(context).t(...)` — the literal "Waveplan" page
+// brand is the only intentional exception.
+//
 // Driver-side Waveplan. Two tabs:
 //   1. "Meine Wave" — the driver's own assigned route, dispatch
 //      area, spur and shift times.
@@ -14,6 +18,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import '../localization/app_localizations.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_elevation.dart';
 import '../theme/app_spacing.dart';
@@ -127,6 +132,10 @@ class _DriverWaveplanViewState extends State<DriverWaveplanView>
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Tabs first — driver's primary action is to switch
+                  // between "Meine Wave" and "Alle Fahrer".
+                  _SegmentedTabs(controller: _tabs),
+                  const SizedBox(height: AppSpacing.sm),
                   _Header(
                     publishedAt: (data?['publishedAt'] as Timestamp?)?.toDate(),
                   ),
@@ -138,8 +147,6 @@ class _DriverWaveplanViewState extends State<DriverWaveplanView>
                     const SizedBox(height: AppSpacing.sm),
                     _NoticeBanner(text: notes),
                   ],
-                  const SizedBox(height: AppSpacing.md),
-                  _SegmentedTabs(controller: _tabs),
                   const SizedBox(height: AppSpacing.md),
                   Expanded(
                     child: TabBarView(
@@ -215,6 +222,7 @@ class _DispatcherStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.all(AppSpacing.sm),
       decoration: BoxDecoration(
@@ -238,7 +246,7 @@ class _DispatcherStrip extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               Text(
-                'Dispatcher heute',
+                t.t('driver_waveplan_dispatcher_today'),
                 style: AppTypography.caption2.copyWith(
                   color: AppColors.labelSecondaryLight,
                   fontWeight: FontWeight.w600,
@@ -249,21 +257,21 @@ class _DispatcherStrip extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Wrap(
-            spacing: 8,
-            runSpacing: 8,
+            spacing: 6,
+            runSpacing: 6,
             children: [
               for (final d in entries)
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
+                    horizontal: 8,
+                    vertical: 4,
                   ),
                   decoration: BoxDecoration(
                     color: AppColors.green50,
                     borderRadius: BorderRadius.circular(999),
                     border: Border.all(
                       color: AppColors.codriverGreen.withOpacity(0.5),
-                      width: 1.2,
+                      width: 1,
                     ),
                   ),
                   child: Row(
@@ -271,29 +279,23 @@ class _DispatcherStrip extends StatelessWidget {
                     children: [
                       const Icon(
                         Icons.person_rounded,
-                        size: 14,
+                        size: 11,
                         color: AppColors.codriverDeep,
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 4),
                       Text(
                         d['name'] ?? '',
-                        style: AppTypography.subheadline.copyWith(
+                        style: AppTypography.caption1.copyWith(
                           color: AppColors.codriverDeep,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                       if ((d['start'] ?? '').isNotEmpty &&
                           (d['end'] ?? '').isNotEmpty) ...[
-                        const SizedBox(width: 6),
-                        const Icon(
-                          Icons.schedule_rounded,
-                          size: 12,
-                          color: AppColors.codriverDeep,
-                        ),
-                        const SizedBox(width: 3),
+                        const SizedBox(width: 4),
                         Text(
                           '${d['start']}–${d['end']}',
-                          style: AppTypography.footnote.copyWith(
+                          style: AppTypography.caption2.copyWith(
                             color: AppColors.codriverDeep,
                             fontWeight: FontWeight.w600,
                             fontFeatures: const [
@@ -323,6 +325,7 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     final now = DateTime.now();
     final dateLabel =
         '${now.day.toString().padLeft(2, '0')}.'
@@ -365,7 +368,9 @@ class _Header extends StatelessWidget {
               ),
               const SizedBox(width: 4),
               Text(
-                'Veröffentlicht ${_hhmm(publishedAt!)}',
+                t.tf('driver_waveplan_published_at', {
+                  'time': _hhmm(publishedAt!),
+                }),
                 style: AppTypography.footnote.copyWith(
                   color: AppColors.labelSecondaryLight,
                   fontWeight: FontWeight.w600,
@@ -392,6 +397,7 @@ class _SegmentedTabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      height: 46,
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: AppColors.surfaceElevatedLight,
@@ -409,6 +415,7 @@ class _SegmentedTabs extends StatelessWidget {
           borderRadius: BorderRadius.circular(999),
         ),
         indicatorSize: TabBarIndicatorSize.tab,
+        labelPadding: EdgeInsets.zero,
         labelColor: Colors.white,
         unselectedLabelColor: AppColors.labelSecondaryLight,
         labelStyle: AppTypography.subheadline.copyWith(
@@ -420,9 +427,14 @@ class _SegmentedTabs extends StatelessWidget {
         dividerColor: Colors.transparent,
         splashFactory: NoSplash.splashFactory,
         overlayColor: WidgetStateProperty.all(Colors.transparent),
-        tabs: const [
-          Tab(text: 'Meine Wave'),
-          Tab(text: 'Alle Fahrer'),
+        tabs: [
+          Tab(
+            text: AppLocalizations.of(context).t('driver_waveplan_tab_my_wave'),
+          ),
+          Tab(
+            text:
+                AppLocalizations.of(context).t('driver_waveplan_tab_all_drivers'),
+          ),
         ],
       ),
     );
@@ -439,12 +451,12 @@ class _MyWaveTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     if (myRoute == null) {
-      return const _EmptyState(
+      return _EmptyState(
         icon: Icons.schedule_rounded,
-        title: 'Noch keine Wave veröffentlicht',
-        description: 'Sobald dein Dispatcher den Waveplan veröffentlicht, '
-            'siehst du hier deine Route, Spur und Abfahrtszeit.',
+        title: t.t('driver_waveplan_no_wave_yet_title'),
+        description: t.t('driver_waveplan_no_wave_yet_desc'),
       );
     }
 
@@ -467,7 +479,7 @@ class _MyWaveTab extends StatelessWidget {
             const SizedBox(height: AppSpacing.md),
           ],
           Container(
-            padding: const EdgeInsets.all(AppSpacing.lg),
+            padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
@@ -477,57 +489,68 @@ class _MyWaveTab extends StatelessWidget {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(18),
               boxShadow: AppElevation.level3,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Wave ${(myRoute!['dispatchTime'] ?? '').toString().substring(0, 5)}',
-                  style: AppTypography.headline.copyWith(
+                  '${t.t('driver_waveplan_wave_prefix')} '
+                  '${(myRoute!['dispatchTime'] ?? '').toString().substring(0, 5)}',
+                  style: AppTypography.footnote.copyWith(
                     color: Colors.white.withOpacity(0.85),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: AppSpacing.xs),
+                const SizedBox(height: 2),
                 Text(
                   (myRoute!['routeCode'] ?? '').toString(),
-                  style: AppTypography.largeTitle.copyWith(
+                  style: AppTypography.title2.copyWith(
                     color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  (myRoute!['serviceType'] ?? '').toString(),
-                  style: AppTypography.body.copyWith(
-                    color: Colors.white.withOpacity(0.8),
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: AppSpacing.md),
-          // Detail rows
-          _DetailCard(
-            icon: Icons.place_rounded,
-            label: 'Dispatch Area',
-            value: (myRoute!['dispatchArea'] ?? '—').toString(),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          _DetailCard(
-            icon: isLeft
-                ? Icons.arrow_back_rounded
-                : Icons.arrow_forward_rounded,
-            label: 'Spur',
-            value: isLeft ? 'links' : 'rechts',
-            valueColor: spurColor,
+          const SizedBox(height: AppSpacing.sm),
+          // Dispatch Area & Spur side-by-side. IntrinsicHeight + stretch
+          // keeps the two cards visually aligned regardless of label
+          // length (one of them may wrap on narrow phones).
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: _DetailCard(
+                    icon: Icons.place_rounded,
+                    label: t.t('driver_waveplan_dispatch_area'),
+                    value: (myRoute!['dispatchArea'] ?? '—').toString(),
+                    compact: true,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: _DetailCard(
+                    icon: isLeft
+                        ? Icons.arrow_back_rounded
+                        : Icons.arrow_forward_rounded,
+                    label: t.t('driver_waveplan_lane'),
+                    value: isLeft
+                        ? t.t('driver_waveplan_lane_left')
+                        : t.t('driver_waveplan_lane_right'),
+                    valueColor: spurColor,
+                    compact: true,
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: AppSpacing.xs),
           _DetailCard(
             icon: Icons.schedule_rounded,
-            label: 'Schicht',
+            label: t.t('driver_waveplan_shift'),
             value:
                 '${(myRoute!['dispatchTime'] ?? '').toString().substring(0, 5)}'
                 ' – '
@@ -594,6 +617,7 @@ class _AtlasAlert extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
@@ -639,19 +663,21 @@ class _AtlasAlert extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${trackingIds.length} Atlas-Paket'
-                      '${trackingIds.length == 1 ? '' : 'e'} '
-                      'beim Dispatcher abholen',
-                      style: AppTypography.headline.copyWith(
+                      t.tf(
+                        trackingIds.length == 1
+                            ? 'driver_waveplan_atlas_title_one'
+                            : 'driver_waveplan_atlas_title_many',
+                        {'count': '${trackingIds.length}'},
+                      ),
+                      style: AppTypography.subheadline.copyWith(
                         color: const Color(0xFF8A4A00),
                         fontWeight: FontWeight.w800,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Diese Pakete sind hochwertig und müssen persönlich '
-                      'übergeben werden.',
-                      style: AppTypography.footnote.copyWith(
+                      t.t('driver_waveplan_atlas_desc'),
+                      style: AppTypography.caption1.copyWith(
                         color: const Color(0xFF8A4A00).withOpacity(0.85),
                       ),
                     ),
@@ -671,7 +697,7 @@ class _AtlasAlert extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Tracking-IDs',
+                  t.t('driver_waveplan_tracking_ids'),
                   style: AppTypography.caption2.copyWith(
                     color: const Color(0xFF8A4A00),
                     fontWeight: FontWeight.w700,
@@ -683,12 +709,9 @@ class _AtlasAlert extends StatelessWidget {
                   spacing: 6,
                   runSpacing: 6,
                   children: [
-                    for (final tid in trackingIds)
+                    for (var i = 0; i < trackingIds.length; i++)
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
+                        padding: const EdgeInsets.fromLTRB(4, 4, 10, 4),
                         decoration: BoxDecoration(
                           color: AppColors.warning.withOpacity(0.16),
                           borderRadius: BorderRadius.circular(999),
@@ -697,15 +720,40 @@ class _AtlasAlert extends StatelessWidget {
                             width: 1,
                           ),
                         ),
-                        child: Text(
-                          tid,
-                          style: AppTypography.footnote.copyWith(
-                            color: const Color(0xFF8A4A00),
-                            fontWeight: FontWeight.w700,
-                            fontFeatures: const [
-                              FontFeature.tabularFigures(),
-                            ],
-                          ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 20,
+                              height: 20,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: AppColors.warning,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Text(
+                                '${i + 1}',
+                                style: AppTypography.caption2.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures(),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              trackingIds[i],
+                              style: AppTypography.footnote.copyWith(
+                                color: const Color(0xFF8A4A00),
+                                fontWeight: FontWeight.w700,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures(),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                   ],
@@ -724,17 +772,33 @@ class _DetailCard extends StatelessWidget {
   final String label;
   final String value;
   final Color? valueColor;
+  /// Compact layout for side-by-side use on narrow phones: smaller
+  /// icon box, smaller padding, and the value uses [AppTypography.subheadline]
+  /// instead of [AppTypography.headline] so it doesn't overflow.
+  final bool compact;
   const _DetailCard({
     required this.icon,
     required this.label,
     required this.value,
     this.valueColor,
+    this.compact = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final iconBox = compact ? 30.0 : 36.0;
+    final gap = compact ? AppSpacing.sm : AppSpacing.md;
+    final valueStyle = compact
+        ? AppTypography.subheadline.copyWith(
+            color: valueColor ?? AppColors.codriverGraphite,
+            fontWeight: FontWeight.w700,
+          )
+        : AppTypography.headline.copyWith(
+            color: valueColor ?? AppColors.codriverGraphite,
+            fontWeight: FontWeight.w700,
+          );
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: EdgeInsets.all(compact ? AppSpacing.sm : AppSpacing.md),
       decoration: BoxDecoration(
         color: AppColors.surfaceElevatedLight,
         borderRadius: BorderRadius.circular(14),
@@ -743,32 +807,38 @@ class _DetailCard extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 36,
-            height: 36,
+            width: iconBox,
+            height: iconBox,
             decoration: BoxDecoration(
               color: AppColors.green50,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, size: 18, color: AppColors.codriverDeep),
+            child: Icon(
+              icon,
+              size: compact ? 16 : 18,
+              color: AppColors.codriverDeep,
+            ),
           ),
-          const SizedBox(width: AppSpacing.md),
+          SizedBox(width: gap),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   label,
-                  style: AppTypography.caption1.copyWith(
+                  style: AppTypography.caption2.copyWith(
                     color: AppColors.labelSecondaryLight,
                     fontWeight: FontWeight.w600,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 Text(
                   value,
-                  style: AppTypography.headline.copyWith(
-                    color: valueColor ?? AppColors.codriverGraphite,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: valueStyle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -795,12 +865,12 @@ class _AllDriversTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     if (myWave == null || waveRoutes.isEmpty) {
-      return const _EmptyState(
+      return _EmptyState(
         icon: Icons.groups_rounded,
-        title: 'Niemand sichtbar',
-        description: 'Sobald der Waveplan veröffentlicht ist, siehst du hier '
-            'alle anderen Fahrer in deiner Wave — praktisch für Fahrgemeinschaften.',
+        title: t.t('driver_waveplan_all_empty_title'),
+        description: t.t('driver_waveplan_all_empty_desc'),
       );
     }
     final me = myTransporterId.trim().toUpperCase();
@@ -817,9 +887,13 @@ class _AllDriversTab extends StatelessWidget {
             ? const Color(0xFF0A84FF)
             : AppColors.codriverGreen;
         final name = (r['driverName'] ?? '').toString();
+        final atlasIds = (r['atlasTrackingIds'] as List? ?? const [])
+            .map((e) => e.toString())
+            .where((e) => e.isNotEmpty)
+            .toList();
 
         return Container(
-          padding: const EdgeInsets.all(AppSpacing.md),
+          padding: const EdgeInsets.all(AppSpacing.sm),
           decoration: BoxDecoration(
             color: isMe ? AppColors.green50 : AppColors.surfaceElevatedLight,
             borderRadius: BorderRadius.circular(14),
@@ -831,50 +905,73 @@ class _AllDriversTab extends StatelessWidget {
           ),
           child: Row(
             children: [
+              // Uniform colored dot — same size for every driver,
+              // no person icon (the name already identifies the row).
               Container(
-                width: 38,
-                height: 38,
+                width: 12,
+                height: 12,
                 decoration: BoxDecoration(
-                  color: isMe ? AppColors.codriverGreen : AppColors.surfaceLight,
+                  color: isMe
+                      ? AppColors.codriverGreen
+                      : AppColors.labelTertiaryLight,
                   shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: Icon(
-                  Icons.person_rounded,
-                  size: 20,
-                  color: isMe ? Colors.white : AppColors.labelSecondaryLight,
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       name.isNotEmpty
-                          ? name + (isMe ? '  (du)' : '')
+                          ? name +
+                              (isMe
+                                  ? '  ${t.t('driver_waveplan_me_suffix')}'
+                                  : '')
                           : tid,
-                      style: AppTypography.headline.copyWith(
+                      style: AppTypography.subheadline.copyWith(
                         color: AppColors.codriverGraphite,
                         fontWeight: FontWeight.w700,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    Text(
-                      '${(r['routeCode'] ?? '').toString()}  ·  '
-                      '${(r['dispatchArea'] ?? '').toString()}',
-                      style: AppTypography.footnote.copyWith(
-                        color: AppColors.labelSecondaryLight,
-                      ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        if (atlasIds.isNotEmpty) ...[
+                          _AtlasCountChip(
+                            count: atlasIds.length,
+                            onTap: () => _showAtlasTrackingPopup(
+                              context,
+                              atlasIds,
+                              driverName: name.isEmpty ? tid : name,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                        ],
+                        Flexible(
+                          child: Text(
+                            '${(r['routeCode'] ?? '').toString()}  ·  '
+                            '${(r['dispatchArea'] ?? '').toString()}',
+                            style: AppTypography.footnote.copyWith(
+                              color: AppColors.labelSecondaryLight,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
+              const SizedBox(width: AppSpacing.xs),
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 4,
+                  horizontal: 6,
+                  vertical: 3,
                 ),
                 decoration: BoxDecoration(
                   color: spurColor.withOpacity(0.10),
@@ -884,32 +981,195 @@ class _AllDriversTab extends StatelessWidget {
                     width: 1,
                   ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      isLeft
-                          ? Icons.arrow_back_rounded
-                          : Icons.arrow_forward_rounded,
-                      size: 12,
-                      color: spurColor,
-                    ),
-                    const SizedBox(width: 2),
-                    Text(
-                      isLeft ? 'links' : 'rechts',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: spurColor,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  isLeft
+                      ? t.t('driver_waveplan_lane_left')
+                      : t.t('driver_waveplan_lane_right'),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: spurColor,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
             ],
           ),
         );
       },
+    );
+  }
+}
+
+/// Modal popup listing all Atlas tracking-IDs for a single driver.
+/// Triggered by tapping the orange Atlas count chip in the "Alle
+/// Fahrer" tab.
+Future<void> _showAtlasTrackingPopup(
+  BuildContext context,
+  List<String> trackingIds, {
+  required String driverName,
+}) async {
+  final t = AppLocalizations.of(context);
+  await showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
+      contentPadding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+      title: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.warning,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.inventory_2_rounded,
+              color: Colors.white,
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  t.t('driver_waveplan_tracking_ids'),
+                  style: AppTypography.subheadline.copyWith(
+                    color: AppColors.codriverGraphite,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Text(
+                  driverName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.caption2.copyWith(
+                    color: AppColors.labelSecondaryLight,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 360, maxHeight: 420),
+        child: SingleChildScrollView(
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (var i = 0; i < trackingIds.length; i++)
+                Container(
+                  padding: const EdgeInsets.fromLTRB(4, 4, 10, 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withOpacity(0.16),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: AppColors.warning.withOpacity(0.4),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 20,
+                        height: 20,
+                        alignment: Alignment.center,
+                        decoration: const BoxDecoration(
+                          color: AppColors.warning,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          '${i + 1}',
+                          style: AppTypography.caption2.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontFeatures: const [
+                              FontFeature.tabularFigures(),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        trackingIds[i],
+                        style: AppTypography.footnote.copyWith(
+                          color: const Color(0xFF8A4A00),
+                          fontWeight: FontWeight.w700,
+                          fontFeatures: const [
+                            FontFeature.tabularFigures(),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: const Text('Schließen'),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Tiny orange chip with the Atlas icon + parcel count. Tappable —
+/// opens [_showAtlasTrackingPopup] with the tracking-IDs.
+class _AtlasCountChip extends StatelessWidget {
+  final int count;
+  final VoidCallback onTap;
+  const _AtlasCountChip({required this.count, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+          decoration: BoxDecoration(
+            color: AppColors.warning.withOpacity(0.16),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: AppColors.warning.withOpacity(0.4),
+              width: 0.8,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.inventory_2_rounded,
+                size: 11,
+                color: AppColors.warning,
+              ),
+              const SizedBox(width: 3),
+              Text(
+                '$count',
+                style: AppTypography.caption2.copyWith(
+                  color: const Color(0xFF8A4A00),
+                  fontWeight: FontWeight.w800,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

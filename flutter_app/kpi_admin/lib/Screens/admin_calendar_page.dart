@@ -72,6 +72,9 @@ class _AdminCalendarPageState extends State<AdminCalendarSection> {
 
   Stream<List<_CalEvent>> _streamEvents() => _streamAllCalendarEvents();
 
+  Future<void> _showEventDetail(_CalEvent event) =>
+      showCalendarEventDetail(context, event);
+
   Future<void> _addEvent({DateTime? prefillStart}) async {
     final result = await showDialog<_NewEventResult>(
       context: context,
@@ -194,7 +197,9 @@ class _AdminCalendarPageState extends State<AdminCalendarSection> {
 
   @override
   Widget build(BuildContext context) {
-    final isNarrow = MediaQuery.of(context).size.width < 1100;
+    final width = MediaQuery.of(context).size.width;
+    final isNarrow = width < 1100;
+    final isMobile = width < 700;
     return StreamBuilder<List<_CalEvent>>(
       stream: _eventsStream,
       builder: (context, snap) {
@@ -208,6 +213,7 @@ class _AdminCalendarPageState extends State<AdminCalendarSection> {
               onNext: () => _gotoMonth(1),
               onToday: _gotoToday,
               onAddEvent: () => _addEvent(prefillStart: _selectedDay),
+              isMobile: isMobile,
             ),
             const SizedBox(height: AppSpacing.md),
             Expanded(
@@ -222,12 +228,20 @@ class _AdminCalendarPageState extends State<AdminCalendarSection> {
                             events: events,
                             onSelectDay: (d) =>
                                 setState(() => _selectedDay = d),
+                            onEventTap: _showEventDetail,
+                            isMobile: isMobile,
                           ),
                         ),
                         const SizedBox(height: AppSpacing.md),
                         SizedBox(
-                          height: 280,
-                          child: _UpcomingPanel(events: events),
+                          height: isMobile ? 360 : 280,
+                          child: _DayEventsPanel(
+                            selectedDay: _selectedDay,
+                            events: events,
+                            onEventTap: _showEventDetail,
+                            onAddForSelected: () =>
+                                _addEvent(prefillStart: _selectedDay),
+                          ),
                         ),
                       ],
                     )
@@ -242,12 +256,20 @@ class _AdminCalendarPageState extends State<AdminCalendarSection> {
                             events: events,
                             onSelectDay: (d) =>
                                 setState(() => _selectedDay = d),
+                            onEventTap: _showEventDetail,
+                            isMobile: false,
                           ),
                         ),
                         const SizedBox(width: AppSpacing.md),
                         SizedBox(
                           width: 320,
-                          child: _UpcomingPanel(events: events),
+                          child: _DayEventsPanel(
+                            selectedDay: _selectedDay,
+                            events: events,
+                            onEventTap: _showEventDetail,
+                            onAddForSelected: () =>
+                                _addEvent(prefillStart: _selectedDay),
+                          ),
                         ),
                       ],
                     ),
@@ -269,40 +291,63 @@ class _Header extends StatelessWidget {
   final VoidCallback onNext;
   final VoidCallback onToday;
   final VoidCallback onAddEvent;
+  final bool isMobile;
   const _Header({
     required this.visibleMonth,
     required this.onPrev,
     required this.onNext,
     required this.onToday,
     required this.onAddEvent,
+    required this.isMobile,
   });
 
   @override
   Widget build(BuildContext context) {
-    final df = DateFormat('MMMM yyyy', _localeForFormat(context));
+    // Wider screens get the full month name; on mobile we use the
+    // short variant ("Mai 2026") so it fits next to nav + actions.
+    final monthFmt = isMobile ? 'MMM yyyy' : 'MMMM yyyy';
+    final df = DateFormat(monthFmt, _localeForFormat(context));
+    final btnSize = isMobile ? 32.0 : 38.0;
+    final titleStyle = (isMobile ? AppTypography.headline : AppTypography.title2)
+        .copyWith(color: AppColors.codriverGraphite);
+
     return Row(
       children: [
-        // Month title + nav arrows directly next to it.
-        Text(
-          df.format(visibleMonth),
-          style: AppTypography.title2.copyWith(
-            color: AppColors.codriverGraphite,
+        Flexible(
+          child: Text(
+            df.format(visibleMonth),
+            style: titleStyle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
         const SizedBox(width: AppSpacing.sm),
         _RoundIconButton(
           icon: Icons.chevron_left_rounded,
           onTap: onPrev,
+          size: btnSize,
         ),
         const SizedBox(width: AppSpacing.xs),
         _RoundIconButton(
           icon: Icons.chevron_right_rounded,
           onTap: onNext,
+          size: btnSize,
         ),
-        const SizedBox(width: AppSpacing.sm),
-        _PillButton(label: 'Heute', onTap: onToday),
+        const SizedBox(width: AppSpacing.xs),
+        // On mobile the "Heute" pill collapses to an icon button to
+        // save horizontal space.
+        if (isMobile)
+          _RoundIconButton(
+            icon: Icons.today_rounded,
+            onTap: onToday,
+            size: btnSize,
+          )
+        else ...[
+          const SizedBox(width: AppSpacing.xs),
+          _PillButton(label: 'Heute', onTap: onToday),
+        ],
         const Spacer(),
-        _AddEventButton(onTap: onAddEvent),
+        _AddEventButton(onTap: onAddEvent, isMobile: isMobile),
       ],
     );
   }
@@ -312,17 +357,21 @@ class _Header extends StatelessWidget {
 /// dialog to create a new event (single-day or multi-day).
 class _AddEventButton extends StatelessWidget {
   final VoidCallback onTap;
-  const _AddEventButton({required this.onTap});
+  final bool isMobile;
+  const _AddEventButton({required this.onTap, this.isMobile = false});
 
   @override
   Widget build(BuildContext context) {
+    final h = isMobile ? 32.0 : 38.0;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          height: 38,
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          height: h,
+          padding: EdgeInsets.symmetric(
+            horizontal: isMobile ? AppSpacing.sm : AppSpacing.md,
+          ),
           decoration: BoxDecoration(
             color: AppColors.codriverGreen,
             borderRadius: BorderRadius.circular(999),
@@ -332,15 +381,21 @@ class _AddEventButton extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.add_rounded, size: 18, color: Colors.white),
-              const SizedBox(width: 4),
-              Text(
-                'Termin',
-                style: AppTypography.subheadline.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                ),
+              Icon(
+                Icons.add_rounded,
+                size: isMobile ? 16 : 18,
+                color: Colors.white,
               ),
+              if (!isMobile) ...[
+                const SizedBox(width: 4),
+                Text(
+                  'Termin',
+                  style: AppTypography.subheadline.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -352,7 +407,12 @@ class _AddEventButton extends StatelessWidget {
 class _RoundIconButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
-  const _RoundIconButton({required this.icon, required this.onTap});
+  final double size;
+  const _RoundIconButton({
+    required this.icon,
+    required this.onTap,
+    this.size = 38,
+  });
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
@@ -360,8 +420,8 @@ class _RoundIconButton extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          width: 38,
-          height: 38,
+          width: size,
+          height: size,
           decoration: BoxDecoration(
             color: AppColors.surfaceElevatedLight,
             shape: BoxShape.circle,
@@ -371,7 +431,7 @@ class _RoundIconButton extends StatelessWidget {
               width: 0.5,
             ),
           ),
-          child: Icon(icon, size: 20, color: AppColors.codriverDeep),
+          child: Icon(icon, size: size * 0.52, color: AppColors.codriverDeep),
         ),
       ),
     );
@@ -423,24 +483,34 @@ class _CalendarGrid extends StatelessWidget {
   final DateTime? selectedDay;
   final List<_CalEvent> events;
   final ValueChanged<DateTime> onSelectDay;
+  final ValueChanged<_CalEvent> onEventTap;
+  final bool isMobile;
 
   const _CalendarGrid({
     required this.visibleMonth,
     required this.selectedDay,
     required this.events,
     required this.onSelectDay,
+    required this.onEventTap,
+    required this.isMobile,
   });
 
   @override
   Widget build(BuildContext context) {
     final weeks = _buildWeeks(visibleMonth);
     final today = DateTime.now();
+    // The KW (Kalenderwoche) column is kept on every viewport; on
+    // mobile we just shrink it to a 24-px stripe with the bare week
+    // number (no "KW " prefix) so day cells still have room.
+    final kwWidth = isMobile ? 24.0 : 56.0;
+    final outerPadding = isMobile ? AppSpacing.sm : AppSpacing.lg;
+    final radius = isMobile ? 14.0 : 20.0;
 
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: EdgeInsets.all(outerPadding),
       decoration: BoxDecoration(
         color: AppColors.surfaceElevatedLight,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(radius),
         boxShadow: AppElevation.level1,
         border: Border.all(
           color: AppColors.separatorLight.withOpacity(0.4),
@@ -452,7 +522,23 @@ class _CalendarGrid extends StatelessWidget {
           // Weekday header row (Mo Di Mi Do Fr Sa So)
           Row(
             children: [
-              const SizedBox(width: 56), // KW column reservation
+              if (kwWidth > 0)
+                SizedBox(
+                  width: kwWidth,
+                  child: Container(
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Text(
+                      'KW',
+                      style: AppTypography.caption2.copyWith(
+                        color: AppColors.labelTertiaryLight,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.4,
+                        fontSize: isMobile ? 9 : null,
+                      ),
+                    ),
+                  ),
+                ),
               for (final wd in const ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'])
                 Expanded(
                   child: Container(
@@ -471,7 +557,7 @@ class _CalendarGrid extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 4),
-          // Week rows — KW label + 7 day cells each
+          // Week rows — KW label (desktop only) + 7 day cells each
           Expanded(
             child: Column(
               children: [
@@ -479,32 +565,34 @@ class _CalendarGrid extends StatelessWidget {
                   Expanded(
                     child: Row(
                       children: [
-                        // KW label (left column)
-                        SizedBox(
-                          width: 56,
-                          child: Center(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.surfaceLight,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                'KW ${_isoWeek(week.first)}',
-                                style: AppTypography.caption2.copyWith(
-                                  color: AppColors.codriverDeep,
-                                  fontWeight: FontWeight.w700,
-                                  fontFeatures: const [
-                                    FontFeature.tabularFigures(),
-                                  ],
+                        if (kwWidth > 0)
+                          SizedBox(
+                            width: kwWidth,
+                            child: Center(
+                              child: Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: isMobile ? 4 : 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surfaceLight,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  isMobile
+                                      ? '${_isoWeek(week.first)}'
+                                      : 'KW ${_isoWeek(week.first)}',
+                                  style: AppTypography.caption2.copyWith(
+                                    color: AppColors.codriverDeep,
+                                    fontWeight: FontWeight.w700,
+                                    fontFeatures: const [
+                                      FontFeature.tabularFigures(),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
                         for (final day in week)
                           Expanded(
                             child: _DayCell(
@@ -517,6 +605,8 @@ class _CalendarGrid extends StatelessWidget {
                                   .where((e) => e.coversDay(day))
                                   .toList(),
                               onTap: () => onSelectDay(day),
+                              onEventTap: onEventTap,
+                              isMobile: isMobile,
                             ),
                           ),
                       ],
@@ -538,6 +628,8 @@ class _DayCell extends StatelessWidget {
   final bool isSelected;
   final List<_CalEvent> events;
   final VoidCallback onTap;
+  final ValueChanged<_CalEvent> onEventTap;
+  final bool isMobile;
 
   const _DayCell({
     required this.day,
@@ -546,16 +638,9 @@ class _DayCell extends StatelessWidget {
     required this.isSelected,
     required this.events,
     required this.onTap,
+    required this.onEventTap,
+    required this.isMobile,
   });
-
-  Color _categoryColor(String category) {
-    final c = category.toLowerCase();
-    if (c.contains('miet')) return const Color(0xFF7B5BFF); // rental purple
-    if (c.contains('meeting') || c.contains('plan')) return AppColors.codriverGreen;
-    if (c.contains('service') || c.contains('tüv')) return AppColors.warning;
-    if (c.contains('hr') || c.contains('onboard')) return const Color(0xFF0A84FF);
-    return AppColors.codriverDeep;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -566,16 +651,24 @@ class _DayCell extends StatelessWidget {
         ? AppColors.surfaceLight.withOpacity(0.4)
         : AppColors.surfaceLight;
 
+    // Mobile uses just the day number (1-31) instead of "DD.MM" because
+    // each cell is only ~45px wide on a phone screen.
+    final dateLabel = isMobile
+        ? '${day.day}'
+        : '${day.day.toString().padLeft(2, '0')}.${day.month.toString().padLeft(2, '0')}';
+
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          margin: const EdgeInsets.all(3),
-          padding: const EdgeInsets.fromLTRB(6, 6, 6, 4),
+          margin: EdgeInsets.all(isMobile ? 1.5 : 3),
+          padding: isMobile
+              ? const EdgeInsets.fromLTRB(3, 3, 3, 3)
+              : const EdgeInsets.fromLTRB(6, 6, 6, 4),
           decoration: BoxDecoration(
             color: cellBg,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(isMobile ? 8 : 10),
             border: Border.all(
               color: isSelected
                   ? AppColors.codriverGreen
@@ -584,14 +677,14 @@ class _DayCell extends StatelessWidget {
             ),
           ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Date pill (top-left): "09.05" — today gets brand pill
+              // Date pill — today gets the brand pill, otherwise plain.
               Align(
-                alignment: Alignment.topLeft,
+                alignment: isMobile ? Alignment.center : Alignment.topLeft,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isMobile ? 4 : 6,
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
@@ -601,47 +694,103 @@ class _DayCell extends StatelessWidget {
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    '${day.day.toString().padLeft(2, '0')}.${day.month.toString().padLeft(2, '0')}',
+                    dateLabel,
                     style: AppTypography.caption1.copyWith(
                       color: isToday ? Colors.white : fg,
                       fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
                       fontFeatures: const [FontFeature.tabularFigures()],
+                      fontSize: isMobile ? 11.5 : null,
                     ),
                   ),
                 ),
               ),
-              const SizedBox(height: 4),
-              // Event bars — up to 3 visible, "+N more" otherwise
+              SizedBox(height: isMobile ? 2 : 4),
+              // Events: on mobile show colored dots (no titles, no room);
+              // on desktop show full event bars with labels — each bar
+              // taps through to the event detail dialog.
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    for (var i = 0; i < events.length && i < 3; i++)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 2),
-                        child: _EventBar(
-                          event: events[i],
-                          day: day,
-                          color: _categoryColor(events[i].category),
-                        ),
+                child: isMobile
+                    ? _MobileEventDots(
+                        events: events,
+                        colorOf: _categoryColorFor,
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          for (var i = 0; i < events.length && i < 3; i++)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 2),
+                              child: _EventBar(
+                                event: events[i],
+                                day: day,
+                                color:
+                                    _categoryColorFor(events[i].category),
+                                onTap: () => onEventTap(events[i]),
+                              ),
+                            ),
+                          if (events.length > 3)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 1),
+                              child: Text(
+                                '+${events.length - 3} mehr',
+                                style: AppTypography.caption2.copyWith(
+                                  color: AppColors.labelSecondaryLight,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
-                    if (events.length > 3)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 1),
-                        child: Text(
-                          '+${events.length - 3} mehr',
-                          style: AppTypography.caption2.copyWith(
-                            color: AppColors.labelSecondaryLight,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Compact event indicator for mobile day cells: up to 4 colored dots
+/// in a row, then a "+N" overflow label. The titles can't fit in a
+/// ~45px cell so we lean on color alone — the upcoming-panel below
+/// gives the labels.
+class _MobileEventDots extends StatelessWidget {
+  final List<_CalEvent> events;
+  final Color Function(String category) colorOf;
+  const _MobileEventDots({required this.events, required this.colorOf});
+
+  @override
+  Widget build(BuildContext context) {
+    if (events.isEmpty) return const SizedBox.shrink();
+    const maxDots = 4;
+    final visible = events.take(maxDots).toList();
+    final overflow = events.length - visible.length;
+    return Padding(
+      padding: const EdgeInsets.only(top: 2),
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 3,
+        runSpacing: 2,
+        children: [
+          for (final e in visible)
+            Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(
+                color: colorOf(e.category),
+                shape: BoxShape.circle,
+              ),
+            ),
+          if (overflow > 0)
+            Text(
+              '+$overflow',
+              style: AppTypography.caption2.copyWith(
+                fontSize: 9,
+                color: AppColors.labelSecondaryLight,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -654,10 +803,12 @@ class _EventBar extends StatelessWidget {
   final _CalEvent event;
   final DateTime day;
   final Color color;
+  final VoidCallback? onTap;
   const _EventBar({
     required this.event,
     required this.day,
     required this.color,
+    this.onTap,
   });
 
   @override
@@ -670,7 +821,7 @@ class _EventBar extends StatelessWidget {
     final leftRound = isFirst || isStartOfWeek;
     final rightRound = isLast || isEndOfWeek;
 
-    return Container(
+    final bar = Container(
       height: 18,
       padding: const EdgeInsets.symmetric(horizontal: 5),
       alignment: Alignment.centerLeft,
@@ -703,6 +854,16 @@ class _EventBar extends StatelessWidget {
         ),
       ),
     );
+
+    if (onTap == null) return bar;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: bar,
+      ),
+    );
   }
 }
 
@@ -710,26 +871,31 @@ class _EventBar extends StatelessWidget {
 //  Upcoming panel (right column) — events in the next 7 days
 // ════════════════════════════════════════════════════════════════════════════
 
-class _UpcomingPanel extends StatelessWidget {
+/// Side panel that lists the events covering the currently selected
+/// day. Replaces the older "next 7 days" view — clicking a day in the
+/// grid drives this list. Tapping a tile opens the event detail.
+class _DayEventsPanel extends StatelessWidget {
+  final DateTime? selectedDay;
   final List<_CalEvent> events;
-  const _UpcomingPanel({required this.events});
+  final ValueChanged<_CalEvent> onEventTap;
+  final VoidCallback onAddForSelected;
+
+  const _DayEventsPanel({
+    required this.selectedDay,
+    required this.events,
+    required this.onEventTap,
+    required this.onAddForSelected,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final until = today.add(const Duration(days: 7));
-    final filtered = events
-        .where((e) => !e.start.isBefore(today) && e.start.isBefore(until))
-        .toList()
+    final today = DateTime.now();
+    final day = selectedDay ?? DateTime(today.year, today.month, today.day);
+    final isToday = _sameDay(day, today);
+    final df = DateFormat('EEE, d. MMMM yyyy', _localeForFormat(context));
+    final filtered = events.where((e) => e.coversDay(day)).toList()
       ..sort((a, b) => a.start.compareTo(b.start));
-
-    // Group by date.
-    final grouped = <DateTime, List<_CalEvent>>{};
-    for (final e in filtered) {
-      final key = DateTime(e.start.year, e.start.month, e.start.day);
-      grouped.putIfAbsent(key, () => []).add(e);
-    }
+    final subtitle = isToday ? 'Heute · ${df.format(day)}' : df.format(day);
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
@@ -753,50 +919,77 @@ class _UpcomingPanel extends StatelessWidget {
                 color: AppColors.codriverDeep,
               ),
               const SizedBox(width: AppSpacing.xs),
-              Text(
-                'Anstehend',
-                style: AppTypography.headline.copyWith(
-                  color: AppColors.codriverGraphite,
+              Expanded(
+                child: Text(
+                  'Termine',
+                  style: AppTypography.headline.copyWith(
+                    color: AppColors.codriverGraphite,
+                  ),
                 ),
               ),
-              const SizedBox(width: 6),
-              Text(
-                'nächste 7 Tage',
-                style: AppTypography.footnote.copyWith(
-                  color: AppColors.labelSecondaryLight,
+              if (filtered.isNotEmpty)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.green50,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    '${filtered.length}',
+                    style: AppTypography.caption2.copyWith(
+                      color: AppColors.codriverDeep,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
-              ),
             ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            style: AppTypography.footnote.copyWith(
+              color: AppColors.labelSecondaryLight,
+            ),
           ),
           const SizedBox(height: AppSpacing.sm),
           if (filtered.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+            Expanded(
               child: Center(
-                child: Text(
-                  'Keine Termine in den nächsten 7 Tagen.',
-                  style: AppTypography.footnote.copyWith(
-                    color: AppColors.labelTertiaryLight,
-                    fontStyle: FontStyle.italic,
-                  ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.event_busy_rounded,
+                      size: 28,
+                      color: AppColors.labelTertiaryLight.withOpacity(0.6),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Keine Termine an diesem Tag.',
+                      style: AppTypography.footnote.copyWith(
+                        color: AppColors.labelTertiaryLight,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    TextButton.icon(
+                      onPressed: onAddForSelected,
+                      icon: const Icon(Icons.add_rounded, size: 16),
+                      label: const Text('Termin hinzufügen'),
+                    ),
+                  ],
                 ),
               ),
             )
           else
             Expanded(
-              child: ListView(
-                children: [
-                  for (final entry in grouped.entries) ...[
-                    _DayHeader(date: entry.key),
-                    const SizedBox(height: 4),
-                    for (final e in entry.value)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: _EventTile(event: e),
-                      ),
-                    const SizedBox(height: AppSpacing.sm),
-                  ],
-                ],
+              child: ListView.separated(
+                itemCount: filtered.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 6),
+                itemBuilder: (_, i) => _EventTile(
+                  event: filtered[i],
+                  onTap: () => onEventTap(filtered[i]),
+                ),
               ),
             ),
         ],
@@ -853,26 +1046,20 @@ class _DayHeader extends StatelessWidget {
 
 class _EventTile extends StatelessWidget {
   final _CalEvent event;
-  const _EventTile({required this.event});
-
-  Color get _categoryColor {
-    final c = event.category.toLowerCase();
-    if (c.contains('meeting') || c.contains('plan')) return AppColors.codriverGreen;
-    if (c.contains('service') || c.contains('tüv')) return AppColors.warning;
-    if (c.contains('hr') || c.contains('onboard')) return const Color(0xFF0A84FF);
-    return AppColors.labelSecondaryLight;
-  }
+  final VoidCallback? onTap;
+  const _EventTile({required this.event, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final tf = DateFormat.Hm(_localeForFormat(context));
-    return Container(
+    final color = _categoryColorFor(event.category);
+    final card = Container(
       padding: const EdgeInsets.all(AppSpacing.sm),
       decoration: BoxDecoration(
         color: AppColors.surfaceLight,
         borderRadius: BorderRadius.circular(12),
         border: Border(
-          left: BorderSide(color: _categoryColor, width: 4),
+          left: BorderSide(color: color, width: 4),
         ),
       ),
       child: Column(
@@ -883,7 +1070,7 @@ class _EventTile extends StatelessWidget {
               Text(
                 tf.format(event.start),
                 style: AppTypography.footnote.copyWith(
-                  color: _categoryColor,
+                  color: color,
                   fontWeight: FontWeight.w800,
                   fontFeatures: const [FontFeature.tabularFigures()],
                 ),
@@ -959,6 +1146,15 @@ class _EventTile extends StatelessWidget {
         ],
       ),
     );
+    if (onTap == null) return card;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: card,
+      ),
+    );
   }
 }
 
@@ -991,8 +1187,101 @@ class _CalendarUpcomingCardState extends State<CalendarUpcomingCard> {
       stream: _stream,
       builder: (context, snap) {
         final events = snap.data ?? const <_CalEvent>[];
-        return _UpcomingPanel(events: events);
+        return _UpcomingHomePanel(events: events);
       },
+    );
+  }
+}
+
+/// Compact "next 7 days" card used on the admin home dashboard. The
+/// detail-page calendar uses [_DayEventsPanel] instead (per-day view);
+/// this widget is intentionally kept simple and read-only.
+class _UpcomingHomePanel extends StatelessWidget {
+  final List<_CalEvent> events;
+  const _UpcomingHomePanel({required this.events});
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final until = today.add(const Duration(days: 7));
+    final filtered = events
+        .where((e) => !e.start.isBefore(today) && e.start.isBefore(until))
+        .toList()
+      ..sort((a, b) => a.start.compareTo(b.start));
+
+    final grouped = <DateTime, List<_CalEvent>>{};
+    for (final e in filtered) {
+      final key = DateTime(e.start.year, e.start.month, e.start.day);
+      grouped.putIfAbsent(key, () => []).add(e);
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceElevatedLight,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: AppElevation.level1,
+        border: Border.all(
+          color: AppColors.separatorLight.withOpacity(0.4),
+          width: 0.5,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.event_rounded,
+                  size: 18, color: AppColors.codriverDeep),
+              const SizedBox(width: AppSpacing.xs),
+              Text(
+                'Anstehend',
+                style: AppTypography.headline.copyWith(
+                  color: AppColors.codriverGraphite,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'nächste 7 Tage',
+                style: AppTypography.footnote.copyWith(
+                  color: AppColors.labelSecondaryLight,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          if (filtered.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+              child: Center(
+                child: Text(
+                  'Keine Termine in den nächsten 7 Tagen.',
+                  style: AppTypography.footnote.copyWith(
+                    color: AppColors.labelTertiaryLight,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+            )
+          else
+            for (final entry in grouped.entries) ...[
+              _DayHeader(date: entry.key),
+              const SizedBox(height: 4),
+              for (final e in entry.value)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Builder(
+                    builder: (ctx) => _EventTile(
+                      event: e,
+                      onTap: () => showCalendarEventDetail(ctx, e),
+                    ),
+                  ),
+                ),
+              const SizedBox(height: AppSpacing.sm),
+            ],
+        ],
+      ),
     );
   }
 }
@@ -1233,6 +1522,225 @@ String _topLevelFleetCategoryFor(String type) {
 //  Helpers
 // ════════════════════════════════════════════════════════════════════════════
 
+/// Strips the `cal:` prefix from a stream-emitted event id back to
+/// the underlying Firestore doc id. Returns null for fleet/demo
+/// events which can't be edited or deleted from the calendar surface.
+String? _calendarDocIdFor(_CalEvent event) {
+  const prefix = 'cal:';
+  if (!event.id.startsWith(prefix)) return null;
+  return event.id.substring(prefix.length);
+}
+
+/// Read-only detail popup with optional Edit / Delete actions. Lives
+/// at top-level so the home-dashboard upcoming card and the calendar
+/// page can both reach it.
+Future<void> showCalendarEventDetail(
+  BuildContext context,
+  _CalEvent event,
+) async {
+  final df = DateFormat(
+    event.isMultiDay ? 'EEE, d. MMM yyyy' : 'EEE, d. MMMM yyyy',
+    _localeForFormat(context),
+  );
+  final tf = DateFormat.Hm(_localeForFormat(context));
+  final timeLabel = event.isMultiDay
+      ? '${df.format(event.start)} — ${df.format(event.end)}'
+      : '${df.format(event.start)} · ${tf.format(event.start)}';
+  final color = _categoryColorFor(event.category);
+
+  Widget detailRow(IconData icon, String text) => Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 16, color: AppColors.codriverDeep),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                text,
+                style: AppTypography.footnote.copyWith(
+                  color: AppColors.codriverGraphite,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+
+  await showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
+      contentPadding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+      title: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 4,
+            height: 28,
+            margin: const EdgeInsets.only(top: 2),
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              event.title.isEmpty ? '—' : event.title,
+              style: AppTypography.title3.copyWith(
+                color: AppColors.codriverGraphite,
+              ),
+            ),
+          ),
+        ],
+      ),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            detailRow(Icons.access_time_rounded, timeLabel),
+            if (event.category.isNotEmpty)
+              detailRow(Icons.label_rounded, event.category),
+            if (event.location.isNotEmpty)
+              detailRow(Icons.place_rounded, event.location),
+            if (event.dispatcher.isNotEmpty)
+              detailRow(Icons.headset_mic_rounded, event.dispatcher),
+          ],
+        ),
+      ),
+      actions: [
+        if (event.id.startsWith('cal:')) ...[
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await deleteCalendarEvent(context, event);
+            },
+            child: const Text('Löschen'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await editCalendarEvent(context, event);
+            },
+            child: const Text('Bearbeiten'),
+          ),
+        ] else if (event.id.startsWith('fleet:'))
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content:
+                      Text('Fleet-Hub-Termine im Fleet-Hub verwalten.'),
+                ),
+              );
+            },
+            child: const Text('Fleet-Hub'),
+          ),
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: const Text('Schließen'),
+        ),
+      ],
+    ),
+  );
+}
+
+Future<void> deleteCalendarEvent(
+  BuildContext context,
+  _CalEvent event,
+) async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return;
+  final docId = _calendarDocIdFor(event);
+  if (docId == null) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Dieser Termin kann hier nicht gelöscht werden.'),
+      ),
+    );
+    return;
+  }
+  try {
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('calendar_events')
+        .doc(docId)
+        .delete();
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Termin "${event.title}" gelöscht.')),
+    );
+  } catch (e) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Löschen fehlgeschlagen: $e')),
+    );
+  }
+}
+
+Future<void> editCalendarEvent(
+  BuildContext context,
+  _CalEvent event,
+) async {
+  final docId = _calendarDocIdFor(event);
+  if (docId == null) return;
+  final result = await showDialog<_NewEventResult>(
+    context: context,
+    builder: (ctx) => _AddEventDialog(initial: event),
+  );
+  if (result == null) return;
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return;
+  try {
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('calendar_events')
+        .doc(docId)
+        .update({
+      'start': Timestamp.fromDate(result.start),
+      'end': Timestamp.fromDate(result.end),
+      'title': result.title,
+      'category': result.category,
+      'location': result.location,
+      'dispatcher': result.dispatcher,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Termin "${result.title}" aktualisiert.')),
+    );
+  } catch (e) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Speichern fehlgeschlagen: $e')),
+    );
+  }
+}
+
+/// Single source of truth for the colored accent used by every event
+/// surface (day-cell bar, event tile, detail dialog).
+Color _categoryColorFor(String category) {
+  final c = category.toLowerCase();
+  if (c.contains('miet')) return const Color(0xFF7B5BFF);
+  if (c.contains('meeting') || c.contains('plan')) {
+    return AppColors.codriverGreen;
+  }
+  if (c.contains('service') || c.contains('tüv')) return AppColors.warning;
+  if (c.contains('hr') || c.contains('onboard')) {
+    return const Color(0xFF0A84FF);
+  }
+  return AppColors.codriverDeep;
+}
+
 class _CalEvent {
   final String id;
   final DateTime start;
@@ -1384,7 +1892,11 @@ class _NewEventResult {
 
 class _AddEventDialog extends StatefulWidget {
   final DateTime? prefillStart;
-  const _AddEventDialog({this.prefillStart});
+  /// If non-null the dialog acts as an EDITOR: all fields are
+  /// pre-filled and the submit button reads "Speichern" instead of
+  /// "Hinzufügen".
+  final _CalEvent? initial;
+  const _AddEventDialog({this.prefillStart, this.initial});
 
   @override
   State<_AddEventDialog> createState() => _AddEventDialogState();
@@ -1398,6 +1910,7 @@ class _AddEventDialogState extends State<_AddEventDialog> {
   late DateTime _start;
   late DateTime _end;
   bool _multiDay = false;
+  bool get _isEditing => widget.initial != null;
 
   Stream<List<String>> _dispatcherStream() {
     final user = FirebaseAuth.instance.currentUser;
@@ -1434,9 +1947,26 @@ class _AddEventDialogState extends State<_AddEventDialog> {
   @override
   void initState() {
     super.initState();
-    final base = widget.prefillStart ?? DateTime.now();
-    _start = DateTime(base.year, base.month, base.day, 9, 0);
-    _end = DateTime(base.year, base.month, base.day, 10, 0);
+    final initial = widget.initial;
+    if (initial != null) {
+      _titleCtrl.text = initial.title;
+      _locationCtrl.text = initial.location;
+      if (_categories.contains(initial.category)) {
+        _category = initial.category;
+      } else if (initial.category.isNotEmpty) {
+        _category = 'Sonstiges';
+      }
+      _dispatcher = initial.dispatcher;
+      _start = initial.start;
+      _end = initial.end;
+      _multiDay = !(initial.start.year == initial.end.year &&
+          initial.start.month == initial.end.month &&
+          initial.start.day == initial.end.day);
+    } else {
+      final base = widget.prefillStart ?? DateTime.now();
+      _start = DateTime(base.year, base.month, base.day, 9, 0);
+      _end = DateTime(base.year, base.month, base.day, 10, 0);
+    }
   }
 
   @override
@@ -1495,7 +2025,7 @@ class _AddEventDialogState extends State<_AddEventDialog> {
   Widget build(BuildContext context) {
     final df = DateFormat('EEE, d. MMMM y', _localeForFormat(context));
     return AlertDialog(
-      title: const Text('Neuer Termin'),
+      title: Text(_isEditing ? 'Termin bearbeiten' : 'Neuer Termin'),
       content: SizedBox(
         width: 480,
         child: Column(

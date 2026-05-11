@@ -12438,6 +12438,274 @@ class AppLocalizations {
     'waveplan_snack_login_required': 'Please log in first.',
   };
 
+  // Shared English defaults for the driver-facing waveplan view.
+  // "Waveplan" itself is the page brand — left untranslated.
+  static const Map<String, String> _driverWaveplanSharedValues = {
+    'driver_waveplan_dispatcher_today': 'Dispatcher today',
+    'driver_waveplan_published_at': 'Published {time}',
+    'driver_waveplan_tab_my_wave': 'My plan',
+    'driver_waveplan_tab_all_drivers': 'All drivers',
+    'driver_waveplan_no_wave_yet_title': 'No wave published yet',
+    'driver_waveplan_no_wave_yet_desc':
+        'Once your dispatcher publishes the waveplan, you\'ll see your '
+        'route, lane and departure time here.',
+    'driver_waveplan_wave_prefix': 'Wave',
+    'driver_waveplan_dispatch_area': 'Dispatch area',
+    'driver_waveplan_lane': 'Lane',
+    'driver_waveplan_lane_left': 'left',
+    'driver_waveplan_lane_right': 'right',
+    'driver_waveplan_shift': 'Shift',
+    'driver_waveplan_atlas_title_one':
+        '{count} Atlas package — pick up from dispatcher',
+    'driver_waveplan_atlas_title_many':
+        '{count} Atlas packages — pick up from dispatcher',
+    'driver_waveplan_atlas_desc':
+        'These parcels are high-value and must be handed over in person.',
+    'driver_waveplan_tracking_ids': 'Tracking IDs',
+    'driver_waveplan_all_empty_title': 'No one visible',
+    'driver_waveplan_all_empty_desc':
+        'Once the waveplan is published, you\'ll see all other drivers in '
+        'your wave here — handy for carpools.',
+    'driver_waveplan_me_suffix': '(you)',
+  };
+
+  static final Map<String, Map<String, String>> _driverWaveplanLocalizedValues =
+      {
+    'en': _driverWaveplanSharedValues,
+    'de': {
+      ..._driverWaveplanSharedValues,
+      'driver_waveplan_dispatcher_today': 'Dispatcher heute',
+      'driver_waveplan_published_at': 'Veröffentlicht {time}',
+      'driver_waveplan_tab_my_wave': 'Mein Plan',
+      'driver_waveplan_tab_all_drivers': 'Alle Fahrer',
+      'driver_waveplan_no_wave_yet_title': 'Noch keine Wave veröffentlicht',
+      'driver_waveplan_no_wave_yet_desc':
+          'Sobald dein Dispatcher den Waveplan veröffentlicht, siehst du '
+          'hier deine Route, Spur und Abfahrtszeit.',
+      'driver_waveplan_wave_prefix': 'Wave',
+      'driver_waveplan_dispatch_area': 'Dispatch Area',
+      'driver_waveplan_lane': 'Spur',
+      'driver_waveplan_lane_left': 'links',
+      'driver_waveplan_lane_right': 'rechts',
+      'driver_waveplan_shift': 'Schicht',
+      'driver_waveplan_atlas_title_one':
+          '{count} Atlas-Paket beim Dispatcher abholen',
+      'driver_waveplan_atlas_title_many':
+          '{count} Atlas-Pakete beim Dispatcher abholen',
+      'driver_waveplan_atlas_desc':
+          'Diese Pakete sind hochwertig und müssen persönlich übergeben '
+          'werden.',
+      'driver_waveplan_tracking_ids': 'Tracking-IDs',
+      'driver_waveplan_all_empty_title': 'Niemand sichtbar',
+      'driver_waveplan_all_empty_desc':
+          'Sobald der Waveplan veröffentlicht ist, siehst du hier alle '
+          'anderen Fahrer in deiner Wave — praktisch für Fahrgemeinschaften.',
+      'driver_waveplan_me_suffix': '(du)',
+    },
+    'sq': {
+      ..._driverWaveplanSharedValues,
+      'driver_waveplan_dispatcher_today': 'Dispeçeri sot',
+      'driver_waveplan_published_at': 'Publikuar {time}',
+      'driver_waveplan_tab_my_wave': 'Plani im',
+      'driver_waveplan_tab_all_drivers': 'Te gjithe shoferet',
+      'driver_waveplan_no_wave_yet_title': 'Asnje wave i publikuar ende',
+      'driver_waveplan_no_wave_yet_desc':
+          'Sapo dispeçeri yt te publikoje Waveplan, ketu do shihni rrugen, '
+          'pistat dhe kohen e nisjes.',
+      'driver_waveplan_wave_prefix': 'Wave',
+      'driver_waveplan_dispatch_area': 'Zona e nisjes',
+      'driver_waveplan_lane': 'Pista',
+      'driver_waveplan_lane_left': 'majtas',
+      'driver_waveplan_lane_right': 'djathtas',
+      'driver_waveplan_shift': 'Turn',
+      'driver_waveplan_atlas_title_one':
+          '{count} pako Atlas — merre te dispeçeri',
+      'driver_waveplan_atlas_title_many':
+          '{count} pako Atlas — merri te dispeçeri',
+      'driver_waveplan_atlas_desc':
+          'Keto pako jane me vlere te larte dhe duhet te dorezohen personalisht.',
+      'driver_waveplan_tracking_ids': 'Tracking-ID',
+      'driver_waveplan_all_empty_title': 'Askush i dukshem',
+      'driver_waveplan_all_empty_desc':
+          'Sapo Waveplan te publikohet, ketu do shihni te gjithe shoferet e '
+          'tjere ne waven tuaj — praktike per udhetime te perbashketa.',
+      'driver_waveplan_me_suffix': '(ti)',
+    },
+    'hu': {
+      ..._driverWaveplanSharedValues,
+      'driver_waveplan_dispatcher_today': 'Mai diszpecser',
+      'driver_waveplan_published_at': 'Kozzeteve {time}',
+      'driver_waveplan_tab_my_wave': 'Sajat terv',
+      'driver_waveplan_tab_all_drivers': 'Osszes sofor',
+      'driver_waveplan_no_wave_yet_title': 'Meg nincs kozzetett wave',
+      'driver_waveplan_no_wave_yet_desc':
+          'Amint a diszpecser kozzeteszi a Waveplant, itt latod az '
+          'utvonalad, a savod es az indulasi idot.',
+      'driver_waveplan_wave_prefix': 'Wave',
+      'driver_waveplan_dispatch_area': 'Indulasi terulet',
+      'driver_waveplan_lane': 'Sav',
+      'driver_waveplan_lane_left': 'balra',
+      'driver_waveplan_lane_right': 'jobbra',
+      'driver_waveplan_shift': 'Muszak',
+      'driver_waveplan_atlas_title_one':
+          '{count} Atlas csomag — vedd at a diszpecsertol',
+      'driver_waveplan_atlas_title_many':
+          '{count} Atlas csomag — vedd at a diszpecsertol',
+      'driver_waveplan_atlas_desc':
+          'Ezek a csomagok ertekesek, szemelyesen kell atadni.',
+      'driver_waveplan_tracking_ids': 'Tracking-ID-k',
+      'driver_waveplan_all_empty_title': 'Senki sem lathato',
+      'driver_waveplan_all_empty_desc':
+          'Amint a Waveplan kozzeteve, itt latod az osszes tobbi sofort a '
+          'wave-edben — kenyelmes telekocsihoz.',
+      'driver_waveplan_me_suffix': '(te)',
+    },
+    'ro': {
+      ..._driverWaveplanSharedValues,
+      'driver_waveplan_dispatcher_today': 'Dispecer astazi',
+      'driver_waveplan_published_at': 'Publicat {time}',
+      'driver_waveplan_tab_my_wave': 'Planul meu',
+      'driver_waveplan_tab_all_drivers': 'Toti soferii',
+      'driver_waveplan_no_wave_yet_title': 'Niciun wave publicat inca',
+      'driver_waveplan_no_wave_yet_desc':
+          'Odata ce dispecerul publica Waveplan, vei vedea aici ruta, '
+          'banda si ora plecarii.',
+      'driver_waveplan_wave_prefix': 'Wave',
+      'driver_waveplan_dispatch_area': 'Zona de plecare',
+      'driver_waveplan_lane': 'Banda',
+      'driver_waveplan_lane_left': 'stanga',
+      'driver_waveplan_lane_right': 'dreapta',
+      'driver_waveplan_shift': 'Schimb',
+      'driver_waveplan_atlas_title_one':
+          '{count} pachet Atlas — ridica de la dispecer',
+      'driver_waveplan_atlas_title_many':
+          '{count} pachete Atlas — ridica de la dispecer',
+      'driver_waveplan_atlas_desc':
+          'Aceste pachete sunt valoroase si trebuie predate personal.',
+      'driver_waveplan_tracking_ids': 'Tracking-ID-uri',
+      'driver_waveplan_all_empty_title': 'Nimeni vizibil',
+      'driver_waveplan_all_empty_desc':
+          'Odata ce Waveplan este publicat, vei vedea aici toti ceilalti '
+          'soferi din wave-ul tau — util pentru carpool.',
+      'driver_waveplan_me_suffix': '(tu)',
+    },
+    'hr': {
+      ..._driverWaveplanSharedValues,
+      'driver_waveplan_dispatcher_today': 'Dispecer danas',
+      'driver_waveplan_published_at': 'Objavljeno {time}',
+      'driver_waveplan_tab_my_wave': 'Moj plan',
+      'driver_waveplan_tab_all_drivers': 'Svi vozaci',
+      'driver_waveplan_no_wave_yet_title': 'Jos nije objavljen wave',
+      'driver_waveplan_no_wave_yet_desc':
+          'Cim tvoj dispecer objavi Waveplan, ovdje ces vidjeti svoju '
+          'rutu, traku i vrijeme polaska.',
+      'driver_waveplan_wave_prefix': 'Wave',
+      'driver_waveplan_dispatch_area': 'Polazna zona',
+      'driver_waveplan_lane': 'Traka',
+      'driver_waveplan_lane_left': 'lijevo',
+      'driver_waveplan_lane_right': 'desno',
+      'driver_waveplan_shift': 'Smjena',
+      'driver_waveplan_atlas_title_one':
+          '{count} Atlas paket — preuzmi kod dispecera',
+      'driver_waveplan_atlas_title_many':
+          '{count} Atlas paketa — preuzmi kod dispecera',
+      'driver_waveplan_atlas_desc':
+          'Ovi paketi su vrijedni i moraju se osobno predati.',
+      'driver_waveplan_tracking_ids': 'Tracking-ID-ovi',
+      'driver_waveplan_all_empty_title': 'Nitko nije vidljiv',
+      'driver_waveplan_all_empty_desc':
+          'Cim je Waveplan objavljen, ovdje vidis sve ostale vozace u '
+          'svom waveu — korisno za zajednicku voznju.',
+      'driver_waveplan_me_suffix': '(ti)',
+    },
+    'ar': {
+      ..._driverWaveplanSharedValues,
+      'driver_waveplan_dispatcher_today': 'الموزع اليوم',
+      'driver_waveplan_published_at': 'نُشر {time}',
+      'driver_waveplan_tab_my_wave': 'خطتي',
+      'driver_waveplan_tab_all_drivers': 'كل السائقين',
+      'driver_waveplan_no_wave_yet_title': 'لم يتم نشر موجة بعد',
+      'driver_waveplan_no_wave_yet_desc':
+          'بمجرد أن ينشر الموزع Waveplan، سترى هنا مسارك ومسربك ووقت المغادرة.',
+      'driver_waveplan_wave_prefix': 'موجة',
+      'driver_waveplan_dispatch_area': 'منطقة الإرسال',
+      'driver_waveplan_lane': 'المسرب',
+      'driver_waveplan_lane_left': 'يسار',
+      'driver_waveplan_lane_right': 'يمين',
+      'driver_waveplan_shift': 'الوردية',
+      'driver_waveplan_atlas_title_one':
+          '{count} طرد أطلس — استلمه من الموزع',
+      'driver_waveplan_atlas_title_many':
+          '{count} طرود أطلس — استلمها من الموزع',
+      'driver_waveplan_atlas_desc':
+          'هذه الطرود قيّمة ويجب تسليمها شخصياً.',
+      'driver_waveplan_tracking_ids': 'أرقام التتبع',
+      'driver_waveplan_all_empty_title': 'لا أحد مرئي',
+      'driver_waveplan_all_empty_desc':
+          'بمجرد نشر Waveplan، سترى هنا جميع السائقين الآخرين في موجتك — '
+          'مفيد للسفر المشترك.',
+      'driver_waveplan_me_suffix': '(أنت)',
+    },
+    'tr': {
+      ..._driverWaveplanSharedValues,
+      'driver_waveplan_dispatcher_today': 'Bugun dispecher',
+      'driver_waveplan_published_at': 'Yayinlandi {time}',
+      'driver_waveplan_tab_my_wave': 'Planim',
+      'driver_waveplan_tab_all_drivers': 'Tum suruculer',
+      'driver_waveplan_no_wave_yet_title': 'Henuz wave yayinlanmadi',
+      'driver_waveplan_no_wave_yet_desc':
+          'Dispecher Waveplan\'i yayinladiginda, rotani, seridi ve '
+          'kalkis saatini burada gorursun.',
+      'driver_waveplan_wave_prefix': 'Wave',
+      'driver_waveplan_dispatch_area': 'Kalkis alani',
+      'driver_waveplan_lane': 'Serit',
+      'driver_waveplan_lane_left': 'sol',
+      'driver_waveplan_lane_right': 'sag',
+      'driver_waveplan_shift': 'Vardiya',
+      'driver_waveplan_atlas_title_one':
+          '{count} Atlas paketi — dispecherdan al',
+      'driver_waveplan_atlas_title_many':
+          '{count} Atlas paketi — dispecherdan al',
+      'driver_waveplan_atlas_desc':
+          'Bu paketler degerlidir ve sahsen teslim edilmelidir.',
+      'driver_waveplan_tracking_ids': 'Takip kimlikleri',
+      'driver_waveplan_all_empty_title': 'Kimse gorunmuyor',
+      'driver_waveplan_all_empty_desc':
+          'Waveplan yayinlandiginda burada wave\'indeki diger tum '
+          'suruculeri gorursun — araba paylasimi icin pratik.',
+      'driver_waveplan_me_suffix': '(sen)',
+    },
+    'ru': {
+      ..._driverWaveplanSharedValues,
+      'driver_waveplan_dispatcher_today': 'Диспетчер сегодня',
+      'driver_waveplan_published_at': 'Опубликовано {time}',
+      'driver_waveplan_tab_my_wave': 'Мой план',
+      'driver_waveplan_tab_all_drivers': 'Все водители',
+      'driver_waveplan_no_wave_yet_title': 'Волна ещё не опубликована',
+      'driver_waveplan_no_wave_yet_desc':
+          'Как только диспетчер опубликует Waveplan, здесь появится твой '
+          'маршрут, полоса и время отправления.',
+      'driver_waveplan_wave_prefix': 'Wave',
+      'driver_waveplan_dispatch_area': 'Зона отправки',
+      'driver_waveplan_lane': 'Полоса',
+      'driver_waveplan_lane_left': 'налево',
+      'driver_waveplan_lane_right': 'направо',
+      'driver_waveplan_shift': 'Смена',
+      'driver_waveplan_atlas_title_one':
+          '{count} пакет Атлас — забрать у диспетчера',
+      'driver_waveplan_atlas_title_many':
+          '{count} пакетов Атлас — забрать у диспетчера',
+      'driver_waveplan_atlas_desc':
+          'Эти посылки ценные и должны быть переданы лично.',
+      'driver_waveplan_tracking_ids': 'Tracking-ID',
+      'driver_waveplan_all_empty_title': 'Никого не видно',
+      'driver_waveplan_all_empty_desc':
+          'После публикации Waveplan здесь появятся все другие водители '
+          'в твоей волне — удобно для попутчиков.',
+      'driver_waveplan_me_suffix': '(ты)',
+    },
+  };
+
   static final Map<String, Map<String, String>> _waveplanLocalizedValues = {
     'en': _waveplanSharedValues,
     'de': {
@@ -13878,6 +14146,8 @@ class AppLocalizations {
         _adminApprovalsLocalizedValues['en']!;
     final waveplanMap =
         _waveplanLocalizedValues[lang] ?? _waveplanLocalizedValues['en']!;
+    final driverWaveplanMap = _driverWaveplanLocalizedValues[lang] ??
+        _driverWaveplanLocalizedValues['en']!;
     final miscMap = _miscLocalizedValues[lang] ?? _miscLocalizedValues['en']!;
     final faqTrainingMap = _faqTrainingLocalizedValues[lang] ??
         _faqTrainingLocalizedValues['en']!;
@@ -13895,6 +14165,7 @@ class AppLocalizations {
         adminFaqMap[key] ??
         adminApprovalsMap[key] ??
         waveplanMap[key] ??
+        driverWaveplanMap[key] ??
         miscMap[key] ??
         faqTrainingMap[key] ??
         _localizedValues['en']![key] ??
@@ -13908,6 +14179,7 @@ class AppLocalizations {
         _adminFaqLocalizedValues['en']![key] ??
         _adminApprovalsLocalizedValues['en']![key] ??
         _waveplanLocalizedValues['en']![key] ??
+        _driverWaveplanLocalizedValues['en']![key] ??
         _miscLocalizedValues['en']![key] ??
         _faqTrainingLocalizedValues['en']![key] ??
         key;

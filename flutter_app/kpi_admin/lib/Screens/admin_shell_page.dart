@@ -15,13 +15,15 @@ import 'drivers_hub_page.dart';
 import 'admin_waveplan_page.dart';
 import 'admin_calendar_page.dart';
 import 'task_sheet_page.dart';
-import 'admin_shift_absence_page.dart';
+import 'admin_zeiten_abwesenheiten_page.dart';
 import 'admin_incident_reports_page.dart';
 import 'notifications_page.dart';
 import 'admin_approvals_page.dart';
 import 'admin_faq_page.dart';
 import 'admin_academy_page.dart';
 import 'admin_dispatcher_pill_page.dart';
+import 'admin_dispatchers_page.dart';
+import 'admin_dispatcher_center_page.dart';
 import 'dsp_profile_page.dart';
 import 'feedback_page.dart';
 import 'fleet_status_page.dart';
@@ -140,14 +142,15 @@ class _AdminShellPageState extends State<AdminShellPage> {
               AdminCalendarPage(),
               FleetStatusPage(),
               TaskSheetPage(),
-              AdminShiftAbsencePage(),
+              AdminZeitenAbwesenheitenPage(),
               AdminIncidentReportsPage(),
               AdminAcademyPage(),
-              AdminDispatcherPillPage(),
+              AdminDispatcherCenterPage(),
               NotificationsPage(),
               FeedbackPage(),
               AdminFaqPage(),
               AdminApprovalsPage(),
+              AdminDispatchersPage(),
               DspProfilePage(),
             ],
           ),
@@ -190,8 +193,10 @@ class _AdminShellPageState extends State<AdminShellPage> {
         return 14;
       case AppNav.adminApprovals:
         return 15;
-      case AppNav.profile:
+      case AppNav.dispatchers:
         return 16;
+      case AppNav.profile:
+        return 17;
       default:
         return 0;
     }

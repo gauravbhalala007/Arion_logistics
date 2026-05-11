@@ -3372,6 +3372,35 @@ class _DriversHubPageState extends State<DriversHubPage> {
                 }).toList();
               }
 
+              // Expiry-first pre-sort: drivers with a document expiring
+              // within 30 days (or already expired) bubble to the top,
+              // sorted by closest expiry. The user's chosen sort
+              // continues to apply as a tie-breaker for everyone else.
+              int expiryRank(QueryDocumentSnapshot<Map<String, dynamic>> d) {
+                final raw = d.data()['onboarding'];
+                if (raw is! Map) return 999;
+                int best = 999;
+                for (final key in const [
+                  'licenseExpiry',
+                  'idDocExpiry',
+                  'residencePermitExpiry',
+                ]) {
+                  final s = (raw[key] ?? '').toString().trim();
+                  final m = RegExp(r'^(\d{4})-(\d{2})-(\d{2})$').firstMatch(s);
+                  if (m == null) continue;
+                  final dt = DateTime.utc(
+                    int.parse(m.group(1)!),
+                    int.parse(m.group(2)!),
+                    int.parse(m.group(3)!),
+                  );
+                  final now = DateTime.now().toUtc();
+                  final today = DateTime.utc(now.year, now.month, now.day);
+                  final days = dt.difference(today).inDays;
+                  if (days < best) best = days;
+                }
+                return best;
+              }
+
               filtered.sort((a, b) {
                 final ad = a.data();
                 final bd = b.data();
@@ -3384,6 +3413,17 @@ class _DriversHubPageState extends State<DriversHubPage> {
                 final bId = (bd['transporterId'] ?? b.id)
                     .toString()
                     .toUpperCase();
+
+                // 1) Expiring drivers (≤30 days) always at the top.
+                final ar = expiryRank(a);
+                final br = expiryRank(b);
+                final aPrio = ar <= 30;
+                final bPrio = br <= 30;
+                if (aPrio != bPrio) return aPrio ? -1 : 1;
+                if (aPrio && bPrio) {
+                  final c = ar.compareTo(br);
+                  if (c != 0) return c;
+                }
 
                 DateTime? asDate(dynamic v) {
                   if (v is Timestamp) return v.toDate();

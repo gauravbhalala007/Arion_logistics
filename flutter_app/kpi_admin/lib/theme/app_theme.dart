@@ -11,6 +11,7 @@ class AppTheme {
 
   static ThemeData light() {
     final base = ThemeData.light(useMaterial3: true);
+    final interFamily = AppTypography.fontFamily;
 
     return base.copyWith(
       colorScheme: ColorScheme.fromSeed(
@@ -27,18 +28,14 @@ class AppTheme {
       canvasColor: AppColors.surfaceLight,
       dividerColor: AppColors.separatorLight,
       textTheme: _textTheme(AppColors.labelLight),
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         backgroundColor: AppColors.surfaceLight,
         foregroundColor: AppColors.labelLight,
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
-        titleTextStyle: TextStyle(
+        titleTextStyle: AppTypography.title3.copyWith(
           color: AppColors.labelLight,
-          fontFamily: AppTypography.fontFamily,
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
-          letterSpacing: -0.4,
         ),
       ),
       cardTheme: CardThemeData(
@@ -71,8 +68,8 @@ class AppTheme {
             horizontal: AppSpacing.md,
             vertical: AppSpacing.sm,
           ),
-          textStyle: const TextStyle(
-            fontFamily: AppTypography.fontFamily,
+          textStyle: TextStyle(
+            fontFamily: interFamily,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -128,8 +125,8 @@ class AppTheme {
         backgroundColor: AppColors.surfaceLight,
         selectedColor: AppColors.green50,
         side: BorderSide.none,
-        labelStyle: const TextStyle(
-          fontFamily: AppTypography.fontFamily,
+        labelStyle: TextStyle(
+          fontFamily: interFamily,
           fontSize: 13,
           fontWeight: FontWeight.w600,
         ),

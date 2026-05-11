@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../Screens/login_page.dart';
 import '../Screens/admin_shell_page.dart';
+import '../Screens/dispatcher_shell_page.dart';
 import '../widgets/app_side_menu.dart';
 
 import '../Screens/driver_home_shell.dart';
@@ -82,6 +83,21 @@ class AuthGate extends StatelessWidget {
               }
 
               final role = (data['role'] ?? '').toString().trim();
+
+              // ✅ DISPATCHER sub-account — runs its own shell scoped
+              // to the parent admin's data namespace.
+              if (role == 'dispatcher') {
+                final parentAdminUid =
+                    (data['parentAdminUid'] ?? '').toString();
+                final active = (data['active'] != false); // default true
+                if (parentAdminUid.isEmpty) {
+                  return const _NoProfileFound();
+                }
+                if (!active) {
+                  return _AwaitApproval(email: user.email ?? '');
+                }
+                return DispatcherShellPage(parentAdminUid: parentAdminUid);
+              }
 
               // ✅ DRIVER account stored in users/{uid}
               if (role == 'driver') {

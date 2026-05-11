@@ -8,6 +8,8 @@
 // right-hand pool unassigns a driver. Phase 1 MVP — assignments live
 // in memory; CSV/paste import is wired so dispatchers can load data.
 
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -162,6 +164,111 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
     _namesStream = _driversNameMapGlobal();
     _dispatcherNamesStream = _streamDispatcherNames();
     _loadProgram(_activeProgram);
+    _watchPublished();
+  }
+
+  @override
+  void dispose() {
+    _publishedSub?.cancel();
+    super.dispose();
+  }
+
+  /// Listens to the active program's `published_waveplans/{date}_{program}`
+  /// doc so the publish/unpublish toggle reflects Firestore reality
+  /// even after a page reload — without this the local `_isPublished`
+  /// flag resets to false and the user can't unpublish what was
+  /// already pushed live.
+  ///
+  /// On the very first emit per program-switch we also **hydrate** the
+  /// local working state (routes, atlas, dispatchers, notes) from the
+  /// doc so reloading the page mid-day brings back the wave. Since the
+  /// doc id is `{YYYY-MM-DD}_{program}`, yesterday's wave never leaks
+  /// into today — a new day automatically starts empty.
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _publishedSub;
+  final Set<String> _hydratedPrograms = <String>{};
+
+  void _watchPublished() {
+    _publishedSub?.cancel();
+    final ref = _publishedDocRef();
+    if (ref == null) return;
+    final hydrationProgram = _activeProgram;
+    _publishedSub = ref.snapshots().listen((snap) {
+      if (!mounted) return;
+      final exists = snap.exists;
+      final data = snap.data() ?? const <String, dynamic>{};
+      final ts = data['publishedAt'];
+      final at = ts is Timestamp ? ts.toDate() : null;
+      final shouldHydrate =
+          exists && !_hydratedPrograms.contains(hydrationProgram);
+      setState(() {
+        _isPublished = exists;
+        _publishedAt = at;
+        if (shouldHydrate) {
+          _hydrateFromPublishedDoc(data);
+          _hydratedPrograms.add(hydrationProgram);
+        }
+      });
+    });
+  }
+
+  /// Restore a published wave back into the editor state. Called once
+  /// per program, the first time we see the doc exists.
+  void _hydrateFromPublishedDoc(Map<String, dynamic> data) {
+    final rawRoutes = data['routes'];
+    if (rawRoutes is List) {
+      _routes = [
+        for (final r in rawRoutes)
+          if (r is Map<String, dynamic>)
+            WaveplanRoute(
+              routeCode: (r['routeCode'] ?? '').toString(),
+              routeId: (r['routeId'] ?? '').toString(),
+              dispatchArea: (r['dispatchArea'] ?? '').toString(),
+              waitingAreaSpur: (r['spur'] ?? '').toString(),
+              dispatchTime: (r['dispatchTime'] ?? '').toString(),
+              shiftEndTime: (r['shiftEnd'] ?? '').toString(),
+              serviceType: (r['serviceType'] ?? '').toString(),
+              transporterId: ((r['transporterId'] ?? '').toString().isEmpty)
+                  ? null
+                  : (r['transporterId'] as String),
+              assignedDsp: ((r['assignedDsp'] ?? '').toString().isEmpty)
+                  ? null
+                  : (r['assignedDsp'] as String),
+            ),
+      ];
+      _atlasByRoute.clear();
+      for (final r in rawRoutes) {
+        if (r is Map<String, dynamic>) {
+          final code = (r['routeCode'] ?? '').toString();
+          final ids = r['atlasTrackingIds'];
+          if (code.isEmpty || ids is! List) continue;
+          final list = ids.map((e) => e.toString()).toList();
+          if (list.isNotEmpty) _atlasByRoute[code] = list;
+        }
+      }
+      // If atlas data came back at all, also lift the publish gate.
+      _atlasConfirmed = true;
+      _waveAnchors.clear();
+    }
+
+    final notes = (data['notes'] ?? '').toString();
+    _generalNotes = notes;
+
+    final disp = data['dispatchers'];
+    if (disp is List) {
+      _selectedDispatchers.clear();
+      _shiftByDispatcher.clear();
+      for (final d in disp) {
+        if (d is Map<String, dynamic>) {
+          final name = (d['name'] ?? '').toString().trim();
+          if (name.isEmpty) continue;
+          _selectedDispatchers.add(name);
+          _shiftByDispatcher[name] = _ShiftRange(
+            start: (d['start'] ?? '').toString(),
+            end: (d['end'] ?? '').toString(),
+          );
+        }
+      }
+    }
   }
 
   /// Replace all visible state with the snapshot of [programKey].
@@ -209,6 +316,8 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
       _activeProgram = newKey;
       _loadProgram(newKey);
     });
+    // Re-bind the published-state stream to the new program's doc.
+    _watchPublished();
   }
 
   /// Streams the dispatcher names configured on the
@@ -365,13 +474,49 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
   @override
   Widget build(BuildContext context) {
     final routes = _routesSorted();
-    final isNarrow = MediaQuery.of(context).size.width < 1100;
+    final width = MediaQuery.of(context).size.width;
+    final isNarrow = width < 1100;
+    final isMobile = width < 700;
+
+    final dispatcherBarWidget = StreamBuilder<List<String>>(
+      stream: _dispatcherNamesStream,
+      builder: (context, dispSnap) {
+        final available = dispSnap.data ?? const <String>[];
+        return _DispatcherBar(
+          available: available,
+          selected: _selectedDispatchers,
+          shiftByDispatcher: _shiftByDispatcher,
+          maxSelectable: _maxDispatchers,
+          onAddDispatcher: (name) {
+            if (_selectedDispatchers.contains(name)) return;
+            if (_selectedDispatchers.length >= _maxDispatchers) return;
+            setState(() {
+              _selectedDispatchers.add(name);
+              _shiftByDispatcher[name] = _defaultShiftFor(
+                _selectedDispatchers.length - 1,
+              );
+            });
+          },
+          onRemoveDispatcher: (name) {
+            setState(() {
+              _selectedDispatchers.remove(name);
+              _shiftByDispatcher.remove(name);
+            });
+          },
+          onShiftChanged: (name, range) {
+            setState(() {
+              _shiftByDispatcher[name] = range;
+            });
+          },
+        );
+      },
+    );
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
+          padding: EdgeInsets.all(isMobile ? AppSpacing.sm : AppSpacing.lg),
           child: StreamBuilder<Map<String, String>>(
             stream: _namesStream,
             builder: (context, snap) {
@@ -379,79 +524,80 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      _ProgramTabs(
-                        active: _activeProgram,
-                        onSelect: _switchProgram,
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: StreamBuilder<List<String>>(
-                          stream: _dispatcherNamesStream,
-                          builder: (context, dispSnap) {
-                            final available =
-                                dispSnap.data ?? const <String>[];
-                            return _DispatcherBar(
-                              available: available,
-                              selected: _selectedDispatchers,
-                              shiftByDispatcher: _shiftByDispatcher,
-                              maxSelectable: _maxDispatchers,
-                              onAddDispatcher: (name) {
-                                if (_selectedDispatchers.contains(name)) return;
-                                if (_selectedDispatchers.length >=
-                                    _maxDispatchers) {
-                                  return;
-                                }
-                                setState(() {
-                                  _selectedDispatchers.add(name);
-                                  _shiftByDispatcher[name] = _defaultShiftFor(
-                                    _selectedDispatchers.length - 1,
-                                  );
-                                });
-                              },
-                              onRemoveDispatcher: (name) {
-                                setState(() {
-                                  _selectedDispatchers.remove(name);
-                                  _shiftByDispatcher.remove(name);
-                                });
-                              },
-                              onShiftChanged: (name, range) {
-                                setState(() {
-                                  _shiftByDispatcher[name] = range;
-                                });
-                              },
-                            );
-                          },
+                  // ─── Top row ─────────────────────────────────────
+                  // Mobile: tabs + round "+" + compact Publish.
+                  // Desktop: tabs + dispatcher bar side-by-side.
+                  if (isMobile)
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        _ProgramPicker(
+                          activeKey: _activeProgram,
+                          onTap: _showProgramPicker,
                         ),
-                      ),
-                    ],
-                  ),
+                        const Spacer(),
+                        _RoundPlusButton(
+                          onTap: _showMobileActionsSheet,
+                        ),
+                        if (_routes.isNotEmpty) ...[
+                          const SizedBox(width: AppSpacing.xs),
+                          _RoundDangerButton(
+                            icon: Icons.delete_outline_rounded,
+                            onTap: _clearWaveplan,
+                          ),
+                        ],
+                        const SizedBox(width: AppSpacing.xs),
+                        _PublishButton(
+                          isPublished: _isPublished,
+                          publishedAt: _publishedAt,
+                          onToggle: (_routes.isEmpty || !_atlasConfirmed) &&
+                                  !_isPublished
+                              ? null
+                              : () => _togglePublish(namesMap),
+                          compact: true,
+                        ),
+                      ],
+                    )
+                  else
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        _ProgramTabs(
+                          active: _activeProgram,
+                          onSelect: _switchProgram,
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(child: dispatcherBarWidget),
+                      ],
+                    ),
                   const SizedBox(height: AppSpacing.sm),
-                  _Header(
-                    programLabel: _programs.firstWhere(
-                      (p) => p['key'] == _activeProgram,
-                      orElse: () => _programs[0],
-                    )['label']!,
-                    onPaste: _showPasteDialog,
-                    onAtlasPaste: _showAtlasPasteDialog,
-                    onNotesEdit: _showNotesDialog,
-                    onClear: _routes.isEmpty ? null : _clearWaveplan,
-                    onPublishToggle:
-                        (_routes.isEmpty || !_atlasConfirmed) && !_isPublished
-                            ? null
-                            : () => _togglePublish(namesMap),
-                    isPublished: _isPublished,
-                    publishedAt: _publishedAt,
-                    routeCount: _routes.length,
-                    assignedCount: _routes.where((r) => r.isAssigned).length,
-                    atlasTotal: _atlasByRoute.values
-                        .fold<int>(0, (s, l) => s + l.length),
-                    atlasConfirmed: _atlasConfirmed,
-                    notesLength: _generalNotes.trim().length,
-                  ),
-                  const SizedBox(height: AppSpacing.md),
+                  // Full header with all action buttons only on desktop;
+                  // on mobile they live behind the round "+" sheet.
+                  if (!isMobile)
+                    _Header(
+                      programLabel: _programs.firstWhere(
+                        (p) => p['key'] == _activeProgram,
+                        orElse: () => _programs[0],
+                      )['label']!,
+                      onPaste: _showPasteDialog,
+                      onAtlasPaste: _showAtlasPasteDialog,
+                      onNotesEdit: _showNotesDialog,
+                      onClear: _routes.isEmpty ? null : _clearWaveplan,
+                      onPublishToggle:
+                          (_routes.isEmpty || !_atlasConfirmed) && !_isPublished
+                              ? null
+                              : () => _togglePublish(namesMap),
+                      isPublished: _isPublished,
+                      publishedAt: _publishedAt,
+                      routeCount: _routes.length,
+                      assignedCount:
+                          _routes.where((r) => r.isAssigned).length,
+                      atlasTotal: _atlasByRoute.values
+                          .fold<int>(0, (s, l) => s + l.length),
+                      atlasConfirmed: _atlasConfirmed,
+                      notesLength: _generalNotes.trim().length,
+                    ),
+                  if (!isMobile) const SizedBox(height: AppSpacing.md),
                   Expanded(
                     child: isNarrow
                         ? _StackedLayout(
@@ -949,6 +1095,274 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
     );
   }
 
+  /// Popover program picker anchored to the trigger button — opens
+  /// just below the [_ProgramPicker] pill instead of sliding up from
+  /// the bottom of the screen.
+  Future<void> _showProgramPicker(BuildContext triggerCtx) async {
+    final button = triggerCtx.findRenderObject() as RenderBox?;
+    final overlayState = Navigator.of(triggerCtx).overlay;
+    final overlay = overlayState?.context.findRenderObject() as RenderBox?;
+    if (button == null || overlay == null) return;
+
+    final position = RelativeRect.fromRect(
+      Rect.fromPoints(
+        button.localToGlobal(
+          button.size.bottomLeft(Offset.zero) + const Offset(0, 6),
+          ancestor: overlay,
+        ),
+        button.localToGlobal(
+          button.size.bottomRight(Offset.zero) + const Offset(0, 6),
+          ancestor: overlay,
+        ),
+      ),
+      Offset.zero & overlay.size,
+    );
+
+    final picked = await showMenu<String>(
+      context: triggerCtx,
+      position: position,
+      color: AppColors.surfaceElevatedLight,
+      elevation: 8,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+      ),
+      items: [
+        for (final p in _programs)
+          PopupMenuItem<String>(
+            value: p['key'],
+            height: 40,
+            child: Row(
+              children: [
+                Icon(
+                  p['key'] == _activeProgram
+                      ? Icons.check_rounded
+                      : Icons.circle_outlined,
+                  size: 16,
+                  color: p['key'] == _activeProgram
+                      ? AppColors.codriverGreen
+                      : AppColors.labelTertiaryLight,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  p['label']!,
+                  style: AppTypography.subheadline.copyWith(
+                    color: AppColors.codriverGraphite,
+                    fontWeight: p['key'] == _activeProgram
+                        ? FontWeight.w700
+                        : FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+    if (picked != null && picked != _activeProgram) {
+      _switchProgram(picked);
+    }
+  }
+
+  /// Mobile action menu — replaces the inline header buttons. Each
+  /// row in the sheet maps to one of the existing dialogs/flows.
+  Future<void> _showMobileActionsSheet() async {
+    final t = AppLocalizations.of(context);
+    final hasRoutes = _routes.isNotEmpty;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surfaceElevatedLight,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (sheetCtx) {
+        Widget tile({
+          required IconData icon,
+          required Color iconBg,
+          required Color iconFg,
+          required String label,
+          required VoidCallback? onTap,
+        }) {
+          final disabled = onTap == null;
+          return ListTile(
+            enabled: !disabled,
+            onTap: disabled
+                ? null
+                : () {
+                    Navigator.of(sheetCtx).pop();
+                    onTap();
+                  },
+            leading: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: disabled ? AppColors.surfaceLight : iconBg,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                icon,
+                size: 18,
+                color: disabled
+                    ? AppColors.labelTertiaryLight
+                    : iconFg,
+              ),
+            ),
+            title: Text(
+              label,
+              style: AppTypography.body.copyWith(
+                fontWeight: FontWeight.w600,
+                color: disabled
+                    ? AppColors.labelTertiaryLight
+                    : AppColors.codriverGraphite,
+              ),
+            ),
+          );
+        }
+
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  decoration: BoxDecoration(
+                    color: AppColors.separatorLight,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                tile(
+                  icon: Icons.content_paste_rounded,
+                  iconBg: AppColors.green50,
+                  iconFg: AppColors.codriverDeep,
+                  label: t.t('waveplan_btn_paste_wave'),
+                  onTap: _showPasteDialog,
+                ),
+                tile(
+                  icon: Icons.headset_mic_rounded,
+                  iconBg: const Color(0xFFE8F1FF),
+                  iconFg: const Color(0xFF0A84FF),
+                  label: t.t('waveplan_dispatcher_label'),
+                  onTap: () => _showDispatcherSheet(),
+                ),
+                tile(
+                  icon: Icons.inventory_2_rounded,
+                  iconBg: const Color(0xFFFFF4E5),
+                  iconFg: AppColors.warning,
+                  label: t.t('waveplan_btn_atlas'),
+                  onTap: _showAtlasPasteDialog,
+                ),
+                tile(
+                  icon: Icons.edit_note_rounded,
+                  iconBg: AppColors.surfaceLight,
+                  iconFg: AppColors.codriverDeep,
+                  label: t.t('waveplan_btn_notes'),
+                  onTap: _showNotesDialog,
+                ),
+                if (hasRoutes)
+                  tile(
+                    icon: Icons.delete_outline_rounded,
+                    iconBg: const Color(0xFFFDECEC),
+                    iconFg: AppColors.error,
+                    label: t.t('waveplan_btn_clear'),
+                    onTap: _clearWaveplan,
+                  ),
+                const SizedBox(height: AppSpacing.xs),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Bottom-sheet wrapper around the dispatcher bar — used on mobile
+  /// where the bar can't share the row with the program tabs.
+  Future<void> _showDispatcherSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surfaceElevatedLight,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (sheetCtx) {
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.sm,
+              AppSpacing.md,
+              MediaQuery.of(sheetCtx).viewInsets.bottom + AppSpacing.lg,
+            ),
+            child: StatefulBuilder(
+              builder: (ctx, setSheetState) {
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      decoration: BoxDecoration(
+                        color: AppColors.separatorLight,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    StreamBuilder<List<String>>(
+                      stream: _dispatcherNamesStream,
+                      builder: (ctx2, snap) {
+                        final available =
+                            snap.data ?? const <String>[];
+                        return _DispatcherBar(
+                          available: available,
+                          selected: _selectedDispatchers,
+                          shiftByDispatcher: _shiftByDispatcher,
+                          maxSelectable: _maxDispatchers,
+                          onAddDispatcher: (name) {
+                            if (_selectedDispatchers.contains(name)) return;
+                            if (_selectedDispatchers.length >=
+                                _maxDispatchers) {
+                              return;
+                            }
+                            setState(() {
+                              _selectedDispatchers.add(name);
+                              _shiftByDispatcher[name] =
+                                  _defaultShiftFor(
+                                _selectedDispatchers.length - 1,
+                              );
+                            });
+                            setSheetState(() {});
+                          },
+                          onRemoveDispatcher: (name) {
+                            setState(() {
+                              _selectedDispatchers.remove(name);
+                              _shiftByDispatcher.remove(name);
+                            });
+                            setSheetState(() {});
+                          },
+                          onShiftChanged: (name, range) {
+                            setState(() {
+                              _shiftByDispatcher[name] = range;
+                            });
+                            setSheetState(() {});
+                          },
+                        );
+                      },
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _clearWaveplan() async {
     final t = AppLocalizations.of(context);
     final confirm = await showDialog<bool>(
@@ -1247,10 +1661,14 @@ class _PublishButton extends StatefulWidget {
   final bool isPublished;
   final DateTime? publishedAt;
   final VoidCallback? onToggle;
+  /// Compact mode for mobile: drops the icon/pulse dot, shrinks padding,
+  /// and uses a one-word label ("Publish" / "Live").
+  final bool compact;
   const _PublishButton({
     required this.isPublished,
     required this.publishedAt,
     required this.onToggle,
+    this.compact = false,
   });
 
   @override
@@ -1296,6 +1714,13 @@ class _PublishButtonState extends State<_PublishButton>
             ? AppColors.codriverDeep
             : (_hovered ? const Color(0xFF00A07A) : AppColors.codriverGreen);
 
+    final compact = widget.compact;
+    final label = compact
+        ? (published ? 'Live' : 'Publish')
+        : (published
+            ? loc.tf('waveplan_published_label', {'time': _timeLabel()})
+            : loc.t('waveplan_publish_label'));
+
     return MouseRegion(
       cursor: disabled
           ? SystemMouseCursors.basic
@@ -1311,9 +1736,13 @@ class _PublishButtonState extends State<_PublishButton>
           child: AnimatedContainer(
           duration: const Duration(milliseconds: 240),
           curve: Curves.easeOutCubic,
-          height: 42,
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-          constraints: BoxConstraints(minWidth: published ? 250 : 220),
+          height: compact ? 36 : 42,
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? AppSpacing.md : AppSpacing.lg,
+          ),
+          constraints: BoxConstraints(
+            minWidth: compact ? 0 : (published ? 250 : 220),
+          ),
           decoration: BoxDecoration(
             color: bg,
             borderRadius: BorderRadius.circular(999),
@@ -1324,46 +1753,45 @@ class _PublishButtonState extends State<_PublishButton>
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              if (published)
-                AnimatedBuilder(
-                  animation: _pulse,
-                  builder: (_, __) {
-                    final t = _pulse.value;
-                    return Container(
-                      width: 10 + 2 * t,
-                      height: 10 + 2 * t,
-                      margin: const EdgeInsets.only(right: 8),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white.withOpacity(0.95),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.white.withOpacity(0.35 + 0.4 * t),
-                            blurRadius: 8 + 6 * t,
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                )
-              else
-                const Padding(
-                  padding: EdgeInsets.only(right: 8),
-                  child: Icon(
-                    Icons.send_rounded,
-                    size: 16,
-                    color: Colors.white,
+              if (!compact) ...[
+                if (published)
+                  AnimatedBuilder(
+                    animation: _pulse,
+                    builder: (_, __) {
+                      final t = _pulse.value;
+                      return Container(
+                        width: 10 + 2 * t,
+                        height: 10 + 2 * t,
+                        margin: const EdgeInsets.only(right: 8),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withOpacity(0.95),
+                          boxShadow: [
+                            BoxShadow(
+                              color:
+                                  Colors.white.withOpacity(0.35 + 0.4 * t),
+                              blurRadius: 8 + 6 * t,
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  )
+                else
+                  const Padding(
+                    padding: EdgeInsets.only(right: 8),
+                    child: Icon(
+                      Icons.send_rounded,
+                      size: 16,
+                      color: Colors.white,
+                    ),
                   ),
-                ),
+              ],
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 200),
                 child: Text(
-                  published
-                      ? loc.tf('waveplan_published_label', {
-                          'time': _timeLabel(),
-                        })
-                      : loc.t('waveplan_publish_label'),
-                  key: ValueKey(published),
+                  label,
+                  key: ValueKey('$published-$compact'),
                   style: AppTypography.subheadline.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.w700,
@@ -1383,6 +1811,70 @@ class _PublishButtonState extends State<_PublishButton>
 /// content-fitting, level-1 shadow + subtle hairline border, hover
 /// darkens the fill slightly. Optional [danger] tints the icon red,
 /// or pass an explicit [accent] colour for a custom tone.
+/// Round "+" pill used in the mobile header — taps open the bottom
+/// sheet that holds the wave/dispatcher/atlas/notes/clear actions.
+class _RoundPlusButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _RoundPlusButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: AppColors.codriverGreen,
+            shape: BoxShape.circle,
+            boxShadow: AppElevation.level1,
+          ),
+          child: const Icon(
+            Icons.add_rounded,
+            size: 22,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Compact round red-tinted button — used inline next to the `+` on
+/// the mobile waveplan header to clear the imported routes. Only
+/// shown when there's actually something to delete.
+class _RoundDangerButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  const _RoundDangerButton({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: const Color(0xFFFDECEC),
+            shape: BoxShape.circle,
+            boxShadow: AppElevation.level1,
+            border: Border.all(
+              color: AppColors.error.withOpacity(0.35),
+              width: 1,
+            ),
+          ),
+          child: Icon(icon, size: 20, color: AppColors.error),
+        ),
+      ),
+    );
+  }
+}
+
 class _SmallActionButton extends StatefulWidget {
   final IconData icon;
   final String label;
@@ -1457,6 +1949,65 @@ class _SmallActionButtonState extends State<_SmallActionButton> {
 /// Program switcher at the very top of the page — three independent
 /// workspaces: Sameday A, Nextday, Sameday C. Switching a tab swaps
 /// the visible state with the saved snapshot for that program.
+/// Mobile replacement for the desktop tab bar. Renders the active
+/// program as a content-sized pill with a chevron — tapping it opens
+/// the program picker popup right below the button (not a bottom
+/// sheet, which would be far from the tap on a tall phone). Title
+/// stays in sync with the selection.
+class _ProgramPicker extends StatelessWidget {
+  final String activeKey;
+  final ValueChanged<BuildContext> onTap;
+  const _ProgramPicker({required this.activeKey, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final label = _programs.firstWhere(
+      (p) => p['key'] == activeKey,
+      orElse: () => _programs[0],
+    )['label']!;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => onTap(context),
+        child: Container(
+          height: 36,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+          ),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceElevatedLight,
+            borderRadius: BorderRadius.circular(999),
+            boxShadow: AppElevation.level1,
+            border: Border.all(
+              color: AppColors.separatorLight.withOpacity(0.4),
+              width: 0.5,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: AppTypography.subheadline.copyWith(
+                  color: AppColors.codriverGraphite,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 18,
+                color: AppColors.codriverDeep,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ProgramTabs extends StatelessWidget {
   final String active;
   final ValueChanged<String> onSelect;
@@ -2014,83 +2565,126 @@ class _RouteCard extends StatelessWidget {
               ),
             ),
           ),
-          child: Row(
-            children: [
-              // Driver chip first — most important info on the left.
-              SizedBox(
-                width: 260,
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: route.isAssigned
-                      ? _DriverChip(
-                          transporterId: route.transporterId!,
-                          driverName: resolveName(route.transporterId),
-                          dsp: route.assignedDsp,
-                          onRemove: onUnassign,
-                        )
-                      : _EmptyDropZone(active: hovered),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              _SpurIndicator(left: left, color: spurColor),
-              const SizedBox(width: AppSpacing.sm),
-              // Route metadata — compact, one column
-              Expanded(
-                flex: 5,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxWidth < 600;
+              final driverName = resolveName(route.transporterId);
+              return Row(
+                children: [
+                  // Driver chip first — most important info on the
+                  // left. Fixed 260px on desktop; flexible on mobile
+                  // so long names ellipsis instead of pushing the
+                  // route metadata off-screen.
+                  if (isCompact)
+                    Expanded(
+                      flex: 4,
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: route.isAssigned
+                            ? _DriverChip(
+                                transporterId: route.transporterId!,
+                                driverName: driverName,
+                                dsp: route.assignedDsp,
+                                onRemove: onUnassign,
+                                compact: true,
+                              )
+                            : _EmptyDropZone(active: hovered),
+                      ),
+                    )
+                  else
+                    SizedBox(
+                      width: 260,
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: route.isAssigned
+                            ? _DriverChip(
+                                transporterId: route.transporterId!,
+                                driverName: driverName,
+                                dsp: route.assignedDsp,
+                                onRemove: onUnassign,
+                              )
+                            : _EmptyDropZone(active: hovered),
+                      ),
+                    ),
+                  const SizedBox(width: AppSpacing.sm),
+                  _SpurIndicator(left: left, color: spurColor),
+                  const SizedBox(width: AppSpacing.sm),
+                  // Route metadata — compact, one column. Atlas chip
+                  // is placed BEFORE the route code so the parcel
+                  // indicator is the first thing the dispatcher
+                  // scans for.
+                  Expanded(
+                    flex: 5,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          route.routeCode,
-                          style: AppTypography.subheadline.copyWith(
-                            color: AppColors.codriverGraphite,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 1,
-                          ),
-                          decoration: BoxDecoration(
-                            color: spurColor.withOpacity(0.10),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            route.dispatchArea,
-                            style: AppTypography.caption2.copyWith(
-                              color: spurColor,
-                              fontWeight: FontWeight.w700,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures(),
-                              ],
+                        Row(
+                          children: [
+                            if (atlasTrackingIds.isNotEmpty) ...[
+                              _AtlasBadge(
+                                count: atlasTrackingIds.length,
+                                trackingIds: atlasTrackingIds,
+                                driverName: driverName,
+                              ),
+                              const SizedBox(width: 6),
+                            ],
+                            Flexible(
+                              child: Text(
+                                route.routeCode,
+                                style:
+                                    AppTypography.subheadline.copyWith(
+                                  color: AppColors.codriverGraphite,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                          ),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 1,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: spurColor.withOpacity(0.10),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  route.dispatchArea,
+                                  style:
+                                      AppTypography.caption2.copyWith(
+                                    color: spurColor,
+                                    fontWeight: FontWeight.w700,
+                                    fontFeatures: const [
+                                      FontFeature.tabularFigures(),
+                                    ],
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        if (atlasTrackingIds.isNotEmpty) ...[
-                          const SizedBox(width: 6),
-                          _AtlasBadge(count: atlasTrackingIds.length),
-                        ],
+                        Text(
+                          '${_normalizeServiceType(route.serviceType)}  ·  '
+                          '${route.dispatchTime.substring(0, 5)}–'
+                          '${route.shiftEndTime.substring(0, 5)}',
+                          style: AppTypography.caption1.copyWith(
+                            color: AppColors.labelSecondaryLight,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ],
                     ),
-                    Text(
-                      '${_normalizeServiceType(route.serviceType)}  ·  '
-                      '${route.dispatchTime.substring(0, 5)}–'
-                      '${route.shiftEndTime.substring(0, 5)}',
-                      style: AppTypography.caption1.copyWith(
-                        color: AppColors.labelSecondaryLight,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ],
+                  ),
+                ],
+              );
+            },
           ),
         );
       },
@@ -2099,16 +2693,22 @@ class _RouteCard extends StatelessWidget {
 }
 
 /// Small attention-grabbing pill on a route card when one or more
-/// Atlas packages are routed to that driver. Tooltip shows the
-/// tracking IDs so the dispatcher can verify on the fly.
+/// Atlas packages are routed to that driver. Tap opens a popup with
+/// the numbered tracking-IDs so the dispatcher can verify on the fly.
 class _AtlasBadge extends StatelessWidget {
   final int count;
-  const _AtlasBadge({required this.count});
+  final List<String> trackingIds;
+  final String driverName;
+  const _AtlasBadge({
+    required this.count,
+    this.trackingIds = const [],
+    this.driverName = '',
+  });
 
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    return Container(
+    final chip = Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
       decoration: BoxDecoration(
         color: AppColors.warning.withOpacity(0.14),
@@ -2138,7 +2738,148 @@ class _AtlasBadge extends StatelessWidget {
         ],
       ),
     );
+
+    if (trackingIds.isEmpty) return chip;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _showAtlasTrackingPopup(
+          context,
+          trackingIds,
+          driverName: driverName,
+        ),
+        child: chip,
+      ),
+    );
   }
+}
+
+/// Popup listing all Atlas tracking-IDs for a single route, opened by
+/// tapping the `_AtlasBadge` on a route card.
+Future<void> _showAtlasTrackingPopup(
+  BuildContext context,
+  List<String> trackingIds, {
+  required String driverName,
+}) async {
+  final t = AppLocalizations.of(context);
+  await showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
+      contentPadding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+      title: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.warning,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.inventory_2_rounded,
+              color: Colors.white,
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  t.tf('waveplan_btn_atlas_count', {
+                    'count': '${trackingIds.length}',
+                  }),
+                  style: AppTypography.subheadline.copyWith(
+                    color: AppColors.codriverGraphite,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if (driverName.isNotEmpty)
+                  Text(
+                    driverName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.caption2.copyWith(
+                      color: AppColors.labelSecondaryLight,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 360, maxHeight: 420),
+        child: SingleChildScrollView(
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (var i = 0; i < trackingIds.length; i++)
+                Container(
+                  padding: const EdgeInsets.fromLTRB(4, 4, 10, 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withOpacity(0.16),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: AppColors.warning.withOpacity(0.4),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 20,
+                        height: 20,
+                        alignment: Alignment.center,
+                        decoration: const BoxDecoration(
+                          color: AppColors.warning,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          '${i + 1}',
+                          style: AppTypography.caption2.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontFeatures: const [
+                              FontFeature.tabularFigures(),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        trackingIds[i],
+                        style: AppTypography.footnote.copyWith(
+                          color: const Color(0xFF8A4A00),
+                          fontWeight: FontWeight.w700,
+                          fontFeatures: const [
+                            FontFeature.tabularFigures(),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: Text(t.t('waveplan_btn_cancel')),
+        ),
+      ],
+    ),
+  );
 }
 
 /// Blue ← for left ("links"), green → for right ("rechts").
@@ -2230,12 +2971,17 @@ class _DriverChip extends StatelessWidget {
   final String driverName;
   final String? dsp;
   final VoidCallback onRemove;
+  /// Compact (mobile) variant: drops the person avatar + close
+  /// button so the chip fits next to the spur indicator on a phone.
+  /// Long press still triggers the drag handle.
+  final bool compact;
 
   const _DriverChip({
     required this.transporterId,
     required this.driverName,
     required this.onRemove,
     this.dsp,
+    this.compact = false,
   });
 
   @override
@@ -2245,6 +2991,7 @@ class _DriverChip extends StatelessWidget {
       driverName: driverName,
       dsp: dsp,
       onRemove: onRemove,
+      compact: compact,
     );
 
     return Draggable<String>(
@@ -2260,6 +3007,7 @@ class _DriverChip extends StatelessWidget {
             dsp: dsp,
             onRemove: onRemove,
             elevated: true,
+            compact: compact,
           ),
         ),
       ),
@@ -2275,6 +3023,7 @@ class _ChipBody extends StatelessWidget {
   final String? dsp;
   final VoidCallback onRemove;
   final bool elevated;
+  final bool compact;
 
   const _ChipBody({
     required this.transporterId,
@@ -2282,6 +3031,7 @@ class _ChipBody extends StatelessWidget {
     required this.onRemove,
     this.dsp,
     this.elevated = false,
+    this.compact = false,
   });
 
   @override
@@ -2289,7 +3039,10 @@ class _ChipBody extends StatelessWidget {
     final hasName = driverName.trim().isNotEmpty;
     return IntrinsicWidth(
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 8 : 12,
+          vertical: compact ? 4 : 7,
+        ),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(999),
@@ -2302,21 +3055,23 @@ class _ChipBody extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 26,
-              height: 26,
-              decoration: const BoxDecoration(
-                color: AppColors.codriverGreen,
-                shape: BoxShape.circle,
+            if (!compact) ...[
+              Container(
+                width: 26,
+                height: 26,
+                decoration: const BoxDecoration(
+                  color: AppColors.codriverGreen,
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: const Icon(
+                  Icons.person_rounded,
+                  size: 14,
+                  color: Colors.white,
+                ),
               ),
-              alignment: Alignment.center,
-              child: const Icon(
-                Icons.person_rounded,
-                size: 14,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(width: 10),
+              const SizedBox(width: 10),
+            ],
             Flexible(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -2325,18 +3080,18 @@ class _ChipBody extends StatelessWidget {
                   Text(
                     hasName ? driverName : '— kein Name —',
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: compact ? 12 : 13,
                       height: 1.15,
                       color: hasName
                           ? AppColors.codriverGraphite
                           : AppColors.labelTertiaryLight,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w600,
                       fontStyle: hasName ? FontStyle.normal : FontStyle.italic,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
+                  SizedBox(height: compact ? 1 : 4),
                   // Tap-to-copy on the transporterId. Hovers light up
                   // the row + a tiny copy icon to make the affordance
                   // discoverable.
@@ -2344,22 +3099,22 @@ class _ChipBody extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: 10),
+            SizedBox(width: compact ? 6 : 10),
             MouseRegion(
               cursor: SystemMouseCursors.click,
               child: GestureDetector(
                 onTap: onRemove,
                 child: Container(
-                  width: 20,
-                  height: 20,
+                  width: compact ? 18 : 20,
+                  height: compact ? 18 : 20,
                   decoration: const BoxDecoration(
                     color: AppColors.surfaceLight,
                     shape: BoxShape.circle,
                   ),
                   alignment: Alignment.center,
-                  child: const Icon(
+                  child: Icon(
                     Icons.close_rounded,
-                    size: 12,
+                    size: compact ? 11 : 12,
                     color: AppColors.labelSecondaryLight,
                   ),
                 ),

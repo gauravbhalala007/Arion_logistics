@@ -3,8 +3,10 @@ import 'dart:convert'; // for base64Decode
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/admin_expiry_aggregator.dart';
 import '../services/auth_service.dart';
 import '../localization/app_localizations.dart';
+import 'admin_notification_bell.dart';
 
 enum AppNav {
   home,
@@ -24,6 +26,7 @@ enum AppNav {
   faqs,
   comingSoon,
   adminApprovals,
+  dispatchers,
   profile,
 }
 
@@ -84,11 +87,19 @@ class AppSideMenu extends StatelessWidget {
         active: active == AppNav.podQuality,
         onTap: () => _handleNav(context, AppNav.podQuality, '/pod-quality'),
       ),
-      _MenuItem(
-        icon: Icons.badge_outlined,
-        label: 'Drivers Hub',
-        active: active == AppNav.drivers,
-        onTap: () => _handleNav(context, AppNav.drivers, '/drivers'),
+      StreamBuilder<int>(
+        stream: () {
+          final uid = FirebaseAuth.instance.currentUser?.uid;
+          if (uid == null) return Stream.value(0);
+          return AdminExpiryAggregator().watchUnreadTotal(uid);
+        }(),
+        builder: (context, snap) => _MenuItem(
+          icon: Icons.badge_outlined,
+          label: 'Drivers Hub',
+          active: active == AppNav.drivers,
+          onTap: () => _handleNav(context, AppNav.drivers, '/drivers'),
+          badgeCount: snap.data ?? 0,
+        ),
       ),
       _MenuItem(
         icon: Icons.waves_rounded,
@@ -133,7 +144,7 @@ class AppSideMenu extends StatelessWidget {
       ),
       _MenuItem(
         icon: Icons.schedule_rounded,
-        label: 'Shift & Absence',
+        label: 'Zeiten & Abwesenheiten',
         active: active == AppNav.shiftAbsence,
         onTap: () => _handleNav(context, AppNav.shiftAbsence, '/shift-absence'),
       ),
@@ -152,7 +163,7 @@ class AppSideMenu extends StatelessWidget {
       ),
       _MenuItem(
         icon: Icons.support_agent_rounded,
-        label: 'Dispatcher',
+        label: 'Dispatcher Center',
         active: active == AppNav.dispatcherPill,
         onTap: () =>
             _handleNav(context, AppNav.dispatcherPill, '/dispatcher-pill'),
@@ -179,7 +190,7 @@ class AppSideMenu extends StatelessWidget {
         onTap: () => _handleNav(context, AppNav.feedback, '/feedback'),
       ),
 
-      // ---- Admin-only item (auto-detect from Firestore user role) ----
+      // ---- Admin-only items (auto-detect from Firestore user role) ----
       StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
         stream: _userDocStream(),
         builder: (context, snap) {
@@ -187,12 +198,23 @@ class AppSideMenu extends StatelessWidget {
           final isAdmin = role == 'admin';
           if (!isAdmin) return const SizedBox.shrink();
 
-          return _MenuItem(
-            icon: Icons.verified_user_outlined,
-            label: 'User Approvals',
-            active: active == AppNav.adminApprovals,
-            onTap: () =>
-                _handleNav(context, AppNav.adminApprovals, '/admin-approvals'),
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _MenuItem(
+                icon: Icons.verified_user_outlined,
+                label: 'User Approvals',
+                active: active == AppNav.adminApprovals,
+                onTap: () => _handleNav(
+                  context,
+                  AppNav.adminApprovals,
+                  '/admin-approvals',
+                ),
+              ),
+              // Sub-accounts now live as Tab 2 of the Dispatcher
+              // Center; this standalone entry is intentionally hidden
+              // so the side menu doesn't repeat itself.
+            ],
           );
         },
       ),
@@ -207,11 +229,28 @@ class AppSideMenu extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Image.asset(
-                'assets/Codriver_logo_dark.png',
-                width: 300,
-                height: 61,
-                fit: BoxFit.contain,
+              Row(
+                children: [
+                  Expanded(
+                    child: Image.asset(
+                      'assets/Codriver_logo_dark.png',
+                      height: 61,
+                      fit: BoxFit.contain,
+                      alignment: Alignment.centerLeft,
+                    ),
+                  ),
+                  // Notification bell — always visible at the top of
+                  // the menu (also acts as the "oben rechts" entry
+                  // point on wide screens where there's no app bar).
+                  AdminNotificationBell(
+                    onTap: () {
+                      if (onSelect != null) {
+                        onSelect!(AppNav.drivers);
+                      }
+                      closeDrawerIfOpen?.call();
+                    },
+                  ),
+                ],
               ),
               const SizedBox(height: 18),
               const _ThinDivider(),
@@ -345,12 +384,16 @@ class _MenuItem extends StatelessWidget {
   final String label;
   final bool active;
   final VoidCallback onTap;
+  /// Optional red count badge on the right (e.g., for the Drivers
+  /// Hub item to show how many expiry notifications are open).
+  final int? badgeCount;
 
   const _MenuItem({
     required this.icon,
     required this.label,
     required this.active,
     required this.onTap,
+    this.badgeCount,
   });
 
   @override
@@ -383,7 +426,28 @@ class _MenuItem extends StatelessWidget {
                 ),
               ),
             ),
-            if (active)
+            if (badgeCount != null && badgeCount! > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 1,
+                ),
+                constraints: const BoxConstraints(minWidth: 20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFB91C1C),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  badgeCount! > 99 ? '99+' : '$badgeCount',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            if (active && (badgeCount == null || badgeCount == 0))
               const Icon(Icons.chevron_right, size: 18, color: Colors.white70),
           ],
         ),
