@@ -10,6 +10,7 @@ enum AppNav {
   home,
   dashboard,
   podQuality,
+  concessions,
   drivers,
   fleetStatus,
   tasks,
@@ -81,6 +82,12 @@ class AppSideMenu extends StatelessWidget {
         label: 'POD Quality',
         active: active == AppNav.podQuality,
         onTap: () => _handleNav(context, AppNav.podQuality, '/pod-quality'),
+      ),
+      _SubMenuItem(
+        icon: Icons.report_gmailerrorred_outlined,
+        label: 'Concessions',
+        active: active == AppNav.concessions,
+        onTap: () => _handleNav(context, AppNav.concessions, '/concessions'),
       ),
       _MenuItem(
         icon: Icons.badge_outlined,

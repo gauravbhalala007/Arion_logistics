@@ -12457,6 +12457,36 @@ class AppLocalizations {
     'signup_request_password_min': 'Min 6 chars',
     'signup_request_submitting': 'Submitting...',
     'signup_request_submit': 'Submit & Verify Email',
+
+    // ===== Concessions =====
+    'concessions_title': 'Concessions',
+    'concessions_shell_week_title': 'CONCESSIONS - WEEK',
+    'concessions_dashboard_title': 'CONCESSIONS DASHBOARD',
+    'concessions_upload_xlsx': 'Upload XLSX',
+    'concessions_no_reports_uploaded':
+        'No Concessions reports yet. Upload a Concessions XLSX to get started.',
+    'concessions_upload_success_one':
+        '1 Concessions report parsed and saved.',
+    'concessions_upload_success_many':
+        '{count} Concessions reports parsed and saved.',
+    'concessions_upload_parse_failed': 'Upload/parse failed: {error}',
+    'concessions_week_label': 'Week {week}',
+    'concessions_no_data_week': 'No Concessions data for this week.',
+    'concessions_drivers': 'Drivers',
+    'concessions_entries_count': '{count} entries',
+    'concessions_delivered': 'Delivered',
+    'concessions_dnr_count': 'DNRs',
+    'concessions_dnr_dpmo': 'DPMO',
+    'concessions_dnr_dpmo_4w': 'DPMO 4W',
+    'concessions_focus_breakdown': 'Focus areas (last 4 weeks)',
+    'concessions_focus_attended_dnr': 'Attended DNR',
+    'concessions_focus_photo_on_delivery': 'POD',
+    'concessions_focus_successful_contact': 'Successful Contact',
+    'concessions_focus_delivered_25m': '>25 m',
+    'concessions_focus_false_scan': 'False Scan',
+    'concessions_focus_mailbox': 'Mailbox',
+    'concessions_focus_delivered_otp': 'OTP',
+    'concessions_week_w': 'W{week}',
   };
 
   static final Map<String, Map<String, String>> _miscLocalizedValues = {
@@ -12538,6 +12568,38 @@ class AppLocalizations {
       'signup_request_password_min': 'Mindestens 6 Zeichen',
       'signup_request_submitting': 'Wird gesendet...',
       'signup_request_submit': 'Absenden & E-Mail bestätigen',
+
+      // ===== Concessions =====
+      'concessions_title': 'Concessions',
+      'concessions_shell_week_title': 'CONCESSIONS - WOCHE',
+      'concessions_dashboard_title': 'CONCESSIONS DASHBOARD',
+      'concessions_upload_xlsx': 'XLSX hochladen',
+      'concessions_no_reports_uploaded':
+          'Noch keine Concessions-Berichte. Lade eine Concessions-XLSX hoch, um zu starten.',
+      'concessions_upload_success_one':
+          '1 Concessions-Bericht gespeichert.',
+      'concessions_upload_success_many':
+          '{count} Concessions-Berichte gespeichert.',
+      'concessions_upload_parse_failed':
+          'Upload/Parse fehlgeschlagen: {error}',
+      'concessions_week_label': 'KW {week}',
+      'concessions_no_data_week':
+          'Keine Concessions-Daten für diese Woche.',
+      'concessions_drivers': 'Fahrer',
+      'concessions_entries_count': '{count} Einträge',
+      'concessions_delivered': 'Zugestellt',
+      'concessions_dnr_count': 'DNRs',
+      'concessions_dnr_dpmo': 'DPMO',
+      'concessions_dnr_dpmo_4w': 'DPMO 4W',
+      'concessions_focus_breakdown': 'Fokus-Bereiche (letzte 4 Wochen)',
+      'concessions_focus_attended_dnr': 'Attended DNR',
+      'concessions_focus_photo_on_delivery': 'POD',
+      'concessions_focus_successful_contact': 'Erfolgreicher Kontakt',
+      'concessions_focus_delivered_25m': '>25 m',
+      'concessions_focus_false_scan': 'False Scan',
+      'concessions_focus_mailbox': 'Briefkasten',
+      'concessions_focus_delivered_otp': 'OTP',
+      'concessions_week_w': 'KW {week}',
     },
     'sq': {
       ..._miscSharedValues,

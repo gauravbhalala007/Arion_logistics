@@ -74,6 +74,26 @@ class DriverRow(BaseModel):
     POD_Q_PackageInCar: Optional[float] = None
     POD_Q_PackageTooClose: Optional[float] = None
 
+    # Concessions (driver-level)
+    CONC_TotalDelivered: Optional[float] = None
+    CONC_TotalDnr: Optional[float] = None
+    CONC_DnrDpmo4w: Optional[float] = None
+    CONC_DnrCount_W1: Optional[float] = None
+    CONC_DnrCount_W2: Optional[float] = None
+    CONC_DnrCount_W3: Optional[float] = None
+    CONC_DnrCount_W4: Optional[float] = None
+    CONC_DnrDpmo_W1: Optional[float] = None
+    CONC_DnrDpmo_W2: Optional[float] = None
+    CONC_DnrDpmo_W3: Optional[float] = None
+    CONC_DnrDpmo_W4: Optional[float] = None
+    CONC_Focus_AttendedDnr: Optional[float] = None
+    CONC_Focus_PhotoOnDelivery: Optional[float] = None
+    CONC_Focus_SuccessfulContact: Optional[float] = None
+    CONC_Focus_Delivered25m: Optional[float] = None
+    CONC_Focus_FalseScan: Optional[float] = None
+    CONC_Focus_Mailbox: Optional[float] = None
+    CONC_Focus_DeliveredOtp: Optional[float] = None
+
 class ParserSummary(BaseModel):
     overallScore: Optional[float] = None
     overallStatus: Optional[str] = None
@@ -93,6 +113,9 @@ class ParserSummary(BaseModel):
     podQualityRejects: Optional[Dict[str, Any]] = None
     complianceAndSafety: Optional[Dict[str, Any]] = None
     deliveryQualitySwc: Optional[Dict[str, Any]] = None
+
+    concessionsSummary: Optional[Dict[str, Any]] = None
+    concessionsFocusBuckets: Optional[Dict[str, Any]] = None
 
 class ParserResponse(BaseModel):
     count: int
@@ -928,6 +951,229 @@ def add_ranking_and_status(
 # ===============================
 # ROUTES
 # ===============================
+# ===============================
+# CONCESSIONS XLSX HANDLING
+# ===============================
+
+def _is_concessions_xlsx(filename: str) -> bool:
+    name = (filename or "").lower()
+    if not (name.endswith(".xlsx") or name.endswith(".xls")):
+        return False
+    return "concession" in name
+
+
+_FOCUS_BUCKET_MAP = {
+    "attended dnr deliveries": "attendedDnr",
+    "photo on delivery": "photoOnDelivery",
+    "successful contact opportunity": "successfulContact",
+    "delivered > 25m": "delivered25m",
+    "feedback false scan indicator": "falseScan",
+    "mailbox eligible, delivered elsewhere": "mailbox",
+    "delivered using otp": "deliveredOtp",
+}
+
+_FOCUS_BUCKET_TX_KEYS = {
+    "attended dnr deliveries": "CONC_Focus_AttendedDnr",
+    "photo on delivery": "CONC_Focus_PhotoOnDelivery",
+    "successful contact opportunity": "CONC_Focus_SuccessfulContact",
+    "delivered > 25m": "CONC_Focus_Delivered25m",
+    "feedback false scan indicator": "CONC_Focus_FalseScan",
+    "mailbox eligible, delivered elsewhere": "CONC_Focus_Mailbox",
+    "delivered using otp": "CONC_Focus_DeliveredOtp",
+}
+
+
+def _xlsx_num(v: Any) -> Optional[float]:
+    if v is None:
+        return None
+    if isinstance(v, (int, float)):
+        return float(v)
+    s = str(v).strip().replace(",", ".")
+    if not s or s == "—":
+        return None
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+
+def _parse_concessions_meta_from_filename(filename: str) -> Dict[str, Any]:
+    """Pull country/dsp/station/week from a filename like
+    'DE-AION-DBY5-Week19-Concessions.xlsx'."""
+    out: Dict[str, Any] = {}
+    if not filename:
+        return out
+    base = filename.rsplit("/", 1)[-1]
+    base = base.rsplit(".", 1)[0]
+    m = re.search(r"([A-Z]{2})-([A-Z0-9]+)-([A-Z0-9]+)-Week(\d+)", base, re.I)
+    if m:
+        out["country"] = m.group(1).upper()
+        out["dsp"] = m.group(2).upper()
+        out["stationCode"] = m.group(3).upper()
+        out["weekNumber"] = int(m.group(4))
+    return out
+
+
+def _extract_concessions_from_xlsx(content: bytes, filename: str):
+    """Returns (summary_dict, drivers_list)."""
+    from openpyxl import load_workbook
+
+    wb = load_workbook(io.BytesIO(content), data_only=True, read_only=True)
+    sheets = {s.lower(): s for s in wb.sheetnames}
+
+    meta = _parse_concessions_meta_from_filename(filename)
+
+    # ----- DSP-level: Focus Areas DSP block -----
+    focus_dsp: Dict[str, float] = {}
+    week_labels: List[str] = []
+    if "focus areas" in sheets:
+        ws = wb[sheets["focus areas"]]
+        rows = list(ws.iter_rows(values_only=True))
+        in_dsp_block = False
+        for row in rows:
+            if not row:
+                continue
+            first = row[0]
+            if first is None:
+                continue
+            text = str(first).strip()
+            if text == "Bucket":
+                in_dsp_block = True
+                week_labels = [
+                    str(c).strip() for c in row[1:5]
+                    if c is not None
+                ]
+                continue
+            if not in_dsp_block:
+                continue
+            if text.lower() == "grand total":
+                break
+            key = _FOCUS_BUCKET_MAP.get(text.lower())
+            if key:
+                total = _xlsx_num(row[5]) if len(row) > 5 else None
+                if total is not None:
+                    focus_dsp[key] = total
+
+    # ----- DSP-level: DNR by DSP -----
+    del_volume = dnr_count = dnr_dpmo = None
+    week_number = meta.get("weekNumber")
+    year = None
+    if "dnr by dsp" in sheets:
+        ws = wb[sheets["dnr by dsp"]]
+        rows = list(ws.iter_rows(values_only=True))
+        data_rows: List[tuple] = []
+        for row in rows:
+            if not row or row[0] in (None, "DNR by DSP", "dsp"):
+                continue
+            data_rows.append(row)
+        if data_rows:
+            last = data_rows[-1]
+            del_volume = _xlsx_num(last[2]) if len(last) > 2 else None
+            dnr_count = _xlsx_num(last[3]) if len(last) > 3 else None
+            dnr_dpmo = _xlsx_num(last[4]) if len(last) > 4 else None
+            # week label like '2026-19'
+            wk = str(last[1] or "").strip()
+            m = re.match(r"(\d{4})-(\d{1,2})", wk)
+            if m:
+                year = int(m.group(1))
+                if week_number is None:
+                    week_number = int(m.group(2))
+
+    summary_block = {
+        "delVolume": del_volume,
+        "dnrCount": dnr_count,
+        "dnrDpmo": dnr_dpmo,
+        "weekLabels": week_labels,
+    }
+
+    # ----- Per driver: DNR by Transporter ID -----
+    drivers_by_id: Dict[str, Dict[str, Any]] = {}
+    if "dnr by transporter id" in sheets:
+        ws = wb[sheets["dnr by transporter id"]]
+        rows = list(ws.iter_rows(values_only=True))
+        header_idx = None
+        for i, row in enumerate(rows):
+            if row and row[0] == "Transporter ID":
+                header_idx = i
+                break
+        if header_idx is not None:
+            for row in rows[header_idx + 1:]:
+                if not row or not row[0]:
+                    continue
+                tid = str(row[0]).strip()
+                if tid.lower() in ("grand total", "total"):
+                    continue
+                drivers_by_id[tid] = {
+                    "Transporter ID": tid,
+                    "CONC_TotalDelivered": _xlsx_num(row[1]) if len(row) > 1 else None,
+                    "CONC_DnrCount_W1": _xlsx_num(row[2]) if len(row) > 2 else None,
+                    "CONC_DnrCount_W2": _xlsx_num(row[3]) if len(row) > 3 else None,
+                    "CONC_DnrCount_W3": _xlsx_num(row[4]) if len(row) > 4 else None,
+                    "CONC_DnrCount_W4": _xlsx_num(row[5]) if len(row) > 5 else None,
+                    "CONC_TotalDnr": _xlsx_num(row[6]) if len(row) > 6 else None,
+                    "CONC_DnrDpmo_W1": _xlsx_num(row[7]) if len(row) > 7 else None,
+                    "CONC_DnrDpmo_W2": _xlsx_num(row[8]) if len(row) > 8 else None,
+                    "CONC_DnrDpmo_W3": _xlsx_num(row[9]) if len(row) > 9 else None,
+                    "CONC_DnrDpmo_W4": _xlsx_num(row[10]) if len(row) > 10 else None,
+                    "CONC_DnrDpmo4w": _xlsx_num(row[11]) if len(row) > 11 else None,
+                }
+
+    # ----- Per driver: Focus Areas Transporter block (totals) -----
+    if "focus areas" in sheets:
+        ws = wb[sheets["focus areas"]]
+        rows = list(ws.iter_rows(values_only=True))
+        in_tx_block = False
+        for row in rows:
+            if not row:
+                continue
+            first = row[0]
+            if first is None:
+                continue
+            text = str(first).strip()
+            if text == "Transporter ID":
+                in_tx_block = True
+                continue
+            if not in_tx_block:
+                continue
+            if text.lower() == "grand total":
+                continue
+            # rows: tid | bucket | w1 | w2 | w3 | w4 | total
+            tid = text
+            bucket_label = str(row[1] or "").strip().lower() if len(row) > 1 else ""
+            if not bucket_label or bucket_label == "total":
+                continue
+            key = _FOCUS_BUCKET_TX_KEYS.get(bucket_label)
+            if not key:
+                continue
+            total = _xlsx_num(row[6]) if len(row) > 6 else None
+            if total is None:
+                # Some rows place 4-week sum at column 5 instead of 6;
+                # fall back to sum of weekly cols.
+                week_sum = sum(
+                    (_xlsx_num(row[i]) or 0) for i in range(2, min(6, len(row)))
+                )
+                total = week_sum if week_sum else None
+            if total is None:
+                continue
+            entry = drivers_by_id.setdefault(tid, {"Transporter ID": tid})
+            entry[key] = (entry.get(key) or 0) + total
+
+    drivers = list(drivers_by_id.values())
+
+    summary: Dict[str, Any] = {
+        "concessionsSummary": summary_block,
+        "concessionsFocusBuckets": focus_dsp,
+        "weekText": f"KW {week_number}" if week_number else None,
+        "weekNumber": week_number,
+        "year": year,
+        "stationCode": meta.get("stationCode"),
+    }
+    # strip None values from summary for a tidy response
+    summary = {k: v for k, v in summary.items() if v is not None}
+
+    return summary, drivers
+
+
 @app.get("/health")
 def health():
     return {"ok": True}
@@ -935,9 +1181,20 @@ def health():
 @app.post("/parse", response_model=ParserResponse)
 async def parse_pdf(file: UploadFile = File(...)):
     content = await file.read()
+    filename = file.filename or ""
+
+    # XLSX route: Concessions report
+    if _is_concessions_xlsx(filename):
+        summary, drivers = _extract_concessions_from_xlsx(content, filename)
+        return {
+            "count": len(drivers),
+            "drivers": drivers,
+            "summary": summary or None,
+        }
+
     with pdfplumber.open(io.BytesIO(content)) as pdf:
-        if _is_pod_quality_pdf(pdf, file.filename or ""):
-            summary = _extract_pod_quality_summary(pdf, file.filename or "")
+        if _is_pod_quality_pdf(pdf, filename):
+            summary = _extract_pod_quality_summary(pdf, filename)
             drivers = _extract_pod_quality_drivers(pdf)
         else:
             summary = extract_summary(pdf)

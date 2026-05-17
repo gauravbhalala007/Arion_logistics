@@ -137,6 +137,9 @@ class App extends StatelessWidget {
             '/pod-quality': (_) => _wrapSelectable(
               const AdminShellPage(initialNav: AppNav.podQuality),
             ),
+            '/concessions': (_) => _wrapSelectable(
+              const AdminShellPage(initialNav: AppNav.concessions),
+            ),
             '/drivers': (_) => _wrapSelectable(
               const AdminShellPage(initialNav: AppNav.drivers),
             ),
