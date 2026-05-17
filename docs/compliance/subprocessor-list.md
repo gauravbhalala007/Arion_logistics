@@ -1,11 +1,14 @@
 # Unterauftragsverarbeiter (Subprocessor List) — CoDRIVER
 
+**Auftragsverarbeiter:** Kreativwerk Albert Dobra,
+Gustav-Weißkopf-Str. 12, 90768 Fürth · info@kw-agentur.de
 **Stand:** 2026-05-17
 **Version:** 1.0
 **Anlage zum:** Auftragsverarbeitungsvertrag (AVV)
 
-> Diese Liste benennt alle Unterauftragsverarbeiter, die CoDRIVER zur
-> Erbringung der Plattformleistung einsetzt. Änderungen werden den
+> Diese Liste benennt alle Unterauftragsverarbeiter, die der
+> Auftragsverarbeiter (Kreativwerk Albert Dobra) zur Erbringung der
+> CoDRIVER-Plattformleistung einsetzt. Änderungen werden den
 > Verantwortlichen mindestens **30 Tage vor Aktivierung** schriftlich
 > (E-Mail) angekündigt. Der Verantwortliche hat das Recht, einer
 > Änderung aus wichtigem Grund schriftlich zu widersprechen.
@@ -46,4 +49,5 @@ und allen Verantwortlichen per E-Mail bekannt gegeben.
 
 | Datum       | Änderung                                | Autor |
 |-------------|-----------------------------------------|-------|
-| 2026-05-17  | Erstfassung — nur Google Ireland Limited als Subprocessor | CoDRIVER |
+| 2026-05-17  | Erstfassung — nur Google Ireland Limited als Subprocessor | Kreativwerk |
+| 2026-05-17  | Auftragsverarbeiter auf Kreativwerk Albert Dobra geändert | Kreativwerk |

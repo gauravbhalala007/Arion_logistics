@@ -9,25 +9,34 @@
 >
 > Für die Verarbeitung von Beschäftigtendaten ist im
 > Beschäftigungsverhältnis der jeweilige Arbeitgeber (DSP) der
-> Verantwortliche. Arion Logistics fungiert als Auftragsverarbeiter und
-> verarbeitet die Daten ausschließlich auf dessen Weisung.
+> **Verantwortliche** gemäß Art. 4 Nr. 7 DSGVO. **Kreativwerk Albert Dobra**
+> stellt als technischer Anbieter die Plattform bereit und fungiert als
+> **Auftragsverarbeiter** gemäß Art. 28 DSGVO — die Verarbeitung erfolgt
+> ausschließlich auf dokumentierte Weisung des Verantwortlichen.
 
 ---
 
-## 1. Verantwortlicher Anbieter
+## 1. Anbieter der Plattform (Auftragsverarbeiter)
 
-**Arion Logistics**
-_______________________________________ (Anschrift)
-E-Mail: info@arion-logistics.de
-Telefon: _______________________________________
+**Kreativwerk Albert Dobra** (Einzelunternehmen)
+Gustav-Weißkopf-Str. 12
+90768 Fürth
+Deutschland
+E-Mail: info@kw-agentur.de
+Telefon: 0170 8139442
 
 **Datenschutzbeauftragter:**
-_______________________________________
-E-Mail: _______________________________________
+Es ist kein Datenschutzbeauftragter benannt, da die Voraussetzungen
+nach § 38 Abs. 1 BDSG nicht erfüllt sind (Einzelunternehmen ohne
+Angestellte). Datenschutzanfragen erreichen den Anbieter direkt unter
+**info@kw-agentur.de**.
 
-Für Beschäftigte: der Arbeitgeber (DSP) ist Verantwortlicher gemäß
-Art. 4 Nr. 7 DSGVO; die Kontaktdaten erhältst du in deinem
-Beschäftigungsverhältnis.
+## 1a. Verantwortlicher für Beschäftigtendaten
+
+Verantwortlicher im Sinne von Art. 4 Nr. 7 DSGVO für die im
+Beschäftigungsverhältnis verarbeiteten Daten ist der jeweilige
+**Arbeitgeber (DSP-Unternehmen)** des Beschäftigten. Die Kontaktdaten
+des Verantwortlichen erhältst du über deinen Arbeitgeber.
 
 ---
 
@@ -162,12 +171,13 @@ Du hast nach DSGVO folgende Rechte:
 - **Widerruf der Einwilligung** (Art. 7 Abs. 3) — soweit eine
   Verarbeitung auf deiner Einwilligung beruht, mit Wirkung für die Zukunft
 - **Beschwerde bei einer Aufsichtsbehörde** (Art. 77) — z. B. die
-  Aufsichtsbehörde am Sitz deines Arbeitgebers oder am Sitz von
-  Arion Logistics
+  Aufsichtsbehörde am Sitz deines Arbeitgebers oder am Sitz des
+  Anbieters (Bayerisches Landesamt für Datenschutzaufsicht — BayLDA,
+  Ansbach)
 
 Zur Wahrnehmung deiner Rechte kannst du dich an:
 - den **Verantwortlichen** (in der Regel deinen Arbeitgeber) oder
-- an **info@arion-logistics.de**
+- an den **Anbieter Kreativwerk Albert Dobra**: **info@kw-agentur.de**
 
 wenden.
 
@@ -220,9 +230,10 @@ Rechtslagen oder erweiterte Funktionen anzupassen. Über wesentliche
 
 | Anliegen | Kontakt |
 |---|---|
-| Allgemeine Anfragen | info@arion-logistics.de |
-| Datenschutz-Anfragen / Betroffenenrechte | _______________________________________ |
-| Datenschutzvorfall melden | _______________________________________ |
+| Allgemeine Anfragen (Anbieter) | info@kw-agentur.de — Kreativwerk Albert Dobra |
+| Datenschutz-Anfragen / Betroffenenrechte | info@kw-agentur.de bzw. dein Arbeitgeber (DSP) |
+| Datenschutzvorfall melden | info@kw-agentur.de — Reaktion innerhalb 48 h |
+| Beschwerde Aufsichtsbehörde | Bayerisches Landesamt für Datenschutzaufsicht (BayLDA), Promenade 18, 91522 Ansbach, https://www.lda.bayern.de |
 
 ---
 

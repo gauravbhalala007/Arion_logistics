@@ -19,11 +19,12 @@
 
 | Feld | Wert |
 |---|---|
-| Firma | Arion Logistics |
-| Anschrift | _______________________________________ (zu vervollständigen) |
-| Vertretungsberechtigt | _______________________________________ |
-| Kontakt Datenschutz | info@arion-logistics.de |
-| Datenschutzbeauftragter | _______________________________________ |
+| Firma | Kreativwerk Albert Dobra (Einzelunternehmen) |
+| Anschrift | Gustav-Weißkopf-Str. 12, 90768 Fürth, Deutschland |
+| Vertretungsberechtigt | Albert Dobra (Inhaber) |
+| Kontakt Datenschutz | info@kw-agentur.de |
+| Telefon | 0170 8139442 |
+| Datenschutzbeauftragter | Nicht benannt — § 38 BDSG-Schwelle (≥20 Beschäftigte) nicht erreicht |
 
 ---
 
@@ -112,9 +113,17 @@ Der AN verpflichtet sich,
 
 ## § 4 Datenschutzbeauftragter
 
-Der AN benennt einen Datenschutzbeauftragten gemäß Art. 37 DSGVO, soweit
-die gesetzlichen Voraussetzungen vorliegen. Aktueller Datenschutzbeauftragter
-des AN: _______________________________________ (Kontaktdaten oben).
+Der AN ist nach derzeitiger Lage **nicht zur Benennung eines
+Datenschutzbeauftragten** verpflichtet, da die Voraussetzungen nach
+§ 38 Abs. 1 BDSG (≥20 Beschäftigte mit ständiger automatisierter
+Verarbeitung) nicht vorliegen (Einzelunternehmen ohne Angestellte) und
+keine Verarbeitungen nach Art. 37 Abs. 1 DSGVO durchgeführt werden, die
+zwingend einen DSB erfordern.
+
+Datenschutzanfragen erreichen den AN unmittelbar unter
+**info@kw-agentur.de**. Bei Wachstum oder Aufnahme entsprechender
+Verarbeitungstätigkeiten wird ein DSB unverzüglich benannt und
+nachträglich zum AVV mitgeteilt.
 
 ---
 
@@ -269,7 +278,7 @@ bleibt die Wirksamkeit der übrigen Bestimmungen davon unberührt.
 
 ### 12.4 Anwendbares Recht und Gerichtsstand
 Es gilt deutsches Recht unter Ausschluss des UN-Kaufrechts.
-Gerichtsstand ist — soweit gesetzlich zulässig — der Sitz des AN.
+Gerichtsstand ist — soweit gesetzlich zulässig — Fürth (Sitz des AN).
 
 ---
 
@@ -290,13 +299,13 @@ Unterschrift: _______________________________________
 
 Name in Druckbuchstaben: _______________________________________
 
-**Auftragnehmer** (Auftragsverarbeiter — Arion Logistics)
+**Auftragnehmer** (Auftragsverarbeiter — Kreativwerk Albert Dobra)
 
-Ort, Datum: _______________________________________
+Ort, Datum: Fürth, _______________________________________
 
 Unterschrift: _______________________________________
 
-Name in Druckbuchstaben: _______________________________________
+Name in Druckbuchstaben: Albert Dobra
 
 ---
 

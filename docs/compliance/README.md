@@ -1,5 +1,9 @@
 # CoDRIVER — Compliance-Dokumentation
 
+**Anbieter / Auftragsverarbeiter:**
+Kreativwerk Albert Dobra (Einzelunternehmen)
+Gustav-Weißkopf-Str. 12, 90768 Fürth · info@kw-agentur.de · 0170 8139442
+
 Dieses Verzeichnis enthält die DSGVO-Compliance-Dokumente für CoDRIVER.
 
 ## Dateien

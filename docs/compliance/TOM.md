@@ -1,6 +1,8 @@
 # Technische und organisatorische Maßnahmen (TOM)
 
-**Verantwortlicher Auftragsverarbeiter:** Arion Logistics
+**Auftragsverarbeiter:** Kreativwerk Albert Dobra
+**Anschrift:** Gustav-Weißkopf-Str. 12, 90768 Fürth, Deutschland
+**Kontakt:** info@kw-agentur.de · Tel. 0170 8139442
 **Produkt:** CoDRIVER (Verwaltungsplattform für DSP-Flotten)
 **Stand:** 2026-05-17
 **Version:** 1.0
@@ -18,25 +20,31 @@
 *Maßnahmen zur Verhinderung des physischen Zugangs Unbefugter zu
 Datenverarbeitungsanlagen.*
 
-- **Hosting:** Google Cloud Platform, Region `europe-west3` (Frankfurt am
-  Main). Physische Sicherheit ist durch Google nach ISO/IEC 27001, ISO/IEC
-  27017, ISO/IEC 27018, SOC 1/2/3 zertifiziert (Belege:
+- **Hosting (primärer Datenort):** Google Cloud Platform, Region
+  `europe-west3` (Frankfurt am Main). Physische Sicherheit zertifiziert
+  nach ISO/IEC 27001, ISO/IEC 27017, ISO/IEC 27018, SOC 1/2/3 (Belege:
   https://cloud.google.com/security/compliance).
-- **Büroräume:** Adresse siehe Vertrag. Zutritt nur für autorisierte
-  Mitarbeiter, abschließbare Türen, dokumentierte Schlüsselverwaltung.
-- **Arbeitsplätze:** Bildschirmsperre nach max. 10 Minuten Inaktivität.
+- **Geschäftsanschrift des Auftragsverarbeiters:** Gustav-Weißkopf-Str. 12,
+  90768 Fürth — **virtuelles Büro**, dient ausschließlich der postalischen
+  Erreichbarkeit. Es findet dort **keine Verarbeitung personenbezogener
+  Daten** statt.
+- **Arbeitsgeräte des Inhabers:** vollverschlüsseltes Notebook
+  (FileVault), automatische Bildschirmsperre nach max. 5 Minuten
+  Inaktivität, starkes Geräte-Passwort, Backup-Verschlüsselung aktiv.
+- Es werden **keine personenbezogenen Kundendaten lokal gespeichert** —
+  Zugriff erfolgt ausschließlich live gegen die Cloud-Infrastruktur in
+  Frankfurt.
 
 ### 1.2 Zugangskontrolle
 *Maßnahmen zur Verhinderung der Nutzung der Systeme durch Unbefugte.*
 
 - Firebase Authentication mit E-Mail + Passwort, Passwörter ausschließlich
-  als **bcrypt/scrypt-Hash** gespeichert (Google-Standard, niemals
-  Klartext).
+  als **scrypt-Hash** gespeichert (Google-Standard, niemals Klartext).
 - Optional E-Mail-Link-Anmeldung (passwortlos) für ausgewählte Rollen.
-- **2-Faktor-Authentifizierung (2FA) verpflichtend** für alle Admin- und
-  Developer-Konten (Google-2FA des Identity Providers).
+- **2-Faktor-Authentifizierung (2FA) verpflichtend** für alle
+  Developer-Konten und für das Google-Cloud-Konto des Auftragsverarbeiters.
 - Automatische Sperre des Auth-Accounts bei wiederholt fehlgeschlagenen
-  Anmeldungen (Firebase-Default + Custom-Rate-Limiting auf Functions-Ebene).
+  Anmeldungen (Firebase-Default).
 
 ### 1.3 Zugriffskontrolle
 *Maßnahmen, dass Berechtigte nur auf die ihnen zugewiesenen Daten
@@ -168,29 +176,48 @@ Audit-Log, Soft-Delete) reduzieren das Risiko auf ein vertretbares Maß.
 
 ## 7. Verfahren zur regelmäßigen Überprüfung (Art. 32 Abs. 1 lit. d)
 
-- **Quartalsweise Review** der Firestore-/Storage-Rules durch das
-  Development-Team mit Protokoll.
-- **Halbjährlich** Penetration-Test (extern beauftragt) — Bericht wird im
-  Compliance-Ordner archiviert.
+- **Quartalsweise Review** der Firestore-/Storage-Rules durch den
+  Inhaber mit Protokoll (Git-Commit-Log dient als Nachweis).
 - **Monatliche** Stichprobe des Audit-Logs auf Auffälligkeiten.
-- **Automatische Alerts** bei: ungewöhnlichen Zugriffsmustern, Cloud
-  Functions-Fehlerraten > 5 %, Backup-Failures.
+- **Automatische Alerts** bei: Cloud-Functions-Fehlerraten > 5 %,
+  Backup-Failures (Google Cloud Monitoring).
+- Penetration-Tests werden bei größerem Kundenwachstum oder neuen
+  sensiblen Modulen extern beauftragt; aktuell wird die Plattform-Sicherheit
+  durch die zertifizierte Google-Cloud-Infrastruktur getragen.
 
 ---
 
 ## 8. Datenschutz-Vorfälle (Art. 33/34)
 
 - Meldepflicht innerhalb 72 h nach Kenntnisnahme an die zuständige
-  Aufsichtsbehörde (bei Sitz in Bayern: BayLDA;
-  Sitz NRW: LDI NRW; Sitz BW: LfDI BW).
-- Vorlage eines vorbereiteten Incident-Response-Plans
-  (`docs/compliance/incident-response.md` — TBD, wird bei Bedarf
-  ausgearbeitet).
+  Aufsichtsbehörde:
+  **Bayerisches Landesamt für Datenschutzaufsicht (BayLDA)**,
+  Promenade 18, 91522 Ansbach,
+  https://www.lda.bayern.de
+- Benachrichtigung der betroffenen Verantwortlichen (Kunden) ebenfalls
+  innerhalb 48 h gemäß § 7 AVV.
+- Incident-Response wird im Bedarfsfall ad-hoc ausgeführt; aufgrund der
+  überschaubaren Plattform-Komplexität wird auf einen vorausgefüllten
+  Plan verzichtet.
+
+## 8a. Datenschutzbeauftragter
+
+Es ist **kein Datenschutzbeauftragter benannt**, da die Voraussetzungen
+nach § 38 Abs. 1 BDSG (mindestens 20 Personen, die ständig mit der
+automatisierten Verarbeitung personenbezogener Daten beschäftigt sind)
+beim Auftragsverarbeiter Kreativwerk Albert Dobra nicht erfüllt sind
+(Einzelunternehmen ohne Angestellte). Es findet auch keine
+Verarbeitung gemäß Art. 35 DSGVO statt, die zwingend eine
+Datenschutz-Folgenabschätzung mit DSB erfordert.
+
+Bei Erweiterung der Mitarbeitendenzahl oder Aufnahme von Verarbeitungen
+nach Art. 35 DSGVO Anlage 4 wird die DSB-Bestellung neu bewertet.
 
 ---
 
 ## 9. Änderungshistorie
 
-| Datum       | Version | Änderung                                  | Autor |
-|-------------|---------|-------------------------------------------|-------|
-| 2026-05-17  | 1.0     | Erstfassung, vor EU-Migration             | CoDRIVER |
+| Datum       | Version | Änderung                                                  | Autor |
+|-------------|---------|-----------------------------------------------------------|-------|
+| 2026-05-17  | 1.0     | Erstfassung, vor EU-Migration                             | Kreativwerk |
+| 2026-05-17  | 1.1     | Auftragsverarbeiter auf Kreativwerk Albert Dobra geändert | Kreativwerk |
