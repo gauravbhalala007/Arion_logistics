@@ -1,8 +1,311 @@
 rules_version = '2';
+
+// CoDRIVER Storage Security Rules
+//
+// Pfad-Übersicht (gepflegt — bei neuen Upload-Pfaden hier ergänzen):
+//   driver_profile_photos/{transporterId}/{file}
+//   driver_docs/{transporterId}/{file}
+//   user_profile_photos/{uid}/{file}
+//   academy_content/{dspUid}/{testId}/{file}
+//   faq_images/{dspUid}/{folder}/{file}
+//   feedback_attachments/{uid}/{feedbackId}/{file}
+//   incident_reports/{dspUid}/{transporterId}/{reportId}/{folder}/{file}
+//   recruiting/{adminUid}/{applicationId}/{file}
+//   users/{dspUid}/seso/{confirmationId}/{file}
+//   users/{dspUid}/time_imports/{importId}/{file}
+//   vehicles/{dspUid}/{plate}/documents/{file}
+//   vehicles/{dspUid}/{plate}/events/{file}
+//   dsgvo_exports/{file}  (Functions-only)
+
 service firebase.storage {
   match /b/{bucket}/o {
+
+    // ============================================================
+    //  HELPER FUNCTIONS
+    // ============================================================
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function tokenRole() {
+      return signedIn() ? request.auth.token.role : null;
+    }
+
+    function isAdmin() {
+      return tokenRole() == 'admin' || tokenRole() == 'developer';
+    }
+
+    function isDispatcher() {
+      return tokenRole() == 'dispatcher';
+    }
+
+    function isDriver() {
+      return tokenRole() == 'driver';
+    }
+
+    function callerDspUid() {
+      return signedIn() ? request.auth.token.dspUid : null;
+    }
+
+    function callerTransporterId() {
+      return signedIn() ? request.auth.token.transporterId : null;
+    }
+
+    // DSP-Scope checks: admin/dispatcher operating on resources of a DSP.
+    // - Admin: matches when caller IS the dspUid (admin user IS the DSP root)
+    //         OR caller's claim says they belong to this DSP (sub-admins).
+    // - Dispatcher: must belong to dspUid via custom claim.
+    function isAdminOfDsp(dspUid) {
+      return isAdmin() && (request.auth.uid == dspUid || callerDspUid() == dspUid);
+    }
+
+    function isDispatcherOfDsp(dspUid) {
+      return isDispatcher() && callerDspUid() == dspUid;
+    }
+
+    function isDriverOfDsp(dspUid) {
+      return isDriver() && callerDspUid() == dspUid;
+    }
+
+    function isSelfDriver(tid) {
+      return isDriver() && callerTransporterId() == tid;
+    }
+
+    // Size and content-type validators
+    function maxMb(mb) {
+      // On delete, request.resource is null → skip the check
+      return request.resource == null || request.resource.size < mb * 1024 * 1024;
+    }
+
+    function isImage() {
+      return request.resource != null
+          && request.resource.contentType != null
+          && request.resource.contentType.matches('image/.*');
+    }
+
+    function isImageOrPdf() {
+      return request.resource != null
+          && request.resource.contentType != null
+          && (request.resource.contentType.matches('image/.*')
+              || request.resource.contentType == 'application/pdf');
+    }
+
+    function isImageOrPdfOrCsv() {
+      return request.resource != null
+          && request.resource.contentType != null
+          && (request.resource.contentType.matches('image/.*')
+              || request.resource.contentType == 'application/pdf'
+              || request.resource.contentType == 'text/csv'
+              || request.resource.contentType == 'application/vnd.ms-excel'
+              || request.resource.contentType
+                  == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    }
+
+    // ============================================================
+    //  DRIVER PROFILE PHOTOS
+    //  driver_profile_photos/{transporterId}/{file}
+    //  - Lesen:  Fahrer selbst + Admin/Dispatcher des DSP
+    //  - Schreiben:  Fahrer selbst (Onboarding) + Admin
+    // ============================================================
+    match /driver_profile_photos/{tid}/{fileName} {
+      allow read: if signedIn() && (
+        isAdmin() || isDispatcher() || isSelfDriver(tid)
+      );
+      allow create, update: if signedIn()
+          && (isAdmin() || isSelfDriver(tid))
+          && isImage()
+          && maxMb(10);
+      allow delete: if signedIn() && (isAdmin() || isSelfDriver(tid));
+    }
+
+    // ============================================================
+    //  DRIVER DOCUMENTS (Verträge, Führerschein, etc.)
+    //  driver_docs/{transporterId}/{file}
+    //  - Lesen:  Fahrer selbst + Admin/Dispatcher des DSP
+    //  - Schreiben: Admin (Bulk-Upload) + Fahrer selbst (Onboarding)
+    // ============================================================
+    match /driver_docs/{tid}/{fileName} {
+      allow read: if signedIn() && (
+        isAdmin() || isDispatcher() || isSelfDriver(tid)
+      );
+      allow create, update: if signedIn()
+          && (isAdmin() || isSelfDriver(tid))
+          && isImageOrPdf()
+          && maxMb(20);
+      allow delete: if signedIn() && isAdmin();
+    }
+
+    // ============================================================
+    //  USER PROFILE PHOTOS (DSP / Admin / Dispatcher)
+    //  user_profile_photos/{uid}/{file}
+    //  - Lesen:  alle eingeloggten Nutzer (Sichtbarkeit für Kollegen)
+    //  - Schreiben: nur der Profil-Eigentümer
+    // ============================================================
+    match /user_profile_photos/{uid}/{fileName} {
+      allow read: if signedIn();
+      allow create, update: if signedIn()
+          && request.auth.uid == uid
+          && isImage()
+          && maxMb(5);
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    // ============================================================
+    //  ACADEMY CONTENT (Schulungs-Videos/Bilder)
+    //  academy_content/{dspUid}/{testId}/{file}
+    //  - Lesen:  Admin/Dispatcher/Driver des DSP
+    //  - Schreiben: Admin des DSP
+    // ============================================================
+    match /academy_content/{dspUid}/{testId}/{fileName} {
+      allow read: if signedIn() && (
+        isAdminOfDsp(dspUid)
+        || isDispatcherOfDsp(dspUid)
+        || isDriverOfDsp(dspUid)
+      );
+      allow create, update: if isAdminOfDsp(dspUid) && maxMb(100);
+      allow delete: if isAdminOfDsp(dspUid);
+    }
+
+    // ============================================================
+    //  FAQ IMAGES
+    //  faq_images/{dspUid}/{folderKey}/{file}
+    //  - Lesen:  Admin/Dispatcher/Driver des DSP
+    //  - Schreiben: Admin des DSP
+    // ============================================================
+    match /faq_images/{dspUid}/{folderKey}/{fileName} {
+      allow read: if signedIn() && (
+        isAdminOfDsp(dspUid)
+        || isDispatcherOfDsp(dspUid)
+        || isDriverOfDsp(dspUid)
+      );
+      allow create, update: if isAdminOfDsp(dspUid) && isImage() && maxMb(10);
+      allow delete: if isAdminOfDsp(dspUid);
+    }
+
+    // ============================================================
+    //  FEEDBACK ATTACHMENTS
+    //  feedback_attachments/{uploaderUid}/{feedbackId}/{file}
+    //  - Lesen:  Uploader + Developer-Staff
+    //  - Schreiben: Uploader
+    // ============================================================
+    match /feedback_attachments/{uid}/{feedbackId}/{fileName} {
+      allow read: if signedIn() && (
+        request.auth.uid == uid || tokenRole() == 'developer'
+      );
+      allow create: if signedIn()
+          && request.auth.uid == uid
+          && maxMb(20);
+      allow update, delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    // ============================================================
+    //  INCIDENT REPORTS (Unfallberichte)
+    //  incident_reports/{dspUid}/{transporterId}/{reportId}/{folder}/{file}
+    //  - Lesen:  Fahrer selbst + Admin/Dispatcher des DSP
+    //  - Schreiben: Fahrer selbst (meldet) + Admin
+    // ============================================================
+    match /incident_reports/{dspUid}/{tid}/{reportId}/{folder}/{fileName} {
+      allow read: if signedIn() && (
+        isAdminOfDsp(dspUid)
+        || isDispatcherOfDsp(dspUid)
+        || isSelfDriver(tid)
+      );
+      allow create, update: if signedIn()
+          && (isAdminOfDsp(dspUid) || isSelfDriver(tid))
+          && isImage()
+          && maxMb(20);
+      allow delete: if isAdminOfDsp(dspUid);
+    }
+
+    // ============================================================
+    //  RECRUITING APPLICATIONS
+    //  recruiting/{adminUid}/{applicationId}/{file}
+    //  Bewerber laden ohne Account hoch → allow create für anonyme
+    //  Reads/Updates nur durch den Admin (Eigentümer des Recruiting-Formulars).
+    // ============================================================
+    match /recruiting/{adminUid}/{applicationId}/{fileName} {
+      allow read: if isAdminOfDsp(adminUid);
+      // Bewerber: write-once create, max 15 MB, nur PDF/Bilder.
+      allow create: if isImageOrPdf() && maxMb(15);
+      allow update, delete: if isAdminOfDsp(adminUid);
+    }
+
+    // ============================================================
+    //  SESO CONFIRMATIONS
+    //  users/{dspUid}/seso/{confirmationId}/{file}
+    //  - Nur Admin des DSP
+    // ============================================================
+    match /users/{dspUid}/seso/{confirmationId}/{fileName} {
+      allow read: if isAdminOfDsp(dspUid);
+      allow create, update: if isAdminOfDsp(dspUid)
+          && isImageOrPdf()
+          && maxMb(20);
+      allow delete: if isAdminOfDsp(dspUid);
+    }
+
+    // ============================================================
+    //  TIME IMPORTS (CSV-Uploads für Zeiterfassung)
+    //  users/{dspUid}/time_imports/{importId}/{file}
+    //  - Nur Admin des DSP
+    // ============================================================
+    match /users/{dspUid}/time_imports/{importId}/{fileName} {
+      allow read: if isAdminOfDsp(dspUid);
+      allow create, update: if isAdminOfDsp(dspUid)
+          && isImageOrPdfOrCsv()
+          && maxMb(20);
+      allow delete: if isAdminOfDsp(dspUid);
+    }
+
+    // ============================================================
+    //  VEHICLE DOCUMENTS (Fahrzeug-Dokumente, TÜV, etc.)
+    //  vehicles/{dspUid}/{plate}/documents/{file}
+    //  - Lesen: Admin + Dispatcher des DSP
+    //  - Schreiben: Admin des DSP
+    // ============================================================
+    match /vehicles/{dspUid}/{plate}/documents/{fileName} {
+      allow read: if signedIn() && (
+        isAdminOfDsp(dspUid) || isDispatcherOfDsp(dspUid)
+      );
+      allow create, update: if isAdminOfDsp(dspUid)
+          && isImageOrPdf()
+          && maxMb(20);
+      allow delete: if isAdminOfDsp(dspUid);
+    }
+
+    // ============================================================
+    //  VEHICLE EVENTS (Unfälle, Schäden, etc.)
+    //  vehicles/{dspUid}/{plate}/events/{file}
+    //  - Lesen + Schreiben: Admin + Dispatcher des DSP
+    // ============================================================
+    match /vehicles/{dspUid}/{plate}/events/{fileName} {
+      allow read: if signedIn() && (
+        isAdminOfDsp(dspUid) || isDispatcherOfDsp(dspUid)
+      );
+      allow create, update: if signedIn()
+          && (isAdminOfDsp(dspUid) || isDispatcherOfDsp(dspUid))
+          && isImageOrPdf()
+          && maxMb(20);
+      allow delete: if isAdminOfDsp(dspUid);
+    }
+
+    // ============================================================
+    //  DSGVO EXPORTS (von Cloud Function generierte ZIPs)
+    //  dsgvo_exports/{file}
+    //  Zugriff ausschließlich über Signed URLs, die die Function
+    //  ausgibt. Direkter Storage-Zugriff ist gesperrt.
+    // ============================================================
+    match /dsgvo_exports/{fileName} {
+      allow read, write: if false;
+    }
+
+    // ============================================================
+    //  DEFAULT DENY — alles Unbekannte ist verboten.
+    //  Wenn ein neuer Upload-Pfad eingeführt wird, MUSS er oben
+    //  explizit erlaubt werden, sonst schlägt der Upload fehl.
+    // ============================================================
     match /{allPaths=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }
