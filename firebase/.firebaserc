@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "gaurav-arion-001-3d94a"
-  }
+    "default": "gaurav-arion-001-3d94a",
+    "eu": "codriver-eu"
+  },
+  "targets": {},
+  "etags": {}
 }

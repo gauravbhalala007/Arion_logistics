@@ -37,7 +37,7 @@ log "═════════════════════════
 
 # 1) Vollexport aus altem Projekt (nur Auth, kein Firestore)
 log "→ Auth-Export aus $OLD_PROJECT_ID"
-firebase use "$OLD_PROJECT_ID"
+cd "$(dirname "$0")/../../../firebase" && firebase use "$OLD_PROJECT_ID"
 firebase auth:export "$TMPDIR/auth-full.json" --format=json \
   --project "$OLD_PROJECT_ID" 2>&1 | tee -a "$LOG_FILE"
 
