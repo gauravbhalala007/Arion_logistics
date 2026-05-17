@@ -1,6 +1,8 @@
 // lib/widgets/app_shell.dart
 import 'package:flutter/material.dart';
 
+import 'maintenance_banner.dart';
+
 class AppShell extends StatelessWidget {
   final Widget sideMenu; // your left menu widget (styled)
   final Widget body; // page content
@@ -58,12 +60,19 @@ class AppShell extends StatelessWidget {
             )
           : null,
 
-      body: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      body: Column(
         children: [
-          if (!narrow)
-            SizedBox(width: menuWidth, child: sideMenu), // persistent menu
-          Expanded(child: body), // page content
+          const MaintenanceBanner(),
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (!narrow)
+                  SizedBox(width: menuWidth, child: sideMenu),
+                Expanded(child: body),
+              ],
+            ),
+          ),
         ],
       ),
     );

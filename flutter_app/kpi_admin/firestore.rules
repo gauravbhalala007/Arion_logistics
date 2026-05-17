@@ -19,6 +19,16 @@ service cloud.firestore {
       return signedIn() && me().data.role == 'admin';
     }
 
+    function isDeveloper() {
+      return signedIn() && me().data.role == 'developer';
+    }
+
+    // "staff" for feedback handling should be only developers.
+    // Admins/DSPs must not see each other's feedback.
+    function isFeedbackStaff() {
+      return isDeveloper();
+    }
+
     function isApproved(userId) {
       return get(/databases/$(database)/documents/users/$(userId)).data.approved == true;
     }
@@ -28,10 +38,51 @@ service cloud.firestore {
       return signedIn() && me().data.role == 'driver';
     }
 
+    // is the caller a driver that belongs to this DSP userId?
+    // (requires users/{driverUid} to have a field "dspUid")
+    function isDriverOf(userId) {
+      return isDriver() && me().data.dspUid == userId;
+    }
+
+    // Fallback for legacy driver accounts that rely on custom claims.
+    function isDriverOfByToken(userId) {
+      return signedIn()
+        && request.auth.token.role == 'driver'
+        && request.auth.token.dspUid == userId;
+    }
+
+    function isDriverForUser(userId) {
+      return isDriverOf(userId) || isDriverOfByToken(userId);
+    }
+
+    // Dispatcher sub-accounts — created by a DSP admin via the
+    // createDispatcherAccount Cloud Function. Each dispatcher belongs
+    // to exactly one admin (parentAdminUid).
+    function isDispatcher() {
+      return signedIn() && me().data.role == 'dispatcher';
+    }
+
+    function isDispatcherOf(userId) {
+      return isDispatcher() && me().data.parentAdminUid == userId;
+    }
+
+    // True when the caller is the admin themselves OR one of their
+    // dispatchers. Used by every users/{adminUid}/... rule that
+    // previously only admitted the admin.
+    function isAdminOrDispatcherOf(userId) {
+      return isSelf(userId) || isDispatcherOf(userId);
+    }
+
+    function isVehicleManagerOrDispatcherOf(userId) {
+      return isVehicleManager(userId) || isDispatcherOf(userId);
+    }
+
     function companyScope() {
-      return ('dspUid' in me().data) && me().data.dspUid != null && me().data.dspUid != ''
-        ? me().data.dspUid
-        : request.auth.uid;
+      return request.auth.uid;
+    }
+
+    function fleetCompanyScope() {
+      return request.auth.uid;
     }
 
     function roleValue() {
@@ -50,13 +101,265 @@ service cloud.firestore {
         && roleValue().matches('(?i)^(admin|user|developer)$');
     }
 
-    function fleetDocScope(data) {
-      return  data.dspUid;
-        
+    function fleetScopeMatchesUser(userId) {
+      return signedIn()
+        && (
+          userId == request.auth.uid
+          || (me().data.dspUid != null && me().data.dspUid == userId)
+          || (request.auth.token.dspUid != null && request.auth.token.dspUid == userId)
+        );
     }
 
-    function isFleetStatus(value) {
-      return value in ['active', 'grounded', 'in_service', 'defleeted'];
+    function isVehicleManager(userId) {
+      return signedIn()
+        && fleetScopeMatchesUser(userId)
+        && isApproved(request.auth.uid)
+        && roleValue().matches('(?i)^(admin|user|developer)$');
+    }
+
+    function isVehicleCategory(value) {
+      return value in [
+        'ARMADA',
+        'AMAZON_PAID_RENTAL',
+        'SELF_SOURCED_RENTAL',
+        'SELF_OWNED_RENTAL',
+      ];
+    }
+
+    function isVehicleFuelType(value) {
+      return value in [
+        'DIESEL',
+        'PETROL',
+        'ELECTRIC',
+        'HYBRID',
+      ];
+    }
+
+    function isVehicleStatusValue(value) {
+      return value in [
+        'ACTIVE',
+        'GROUNDED',
+        'IN_SERVICE',
+        'DEFLEETED',
+      ];
+    }
+
+    function isVehicleDateString(value) {
+      return value is string
+        && value.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    function validVehicleMetadata(data) {
+      return data.metadata is map
+        && (
+          data.category == 'ARMADA'
+            ? data.metadata.keys().hasOnly([
+                'armadaId',
+                'armadaCompanyName',
+                'contractStartDate',
+                'contractEndDate',
+              ])
+              && data.metadata.armadaId is string
+              && data.metadata.armadaId != ''
+              && data.metadata.armadaCompanyName is string
+              && data.metadata.armadaCompanyName != ''
+              && isVehicleDateString(data.metadata.contractStartDate)
+              && isVehicleDateString(data.metadata.contractEndDate)
+            : data.category == 'AMAZON_PAID_RENTAL'
+            ? data.metadata.keys().hasOnly([
+                'rentalCompanyName',
+                'contractNumber',
+                'rentalStartDate',
+                'rentalEndDate',
+              ])
+              && data.metadata.rentalCompanyName is string
+              && data.metadata.rentalCompanyName != ''
+              && data.metadata.contractNumber is string
+              && data.metadata.contractNumber != ''
+              && isVehicleDateString(data.metadata.rentalStartDate)
+              && isVehicleDateString(data.metadata.rentalEndDate)
+            : data.category == 'SELF_SOURCED_RENTAL'
+            ? data.metadata.keys().hasOnly([
+                'ownerName',
+                'ownerContactNumber',
+                'rentalAgreementNumber',
+                'rentalStartDate',
+                'rentalEndDate',
+              ])
+              && data.metadata.ownerName is string
+              && data.metadata.ownerName != ''
+              && data.metadata.ownerContactNumber is string
+              && data.metadata.ownerContactNumber != ''
+              && data.metadata.rentalAgreementNumber is string
+              && data.metadata.rentalAgreementNumber != ''
+              && isVehicleDateString(data.metadata.rentalStartDate)
+              && isVehicleDateString(data.metadata.rentalEndDate)
+            : data.category == 'SELF_OWNED_RENTAL'
+            ? data.metadata.keys().hasOnly([
+                'ownershipType',
+                'purchaseDate',
+              ])
+              && data.metadata.ownershipType is string
+              && data.metadata.ownershipType != ''
+              && isVehicleDateString(data.metadata.purchaseDate)
+            : false
+        );
+    }
+
+    function validVehicleDocument(data, userId, plateNumber) {
+      return data.keys().hasOnly([
+          'dspUid',
+          'plateNumber',
+          'category',
+          'brand',
+          'model',
+          'manufacturingYear',
+          'vinNumber',
+          'fuelType',
+          'status',
+          'serviceEndDate',
+          'metadata',
+          'notes',
+          'isDeleted',
+          'createdAt',
+          'updatedAt',
+        ])
+        && data.dspUid == userId
+        && data.plateNumber == plateNumber
+        && data.category is string
+        && isVehicleCategory(data.category)
+        && data.brand is string
+        && data.brand != ''
+        && data.model is string
+        && data.model != ''
+        && data.manufacturingYear is number
+        && data.vinNumber is string
+        && data.vinNumber != ''
+        && data.fuelType is string
+        && isVehicleFuelType(data.fuelType)
+        && data.status is string
+        && isVehicleStatusValue(data.status)
+        && (!('serviceEndDate' in data)
+          || data.serviceEndDate == null
+          || isVehicleDateString(data.serviceEndDate))
+        && data.notes is string
+        && data.isDeleted is bool
+        && validVehicleMetadata(data);
+    }
+
+    function isVehicleDocumentManager(userId) {
+      return signedIn()
+        && fleetScopeMatchesUser(userId)
+        && isApproved(request.auth.uid)
+        && roleValue().matches('(?i)^(admin|user|developer)$');
+    }
+
+    function validVehicleSubDocumentDate(value) {
+      return value is string
+        && value.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    function validVehicleDocumentRecord(data, userId, plateNumber, documentId) {
+      return data.keys().hasOnly([
+          'documentId',
+          'dspUid',
+          'plateNumber',
+          'documentType',
+          'documentNumber',
+          'expiryDate',
+          'fileUrl',
+          'fileName',
+          'fileType',
+          'notes',
+          'isDeleted',
+          'createdAt',
+          'updatedAt',
+        ])
+        && data.documentId == documentId
+        && data.dspUid == userId
+        && data.plateNumber == plateNumber
+        && data.documentType is string
+        && data.documentType != ''
+        && data.documentNumber is string
+        && validVehicleSubDocumentDate(data.expiryDate)
+        && data.fileUrl is string
+        && data.fileName is string
+        && data.fileName != ''
+        && data.fileType is string
+        && data.fileType != ''
+        && data.notes is string
+        && data.isDeleted is bool;
+    }
+
+    function isVehicleEventManager(userId) {
+      return signedIn()
+        && fleetScopeMatchesUser(userId)
+        && isApproved(request.auth.uid)
+        && roleValue().matches('(?i)^(admin|user|developer)$');
+    }
+
+    function allowedVehicleEventKeys() {
+      return [
+        'eventId',
+        'dspUid',
+        'plateNumber',
+        'eventType',
+        'title',
+        'eventDate',
+        'metadata',
+        'fileUrl',
+        'fileName',
+        'fileType',
+        'notes',
+        'isDeleted',
+        'createdAt',
+        'updatedAt',
+      ];
+    }
+
+    function validAccidentMetadata(metadata) {
+      return metadata is map
+        && metadata.keys().hasOnly([
+          'location',
+          'damageLevel',
+          'policeReportNumber',
+          'insuranceClaimNumber',
+        ])
+        && (!('location' in metadata) || metadata.location is string)
+        && (!('damageLevel' in metadata) || metadata.damageLevel is string)
+        && (!('policeReportNumber' in metadata) || metadata.policeReportNumber is string)
+        && (!('insuranceClaimNumber' in metadata) || metadata.insuranceClaimNumber is string);
+    }
+
+    function validVehicleEventMetadata(data) {
+      return data.metadata is map
+        && (
+          data.eventType == 'ACCIDENT'
+            ? validAccidentMetadata(data.metadata)
+            : data.metadata.keys().size() == 0
+        );
+    }
+
+    function validVehicleEventRecord(data, userId, plateNumber, eventId) {
+      return data.keys().hasOnly(allowedVehicleEventKeys())
+        && data.eventId == eventId
+        && data.dspUid == userId
+        && data.plateNumber == plateNumber
+        && data.eventType is string
+        && data.eventType != ''
+        && data.title is string
+        && data.title != ''
+        && validVehicleSubDocumentDate(data.eventDate)
+        && validVehicleEventMetadata(data)
+        && data.fileUrl is string
+        && data.fileName is string
+        && data.fileType is string
+        && data.notes is string
+        && data.isDeleted is bool;
+    }
+
+    function fleetDocScope(data) {
+      return  data.dspUid;
     }
 
     function isFleetType(value) {
@@ -94,119 +397,286 @@ service cloud.firestore {
       return !(field in data) || data[field] == null || data[field] is number;
     }
 
-    function validFleetVehicleData(data, userId, vehicleId) {
+    function validFleetVehicleBase(data, userId, vehicleId) {
       return data.vehicleNumber == vehicleId
         && fleetDocScope(data) == userId
-        && data.model is string
-        && data.status is string
-        && isFleetStatus(data.status)
-        && data.fleetType is string
-        && isFleetType(data.fleetType)
-        && data.providerOrOwnerName is string
-        && data.contractReference is string
-        && data.notes is string
+        && data.status in [
+          'active',
+          'grounded',
+          'in_service',
+          'defleeted',
+        ]
+        && (!('model' in data) || data.model is string)
+        && (!('fleetType' in data) || data.fleetType == null || isFleetType(data.fleetType))
+        && optionalString(data, 'providerOrOwnerName')
+        && optionalString(data, 'contractReference')
+        && optionalString(data, 'notes')
         && optionalTimestamp(data, 'contractStartDate')
         && optionalTimestamp(data, 'contractEndDate')
         && optionalTimestamp(data, 'serviceStartDate')
         && optionalTimestamp(data, 'serviceEndDate')
-        && optionalNumber(data, 'monthlyRateEur')
-        && optionalNumber(data, 'purchaseValueEur')
         && optionalTimestamp(data, 'createdAt')
-        && optionalTimestamp(data, 'updatedAt');
+        && optionalTimestamp(data, 'updatedAt')
+        && optionalNumber(data, 'monthlyRateEur')
+        && optionalNumber(data, 'purchaseValueEur');
     }
 
-    // is the caller a driver that belongs to this DSP userId?
-    // (requires users/{driverUid} to have a field "dspUid")
-    function isDriverOf(userId) {
-      return isDriver() && me().data.dspUid == userId;
+    function validFleetVehicleTypeRequirements(data) {
+      return !('fleetType' in data)
+        || data.fleetType == null
+        || (
+          data.fleetType == 'self_owned_rental'
+            ? data.providerOrOwnerName is string
+              && data.providerOrOwnerName != ''
+              && data.purchaseValueEur is number
+            : data.providerOrOwnerName is string
+              && data.providerOrOwnerName != ''
+              && data.contractReference is string
+              && data.contractReference != ''
+              && data.contractStartDate is timestamp
+              && data.monthlyRateEur is number
+        );
     }
 
-    // Fallback for legacy driver accounts that rely on custom claims.
-    function isDriverOfByToken(userId) {
-      return signedIn()
-        && request.auth.token.role == 'driver'
-        && request.auth.token.dspUid == userId;
+    function validFleetVehicleTypeRequirementsFleetHub(data) {
+      return !('fleetType' in data)
+        || data.fleetType == null
+        || (
+          data.fleetType == 'self_owned_rental'
+            ? optionalString(data, 'providerOrOwnerName')
+              && optionalString(data, 'contractReference')
+              && optionalTimestamp(data, 'contractStartDate')
+              && optionalTimestamp(data, 'contractEndDate')
+              && optionalNumber(data, 'monthlyRateEur')
+              && optionalNumber(data, 'purchaseValueEur')
+            : data.providerOrOwnerName is string
+              && data.providerOrOwnerName != ''
+              && data.contractReference is string
+              && data.contractReference != ''
+              && data.contractStartDate is timestamp
+              && optionalTimestamp(data, 'contractEndDate')
+              && optionalNumber(data, 'monthlyRateEur')
+              && optionalNumber(data, 'purchaseValueEur')
+        );
     }
 
-    function driverTransporterMatches(driverId) {
-      return (isDriver() && me().data.transporterId == driverId)
-        || (signedIn() && request.auth.token.role == 'driver'
-          && request.auth.token.transporterId == driverId);
+
+    function driverTransporterId() {
+      return isDriver() ? me().data.transporterId : request.auth.token.transporterId;
+    }
+
+    // ------------------------------------------------------------------------
+    // Feedback (global collection)
+    // ------------------------------------------------------------------------
+    match /feedback/{feedbackId} {
+      // Non-driver users can submit feedback for themselves once approved.
+      allow create: if signedIn()
+        && isApproved(request.auth.uid)
+        && me().data.role != 'driver'
+        && request.resource.data.createdByUid == request.auth.uid
+        && request.resource.data.status == 'open';
+
+      // Developers can read everything; submitters can read their own items.
+      allow read: if (isFeedbackStaff() && isApproved(request.auth.uid))
+        || (signedIn() && resource.data.createdByUid == request.auth.uid);
+
+      // Only developers can update/delete feedback.
+      allow update, delete: if isFeedbackStaff() && isApproved(request.auth.uid);
+    }
+
+    // ---------- co:timer holiday cache (global) ----------
+    // Lookup table for German federal-state holidays, populated by the
+    // scheduled `populateHolidays` Cloud Function. Read-only for any
+    // signed-in caller; only server writes.
+    match /global_holidays/{holidayId} {
+      allow read: if request.auth != null;
+    }
+
+    // ---------- DSGVO Audit-Log (Art. 32 — Nachweispflicht) ----------
+    // Schreibzugriffe ausschliesslich ueber Cloud Functions (Admin SDK).
+    // Lesen: Admin/Developer global, oder DSP-Admin nur fuer eigenen DSP-Scope.
+    match /audit_log/{eventId} {
+      allow read: if isDeveloper()
+        || isAdmin()
+        || (request.auth != null
+            && resource.data.dspUid == request.auth.uid);
+      allow write: if false;
+    }
+
+    // ---------- DSGVO Soft-Delete Schattenkopien ----------
+    // Bei Loeschung eines Fahrers wird der Originaldatensatz hier 6 Monate
+    // archiviert (Wiederherstellung + Loeschnachweis). Auto-Purge per
+    // Scheduled Function. Zugriff ausschliesslich Admin/Developer.
+    match /_deleted_drivers/{driverId} {
+      allow read: if isAdmin() || isDeveloper();
+      allow write: if false;
+    }
+
+    // ---------- System-Flags (Wartungsmodus etc.) ----------
+    match /_system/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isDeveloper();
+    }
+
+    // ---------- co:timer CollectionGroup access ----------
+    // Live-Board, Compliance, Korrekturen-Inbox und Zeitkonto-Export
+    // verwenden CollectionGroup-Queries (where adminUid == request.auth.uid).
+    // Diese müssen separate Rules haben — die nested-Pfad-Rules unter
+    // /users/{userId}/drivers/{driverId}/... gelten nicht für CG-Queries.
+    //
+    // Schreibe sind über Cloud Functions abgedeckt; hier nur Reads.
+    match /{path=**}/shifts/{shiftId} {
+      allow read: if request.auth != null
+        && resource.data.adminUid == request.auth.uid;
+    }
+    match /{path=**}/correction_requests/{requestId} {
+      allow read: if request.auth != null
+        && resource.data.adminUid == request.auth.uid;
+    }
+    match /{path=**}/time_account/{month} {
+      allow read: if request.auth != null
+        && resource.data.adminUid == request.auth.uid;
     }
 
     match /users/{userId} {
-    
+
     	// ---------- admin notifications ----------
       match /notifications/{notificationId} {
         // Admin (DSP owner) can create + read notification history
         allow read, write: if isSelf(userId) && isApproved(userId);
       }
-      
+
+      // ---------- co:timer audit log (admin-scoped) ----------
+      // users/{userId}/time_audit_log/{eventId}
+      // Server-only write via Cloud Functions. Admin can read for the
+      // compliance view; driver has no read access.
+      match /time_audit_log/{eventId} {
+        allow read: if isSelf(userId) && isApproved(userId);
+      }
+
+      // ---------- dispatcher sub-accounts (managed by parent admin) ----------
+      // Stored under the admin's user doc. Only the admin themselves can
+      // create / list / update / delete; dispatchers can read their OWN
+      // sub-account doc to learn their permission set.
+      match /sub_accounts/{subUid} {
+        allow read, write: if isSelf(userId);
+        allow read: if isDispatcherOf(userId) && request.auth.uid == subUid;
+      }
+
+      // Dispatcher blanket access to their parent admin's entire user
+      // namespace — UI gating decides which *modules* the dispatcher
+      // can see (Phase 2 settings page); Firestore rules only enforce
+      // cross-admin isolation. Phase 3 may tighten this per permission.
+      //
+      // ALSO covers any admin subcollection that doesn't have its own
+      // explicit `match` block (e.g. `seso_confirmations`). Existing
+      // narrower rules below are union'd — this never tightens them.
+      match /{document=**} {
+        allow read, write: if isSelf(userId) || isDispatcherOf(userId);
+      }
+
+      // co:timer Stations — Driver dürfen die Hub-Stations ihres DSPs
+      // LESEN (für Geofence-Lookup beim Stempeln). Schreiben bleibt
+      // Admin-only.
+      match /stations/{stationId} {
+        allow read: if isDriverForUser(userId) && isApproved(userId);
+      }
+
       // Created by the user at signup (DSP/admin + also driver profiles)
       allow create: if isSelf(userId);
 
-      // Everyone can read their OWN user doc; admin can read all
-      allow read: if isSelf(userId) || isAdmin();
+      // Everyone can read their OWN user doc; admin can read all;
+      // a dispatcher can read their parent admin's user doc so the
+      // app can render the admin's name etc.
+      allow read: if isSelf(userId) || isAdmin() || isDispatcherOf(userId);
 
       // Only admins may update/delete user docs (for now)
-      allow update: if isAdmin() || isSelf(userId); 
+      allow update: if isAdmin() || isSelf(userId);
       allow delete: if isAdmin();
 
-      match /vehicles/{vehicleId} {
-        allow get, list: if isApprovedFleetViewer() && userId == companyScope();
+      match /vehicles/{plateNumber} {
+        allow get, list: if isVehicleManager(userId);
 
-        allow create, update: if isApprovedFleetManager()
-          && userId == companyScope()
-          && validFleetVehicleData(request.resource.data, userId, vehicleId)
-          && (!exists(/databases/$(database)/documents/users/$(userId)/vehicles/$(vehicleId))
-            || fleetDocScope(resource.data) == userId)
-          && (
-            request.resource.data.fleetType == 'self_owned_rental'
-              ? request.resource.data.providerOrOwnerName != ''
-                && request.resource.data.purchaseValueEur is number
-              : request.resource.data.providerOrOwnerName != ''
-                && request.resource.data.contractReference != ''
-                && request.resource.data.contractStartDate is timestamp
-                && request.resource.data.monthlyRateEur is number
-          );
+        allow create: if isVehicleManager(userId)
+          && validVehicleDocument(request.resource.data, userId, plateNumber)
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.updatedAt == request.time;
 
-        allow delete: if isApprovedFleetManager() && userId == companyScope();
+        allow update: if isVehicleManager(userId)
+          && resource.data.dspUid == userId
+          && request.resource.data.dspUid == resource.data.dspUid
+          && request.resource.data.plateNumber == resource.data.plateNumber
+          && validVehicleDocument(request.resource.data, userId, plateNumber)
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.updatedAt == request.time;
+
+        allow delete: if isVehicleManager(userId)
+          && resource.data.dspUid == userId;
 
         match /documents/{documentId} {
-          allow get, list: if isApprovedFleetViewer() && userId == companyScope();
+          allow read: if isVehicleDocumentManager(userId);
 
-          allow create, update, delete: if isApprovedFleetManager()
-            && userId == companyScope()
-            && request.resource.data.type in ['tuv', 'insurance', 'service', 'rc']
-            && request.resource.data.fileUrl is string
-            && request.resource.data.fileName is string
-            && request.resource.data.uploadedAt is timestamp
-            && (!('expiryDate' in request.resource.data)
-              || request.resource.data.expiryDate == null
-              || request.resource.data.expiryDate is timestamp)
-            && (!('storagePath' in request.resource.data)
-              || request.resource.data.storagePath is string);
+          allow create: if isVehicleDocumentManager(userId)
+            && validVehicleDocumentRecord(
+              request.resource.data,
+              userId,
+              plateNumber,
+              documentId
+            )
+            && request.resource.data.createdAt == request.time
+            && request.resource.data.updatedAt == request.time;
+
+          allow update: if isVehicleDocumentManager(userId)
+            && resource.data.dspUid == userId
+            && resource.data.plateNumber == plateNumber
+            && request.resource.data.dspUid == resource.data.dspUid
+            && request.resource.data.plateNumber == resource.data.plateNumber
+            && request.resource.data.documentId == resource.data.documentId
+            && validVehicleDocumentRecord(
+              request.resource.data,
+              userId,
+              plateNumber,
+              documentId
+            )
+            && request.resource.data.createdAt == resource.data.createdAt
+            && request.resource.data.updatedAt == request.time;
+
+          allow delete: if isVehicleDocumentManager(userId)
+            && resource.data.dspUid == userId
+            && resource.data.plateNumber == plateNumber;
         }
 
-        match /history/{historyId} {
-          allow get, list: if isApprovedFleetViewer() && userId == companyScope();
+        match /events/{eventId} {
+          allow read: if isVehicleEventManager(userId);
 
-          allow create, update: if isApprovedFleetManager()
-            && userId == companyScope()
-            && request.resource.data.eventType is string
-            && isFleetEventType(request.resource.data.eventType)
-            && request.resource.data.eventDate is timestamp
-            && request.resource.data.title is string
-            && request.resource.data.createdByUid is string
-            && optionalString(request.resource.data, 'notes')
-            && optionalString(request.resource.data, 'fileUrl')
-            && optionalString(request.resource.data, 'fileName')
-            && optionalString(request.resource.data, 'storagePath')
-            && optionalTimestamp(request.resource.data, 'createdAt')
-            && optionalTimestamp(request.resource.data, 'updatedAt');
+          allow create: if isVehicleEventManager(userId)
+            && validVehicleEventRecord(
+              request.resource.data,
+              userId,
+              plateNumber,
+              eventId
+            )
+            && request.resource.data.createdAt == request.time
+            && request.resource.data.updatedAt == request.time;
 
-          allow delete: if isApprovedFleetManager()
-            && userId == companyScope();
+          allow update: if isVehicleEventManager(userId)
+            && resource.data.dspUid == userId
+            && resource.data.plateNumber == plateNumber
+            && request.resource.data.dspUid == resource.data.dspUid
+            && request.resource.data.plateNumber == resource.data.plateNumber
+            && request.resource.data.eventId == resource.data.eventId
+            && validVehicleEventRecord(
+              request.resource.data,
+              userId,
+              plateNumber,
+              eventId
+            )
+            && request.resource.data.createdAt == resource.data.createdAt
+            && request.resource.data.updatedAt == request.time;
+
+          allow delete: if isVehicleEventManager(userId)
+            && resource.data.dspUid == userId
+            && resource.data.plateNumber == plateNumber;
         }
       }
 
@@ -218,7 +688,7 @@ service cloud.firestore {
         allow write: if isSelf(userId) && isApproved(userId);
 
         // Drivers of this DSP can READ reports (for dashboard)
-        allow read: if isDriverOf(userId) && isApproved(userId);
+        allow read: if isDriverForUser(userId) && isApproved(userId);
 
         // per-report driver name mappings
         match /driverNames/{nameId} {
@@ -227,8 +697,24 @@ service cloud.firestore {
           allow write: if isSelf(userId) && isApproved(userId);
 
           // drivers of this DSP can read for display
-          allow read: if isDriverOf(userId) && isApproved(userId);
+          allow read: if isDriverForUser(userId) && isApproved(userId);
         }
+      }
+
+      // ---------- published waveplans ----------
+      // users/{userId}/published_waveplans/{date}
+      // Admin (DSP) writes the daily Waveplan when they hit Publish.
+      // Drivers of this DSP read it to see their assignment + carpool tab.
+      match /published_waveplans/{date} {
+        allow read, write: if isSelf(userId) && isApproved(userId);
+        allow read: if isDriverForUser(userId) && isApproved(userId);
+      }
+
+      // ---------- calendar events ----------
+      // users/{userId}/calendar_events/{eventId}
+      // Admin-only — calendar lives entirely in the admin area.
+      match /calendar_events/{eventId} {
+        allow read, write: if isSelf(userId) && isApproved(userId);
       }
 
       // ---------- scores for a report ----------
@@ -239,7 +725,35 @@ service cloud.firestore {
         allow write: if isSelf(userId) && isApproved(userId);
 
         // drivers of this DSP can read all scores (for ranking view)
-        allow read: if isDriverOf(userId) && isApproved(userId);
+        allow read: if isDriverForUser(userId) && isApproved(userId);
+      }
+
+      // ---------- task sheet ----------
+      // users/{userId}/tasks/{taskId}
+      match /tasks/{taskId} {
+        // DSP/admin full access for own account
+        allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
+
+        // Driver can only see tasks assigned to their transporterId
+        allow read: if isDriverForUser(userId)
+          && isApproved(userId)
+          && resource.data.assignedTransporterId == driverTransporterId();
+
+        // Driver can only update limited status fields on their own assigned tasks
+        allow update: if isDriverForUser(userId)
+          && isApproved(userId)
+          && resource.data.assignedTransporterId == driverTransporterId()
+          && request.resource.data.assignedTransporterId == resource.data.assignedTransporterId
+          && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+            'status',
+            'completedConfirmed',
+            'completedConfirmedAt',
+            'updatedAt',
+            'respondedAt',
+            'feedbackText',
+            'feedbackSelectedOption',
+          ])
+          && request.resource.data.status in ['pending', 'in_progress', 'completed'];
       }
 
       // ---------- FAQs ----------
@@ -249,7 +763,7 @@ service cloud.firestore {
         allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
 
         // Drivers of this DSP can read FAQs
-        allow read: if isDriverOf(userId) && isApproved(userId);
+        allow read: if isDriverForUser(userId) && isApproved(userId);
       }
 
       // users/{userId}/faqs_localized/{faqId}
@@ -258,7 +772,7 @@ service cloud.firestore {
         allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
 
         // Drivers of this DSP can read localized overrides
-        allow read: if isDriverOf(userId) && isApproved(userId);
+        allow read: if isDriverForUser(userId) && isApproved(userId);
       }
 
       // users/{userId}/settings/{settingId}
@@ -266,9 +780,89 @@ service cloud.firestore {
         // DSP/admin full access for own account
         allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
 
-        // Drivers of this DSP can read settings (e.g. dispatcher pill, resources)
-        allow read: if (isDriverOf(userId) || isDriverOfByToken(userId))
-          && isApproved(userId);
+        // Drivers of this DSP can read settings (e.g. academy/faq resources)
+        allow read: if isDriverForUser(userId) && isApproved(userId);
+
+        // PUBLIC read for the recruiting form-builder configs. The
+        // public application form fetches these docs to render the
+        // DSP's custom questions. Limited to settingId prefixed with
+        // `recruiting_form_` so other settings stay private.
+        allow read: if settingId.matches('recruiting_form_.*');
+      }
+
+      // ---------- Shift Plans ----------
+      // users/{userId}/shift_plans/{shiftId}
+      //
+      // Shift plans are day-level broadcast docs — they hold the
+      // entire roster in an `entries[]` array, not a single
+      // driverTransporterId at the top. Every approved driver of
+      // this DSP can read every published plan; the client filters
+      // for "my shift" + "all drivers". Writes stay admin-only.
+      match /shift_plans/{shiftId} {
+        // DSP/admin full access for own account
+        allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
+
+        // Any approved driver of this DSP can read the day plan.
+        allow read: if isDriverForUser(userId) && isApproved(userId);
+      }
+
+      // ---------- Recruiting Applications ----------
+      // users/{userId}/recruiting_applications/{appId}
+      // Public form (unauthenticated) creates these; only the admin
+      // can read / update / delete.
+      match /recruiting_applications/{appId} {
+        // Admin full access on their own namespace.
+        allow read, update, delete: if isSelf(userId) && isApproved(userId);
+
+        // PUBLIC create — no auth required. We validate the resource
+        // shape so spam / abuse stays bounded:
+        //   • adminUid must match the path
+        //   • channel must be 'local' or 'visa'
+        //   • required strings must be present + non-empty
+        //   • documents must be an array (the form attaches passport
+        //     + license front/back as base64).
+        allow create: if request.resource.data.adminUid == userId
+          && request.resource.data.channel in ['local', 'visa']
+          && request.resource.data.firstName is string
+          && request.resource.data.firstName.size() > 0
+          && request.resource.data.lastName is string
+          && request.resource.data.lastName.size() > 0
+          && request.resource.data.email is string
+          && request.resource.data.email.size() > 0
+          && request.resource.data.documents is list;
+      }
+
+      // ---------- Absence Requests ----------
+      // users/{userId}/absence_requests/{requestId}
+      match /absence_requests/{requestId} {
+        // DSP/admin full access for own account
+        allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
+
+        // Driver can create and read only own requests
+        allow create: if isDriverForUser(userId)
+          && isApproved(userId)
+          && request.resource.data.driverTransporterId == driverTransporterId()
+          && request.resource.data.status == 'pending';
+
+        allow read: if isDriverForUser(userId)
+          && isApproved(userId)
+          && resource.data.driverTransporterId == driverTransporterId();
+      }
+
+      // ---------- Incident Reports ----------
+      // users/{userId}/incident_reports/{reportId}
+      match /incident_reports/{reportId} {
+        // DSP/admin full access for own account
+        allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
+
+        // Driver can create and read only own incident reports
+        allow create: if isDriverForUser(userId)
+          && isApproved(userId)
+          && request.resource.data.driverTransporterId == driverTransporterId();
+
+        allow read: if isDriverForUser(userId)
+          && isApproved(userId)
+          && resource.data.driverTransporterId == driverTransporterId();
       }
 
       // ---------- DA Academy Tests ----------
@@ -278,7 +872,7 @@ service cloud.firestore {
         allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
 
         // Drivers of this DSP can read test metadata
-        allow read: if (isDriverOf(userId) || isDriverOfByToken(userId))
+        allow read: if isDriverForUser(userId)
           && isApproved(userId);
 
         // users/{userId}/academy_tests/{testId}/questions/{questionId}
@@ -287,7 +881,7 @@ service cloud.firestore {
           allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
 
           // Drivers of this DSP can read test questions
-          allow read: if (isDriverOf(userId) || isDriverOfByToken(userId))
+          allow read: if isDriverForUser(userId)
             && isApproved(userId);
         }
       }
@@ -303,14 +897,14 @@ service cloud.firestore {
           allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
 
           // Driver can read only own result doc
-          allow read: if (isDriverOf(userId) || isDriverOfByToken(userId))
+          allow read: if isDriverForUser(userId)
             && isApproved(userId)
-            && driverTransporterMatches(driverId);
+            && driverTransporterId() == driverId;
 
           // Driver can create/update only own result doc
-          allow create, update: if (isDriverOf(userId) || isDriverOfByToken(userId))
+          allow create, update: if isDriverForUser(userId)
             && isApproved(userId)
-            && driverTransporterMatches(driverId)
+            && driverTransporterId() == driverId
             && request.resource.data.driverTransporterId == driverId
             && request.resource.data.testId == testId;
         }
@@ -329,8 +923,8 @@ service cloud.firestore {
           allow read: if isSelf(userId) && isApproved(userId);
 
           // Driver can read + update (mark read / confirm)
-          allow read, update: if isDriverOf(userId)
-            && me().data.transporterId == driverId;
+          allow read, update: if isDriverForUser(userId)
+            && driverTransporterId() == driverId;
         }
 
         // ---------- driver academy tests ----------
@@ -340,18 +934,116 @@ service cloud.firestore {
           allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
 
           // Driver can read own assigned test doc
-          allow read: if (isDriverOf(userId) || isDriverOfByToken(userId))
+          allow read: if isDriverForUser(userId)
             && isApproved(userId)
-            && driverTransporterMatches(driverId);
+            && driverTransporterId() == driverId;
 
           // Driver can submit own test attempts
-          allow create, update: if (isDriverOf(userId) || isDriverOfByToken(userId))
+          allow create, update: if isDriverForUser(userId)
             && isApproved(userId)
-            && driverTransporterMatches(driverId)
+            && driverTransporterId() == driverId
             && request.resource.data.driverTransporterId == driverId
             && request.resource.data.testId == testId;
         }
 
+        // ---------- driver FAQ training ----------
+        // users/{userId}/drivers/{driverId}/faq_training/{date}
+        // Daily completion record written when the driver finishes
+        // the FAQ Training quiz.
+        match /faq_training/{date} {
+          // DSP/admin can read+manage their drivers' progress
+          allow read, create, update, delete:
+            if isSelf(userId) && isApproved(userId);
+
+          // Driver can read + write their own training records
+          allow read, create, update: if isDriverForUser(userId)
+            && isApproved(userId)
+            && driverTransporterId() == driverId;
+        }
+
+        // ---------- driver shifts ----------
+        // users/{userId}/drivers/{driverId}/shifts/{shiftId}
+        match /shifts/{shiftId} {
+          // DSP/admin full access for own account
+          allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
+
+          // Driver can read own shifts
+          allow read: if isDriverForUser(userId)
+            && isApproved(userId)
+            && driverTransporterId() == driverId;
+        }
+
+        // ---------- co:timer raw entries (audit trail) ----------
+        // users/{userId}/drivers/{driverId}/time_entries/{entryId}
+        // Server-only write via clockIn/clockOut/pauseToggle Cloud Functions.
+        match /time_entries/{entryId} {
+          allow read: if isSelf(userId) && isApproved(userId);
+          allow read: if isDriverForUser(userId)
+            && isApproved(userId)
+            && driverTransporterId() == driverId;
+        }
+
+        // ---------- monthly time-account aggregations ----------
+        // users/{userId}/drivers/{driverId}/time_account/{month}  (YYYY-MM)
+        // Server-only write via scheduled computeMonthlyAccount.
+        match /time_account/{month} {
+          allow read: if isSelf(userId) && isApproved(userId);
+          allow read: if isDriverForUser(userId)
+            && isApproved(userId)
+            && driverTransporterId() == driverId;
+        }
+
+        // ---------- correction requests ----------
+        // users/{userId}/drivers/{driverId}/correction_requests/{id}
+        // Driver creates pending request, admin approves via Cloud Function.
+        match /correction_requests/{requestId} {
+          allow read: if isSelf(userId) && isApproved(userId);
+          allow read: if isDriverForUser(userId)
+            && isApproved(userId)
+            && driverTransporterId() == driverId;
+          // Driver may add new pending requests for their own driver doc.
+          allow create: if isDriverForUser(userId)
+            && isApproved(userId)
+            && driverTransporterId() == driverId
+            && request.resource.data.status == 'pending';
+          // Final state transitions are server-only via
+          // processCorrectionRequest Cloud Function.
+        }
+
+        // ---------- driver absence requests ----------
+        // users/{userId}/drivers/{driverId}/absence_requests/{requestId}
+        match /absence_requests/{requestId} {
+          // DSP/admin full access for own account
+          allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
+
+          // Driver can create/read own requests
+          allow create: if isDriverForUser(userId)
+            && isApproved(userId)
+            && driverTransporterId() == driverId
+            && request.resource.data.driverTransporterId == driverId
+            && request.resource.data.status == 'pending';
+
+          allow read: if isDriverForUser(userId)
+            && isApproved(userId)
+            && driverTransporterId() == driverId;
+        }
+
+        // ---------- driver incident reports ----------
+        // users/{userId}/drivers/{driverId}/incident_reports/{reportId}
+        match /incident_reports/{reportId} {
+          // DSP/admin full access for own account
+          allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
+
+          // Driver can create/read/update only own incident report docs
+          allow read: if isDriverForUser(userId)
+            && isApproved(userId)
+            && driverTransporterId() == driverId;
+
+          allow create, update: if isDriverForUser(userId)
+            && isApproved(userId)
+            && driverTransporterId() == driverId
+            && request.resource.data.driverTransporterId == driverId;
+        }
 
         // DSP can fully manage its driver list
         allow read: if isSelf(userId) && isApproved(userId);
@@ -359,16 +1051,15 @@ service cloud.firestore {
         allow update: if isSelf(userId) && isApproved(userId);
 
         // Driver can read + update ONLY his own driver doc
-        allow read, update: if isDriverOf(userId)
-          && me().data.transporterId == driverId;
+        allow read, update: if isDriverForUser(userId)
+          && driverTransporterId() == driverId;
 
         // ---------- driver documents subcollection ----------
         match /documents/{docId} {
           allow read, write: if isSelf(userId) && isApproved(userId)
-            || (isDriverOf(userId) && me().data.transporterId == driverId);
+            || (isDriverForUser(userId) && driverTransporterId() == driverId);
         }
       }
     }
-
   }
 }

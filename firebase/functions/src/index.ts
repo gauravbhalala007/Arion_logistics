@@ -24,6 +24,7 @@ const auth = getAuth();
 type CreateDriverLoginData = {
   dspUid?: string;
   transporterId?: string;
+  driverDocId?: string;
   password?: string;
 };
 
@@ -311,12 +312,13 @@ export const createDriverLogin = onCall(async (request) => {
 
   const dspUid = (data.dspUid || "").trim();
   const transporterIdRaw = (data.transporterId || "").trim();
+  const driverDocIdRaw = (data.driverDocId || "").trim();
   const password = (data.password || "").toString();
 
-  if (!dspUid || !transporterIdRaw || !password) {
+  if (!dspUid || !password || (!transporterIdRaw && !driverDocIdRaw)) {
     throw new HttpsError(
       "invalid-argument",
-      "dspUid, transporterId and password are required.",
+      "dspUid, password and either transporterId or driverDocId are required.",
     );
   }
 
@@ -328,24 +330,35 @@ export const createDriverLogin = onCall(async (request) => {
     );
   }
 
-  const transporterId = transporterIdRaw.toUpperCase();
+  // Resolve driver doc: prefer explicit driverDocId, otherwise look up by TID.
+  // When TID is present we also use it as doc id (legacy schema).
+  const driverDocId = driverDocIdRaw ||
+    transporterIdRaw.toUpperCase();
 
-  // Find driver under this DSP
   const driverRef = db
     .collection("users")
     .doc(dspUid)
     .collection("drivers")
-    .doc(transporterId);
+    .doc(driverDocId);
 
   const driverSnap = await driverRef.get();
   if (!driverSnap.exists) {
     throw new HttpsError(
       "not-found",
-      `Driver with transporterId=${transporterId} does not exist.`,
+      `Driver ${driverDocId} does not exist under DSP ${dspUid}.`,
     );
   }
 
-  const driverData = driverSnap.data() || {};
+  // Derive a stable transporterId for claims/synthetic email. When no TID is
+  // assigned yet, fall back to the doc id so the synthetic email + claims
+  // stay unique. The driver's TID can be set later via the Drivers Hub UI.
+  const driverDataPre = driverSnap.data() || {};
+  const tidFromDoc =
+    (driverDataPre.transporterId ?? "").toString().trim().toUpperCase();
+  const transporterId =
+    transporterIdRaw.toUpperCase() || tidFromDoc || driverDocId;
+
+  const driverData = driverDataPre;
   const driverName = (driverData.driverName ?? "").toString();
   const existingEmail = (driverData.email ?? "").toString().trim();
 
@@ -356,8 +369,31 @@ export const createDriverLogin = onCall(async (request) => {
   let userRecord: UserRecord;
 
   try {
-    // If user already exists with this email → update password.
+    // If user already exists with this email → check ownership.
     const existingUser = await auth.getUserByEmail(loginEmail);
+
+    // SICHERHEITS-CHECK (Multi-Tenant): existiert der Auth-User schon
+    // und gehört zu einem ANDEREN DSP, dürfen wir ihn nicht einfach
+    // überschreiben — sonst könnte ein Admin einen Fahrer einem anderen
+    // DSP "klauen". Wir lassen nur durch wenn:
+    //   • das Top-Level-Doc fehlt (frischer Auth-User ohne Profile), oder
+    //   • das Doc dem gleichen dspUid gehört (Re-Issue für eigenen Fahrer)
+    const existingProfileSnap = await db
+      .collection("users")
+      .doc(existingUser.uid)
+      .get();
+    const existingProfile = existingProfileSnap.data() ?? {};
+    const existingDspUid =
+      (existingProfile.dspUid ?? "").toString().trim();
+    if (existingDspUid && existingDspUid !== dspUid) {
+      throw new HttpsError(
+        "already-exists",
+        "Diese Email ist bereits einem anderen DSP zugewiesen " +
+        `(${existingDspUid}). Bitte den dortigen Admin den Fahrer ` +
+        "freigeben oder eine andere Email nutzen.",
+      );
+    }
+
     userRecord = await auth.updateUser(existingUser.uid, {
       password,
       displayName: driverName || undefined,
@@ -366,6 +402,8 @@ export const createDriverLogin = onCall(async (request) => {
       `Updated existing driver user for ${loginEmail} (uid=${userRecord.uid})`,
     );
   } catch (err: unknown) {
+    // HttpsError vom Ownership-Check direkt weiterreichen
+    if (err instanceof HttpsError) throw err;
     const e = (typeof err === "object" && err !== null ? err : {}) as AuthLikeError;
 
     if (e.code === "auth/user-not-found") {
@@ -398,6 +436,10 @@ export const createDriverLogin = onCall(async (request) => {
     role: "driver",
     dspUid,
     transporterId,
+    // driverId == driver doc id under users/{dspUid}/drivers/{...}.
+    // Used by co:timer Cloud Functions (clockIn/clockOut/...) to resolve
+    // the driver path from the auth token without an extra Firestore read.
+    driverId: driverDocId,
   });
 
   const now = FieldValue.serverTimestamp();
@@ -1214,20 +1256,39 @@ export const deleteDriverAccount = onCall(async (request) => {
     );
   }
 
-  const driverRef = db
+  // Erst per upper-cased TID als Doc-ID versuchen (alte Schema).
+  // Falls nicht gefunden, per `transporterId`-Feld suchen — neue
+  // Drivers ohne TID landen auf Auto-IDs und brauchen den Fallback.
+  let driverRef = db
     .collection("users")
     .doc(dspUid)
     .collection("drivers")
     .doc(transporterId);
 
-  const driverSnap = await driverRef.get();
+  let driverSnap = await driverRef.get();
   if (!driverSnap.exists) {
-    throw new HttpsError("not-found", "Driver not found.");
+    const query = await db
+      .collection("users").doc(dspUid)
+      .collection("drivers")
+      .where("transporterId", "==", transporterId)
+      .limit(1)
+      .get();
+    if (query.empty) {
+      throw new HttpsError("not-found", "Driver not found.");
+    }
+    driverSnap = query.docs[0];
+    driverRef = driverSnap.ref;
   }
 
   const driverData = driverSnap.data() || {};
   let authUid = (driverData.authUid ?? "").toString().trim();
-  const loginEmail = (driverData.loginEmail ?? "").toString().trim();
+  // Mehrere mögliche Email-Felder (legacy: loginEmail, neu: email + pendingLogin.email)
+  const loginEmail = (
+    driverData.loginEmail ??
+      driverData.email ??
+      (driverData.pendingLogin as Record<string, unknown> | undefined)?.email ??
+      ""
+  ).toString().trim();
 
   if (!authUid && loginEmail) {
     try {
@@ -1450,8 +1511,10 @@ export const cleanupResolvedFeedback = onSchedule(
 // users/{adminUid}/sub_accounts/{dispatcherUid}.permissions.
 
 const DISPATCHER_PERMISSION_KEYS = [
-  "waveplan",
+  "dashboard",
+  "pod_quality",
   "drivers_hub",
+  "waveplan",
   "calendar",
   "fleet_status",
   "tasks",
@@ -1459,24 +1522,30 @@ const DISPATCHER_PERMISSION_KEYS = [
   "incident_reports",
   "academy",
   "dispatcher_pill",
+  "notifications",
   "feedback",
   "faqs",
   "approvals",
 ] as const;
 
+// Volle Parität mit dem Admin: alle Module per Default aktiviert, der
+// Admin kann später einzelne Module explizit auf `false` setzen.
 const DISPATCHER_DEFAULT_PERMISSIONS: Record<string, boolean> = {
+  dashboard: true,
+  pod_quality: true,
+  drivers_hub: true,
   waveplan: true,
-  drivers_hub: false,
   calendar: true,
-  fleet_status: false,
+  fleet_status: true,
   tasks: true,
-  shift_absence: false,
-  incident_reports: false,
-  academy: false,
-  dispatcher_pill: false,
-  feedback: false,
+  shift_absence: true,
+  incident_reports: true,
+  academy: true,
+  dispatcher_pill: true,
+  notifications: true,
+  feedback: true,
   faqs: true,
-  approvals: false,
+  approvals: true,
 };
 
 /**
@@ -1737,3 +1806,134 @@ export const deleteDispatcherAccount = onCall(async (request) => {
   );
   return {ok: true, authDeleted};
 });
+
+// ─── Driver-Re-Assignment (Super-Admin-only) ─────────────────────
+//
+// Zieht einen Driver-Account explizit auf den aufrufenden Admin um.
+// Use-Case: ein Driver wurde ursprünglich unter einem alten/falschen
+// Admin-Account angelegt; jetzt soll sein Top-Level-Doc + die Custom
+// Claims auf den AKTUELL eingeloggten Admin zeigen.
+//
+// Schutz: nur explizite Super-Admin-Emails dürfen das. Andere DSPs
+// kriegen `permission-denied` — sonst könnte jeder Admin Fahrer eines
+// anderen DSPs übernehmen.
+export const transferDriverToCallerAdmin = onCall(async (request) => {
+  const callerUid = request.auth?.uid;
+  const callerEmail = (request.auth?.token?.email ?? "")
+    .toString()
+    .toLowerCase()
+    .trim();
+  if (!callerUid) {
+    throw new HttpsError("unauthenticated", "Login required");
+  }
+  // Whitelist — nur der Owner-Account von CoDriver darf andere
+  // Admin-Konten "stehlen", damit niemand anderes diese Funktion
+  // missbrauchen kann.
+  const allowedEmails = new Set<string>([
+    "admin@arion-logistics.de",
+  ]);
+  if (!allowedEmails.has(callerEmail)) {
+    throw new HttpsError(
+      "permission-denied",
+      "Nur Super-Admin darf Driver-Accounts umziehen.",
+    );
+  }
+
+  const data = (request.data || {}) as {driverEmail?: string};
+  const driverEmail = (data.driverEmail || "").toString().trim();
+  if (!driverEmail) {
+    throw new HttpsError(
+      "invalid-argument",
+      "driverEmail required",
+    );
+  }
+
+  // Auth-User finden
+  let authUser;
+  try {
+    authUser = await auth.getUserByEmail(driverEmail);
+  } catch (e) {
+    throw new HttpsError(
+      "not-found",
+      `Kein Auth-User mit Email ${driverEmail}`,
+    );
+  }
+
+  // Aktuelle Custom Claims lesen (für transporterId / driverId Erhalt)
+  const claims = authUser.customClaims ?? {};
+  const transporterId = (claims.transporterId ?? "").toString();
+  const driverId = (claims.driverId ?? transporterId).toString();
+
+  // Top-Level-Doc auf den aufrufenden Admin umschreiben
+  await db.collection("users").doc(authUser.uid).set({
+    role: "driver",
+    dspUid: callerUid,
+    transporterId,
+    email: driverEmail,
+    approved: true,
+    updatedAt: FieldValue.serverTimestamp(),
+    transferredAt: FieldValue.serverTimestamp(),
+    transferredBy: callerUid,
+  }, {merge: true});
+
+  // Custom Claims auf neue dspUid setzen
+  await auth.setCustomUserClaims(authUser.uid, {
+    role: "driver",
+    dspUid: callerUid,
+    transporterId,
+    driverId,
+  });
+
+  logger.info(
+    `transferDriverToCallerAdmin: ${driverEmail} → ${callerUid} ` +
+      `(by ${callerEmail})`,
+  );
+
+  return {
+    ok: true,
+    driverAuthUid: authUser.uid,
+    newDspUid: callerUid,
+    transporterId,
+  };
+});
+
+// ─── Time-Tracking Modul (Add-On) ────────────────────────────────
+// Server-seitig gepunchte Schichten + Pausen + Audit-Log,
+// schreibt gegen die zweite Firestore-Database `time-tracking` (eur3).
+// Aktivierung pro Account via `users/{uid}.addons.timeTracking` (true).
+//
+// QR-Hub-Secret ist optional — die Functions lesen QR_HUB_SECRET aus
+// process.env. Solange das Secret nicht gesetzt ist, wird der QR-Path
+// einfach übersprungen (Geofence-Check entscheidet). Für die volle
+// QR-Sicherheit später: Secret Manager API aktivieren, dann
+// `firebase functions:secrets:set QR_HUB_SECRET`.
+export {
+  clockIn,
+  clockOut,
+  pauseToggle,
+  computeMonthlyAccount,
+  recomputeMonthlyAccount,
+  populateHolidays,
+  seedHolidaysNow,
+  processCorrectionRequest,
+  onAbsenceUpdated,
+} from "./timeTracking";
+
+// DSGVO-Compliance Module (Region: europe-west3)
+// Audit-Log (Art. 32) — protokolliert Schreibzugriffe auf Fahrer-Daten.
+export {onDriverDocumentWritten} from "./audit";
+
+// DSGVO Datenportabilitaet (Art. 20) + Loeschworkflow (Art. 17 / Art. 5
+// Speicherbegrenzung). Soft-Delete behaelt Daten 6 Monate, dann Auto-Purge.
+export {
+  softDeleteDriver,
+  purgeExpiredSoftDeletes,
+  exportDriverData,
+} from "./dsgvo";
+
+// Backup-Automation (Art. 32 Belastbarkeit) — taeglicher Firestore-Export
+// nach GCS, mit 30-Tage-Retention.
+export {
+  scheduledFirestoreBackup,
+  purgeOldBackups,
+} from "./backup";

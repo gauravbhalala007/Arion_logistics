@@ -484,12 +484,74 @@ service cloud.firestore {
       allow update, delete: if isFeedbackStaff() && isApproved(request.auth.uid);
     }
 
+    // ---------- co:timer holiday cache (global) ----------
+    // Lookup table for German federal-state holidays, populated by the
+    // scheduled `populateHolidays` Cloud Function. Read-only for any
+    // signed-in caller; only server writes.
+    match /global_holidays/{holidayId} {
+      allow read: if request.auth != null;
+    }
+
+    // ---------- DSGVO Audit-Log (Art. 32 — Nachweispflicht) ----------
+    // Schreibzugriffe ausschliesslich ueber Cloud Functions (Admin SDK).
+    // Lesen: Admin/Developer global, oder DSP-Admin nur fuer eigenen DSP-Scope.
+    match /audit_log/{eventId} {
+      allow read: if isDeveloper()
+        || isAdmin()
+        || (request.auth != null
+            && resource.data.dspUid == request.auth.uid);
+      allow write: if false;
+    }
+
+    // ---------- DSGVO Soft-Delete Schattenkopien ----------
+    // Bei Loeschung eines Fahrers wird der Originaldatensatz hier 6 Monate
+    // archiviert (Wiederherstellung + Loeschnachweis). Auto-Purge per
+    // Scheduled Function. Zugriff ausschliesslich Admin/Developer.
+    match /_deleted_drivers/{driverId} {
+      allow read: if isAdmin() || isDeveloper();
+      allow write: if false;
+    }
+
+    // ---------- System-Flags (Wartungsmodus etc.) ----------
+    match /_system/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isDeveloper();
+    }
+
+    // ---------- co:timer CollectionGroup access ----------
+    // Live-Board, Compliance, Korrekturen-Inbox und Zeitkonto-Export
+    // verwenden CollectionGroup-Queries (where adminUid == request.auth.uid).
+    // Diese müssen separate Rules haben — die nested-Pfad-Rules unter
+    // /users/{userId}/drivers/{driverId}/... gelten nicht für CG-Queries.
+    //
+    // Schreibe sind über Cloud Functions abgedeckt; hier nur Reads.
+    match /{path=**}/shifts/{shiftId} {
+      allow read: if request.auth != null
+        && resource.data.adminUid == request.auth.uid;
+    }
+    match /{path=**}/correction_requests/{requestId} {
+      allow read: if request.auth != null
+        && resource.data.adminUid == request.auth.uid;
+    }
+    match /{path=**}/time_account/{month} {
+      allow read: if request.auth != null
+        && resource.data.adminUid == request.auth.uid;
+    }
+
     match /users/{userId} {
 
     	// ---------- admin notifications ----------
       match /notifications/{notificationId} {
         // Admin (DSP owner) can create + read notification history
         allow read, write: if isSelf(userId) && isApproved(userId);
+      }
+
+      // ---------- co:timer audit log (admin-scoped) ----------
+      // users/{userId}/time_audit_log/{eventId}
+      // Server-only write via Cloud Functions. Admin can read for the
+      // compliance view; driver has no read access.
+      match /time_audit_log/{eventId} {
+        allow read: if isSelf(userId) && isApproved(userId);
       }
 
       // ---------- dispatcher sub-accounts (managed by parent admin) ----------
@@ -511,6 +573,13 @@ service cloud.firestore {
       // narrower rules below are union'd — this never tightens them.
       match /{document=**} {
         allow read, write: if isSelf(userId) || isDispatcherOf(userId);
+      }
+
+      // co:timer Stations — Driver dürfen die Hub-Stations ihres DSPs
+      // LESEN (für Geofence-Lookup beim Stempeln). Schreiben bleibt
+      // Admin-only.
+      match /stations/{stationId} {
+        allow read: if isDriverForUser(userId) && isApproved(userId);
       }
 
       // Created by the user at signup (DSP/admin + also driver profiles)
@@ -713,18 +782,54 @@ service cloud.firestore {
 
         // Drivers of this DSP can read settings (e.g. academy/faq resources)
         allow read: if isDriverForUser(userId) && isApproved(userId);
+
+        // PUBLIC read for the recruiting form-builder configs. The
+        // public application form fetches these docs to render the
+        // DSP's custom questions. Limited to settingId prefixed with
+        // `recruiting_form_` so other settings stay private.
+        allow read: if settingId.matches('recruiting_form_.*');
       }
 
       // ---------- Shift Plans ----------
       // users/{userId}/shift_plans/{shiftId}
+      //
+      // Shift plans are day-level broadcast docs — they hold the
+      // entire roster in an `entries[]` array, not a single
+      // driverTransporterId at the top. Every approved driver of
+      // this DSP can read every published plan; the client filters
+      // for "my shift" + "all drivers". Writes stay admin-only.
       match /shift_plans/{shiftId} {
         // DSP/admin full access for own account
         allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
 
-        // Driver can read only own assigned shifts
-        allow read: if isDriverForUser(userId)
-          && isApproved(userId)
-          && resource.data.driverTransporterId == driverTransporterId();
+        // Any approved driver of this DSP can read the day plan.
+        allow read: if isDriverForUser(userId) && isApproved(userId);
+      }
+
+      // ---------- Recruiting Applications ----------
+      // users/{userId}/recruiting_applications/{appId}
+      // Public form (unauthenticated) creates these; only the admin
+      // can read / update / delete.
+      match /recruiting_applications/{appId} {
+        // Admin full access on their own namespace.
+        allow read, update, delete: if isSelf(userId) && isApproved(userId);
+
+        // PUBLIC create — no auth required. We validate the resource
+        // shape so spam / abuse stays bounded:
+        //   • adminUid must match the path
+        //   • channel must be 'local' or 'visa'
+        //   • required strings must be present + non-empty
+        //   • documents must be an array (the form attaches passport
+        //     + license front/back as base64).
+        allow create: if request.resource.data.adminUid == userId
+          && request.resource.data.channel in ['local', 'visa']
+          && request.resource.data.firstName is string
+          && request.resource.data.firstName.size() > 0
+          && request.resource.data.lastName is string
+          && request.resource.data.lastName.size() > 0
+          && request.resource.data.email is string
+          && request.resource.data.email.size() > 0
+          && request.resource.data.documents is list;
       }
 
       // ---------- Absence Requests ----------
@@ -866,6 +971,43 @@ service cloud.firestore {
           allow read: if isDriverForUser(userId)
             && isApproved(userId)
             && driverTransporterId() == driverId;
+        }
+
+        // ---------- co:timer raw entries (audit trail) ----------
+        // users/{userId}/drivers/{driverId}/time_entries/{entryId}
+        // Server-only write via clockIn/clockOut/pauseToggle Cloud Functions.
+        match /time_entries/{entryId} {
+          allow read: if isSelf(userId) && isApproved(userId);
+          allow read: if isDriverForUser(userId)
+            && isApproved(userId)
+            && driverTransporterId() == driverId;
+        }
+
+        // ---------- monthly time-account aggregations ----------
+        // users/{userId}/drivers/{driverId}/time_account/{month}  (YYYY-MM)
+        // Server-only write via scheduled computeMonthlyAccount.
+        match /time_account/{month} {
+          allow read: if isSelf(userId) && isApproved(userId);
+          allow read: if isDriverForUser(userId)
+            && isApproved(userId)
+            && driverTransporterId() == driverId;
+        }
+
+        // ---------- correction requests ----------
+        // users/{userId}/drivers/{driverId}/correction_requests/{id}
+        // Driver creates pending request, admin approves via Cloud Function.
+        match /correction_requests/{requestId} {
+          allow read: if isSelf(userId) && isApproved(userId);
+          allow read: if isDriverForUser(userId)
+            && isApproved(userId)
+            && driverTransporterId() == driverId;
+          // Driver may add new pending requests for their own driver doc.
+          allow create: if isDriverForUser(userId)
+            && isApproved(userId)
+            && driverTransporterId() == driverId
+            && request.resource.data.status == 'pending';
+          // Final state transitions are server-only via
+          // processCorrectionRequest Cloud Function.
         }
 
         // ---------- driver absence requests ----------
