@@ -16,20 +16,20 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../widgets/admin_scope.dart';
 import 'login_page.dart';
 
-// Module bodies — same as AdminShellPage.
+// Module bodies — full parity with AdminShellPage.
 import 'admin_home_page.dart';
 import 'admin_waveplan_page.dart';
 import 'admin_calendar_page.dart';
-import 'admin_dispatcher_pill_page.dart';
+import 'admin_dispatcher_center_page.dart';
 import 'admin_faq_page.dart';
 import 'admin_incident_reports_page.dart';
-import 'admin_shift_absence_page.dart';
+import 'admin_shift_plan_page.dart';
+import 'admin_zeiten_abwesenheiten_page.dart';
 import 'admin_academy_page.dart';
 import 'admin_approvals_page.dart';
 import 'dsp_profile_page.dart';
@@ -37,6 +37,9 @@ import 'drivers_hub_page.dart';
 import 'feedback_page.dart';
 import 'fleet_status_page.dart';
 import 'task_sheet_page.dart';
+import 'scorecard_overview.dart';
+import 'pod_quality_overview.dart';
+import 'notifications_page.dart';
 
 /// Permission key → (icon, label, page) used to render the nav and
 /// resolve the active page.
@@ -55,6 +58,24 @@ class _ModuleEntry {
 
 const List<_ModuleEntry> _kAllModules = [
   _ModuleEntry(
+    key: 'dashboard',
+    icon: Icons.dashboard_rounded,
+    label: 'Score Card Dashboard',
+    page: ScorecardOverviewPage(),
+  ),
+  _ModuleEntry(
+    key: 'pod_quality',
+    icon: Icons.photo_camera_outlined,
+    label: 'POD Quality',
+    page: PodQualityOverviewPage(),
+  ),
+  _ModuleEntry(
+    key: 'drivers_hub',
+    icon: Icons.groups_rounded,
+    label: 'Drivers Hub',
+    page: DriversHubPage(),
+  ),
+  _ModuleEntry(
     key: 'waveplan',
     icon: Icons.waves_rounded,
     label: 'Waveplan',
@@ -67,10 +88,10 @@ const List<_ModuleEntry> _kAllModules = [
     page: AdminCalendarPage(),
   ),
   _ModuleEntry(
-    key: 'drivers_hub',
-    icon: Icons.groups_rounded,
-    label: 'Drivers Hub',
-    page: DriversHubPage(),
+    key: 'fleet_status',
+    icon: Icons.local_shipping_rounded,
+    label: 'Fleet Hub',
+    page: FleetStatusPage(),
   ),
   _ModuleEntry(
     key: 'tasks',
@@ -79,16 +100,16 @@ const List<_ModuleEntry> _kAllModules = [
     page: TaskSheetPage(),
   ),
   _ModuleEntry(
-    key: 'shift_absence',
-    icon: Icons.event_busy_rounded,
-    label: 'Shift & Absence',
-    page: AdminShiftAbsencePage(),
+    key: 'shift_plan',
+    icon: Icons.event_note_rounded,
+    label: 'Shift Plan',
+    page: AdminShiftPlanPage(),
   ),
   _ModuleEntry(
-    key: 'fleet_status',
-    icon: Icons.local_shipping_rounded,
-    label: 'Fleet Hub',
-    page: FleetStatusPage(),
+    key: 'shift_absence',
+    icon: Icons.event_busy_rounded,
+    label: 'Zeiten & Abwesenheiten',
+    page: AdminZeitenAbwesenheitenPage(),
   ),
   _ModuleEntry(
     key: 'incident_reports',
@@ -105,8 +126,14 @@ const List<_ModuleEntry> _kAllModules = [
   _ModuleEntry(
     key: 'dispatcher_pill',
     icon: Icons.support_agent_rounded,
-    label: 'Dispatcher Pill',
-    page: AdminDispatcherPillPage(),
+    label: 'Dispatcher Center',
+    page: AdminDispatcherCenterPage(),
+  ),
+  _ModuleEntry(
+    key: 'notifications',
+    icon: Icons.notifications_outlined,
+    label: 'Notifications',
+    page: NotificationsPage(),
   ),
   _ModuleEntry(
     key: 'feedback',
@@ -163,17 +190,19 @@ class _DispatcherShellPageState extends State<DispatcherShellPage> {
           }
           final data = snap.data?.data() ?? const <String, dynamic>{};
           final active = data['active'] != false;
-          final permissions = (data['permissions'] as Map?)
-                  ?.map((k, v) => MapEntry(k.toString(), v == true)) ??
-              const <String, bool>{};
+          final displayName =
+              (data['name'] ?? data['email'] ?? auth.displayName ?? auth.email ?? '')
+                  .toString();
 
           if (!active) {
             return const _DispatcherDisabled();
           }
 
-          final allowed = _kAllModules
-              .where((m) => permissions[m.key] == true)
-              .toList();
+          // Volle Parität mit dem Admin: Dispatcher sieht alle Module —
+          // alte `permissions: { … : false }`-Flags aus früheren Accounts
+          // werden bewusst ignoriert. Granulares Module-Gating kann
+          // später wieder eingeführt werden, wenn der Admin es braucht.
+          final allowed = List<_ModuleEntry>.from(_kAllModules);
 
           // If the previously-active module got revoked, fall back to home.
           if (_active != 'home' &&
@@ -195,6 +224,7 @@ class _DispatcherShellPageState extends State<DispatcherShellPage> {
                       child: _DispatcherSideMenu(
                         active: _active,
                         allowed: allowed,
+                        displayName: displayName,
                         onSelect: (k) {
                           setState(() => _active = k);
                           Navigator.of(context).pop();
@@ -207,10 +237,27 @@ class _DispatcherShellPageState extends State<DispatcherShellPage> {
                 ? AppBar(
                     backgroundColor: const Color(0xFF0B1220),
                     foregroundColor: Colors.white,
-                    title: Image.asset(
-                      'assets/Codriver_logo_dark.png',
-                      height: 38,
-                      fit: BoxFit.contain,
+                    title: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Image.asset(
+                          'assets/Codriver_logo_dark.png',
+                          height: 30,
+                          fit: BoxFit.contain,
+                        ),
+                        if (displayName.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            'Dispatcher: $displayName',
+                            style: AppTypography.caption2.copyWith(
+                              color: Colors.white.withOpacity(0.8),
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.4,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     centerTitle: true,
                   )
@@ -224,6 +271,7 @@ class _DispatcherShellPageState extends State<DispatcherShellPage> {
                     child: _DispatcherSideMenu(
                       active: _active,
                       allowed: allowed,
+                      displayName: displayName,
                       onSelect: (k) => setState(() => _active = k),
                     ),
                   ),
@@ -248,10 +296,12 @@ class _DispatcherShellPageState extends State<DispatcherShellPage> {
 class _DispatcherSideMenu extends StatelessWidget {
   final String active;
   final List<_ModuleEntry> allowed;
+  final String displayName;
   final ValueChanged<String> onSelect;
   const _DispatcherSideMenu({
     required this.active,
     required this.allowed,
+    required this.displayName,
     required this.onSelect,
   });
 
@@ -275,20 +325,53 @@ class _DispatcherSideMenu extends StatelessWidget {
               const SizedBox(height: 18),
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
+                  horizontal: 12,
+                  vertical: 8,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  'Dispatcher',
-                  style: AppTypography.caption1.copyWith(
-                    color: Colors.white.withOpacity(0.8),
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.6,
+                  color: AppColors.codriverGreen.withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: AppColors.codriverGreen.withOpacity(0.32),
+                    width: 0.6,
                   ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.support_agent_rounded,
+                      size: 16,
+                      color: AppColors.codriverGreen,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'DISPATCHER',
+                            style: AppTypography.caption2.copyWith(
+                              color: Colors.white.withOpacity(0.7),
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.0,
+                              fontSize: 9.5,
+                            ),
+                          ),
+                          if (displayName.isNotEmpty)
+                            Text(
+                              displayName,
+                              style: AppTypography.footnote.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 16),

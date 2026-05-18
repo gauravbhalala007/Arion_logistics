@@ -84,7 +84,12 @@ class SesoConfirmation {
   final String transactionId; // SESO transaction-ID from the Amazon email
   final String orderId; // SESO order-ID (Auftrags-ID)
   final SesoVehicleType vehicleType;
+  /// What Amazon pays the DSP per day (netto). Income side.
   final double dailyRate;
+  /// What the DSP pays the rental partner per day. Cost side. The
+  /// difference (`dailyRate - partnerDailyRate`) is the margin the
+  /// DSP keeps before VAT.
+  final double partnerDailyRate;
   final bool offPeak;
   final List<SesoWeekEntry> weeks;
   /// Confirmation email / screenshot of the SESO confirmation.
@@ -94,8 +99,14 @@ class SesoConfirmation {
   // Rental-company integration (Mietfirma).
   final String? rentalCompanyId;
   final DateTime? pickupDate;
-  final int? pickupVehicleCount;
   final DateTime? returnDate;
+  /// Total number of vehicles for the whole confirmation period.
+  /// Replaces the older pickup/return-specific counts which kept the
+  /// same number twice.
+  final int? vehicleCount;
+  // Legacy split fields — kept on read so older docs render until they
+  // get re-saved. New writes only use [vehicleCount].
+  final int? pickupVehicleCount;
   final int? returnVehicleCount;
   // Calendar event IDs (Firestore doc ids inside users/{uid}/calendar_events)
   // so we can update / delete the linked events when the SESO record
@@ -115,12 +126,14 @@ class SesoConfirmation {
     required this.dailyRate,
     required this.offPeak,
     required this.weeks,
+    this.partnerDailyRate = 0,
     this.confirmationScreenshotPath,
     this.invoiceScreenshotPath,
     this.rentalCompanyId,
     this.pickupDate,
-    this.pickupVehicleCount,
     this.returnDate,
+    this.vehicleCount,
+    this.pickupVehicleCount,
     this.returnVehicleCount,
     this.calendarPickupEventId,
     this.calendarReturnEventId,
@@ -137,11 +150,19 @@ class SesoConfirmation {
   double get paidCost => weeklyCost * paidWeekCount;
   double get openCost => totalCost - paidCost;
 
+  // Margin breakdown (income − partner cost).
+  double get dailyMargin => dailyRate - partnerDailyRate;
+  double get weeklyPartnerCost => partnerDailyRate * 7;
+  double get totalPartnerCost => weeklyPartnerCost * weeks.length;
+  double get weeklyMargin => dailyMargin * 7;
+  double get totalMargin => weeklyMargin * weeks.length;
+
   Map<String, dynamic> toMap() => {
         'transactionId': transactionId,
         'orderId': orderId,
         'vehicleType': vehicleType.wire,
         'dailyRate': dailyRate,
+        'partnerDailyRate': partnerDailyRate,
         'offPeak': offPeak,
         'weeks': [for (final w in weeks) w.toMap()],
         if (confirmationScreenshotPath != null &&
@@ -189,6 +210,8 @@ class SesoConfirmation {
       orderId: (m['orderId'] ?? '').toString(),
       vehicleType: SesoVehicleTypeX.fromWire(m['vehicleType']?.toString()),
       dailyRate: (m['dailyRate'] as num?)?.toDouble() ?? 0.0,
+      partnerDailyRate:
+          (m['partnerDailyRate'] as num?)?.toDouble() ?? 0.0,
       offPeak: m['offPeak'] == true,
       weeks: weeks,
       confirmationScreenshotPath:
@@ -203,8 +226,11 @@ class SesoConfirmation {
           ? null
           : m['rentalCompanyId'] as String,
       pickupDate: pickupTs is Timestamp ? pickupTs.toDate() : null,
-      pickupVehicleCount: (m['pickupVehicleCount'] as num?)?.toInt(),
       returnDate: returnTs is Timestamp ? returnTs.toDate() : null,
+      vehicleCount: (m['vehicleCount'] as num?)?.toInt() ??
+          (m['pickupVehicleCount'] as num?)?.toInt() ??
+          (m['returnVehicleCount'] as num?)?.toInt(),
+      pickupVehicleCount: (m['pickupVehicleCount'] as num?)?.toInt(),
       returnVehicleCount: (m['returnVehicleCount'] as num?)?.toInt(),
       calendarPickupEventId:
           (m['calendarPickupEventId'] ?? '').toString().isEmpty

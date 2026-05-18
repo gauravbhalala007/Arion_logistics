@@ -108,14 +108,14 @@ class SesoConfirmationRepository {
     required String orderId,
     required SesoVehicleType vehicleType,
     required double dailyRate,
+    double partnerDailyRate = 0,
     required bool offPeak,
     required List<SesoWeekEntry> weeks,
     String? note,
     String? rentalCompanyId,
     DateTime? pickupDate,
-    int? pickupVehicleCount,
     DateTime? returnDate,
-    int? returnVehicleCount,
+    int? vehicleCount,
   }) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     final ref = await _col(dspUid).add({
@@ -123,17 +123,15 @@ class SesoConfirmationRepository {
       'orderId': orderId,
       'vehicleType': vehicleType.wire,
       'dailyRate': dailyRate,
+      'partnerDailyRate': partnerDailyRate,
       'offPeak': offPeak,
       'weeks': [for (final w in weeks) w.toMap()],
       if (note != null && note.isNotEmpty) 'note': note,
       if (rentalCompanyId != null && rentalCompanyId.isNotEmpty)
         'rentalCompanyId': rentalCompanyId,
       if (pickupDate != null) 'pickupDate': Timestamp.fromDate(pickupDate),
-      if (pickupVehicleCount != null)
-        'pickupVehicleCount': pickupVehicleCount,
       if (returnDate != null) 'returnDate': Timestamp.fromDate(returnDate),
-      if (returnVehicleCount != null)
-        'returnVehicleCount': returnVehicleCount,
+      if (vehicleCount != null) 'vehicleCount': vehicleCount,
       if (uid != null) 'createdByUid': uid,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
@@ -153,6 +151,7 @@ class SesoConfirmationRepository {
     String? orderId,
     SesoVehicleType? vehicleType,
     double? dailyRate,
+    double? partnerDailyRate,
     bool? offPeak,
     List<SesoWeekEntry>? weeks,
     String? note,
@@ -164,10 +163,9 @@ class SesoConfirmationRepository {
     bool clearRentalCompany = false,
     DateTime? pickupDate,
     bool clearPickupDate = false,
-    int? pickupVehicleCount,
     DateTime? returnDate,
     bool clearReturnDate = false,
-    int? returnVehicleCount,
+    int? vehicleCount,
   }) async {
     final patch = <String, dynamic>{
       'updatedAt': FieldValue.serverTimestamp(),
@@ -176,6 +174,9 @@ class SesoConfirmationRepository {
     if (orderId != null) patch['orderId'] = orderId;
     if (vehicleType != null) patch['vehicleType'] = vehicleType.wire;
     if (dailyRate != null) patch['dailyRate'] = dailyRate;
+    if (partnerDailyRate != null) {
+      patch['partnerDailyRate'] = partnerDailyRate;
+    }
     if (offPeak != null) patch['offPeak'] = offPeak;
     if (weeks != null) {
       patch['weeks'] = [for (final w in weeks) w.toMap()];
@@ -203,16 +204,13 @@ class SesoConfirmationRepository {
     } else if (pickupDate != null) {
       patch['pickupDate'] = Timestamp.fromDate(pickupDate);
     }
-    if (pickupVehicleCount != null) {
-      patch['pickupVehicleCount'] = pickupVehicleCount;
-    }
     if (clearReturnDate) {
       patch['returnDate'] = FieldValue.delete();
     } else if (returnDate != null) {
       patch['returnDate'] = Timestamp.fromDate(returnDate);
     }
-    if (returnVehicleCount != null) {
-      patch['returnVehicleCount'] = returnVehicleCount;
+    if (vehicleCount != null) {
+      patch['vehicleCount'] = vehicleCount;
     }
     await _col(dspUid).doc(confirmationId).update(patch);
 
@@ -284,12 +282,16 @@ class SesoConfirmationRepository {
 
     final patch = <String, dynamic>{};
 
+    final count = c.vehicleCount ??
+        c.pickupVehicleCount ??
+        c.returnVehicleCount;
+
     // Pickup event.
     await _upsertCalendarEvent(
       dspUid: dspUid,
       existingEventId: c.calendarPickupEventId,
       date: c.pickupDate,
-      count: c.pickupVehicleCount,
+      count: count,
       titlePrefix: 'Abholung',
       companyName: companyName,
       vehicleTypeLabel: c.vehicleType.label,
@@ -303,7 +305,7 @@ class SesoConfirmationRepository {
       dspUid: dspUid,
       existingEventId: c.calendarReturnEventId,
       date: c.returnDate,
-      count: c.returnVehicleCount,
+      count: count,
       titlePrefix: 'Abgabe',
       companyName: companyName,
       vehicleTypeLabel: c.vehicleType.label,

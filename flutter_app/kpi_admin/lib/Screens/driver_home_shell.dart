@@ -18,15 +18,18 @@ import 'package:firebase_storage/firebase_storage.dart' as fb;
 import '../localization/app_localizations.dart';
 import '../models/driver_notification.dart';
 import '../theme/app_button_style.dart';
+import '../widgets/maintenance_banner.dart';
 import 'driver_academy_page.dart';
 import 'driver_absence_page.dart';
 import 'driver_onboarding_page.dart';
 import 'driver_dashboard_page.dart' show DashboardTabBody;
 import 'driver_home_page.dart';
+import 'driver_cotimer_clock_page.dart';
 import 'driver_notification_detail_view.dart';
 import 'driver_notifications_view.dart';
 import 'driver_rules_view.dart';
 import 'driver_tasks_view.dart';
+import 'driver_shift_plan_view.dart';
 import 'driver_waveplan_view.dart';
 
 import '../widgets/notification_pin_dialogs.dart';
@@ -69,6 +72,7 @@ enum DriverView {
   notificationDetail,
   profile,
   waveplan,
+  cotimer,
 }
 
 class DriverHomeShell extends StatefulWidget {
@@ -324,6 +328,7 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
           body: SafeArea(
             child: Column(
               children: [
+                const MaintenanceBanner(),
                 // ---------- HEADER (always visible) ----------
                 Padding(
                   padding: const EdgeInsets.symmetric(
@@ -431,7 +436,7 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
           onOpenShiftPlan: () {
             setState(() {
               _tabIndex = 0;
-              _view = DriverView.comingSoon;
+              _view = DriverView.shiftPlan;
             });
           },
           onOpenAbsence: () {
@@ -458,6 +463,12 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
               _view = DriverView.comingSoon;
             });
           },
+          onOpenCotimer: () {
+            setState(() {
+              _tabIndex = 0;
+              _view = DriverView.cotimer;
+            });
+          },
         );
 
       case DriverView.academy:
@@ -473,15 +484,9 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
         );
 
       case DriverView.shiftPlan:
-        return Center(
-          child: Text(
-            loc.t('coming_soon'),
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF6B7280),
-            ),
-          ),
+        return DriverShiftPlanView(
+          dspUid: widget.dspUid,
+          driverTransporterId: widget.driverTransporterId,
         );
 
       case DriverView.absence:
@@ -512,6 +517,12 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
         return DriverWaveplanView(
           dspUid: widget.dspUid,
           driverTransporterId: widget.driverTransporterId,
+        );
+
+      case DriverView.cotimer:
+        return DriverCotimerLauncher(
+          adminUid: widget.dspUid,
+          driverId: widget.driverTransporterId.toUpperCase(),
         );
 
       case DriverView.comingSoon:

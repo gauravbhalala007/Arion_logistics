@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../widgets/admin_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -14,6 +15,10 @@ import '../services/fleet_vehicle_document_service.dart';
 import '../services/fleet_vehicle_event_repository.dart';
 import '../services/fleet_vehicle_event_service.dart';
 import '../services/fleet_vehicle_repository.dart';
+import '../theme/app_colors.dart';
+import '../widgets/co_button.dart';
+import '../widgets/co_pressable.dart';
+import '../widgets/pill_tab_bar.dart';
 import 'seso_overview_page.dart';
 
 class FleetStatusPage extends StatefulWidget {
@@ -42,7 +47,11 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
       FleetVehicleDocumentService();
   final TextEditingController _searchCtrl = TextEditingController();
 
-  String? get _uid => FirebaseAuth.instance.currentUser?.uid;
+  String? get _uid {
+    final scoped = AdminScope.maybeOf(context)?.adminUid;
+    if (scoped != null && scoped.isNotEmpty) return scoped;
+    return FirebaseAuth.instance.currentUser?.uid;
+  }
 
   String? _resolvedDspUid;
   String _role = '';
@@ -295,14 +304,15 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
           }),
         ),
         actions: [
-          TextButton(
+          CoButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: Text(t.t('button_close')),
+            label: t.t('button_close'),
+            variant: CoButtonVariant.quiet,
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: _kRed),
+          CoButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: Text(t.t('fleet_status_action_delete')),
+            label: t.t('fleet_status_action_delete'),
+            variant: CoButtonVariant.destructive,
           ),
         ],
       ),
@@ -419,7 +429,12 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
       return Center(child: Text(t.t('fleet_status_must_login')));
     }
     if (_loadingScope) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: CircularProgressIndicator(
+          strokeWidth: 3,
+          valueColor: AlwaysStoppedAnimation<Color>(AppColors.codriverGreen),
+        ),
+      );
     }
     if (!_canViewVehicles) {
       return Center(child: Text(t.t('fleet_status_no_access')));
@@ -434,17 +449,13 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
       length: 2,
       child: Column(
         children: [
-          Material(
-            color: _kPageBg,
-            child: TabBar(
-              indicatorColor: _kGreen,
-              labelColor: _kText,
-              unselectedLabelColor: _kMuted,
-              labelStyle: const TextStyle(fontWeight: FontWeight.w700),
-              tabs: const [
-                Tab(text: 'Fahrzeuge'),
-                Tab(text: 'SESO'),
-              ],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            child: Builder(
+              builder: (ctx) => PillTabBar(
+                controller: DefaultTabController.of(ctx),
+                tabs: const ['Fahrzeuge', 'SESO'],
+              ),
             ),
           ),
           Expanded(
@@ -495,20 +506,40 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                         _buildToolbar(context, isNarrow: isNarrow),
                         const SizedBox(height: 16),
                         Expanded(
-                          child:
-                              snapshot.connectionState ==
-                                      ConnectionState.waiting &&
-                                  !snapshot.hasData
-                              ? const Center(child: CircularProgressIndicator())
-                              : errorMessage != null
-                              ? _buildErrorState(context, errorMessage)
-                              : vehicles.isEmpty
-                              ? _buildEmptyState(context)
-                              : _buildVehicleTable(
-                                  context,
-                                  vehicles,
-                                  complianceByPlate: complianceByPlate,
-                                ),
+                          child: CoStateSwitcher(
+                            child:
+                                snapshot.connectionState ==
+                                        ConnectionState.waiting &&
+                                    !snapshot.hasData
+                                ? const Center(
+                                    key: ValueKey('fleet-loading'),
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 3,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        AppColors.codriverGreen,
+                                      ),
+                                    ),
+                                  )
+                                : errorMessage != null
+                                ? KeyedSubtree(
+                                    key: const ValueKey('fleet-error'),
+                                    child: _buildErrorState(
+                                        context, errorMessage),
+                                  )
+                                : vehicles.isEmpty
+                                ? KeyedSubtree(
+                                    key: const ValueKey('fleet-empty'),
+                                    child: _buildEmptyState(context),
+                                  )
+                                : KeyedSubtree(
+                                    key: const ValueKey('fleet-table'),
+                                    child: _buildVehicleTable(
+                                      context,
+                                      vehicles,
+                                      complianceByPlate: complianceByPlate,
+                                    ),
+                                  ),
+                          ),
                         ),
                       ],
                     ),
@@ -551,15 +582,10 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
           ),
         ),
         if (_canManageVehicles)
-          FilledButton.icon(
+          CoButton(
             onPressed: () => _showVehicleEditor(),
-            icon: const Icon(Icons.add_rounded),
-            style: FilledButton.styleFrom(
-              backgroundColor: _kGreen,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-            ),
-            label: Text(t.t('fleet_status_add_vehicle')),
+            icon: Icons.add_rounded,
+            label: t.t('fleet_status_add_vehicle'),
           )
         else
           Container(
@@ -800,7 +826,7 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                       children: [
                         Expanded(
                           flex: 4,
-                          child: InkWell(
+                          child: CoPressable(
                             onTap: () => _showVehicleDetails(vehicle),
                             borderRadius: BorderRadius.circular(12),
                             child: Column(
@@ -1173,7 +1199,7 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
               Row(
                 children: [
                   Expanded(
-                    child: InkWell(
+                    child: CoPressable(
                       onTap: () => _showVehicleDetails(vehicle),
                       borderRadius: BorderRadius.circular(8),
                       child: Padding(
@@ -1210,12 +1236,14 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                         onPressed: () => _showVehicleDetails(vehicle),
                         icon: const Icon(Icons.visibility_outlined),
                       ),
-                      if (_canManageVehicles)
+                      if (_canManageVehicles) ...[
+                        const SizedBox(width: 4),
                         IconButton(
                           tooltip: t.t('button_edit'),
                           onPressed: () => _showVehicleEditor(vehicle: vehicle),
                           icon: const Icon(Icons.edit_outlined),
                         ),
+                      ],
                     ],
                   ),
                 ],
@@ -1272,10 +1300,11 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
               Align(
                 alignment: Alignment.centerRight,
                 child: _canManageVehicles
-                    ? TextButton.icon(
+                    ? CoButton(
                         onPressed: () => _deleteVehicle(vehicle),
-                        icon: const Icon(Icons.delete_outline),
-                        label: Text(t.t('fleet_status_action_delete')),
+                        icon: Icons.delete_outline,
+                        label: t.t('fleet_status_action_delete'),
+                        variant: CoButtonVariant.destructiveQuiet,
                       )
                     : Text(
                         t.t('fleet_status_read_only'),
@@ -1770,9 +1799,10 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
                     const SizedBox(height: 6),
                     Align(
                       alignment: Alignment.centerRight,
-                      child: TextButton(
+                      child: CoButton(
                         onPressed: () => setState(() => _serviceEndDateCtrl.clear()),
-                        child: Text(t.t('fleet_status_clear_date')),
+                        label: t.t('fleet_status_clear_date'),
+                        variant: CoButtonVariant.quiet,
                       ),
                     ),
                   ],
@@ -1796,19 +1826,18 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    TextButton(
+                    CoButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      child: Text(t.t('button_close')),
+                      label: t.t('button_close'),
+                      variant: CoButtonVariant.quiet,
                     ),
                     const SizedBox(width: 10),
-                    FilledButton(
+                    CoButton(
                       onPressed: _submit,
-                      child: Text(
-                        t.t(
-                          _isEditing
-                              ? 'button_save'
-                              : 'fleet_status_create_action',
-                        ),
+                      label: t.t(
+                        _isEditing
+                            ? 'button_save'
+                            : 'fleet_status_create_action',
                       ),
                     ),
                   ],
@@ -2264,16 +2293,15 @@ class _VehicleDetailsPageState extends State<_VehicleDetailsPage> {
           }),
         ),
         actions: [
-          TextButton(
+          CoButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: Text(t.t('button_close')),
+            label: t.t('button_close'),
+            variant: CoButtonVariant.quiet,
           ),
-          FilledButton(
+          CoButton(
             onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: _FleetStatusPageState._kRed,
-            ),
-            child: Text(t.t('button_delete')),
+            label: t.t('button_delete'),
+            variant: CoButtonVariant.destructive,
           ),
         ],
       ),
@@ -2406,16 +2434,15 @@ class _VehicleDetailsPageState extends State<_VehicleDetailsPage> {
           }),
         ),
         actions: [
-          TextButton(
+          CoButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: Text(t.t('button_close')),
+            label: t.t('button_close'),
+            variant: CoButtonVariant.quiet,
           ),
-          FilledButton(
+          CoButton(
             onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: _FleetStatusPageState._kRed,
-            ),
-            child: Text(t.t('button_delete')),
+            label: t.t('button_delete'),
+            variant: CoButtonVariant.destructive,
           ),
         ],
       ),
@@ -2630,11 +2657,11 @@ class _VehicleDetailsPageState extends State<_VehicleDetailsPage> {
                         ),
                       ),
                       if (widget.canManageDocuments)
-                        FilledButton.icon(
+                        CoButton(
                           onPressed: () => _showVehicleEventDialog(),
-                          icon: const Icon(Icons.add),
-                          label: Text(
-                            t.t('fleet_status_vehicle_events_add_action'),
+                          icon: Icons.add,
+                          label: t.t(
+                            'fleet_status_vehicle_events_add_action',
                           ),
                         ),
                     ],
@@ -2709,46 +2736,59 @@ class _VehicleDetailsPageState extends State<_VehicleDetailsPage> {
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting &&
                           !snapshot.hasData) {
-                        return const LinearProgressIndicator(minHeight: 2);
+                        return const CoStateSwitcher(
+                          child: LinearProgressIndicator(
+                            key: ValueKey('events-loading'),
+                            minHeight: 2,
+                          ),
+                        );
                       }
                       if (snapshot.hasError) {
-                        return Text(
-                          t.tf('fleet_status_vehicle_events_load_failed', {
-                            'error': '${snapshot.error}',
-                          }),
+                        return CoStateSwitcher(
+                          child: Text(
+                            key: const ValueKey('events-error'),
+                            t.tf('fleet_status_vehicle_events_load_failed', {
+                              'error': '${snapshot.error}',
+                            }),
+                          ),
                         );
                       }
                       final events = _filterEvents(
                         snapshot.data ?? const <FleetVehicleEvent>[],
                       );
                       if (events.isEmpty) {
-                        return Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF9FAFB),
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(
-                              color: _FleetStatusPageState._kBorder,
+                        return CoStateSwitcher(
+                          child: Container(
+                            key: const ValueKey('events-empty'),
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF9FAFB),
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(
+                                color: _FleetStatusPageState._kBorder,
+                              ),
                             ),
-                          ),
-                          child: Text(
-                            t.t('fleet_status_vehicle_events_empty'),
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: _FleetStatusPageState._kMuted,
-                              fontWeight: FontWeight.w600,
+                            child: Text(
+                              t.t('fleet_status_vehicle_events_empty'),
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: _FleetStatusPageState._kMuted,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                         );
                       }
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: events.map((event) {
-                          final metadata = event.metadata;
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: Material(
+                      return CoStateSwitcher(
+                        child: Column(
+                          key: const ValueKey('events-list'),
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: events.map((event) {
+                            final metadata = event.metadata;
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Material(
                               color: Colors.transparent,
                               child: Container(
                                 padding: const EdgeInsets.all(14),
@@ -2828,6 +2868,9 @@ class _VehicleDetailsPageState extends State<_VehicleDetailsPage> {
                                                   Icons.open_in_new_outlined,
                                                 ),
                                               ),
+                                            if (event.fileUrl.trim().isNotEmpty &&
+                                                widget.canManageDocuments)
+                                              const SizedBox(width: 4),
                                             if (widget.canManageDocuments) ...[
                                               IconButton(
                                                 tooltip: t.t('button_edit'),
@@ -2839,6 +2882,7 @@ class _VehicleDetailsPageState extends State<_VehicleDetailsPage> {
                                                   Icons.edit_outlined,
                                                 ),
                                               ),
+                                              const SizedBox(width: 4),
                                               IconButton(
                                                 tooltip: t.t('button_delete'),
                                                 onPressed: () =>
@@ -2976,6 +3020,7 @@ class _VehicleDetailsPageState extends State<_VehicleDetailsPage> {
                             ),
                           );
                         }).toList(),
+                        ),
                       );
                     },
                   ),
@@ -3054,11 +3099,11 @@ class _VehicleDetailsPageState extends State<_VehicleDetailsPage> {
                         ),
                       ),
                       if (widget.canManageDocuments)
-                        FilledButton.icon(
+                        CoButton(
                           onPressed: () => _showDocumentDialog(),
-                          icon: const Icon(Icons.add),
-                          label: Text(
-                            t.t('fleet_status_vehicle_documents_add_action'),
+                          icon: Icons.add,
+                          label: t.t(
+                            'fleet_status_vehicle_documents_add_action',
                           ),
                         ),
                     ],
@@ -3072,41 +3117,54 @@ class _VehicleDetailsPageState extends State<_VehicleDetailsPage> {
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting &&
                           !snapshot.hasData) {
-                        return const LinearProgressIndicator(minHeight: 2);
+                        return const CoStateSwitcher(
+                          child: LinearProgressIndicator(
+                            key: ValueKey('docs-loading'),
+                            minHeight: 2,
+                          ),
+                        );
                       }
                       if (snapshot.hasError) {
-                        return Text(
-                          t.tf('fleet_status_vehicle_documents_load_failed', {
-                            'error': '${snapshot.error}',
-                          }),
+                        return CoStateSwitcher(
+                          child: Text(
+                            key: const ValueKey('docs-error'),
+                            t.tf('fleet_status_vehicle_documents_load_failed', {
+                              'error': '${snapshot.error}',
+                            }),
+                          ),
                         );
                       }
                       final docs =
                           snapshot.data ?? const <FleetVehicleDocument>[];
                       if (docs.isEmpty) {
-                        return Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF9FAFB),
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(
-                              color: _FleetStatusPageState._kBorder,
+                        return CoStateSwitcher(
+                          child: Container(
+                            key: const ValueKey('docs-empty'),
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF9FAFB),
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(
+                                color: _FleetStatusPageState._kBorder,
+                              ),
                             ),
-                          ),
-                          child: Text(
-                            t.t('fleet_status_vehicle_documents_empty'),
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: _FleetStatusPageState._kMuted,
-                              fontWeight: FontWeight.w600,
+                            child: Text(
+                              t.t('fleet_status_vehicle_documents_empty'),
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: _FleetStatusPageState._kMuted,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                         );
                       }
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: docs.map((doc) {
+                      return CoStateSwitcher(
+                        child: Column(
+                          key: const ValueKey('docs-list'),
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: docs.map((doc) {
                           final status = _documentStatusFor(
                             context,
                             _documentService.getDocumentStatus(
@@ -3179,6 +3237,8 @@ class _VehicleDetailsPageState extends State<_VehicleDetailsPage> {
                                                 Icons.open_in_new_outlined,
                                               ),
                                             ),
+                                            if (widget.canManageDocuments)
+                                              const SizedBox(width: 4),
                                             if (widget.canManageDocuments) ...[
                                               IconButton(
                                                 tooltip: t.t('button_edit'),
@@ -3190,6 +3250,7 @@ class _VehicleDetailsPageState extends State<_VehicleDetailsPage> {
                                                   Icons.edit_outlined,
                                                 ),
                                               ),
+                                              const SizedBox(width: 4),
                                               IconButton(
                                                 tooltip: t.t('button_delete'),
                                                 onPressed: () =>
@@ -3271,6 +3332,7 @@ class _VehicleDetailsPageState extends State<_VehicleDetailsPage> {
                             ),
                           );
                         }).toList(),
+                        ),
                       );
                     },
                   ),
@@ -3716,14 +3778,13 @@ class _VehicleEventDialogState extends State<_VehicleEventDialog> {
                   runSpacing: 8,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    OutlinedButton.icon(
+                    CoButton(
                       onPressed: _pickFile,
-                      icon: const Icon(Icons.upload_file_outlined),
-                      label: Text(
-                        _selectedFile == null
-                            ? t.t('fleet_status_vehicle_events_pick_file')
-                            : t.t('fleet_status_vehicle_events_change_file'),
-                      ),
+                      icon: Icons.upload_file_outlined,
+                      label: _selectedFile == null
+                          ? t.t('fleet_status_vehicle_events_pick_file')
+                          : t.t('fleet_status_vehicle_events_change_file'),
+                      variant: CoButtonVariant.secondaryOutlined,
                     ),
                     SizedBox(
                       width: 280,
@@ -3753,16 +3814,15 @@ class _VehicleEventDialogState extends State<_VehicleEventDialog> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    TextButton(
+                    CoButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      child: Text(t.t('button_close')),
+                      label: t.t('button_close'),
+                      variant: CoButtonVariant.quiet,
                     ),
                     const SizedBox(width: 10),
-                    FilledButton(
+                    CoButton(
                       onPressed: _submit,
-                      child: Text(
-                        t.t(_isEditing ? 'button_save' : 'button_add'),
-                      ),
+                      label: t.t(_isEditing ? 'button_save' : 'button_add'),
                     ),
                   ],
                 ),
@@ -3995,14 +4055,13 @@ class _VehicleDocumentDialogState extends State<_VehicleDocumentDialog> {
                   runSpacing: 8,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    OutlinedButton.icon(
+                    CoButton(
                       onPressed: _pickFile,
-                      icon: const Icon(Icons.upload_file_outlined),
-                      label: Text(
-                        _selectedFile == null
-                            ? t.t('fleet_status_vehicle_documents_pick_file')
-                            : t.t('fleet_status_vehicle_documents_change_file'),
-                      ),
+                      icon: Icons.upload_file_outlined,
+                      label: _selectedFile == null
+                          ? t.t('fleet_status_vehicle_documents_pick_file')
+                          : t.t('fleet_status_vehicle_documents_change_file'),
+                      variant: CoButtonVariant.secondaryOutlined,
                     ),
                     SizedBox(
                       width: 280,
@@ -4032,16 +4091,15 @@ class _VehicleDocumentDialogState extends State<_VehicleDocumentDialog> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    TextButton(
+                    CoButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      child: Text(t.t('button_close')),
+                      label: t.t('button_close'),
+                      variant: CoButtonVariant.quiet,
                     ),
                     const SizedBox(width: 10),
-                    FilledButton(
+                    CoButton(
                       onPressed: _submit,
-                      child: Text(
-                        t.t(_isEditing ? 'button_save' : 'button_add'),
-                      ),
+                      label: t.t(_isEditing ? 'button_save' : 'button_add'),
                     ),
                   ],
                 ),
@@ -4469,16 +4527,17 @@ class _ServiceEndDateDialogState extends State<_ServiceEndDateDialog> {
         ),
       ),
       actions: [
-        TextButton(
+        CoButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: Text(t.t('button_close')),
+          label: t.t('button_close'),
+          variant: CoButtonVariant.quiet,
         ),
-        FilledButton(
+        CoButton(
           onPressed: () {
             if (!(_formKey.currentState?.validate() ?? false)) return;
             Navigator.of(context).pop(_controller.text.trim());
           },
-          child: Text(t.t('button_save')),
+          label: t.t('button_save'),
         ),
       ],
     );

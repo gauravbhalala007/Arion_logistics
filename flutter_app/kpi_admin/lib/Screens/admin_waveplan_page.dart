@@ -12,16 +12,21 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../widgets/admin_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../localization/app_localizations.dart';
+import '../models/shift_plan.dart';
 import '../models/waveplan_route.dart';
-import '../theme/app_button_style.dart';
+import '../services/shift_plan_repository.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_elevation.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
+import '../widgets/co_button.dart';
+import '../widgets/co_pressable.dart';
+import '../widgets/waveplan_date_strip.dart';
 
 class AdminWaveplanPage extends StatefulWidget {
   const AdminWaveplanPage({super.key});
@@ -126,6 +131,10 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
   bool _isPublished = false;
   DateTime? _publishedAt;
 
+  /// Day the dispatcher is currently viewing. Defaults to today.
+  /// Persisted nowhere — refresh = back to today.
+  late DateTime _selectedDate;
+
   // Page-level dispatcher coordination — one bar at the top covers
   // every wave. Up to 3 dispatchers; each one has its own shift
   // bracket (independent picker). One free-form notes line is shown
@@ -158,18 +167,311 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
   // Mirrors the resolution used in scorecard_overview.dart.
   Stream<Map<String, String>>? _namesStream;
 
+  /// Published shift plan for the currently-selected date, populated by
+  /// [_watchShiftPlan]. Lets us surface Park / Dispatch times that the
+  /// admin already chose in the Shift Plan page.
+  ShiftPlanDoc? _shiftPlanDoc;
+  Map<String, ShiftPlanEntry> _shiftByTid =
+      const <String, ShiftPlanEntry>{};
+  StreamSubscription<ShiftPlanDoc?>? _shiftPlanSub;
+  final ShiftPlanRepository _shiftPlanRepo = ShiftPlanRepository();
+
+  String _dateKeyOf(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-'
+      '${d.month.toString().padLeft(2, '0')}-'
+      '${d.day.toString().padLeft(2, '0')}';
+
+  void _watchShiftPlan() {
+    _shiftPlanSub?.cancel();
+    final uid = AdminScope.adminUidOf(context) ??
+        FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    _shiftPlanSub = _shiftPlanRepo
+        .watch(adminUid: uid, dateKey: _dateKeyOf(_selectedDate))
+        .listen((doc) {
+      if (!mounted) return;
+      setState(() {
+        _shiftPlanDoc = doc;
+        final map = <String, ShiftPlanEntry>{};
+        if (doc != null) {
+          for (final e in doc.entries) {
+            final tid = e.transporterId.trim().toUpperCase();
+            if (tid.isNotEmpty) map[tid] = e;
+          }
+        }
+        _shiftByTid = map;
+      });
+    });
+  }
+
+  /// Parking arrival time computed for [tid] from the shift plan.
+  /// Mirrors the same logic used in admin_shift_plan_page.dart.
+  String? _shiftParkingFor(String tid) {
+    final doc = _shiftPlanDoc;
+    final entry = _shiftByTid[tid.trim().toUpperCase()];
+    if (doc == null || entry == null) return null;
+    final override = entry.meetingTime.trim();
+    if (override.isNotEmpty) return override;
+    if (entry.blocks.isEmpty) return null;
+    final raw = entry.blocks.first.startTime.trim();
+    final m = RegExp(r'^(\d{1,2}):(\d{2})\s*(am|pm)?',
+            caseSensitive: false)
+        .firstMatch(raw);
+    if (m == null) return null;
+    var h = int.tryParse(m.group(1) ?? '0') ?? 0;
+    final min = int.tryParse(m.group(2) ?? '0') ?? 0;
+    final suf = (m.group(3) ?? '').toLowerCase();
+    if (suf == 'pm' && h < 12) h += 12;
+    if (suf == 'am' && h == 12) h = 0;
+    final mins = h * 60 + min - doc.parkingOffsetMinutes;
+    if (mins < 0) return null;
+    final hh = (mins ~/ 60).toString().padLeft(2, '0');
+    final mm = (mins % 60).toString().padLeft(2, '0');
+    return '$hh:$mm';
+  }
+
   @override
   void initState() {
     super.initState();
+    final now = DateTime.now();
+    _selectedDate = DateTime(now.year, now.month, now.day);
     _namesStream = _driversNameMapGlobal();
     _dispatcherNamesStream = _streamDispatcherNames();
     _loadProgram(_activeProgram);
     _watchPublished();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _watchShiftPlan());
+  }
+
+  /// Opens a dialog listing every driver in the published shift plan
+  /// with their parking and dispatch times. Read-only — admin edits go
+  /// through the Shift Plan page itself.
+  Future<void> _openShiftPlanTimesDialog(
+    Map<String, String> namesMap,
+  ) async {
+    final doc = _shiftPlanDoc;
+    if (doc == null) return;
+    final entries = doc.entries
+        .where((e) => e.transporterId.trim().isNotEmpty)
+        .toList()
+      ..sort((a, b) {
+        final at = a.blocks.isNotEmpty ? a.blocks.first.startTime : '';
+        final bt = b.blocks.isNotEmpty ? b.blocks.first.startTime : '';
+        return at.compareTo(bt);
+      });
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560, maxHeight: 640),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(22, 20, 22, 14),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.green50,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        Icons.event_note_rounded,
+                        color: AppColors.codriverDeep,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Shift plan · ${entries.length} drivers',
+                            style: AppTypography.title3.copyWith(
+                              color: AppColors.codriverGraphite,
+                            ),
+                          ),
+                          Text(
+                            'Park = dispatch − ${doc.parkingOffsetMinutes} min',
+                            style: AppTypography.caption1.copyWith(
+                              color: AppColors.labelSecondaryLight,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      icon: const Icon(Icons.close_rounded),
+                      color: AppColors.labelSecondaryLight,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Flexible(
+                  child: entries.isEmpty
+                      ? Padding(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 32,
+                          ),
+                          child: Center(
+                            child: Text(
+                              'No drivers in the shift plan yet.',
+                              style: AppTypography.body.copyWith(
+                                color: AppColors.labelSecondaryLight,
+                              ),
+                            ),
+                          ),
+                        )
+                      : ListView.separated(
+                          shrinkWrap: true,
+                          itemCount: entries.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 6),
+                          itemBuilder: (ctx, i) {
+                            final e = entries[i];
+                            final tid =
+                                e.transporterId.trim().toUpperCase();
+                            final name = e.driverName.isNotEmpty
+                                ? e.driverName
+                                : (namesMap[tid] ?? tid);
+                            final dispatch = e.blocks.isNotEmpty
+                                ? e.blocks.first.startTime
+                                : '—';
+                            final park = _shiftParkingFor(tid) ?? '—';
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceLight,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: AppColors.separatorLight,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          name,
+                                          style: AppTypography.subheadline
+                                              .copyWith(
+                                            color: AppColors
+                                                .codriverGraphite,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        Text(
+                                          tid,
+                                          style: AppTypography.caption2
+                                              .copyWith(
+                                            color: AppColors
+                                                .labelSecondaryLight,
+                                            fontFamily: 'monospace',
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  _ShiftPlanTimePill(
+                                    label: 'Park',
+                                    value: park,
+                                    accent: AppColors.codriverDeep,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  _ShiftPlanTimePill(
+                                    label: 'Dispatch',
+                                    value: dispatch,
+                                    accent: AppColors.codriverGreen,
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Set / clear the mentee for the route identified by [routeId].
+  void _assignMentee(String routeId, String? menteeTid) {
+    setState(() {
+      _routes = _routes.map((r) {
+        if (r.routeId != routeId) return r;
+        if (menteeTid == null || menteeTid.trim().isEmpty) {
+          return r.copyWith(clearMenteeTransporterId: true);
+        }
+        return r.copyWith(menteeTransporterId: menteeTid.trim());
+      }).toList();
+    });
+  }
+
+  /// transporterIds already used in this wave (either as the primary
+  /// driver or as a mentee). Used to filter the "Add Mentee" search.
+  Set<String> get _inWaveTids {
+    final out = <String>{};
+    for (final r in _routes) {
+      final t = (r.transporterId ?? '').trim().toUpperCase();
+      if (t.isNotEmpty) out.add(t);
+      final m = (r.menteeTransporterId ?? '').trim().toUpperCase();
+      if (m.isNotEmpty) out.add(m);
+    }
+    return out;
+  }
+
+  /// Switch the displayed day. Resets in-memory state for ALL programs
+  /// so we don't leak yesterday's snapshot into today's view, then
+  /// re-watches the published doc for the new date.
+  void _changeDate(DateTime d) {
+    final next = DateTime(d.year, d.month, d.day);
+    if (next == _selectedDate) return;
+    setState(() {
+      _selectedDate = next;
+      // Reset all program snapshots — hydration will refill them from
+      // the new date's published doc if it exists.
+      for (final k in _saved.keys) {
+        _saved[k] = _ProgramSnapshot();
+      }
+      _routes = <WaveplanRoute>[];
+      _unassigned.clear();
+      _atlasByRoute.clear();
+      _atlasConfirmed = false;
+      _isPublished = false;
+      _publishedAt = null;
+      _generalNotes = '';
+      _waveAnchors.clear();
+      _hydratedPrograms.clear();
+    });
+    _watchPublished();
+    _watchShiftPlan();
   }
 
   @override
   void dispose() {
     _publishedSub?.cancel();
+    _shiftPlanSub?.cancel();
     super.dispose();
   }
 
@@ -233,6 +535,10 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
               assignedDsp: ((r['assignedDsp'] ?? '').toString().isEmpty)
                   ? null
                   : (r['assignedDsp'] as String),
+              menteeTransporterId:
+                  ((r['menteeTransporterId'] ?? '').toString().isEmpty)
+                      ? null
+                      : (r['menteeTransporterId'] as String),
             ),
       ];
       _atlasByRoute.clear();
@@ -524,6 +830,28 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // ─── Date strip ───────────────────────────────────
+                  WaveplanDateStrip(
+                    selected: _selectedDate,
+                    onSelect: _changeDate,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  // ─── Shift plan banner ────────────────────────────
+                  if (_shiftPlanDoc != null &&
+                      _shiftPlanDoc!.entries.isNotEmpty) ...[
+                    _ShiftPlanBanner(
+                      driverCount: _shiftPlanDoc!.entries
+                          .where((e) =>
+                              e.transporterId.trim().isNotEmpty)
+                          .length,
+                      offsetMinutes:
+                          _shiftPlanDoc!.parkingOffsetMinutes,
+                      onShowAll: () => _openShiftPlanTimesDialog(
+                        namesMap,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                  ],
                   // ─── Top row ─────────────────────────────────────
                   // Mobile: tabs + round "+" + compact Publish.
                   // Desktop: tabs + dispatcher bar side-by-side.
@@ -611,6 +939,8 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
                             onAssign: _assignTo,
                             onUnassign: _unassign,
                             onDropToPool: _dropToPool,
+                            onMenteeChange: _assignMentee,
+                            inWaveTids: _inWaveTids,
                           )
                         : _SideBySideLayout(
                             routes: routes,
@@ -623,6 +953,8 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
                             onAssign: _assignTo,
                             onUnassign: _unassign,
                             onDropToPool: _dropToPool,
+                            onMenteeChange: _assignMentee,
+                            inWaveTids: _inWaveTids,
                           ),
                   ),
                 ],
@@ -687,18 +1019,19 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
           ),
         ),
         actions: [
-          TextButton(
+          CoButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(t.t('waveplan_btn_cancel')),
+            label: t.t('waveplan_btn_cancel'),
+            variant: CoButtonVariant.quiet,
           ),
-          TextButton(
+          CoButton(
             onPressed: () => Navigator.of(ctx).pop(_kAtlasNoneToday),
-            child: Text(t.t('waveplan_atlas_dialog_btn_none_today')),
+            label: t.t('waveplan_atlas_dialog_btn_none_today'),
+            variant: CoButtonVariant.quiet,
           ),
-          FilledButton(
-            style: AppButtonStyle.of(AppButtonVariant.primary),
+          CoButton(
             onPressed: () => Navigator.of(ctx).pop(controller.text),
-            child: Text(t.t('waveplan_btn_import')),
+            label: t.t('waveplan_btn_import'),
           ),
         ],
       ),
@@ -828,14 +1161,14 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
           ),
         ),
         actions: [
-          TextButton(
+          CoButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(t.t('waveplan_btn_cancel')),
+            label: t.t('waveplan_btn_cancel'),
+            variant: CoButtonVariant.quiet,
           ),
-          FilledButton(
-            style: AppButtonStyle.of(AppButtonVariant.primary),
+          CoButton(
             onPressed: () => Navigator.of(ctx).pop(controller.text),
-            child: Text(t.t('waveplan_btn_save')),
+            label: t.t('waveplan_btn_save'),
           ),
         ],
       ),
@@ -884,14 +1217,14 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
           ),
         ),
         actions: [
-          TextButton(
+          CoButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(t.t('waveplan_btn_cancel')),
+            label: t.t('waveplan_btn_cancel'),
+            variant: CoButtonVariant.quiet,
           ),
-          FilledButton(
-            style: AppButtonStyle.of(AppButtonVariant.primary),
+          CoButton(
             onPressed: () => Navigator.of(ctx).pop(controller.text),
-            child: Text(t.t('waveplan_btn_import')),
+            label: t.t('waveplan_btn_import'),
           ),
         ],
       ),
@@ -921,19 +1254,67 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
   }
 
   /// Parses the line-per-field paste format used by the Amazon dispatch
-  /// list. Each route is 9 consecutive non-empty lines; "ASSIGN DA" is
-  /// `<TID> / <DSP> / <TID>` and the first segment is taken as the
-  /// transporterId.
+  /// list. Each route is 9 consecutive non-empty lines, in order:
+  ///   1. dispatchTime              (`11:00:00` or `11:00:00 AM`)
+  ///   2. shift end / driving until (same shape)
+  ///   3. routeCode                 (e.g. `CA_A151`)
+  ///   4. routeId                   (e.g. `7510683-151`)
+  ///   5. dispatchArea              (e.g. `STG-B_RED.3`)
+  ///   6. waiting area spur         (`rechts` / `links` / …)
+  ///   7. ASSIGN DA                 (`<TID> / <DSP> / <TID>` or just `<TID>`)
+  ///   8. Assigned DSP              (e.g. `AION`)
+  ///   9. Service Type              (free text)
+  ///
+  /// The parser is tolerant to:
+  ///   • header rows at the top of the paste (skipped by content match),
+  ///   • 12-hour times with `AM`/`PM` suffix (normalised to 24h),
+  ///   • blank lines (already stripped),
+  ///   • partially-mangled chunks — uses time-anchors at lines i and i+1
+  ///     to re-sync rather than blindly chunk by 9.
   List<WaveplanRoute> _parsePastedWaveplan(String input) {
-    final lines = input
+    final raw = input
         .split('\n')
         .map((l) => l.trim())
         .where((l) => l.isNotEmpty)
         .toList();
+
+    // Filter out known header tokens. Amazon's dispatch-list export
+    // sometimes includes a header row above the data; without this
+    // filter every subsequent chunk would be off-by-one.
+    const headerTokens = <String>{
+      'dispatchtime',
+      'driving time until',
+      'routecode',
+      'routeid',
+      'dispatcharea',
+      'waiting area spur',
+      'assign da',
+      'assigned dsp',
+      'service type',
+    };
+    final lines = raw
+        .where((l) => !headerTokens.contains(l.toLowerCase()))
+        .toList();
+
+    // A time cell is `H:MM`, `H:MM:SS` optionally followed by AM/PM.
+    final timeRe = RegExp(
+      r'^\d{1,2}:\d{2}(?::\d{2})?\s*(AM|PM)?$',
+      caseSensitive: false,
+    );
+
     final out = <WaveplanRoute>[];
-    for (var i = 0; i + 8 < lines.length; i += 9) {
-      final dispatchTime = lines[i + 0];
-      final shiftEnd = lines[i + 1];
+    var i = 0;
+    while (i + 8 < lines.length) {
+      // Anchor on two consecutive time-looking lines. If the chunk is
+      // misaligned we skip one line and try again instead of dropping
+      // 9 in a row.
+      if (!timeRe.hasMatch(lines[i]) || !timeRe.hasMatch(lines[i + 1])) {
+        i += 1;
+        continue;
+      }
+
+      final dispatchTime = _normaliseClock(lines[i + 0]);
+      final shiftEnd = _normaliseClock(lines[i + 1]);
       final routeCode = lines[i + 2];
       final routeId = lines[i + 3];
       final dispatchArea = lines[i + 4];
@@ -941,11 +1322,6 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
       final assignDa = lines[i + 6];
       final dsp = lines[i + 7];
       final serviceType = lines[i + 8];
-
-      // Sanity check — first line should look like HH:MM:SS
-      if (!RegExp(r'^\d{1,2}:\d{2}:\d{2}$').hasMatch(dispatchTime)) {
-        continue;
-      }
 
       String? tid;
       final parts = assignDa.split('/').map((p) => p.trim()).toList();
@@ -965,8 +1341,27 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
           assignedDsp: dsp,
         ),
       );
+      i += 9;
     }
     return out;
+  }
+
+  /// Normalise a clock string to `HH:MM:SS` 24h. Accepts `11:00`,
+  /// `11:00:00`, `11:00 AM`, `11:00:00 AM`, `08:00 PM`, …
+  static String _normaliseClock(String raw) {
+    final s = raw.trim();
+    final m = RegExp(
+      r'^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$',
+      caseSensitive: false,
+    ).firstMatch(s);
+    if (m == null) return s;
+    var hh = int.tryParse(m.group(1) ?? '') ?? 0;
+    final mm = m.group(2) ?? '00';
+    final ss = m.group(3) ?? '00';
+    final ampm = m.group(4)?.toUpperCase();
+    if (ampm == 'PM' && hh < 12) hh += 12;
+    if (ampm == 'AM' && hh == 12) hh = 0;
+    return '${hh.toString().padLeft(2, '0')}:$mm:$ss';
   }
 
   /// Today's published-waveplan doc reference for the active program.
@@ -985,11 +1380,11 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
   DocumentReference<Map<String, dynamic>>? _publishedDocRef() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return null;
-    final now = DateTime.now();
+    final d = _selectedDate;
     final date =
-        '${now.year.toString().padLeft(4, '0')}-'
-        '${now.month.toString().padLeft(2, '0')}-'
-        '${now.day.toString().padLeft(2, '0')}';
+        '${d.year.toString().padLeft(4, '0')}-'
+        '${d.month.toString().padLeft(2, '0')}-'
+        '${d.day.toString().padLeft(2, '0')}';
     return FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)
@@ -1051,6 +1446,8 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
         'transporterId': r.transporterId ?? '',
         'driverName': _resolveName(namesMap, r.transporterId),
         'assignedDsp': r.assignedDsp ?? '',
+        'menteeTransporterId': r.menteeTransporterId ?? '',
+        'menteeName': _resolveName(namesMap, r.menteeTransporterId),
         'atlasTrackingIds': _atlasByRoute[r.routeCode] ?? const <String>[],
       };
     }).toList();
@@ -1371,14 +1768,15 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
         title: Text(t.t('waveplan_clear_dialog_title')),
         content: Text(t.t('waveplan_clear_dialog_body')),
         actions: [
-          TextButton(
+          CoButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(t.t('waveplan_btn_cancel')),
+            label: t.t('waveplan_btn_cancel'),
+            variant: CoButtonVariant.quiet,
           ),
-          FilledButton(
-            style: AppButtonStyle.of(AppButtonVariant.destructive),
+          CoButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(t.t('waveplan_btn_clear')),
+            label: t.t('waveplan_btn_clear'),
+            variant: CoButtonVariant.destructive,
           ),
         ],
       ),
@@ -1413,6 +1811,8 @@ class _SideBySideLayout extends StatelessWidget {
   final void Function(String routeId, String transporterId) onAssign;
   final void Function(String routeId) onUnassign;
   final void Function(String transporterId) onDropToPool;
+  final void Function(String routeId, String? menteeTid) onMenteeChange;
+  final Set<String> inWaveTids;
 
   const _SideBySideLayout({
     required this.routes,
@@ -1424,6 +1824,8 @@ class _SideBySideLayout extends StatelessWidget {
     required this.onAssign,
     required this.onUnassign,
     required this.onDropToPool,
+    required this.onMenteeChange,
+    required this.inWaveTids,
   });
 
   @override
@@ -1440,6 +1842,9 @@ class _SideBySideLayout extends StatelessWidget {
             resolveName: resolveName,
             onAssign: onAssign,
             onUnassign: onUnassign,
+            onMenteeChange: onMenteeChange,
+            namesMap: namesMap,
+            inWaveTids: inWaveTids,
           ),
         ),
         const SizedBox(width: AppSpacing.md),
@@ -1466,6 +1871,8 @@ class _StackedLayout extends StatelessWidget {
   final void Function(String routeId, String transporterId) onAssign;
   final void Function(String routeId) onUnassign;
   final void Function(String transporterId) onDropToPool;
+  final void Function(String routeId, String? menteeTid) onMenteeChange;
+  final Set<String> inWaveTids;
 
   const _StackedLayout({
     required this.routes,
@@ -1477,6 +1884,8 @@ class _StackedLayout extends StatelessWidget {
     required this.onAssign,
     required this.onUnassign,
     required this.onDropToPool,
+    required this.onMenteeChange,
+    required this.inWaveTids,
   });
 
   @override
@@ -1500,6 +1909,9 @@ class _StackedLayout extends StatelessWidget {
             resolveName: resolveName,
             onAssign: onAssign,
             onUnassign: onUnassign,
+            onMenteeChange: onMenteeChange,
+            namesMap: namesMap,
+            inWaveTids: inWaveTids,
           ),
         ),
       ],
@@ -1821,7 +2233,7 @@ class _RoundPlusButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      child: GestureDetector(
+      child: CoPressable(
         onTap: onTap,
         child: Container(
           width: 38,
@@ -1854,7 +2266,7 @@ class _RoundDangerButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      child: GestureDetector(
+      child: CoPressable(
         onTap: onTap,
         child: Container(
           width: 38,
@@ -2094,6 +2506,9 @@ class _RouteList extends StatelessWidget {
   final String Function(String? transporterId) resolveName;
   final void Function(String routeId, String transporterId) onAssign;
   final void Function(String routeId) onUnassign;
+  final void Function(String routeId, String? menteeTid) onMenteeChange;
+  final Map<String, String> namesMap;
+  final Set<String> inWaveTids;
 
   const _RouteList({
     required this.routes,
@@ -2102,6 +2517,9 @@ class _RouteList extends StatelessWidget {
     required this.resolveName,
     required this.onAssign,
     required this.onUnassign,
+    required this.onMenteeChange,
+    required this.namesMap,
+    required this.inWaveTids,
   });
 
   @override
@@ -2148,6 +2566,10 @@ class _RouteList extends StatelessWidget {
           resolveName: resolveName,
           onAssign: (tid) => onAssign(routeItem.route.routeId, tid),
           onUnassign: () => onUnassign(routeItem.route.routeId),
+          onMenteeChange: (mTid) =>
+              onMenteeChange(routeItem.route.routeId, mTid),
+          namesMap: namesMap,
+          inWaveTids: inWaveTids,
           isAlternate: routeItem.isAlternate,
         );
       },
@@ -2272,8 +2694,9 @@ class _AddDispatcherChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      child: GestureDetector(
+      child: CoPressable(
         onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
         child: Container(
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.sm,
@@ -2335,8 +2758,9 @@ class _DispatcherRow extends StatelessWidget {
         // whole pill) removes the dispatcher from the selection.
         MouseRegion(
           cursor: SystemMouseCursors.click,
-          child: GestureDetector(
+          child: CoPressable(
             onTap: onRemove,
+            borderRadius: BorderRadius.circular(999),
             child: Container(
               padding: const EdgeInsets.fromLTRB(10, 5, 4, 5),
               decoration: BoxDecoration(
@@ -2521,6 +2945,9 @@ class _RouteCard extends StatelessWidget {
   final String Function(String? transporterId) resolveName;
   final ValueChanged<String> onAssign;
   final VoidCallback onUnassign;
+  final ValueChanged<String?> onMenteeChange;
+  final Map<String, String> namesMap;
+  final Set<String> inWaveTids;
   final bool isAlternate;
 
   const _RouteCard({
@@ -2529,6 +2956,9 @@ class _RouteCard extends StatelessWidget {
     required this.resolveName,
     required this.onAssign,
     required this.onUnassign,
+    required this.onMenteeChange,
+    required this.namesMap,
+    required this.inWaveTids,
     required this.isAlternate,
   });
 
@@ -2585,7 +3015,15 @@ class _RouteCard extends StatelessWidget {
                                 transporterId: route.transporterId!,
                                 driverName: driverName,
                                 dsp: route.assignedDsp,
+                                menteeTransporterId:
+                                    route.menteeTransporterId,
+                                menteeName: route.hasMentee
+                                    ? resolveName(route.menteeTransporterId)
+                                    : '',
                                 onRemove: onUnassign,
+                                onMenteeChange: onMenteeChange,
+                                namesMap: namesMap,
+                                inWaveTids: inWaveTids,
                                 compact: true,
                               )
                             : _EmptyDropZone(active: hovered),
@@ -2601,7 +3039,15 @@ class _RouteCard extends StatelessWidget {
                                 transporterId: route.transporterId!,
                                 driverName: driverName,
                                 dsp: route.assignedDsp,
+                                menteeTransporterId:
+                                    route.menteeTransporterId,
+                                menteeName: route.hasMentee
+                                    ? resolveName(route.menteeTransporterId)
+                                    : '',
                                 onRemove: onUnassign,
+                                onMenteeChange: onMenteeChange,
+                                namesMap: namesMap,
+                                inWaveTids: inWaveTids,
                               )
                             : _EmptyDropZone(active: hovered),
                       ),
@@ -2742,8 +3188,7 @@ class _AtlasBadge extends StatelessWidget {
     if (trackingIds.isEmpty) return chip;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
+      child: CoPressable(
         onTap: () => _showAtlasTrackingPopup(
           context,
           trackingIds,
@@ -2873,9 +3318,10 @@ Future<void> _showAtlasTrackingPopup(
         ),
       ),
       actions: [
-        TextButton(
+        CoButton(
           onPressed: () => Navigator.of(ctx).pop(),
-          child: Text(t.t('waveplan_btn_cancel')),
+          label: t.t('waveplan_btn_cancel'),
+          variant: CoButtonVariant.quiet,
         ),
       ],
     ),
@@ -2971,6 +3417,11 @@ class _DriverChip extends StatelessWidget {
   final String driverName;
   final String? dsp;
   final VoidCallback onRemove;
+  final String? menteeTransporterId;
+  final String menteeName;
+  final ValueChanged<String?> onMenteeChange;
+  final Map<String, String> namesMap;
+  final Set<String> inWaveTids;
   /// Compact (mobile) variant: drops the person avatar + close
   /// button so the chip fits next to the spur indicator on a phone.
   /// Long press still triggers the drag handle.
@@ -2980,6 +3431,11 @@ class _DriverChip extends StatelessWidget {
     required this.transporterId,
     required this.driverName,
     required this.onRemove,
+    required this.onMenteeChange,
+    required this.namesMap,
+    required this.inWaveTids,
+    this.menteeTransporterId,
+    this.menteeName = '',
     this.dsp,
     this.compact = false,
   });
@@ -2990,7 +3446,12 @@ class _DriverChip extends StatelessWidget {
       transporterId: transporterId,
       driverName: driverName,
       dsp: dsp,
+      menteeTransporterId: menteeTransporterId,
+      menteeName: menteeName,
       onRemove: onRemove,
+      onMenteeChange: onMenteeChange,
+      namesMap: namesMap,
+      inWaveTids: inWaveTids,
       compact: compact,
     );
 
@@ -3005,7 +3466,12 @@ class _DriverChip extends StatelessWidget {
             transporterId: transporterId,
             driverName: driverName,
             dsp: dsp,
+            menteeTransporterId: menteeTransporterId,
+            menteeName: menteeName,
             onRemove: onRemove,
+            onMenteeChange: onMenteeChange,
+            namesMap: namesMap,
+            inWaveTids: inWaveTids,
             elevated: true,
             compact: compact,
           ),
@@ -3022,6 +3488,11 @@ class _ChipBody extends StatelessWidget {
   final String driverName;
   final String? dsp;
   final VoidCallback onRemove;
+  final String? menteeTransporterId;
+  final String menteeName;
+  final ValueChanged<String?> onMenteeChange;
+  final Map<String, String> namesMap;
+  final Set<String> inWaveTids;
   final bool elevated;
   final bool compact;
 
@@ -3029,98 +3500,547 @@ class _ChipBody extends StatelessWidget {
     required this.transporterId,
     required this.driverName,
     required this.onRemove,
+    required this.onMenteeChange,
+    required this.namesMap,
+    required this.inWaveTids,
+    this.menteeTransporterId,
+    this.menteeName = '',
     this.dsp,
     this.elevated = false,
     this.compact = false,
   });
 
+  bool get _hasMentee =>
+      menteeTransporterId != null && menteeTransporterId!.trim().isNotEmpty;
+
+  static const Color _kMenteeBlue = Color(0xFF0A84FF);
+
+  Future<void> _openMenu(BuildContext context) async {
+    final box = context.findRenderObject() as RenderBox?;
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (box == null || overlay == null) return;
+    final origin = box.localToGlobal(Offset.zero, ancestor: overlay);
+    final position = RelativeRect.fromLTRB(
+      origin.dx,
+      origin.dy + box.size.height + 6,
+      overlay.size.width - origin.dx - box.size.width,
+      0,
+    );
+
+    final picked = await showMenu<String>(
+      context: context,
+      position: position,
+      color: AppColors.surfaceElevatedLight,
+      elevation: 8,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+      ),
+      items: [
+        PopupMenuItem<String>(
+          value: 'copy_tid',
+          height: 44,
+          child: Row(
+            children: [
+              const Icon(
+                Icons.copy_rounded,
+                size: 16,
+                color: AppColors.codriverGraphite,
+              ),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'TID kopieren',
+                      style: AppTypography.subheadline.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.codriverGraphite,
+                      ),
+                    ),
+                    Text(
+                      transporterId,
+                      style: AppTypography.caption2.copyWith(
+                        color: AppColors.labelSecondaryLight,
+                        fontFamily: 'monospace',
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem<String>(
+          value: 'mentee',
+          height: 44,
+          child: Row(
+            children: [
+              Icon(
+                _hasMentee ? Icons.swap_horiz_rounded : Icons.person_add_alt_1,
+                size: 18,
+                color: _kMenteeBlue,
+              ),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Text(
+                  _hasMentee
+                      ? 'Mentee ändern (${menteeName.isNotEmpty ? menteeName : menteeTransporterId})'
+                      : 'Mentee hinzufügen',
+                  style: AppTypography.subheadline.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: _kMenteeBlue,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (_hasMentee)
+          PopupMenuItem<String>(
+            value: 'mentee_remove',
+            height: 40,
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.person_remove_alt_1_outlined,
+                  size: 18,
+                  color: Color(0xFFB91C1C),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'Mentee entfernen',
+                  style: AppTypography.subheadline.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFFB91C1C),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+
+    if (!context.mounted) return;
+    switch (picked) {
+      case 'copy_tid':
+        await Clipboard.setData(ClipboardData(text: transporterId));
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('TID kopiert · $transporterId'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        break;
+      case 'mentee':
+        final pickedTid = await showDialog<String>(
+          context: context,
+          builder: (ctx) => _AddMenteeDialog(
+            namesMap: namesMap,
+            disabledTids: {
+              ...inWaveTids,
+              transporterId.trim().toUpperCase(),
+            },
+            currentMenteeTid: menteeTransporterId,
+          ),
+        );
+        if (pickedTid != null) {
+          onMenteeChange(pickedTid);
+        }
+        break;
+      case 'mentee_remove':
+        onMenteeChange(null);
+        break;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final hasName = driverName.trim().isNotEmpty;
+    final borderColor =
+        _hasMentee ? _kMenteeBlue : AppColors.codriverGreen;
+    final avatarColor =
+        _hasMentee ? _kMenteeBlue : AppColors.codriverGreen;
+
     return IntrinsicWidth(
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: compact ? 8 : 12,
-          vertical: compact ? 4 : 7,
-        ),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: AppColors.codriverGreen,
-            width: 1.5,
-          ),
-          boxShadow: elevated ? AppElevation.level3 : AppElevation.level1,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (!compact) ...[
-              Container(
-                width: 26,
-                height: 26,
-                decoration: const BoxDecoration(
-                  color: AppColors.codriverGreen,
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: const Icon(
-                  Icons.person_rounded,
-                  size: 14,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(width: 10),
-            ],
-            Flexible(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    hasName ? driverName : '— kein Name —',
-                    style: TextStyle(
-                      fontSize: compact ? 12 : 13,
-                      height: 1.15,
-                      color: hasName
-                          ? AppColors.codriverGraphite
-                          : AppColors.labelTertiaryLight,
-                      fontWeight: FontWeight.w600,
-                      fontStyle: hasName ? FontStyle.normal : FontStyle.italic,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  SizedBox(height: compact ? 1 : 4),
-                  // Tap-to-copy on the transporterId. Hovers light up
-                  // the row + a tiny copy icon to make the affordance
-                  // discoverable.
-                  _CopyableId(transporterId: transporterId),
-                ],
-              ),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => _openMenu(context),
+          child: Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: compact ? 8 : 12,
+              vertical: compact ? 4 : 7,
             ),
-            SizedBox(width: compact ? 6 : 10),
-            MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: GestureDetector(
-                onTap: onRemove,
-                child: Container(
-                  width: compact ? 18 : 20,
-                  height: compact ? 18 : 20,
-                  decoration: const BoxDecoration(
-                    color: AppColors.surfaceLight,
-                    shape: BoxShape.circle,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: borderColor,
+                width: _hasMentee ? 2 : 1.5,
+              ),
+              boxShadow: elevated ? AppElevation.level3 : AppElevation.level1,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!compact) ...[
+                  Container(
+                    width: 26,
+                    height: 26,
+                    decoration: BoxDecoration(
+                      color: avatarColor,
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: Icon(
+                      _hasMentee
+                          ? Icons.school_outlined
+                          : Icons.person_rounded,
+                      size: 14,
+                      color: Colors.white,
+                    ),
                   ),
-                  alignment: Alignment.center,
-                  child: Icon(
-                    Icons.close_rounded,
-                    size: compact ? 11 : 12,
+                  const SizedBox(width: 10),
+                ],
+                Flexible(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        hasName ? driverName : '— kein Name —',
+                        style: TextStyle(
+                          fontSize: compact ? 12 : 13,
+                          height: 1.15,
+                          color: hasName
+                              ? AppColors.codriverGraphite
+                              : AppColors.labelTertiaryLight,
+                          fontWeight: FontWeight.w600,
+                          fontStyle:
+                              hasName ? FontStyle.normal : FontStyle.italic,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      SizedBox(height: compact ? 1 : 2),
+                      Text(
+                        transporterId,
+                        style: AppTypography.caption2.copyWith(
+                          fontFamily: 'monospace',
+                          color: AppColors.labelSecondaryLight,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (_hasMentee) ...[
+                        SizedBox(height: compact ? 2 : 4),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.school_rounded,
+                              size: 11,
+                              color: _kMenteeBlue,
+                            ),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                menteeName.isNotEmpty
+                                    ? menteeName
+                                    : (menteeTransporterId ?? ''),
+                                style: AppTypography.caption2.copyWith(
+                                  color: _kMenteeBlue,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                SizedBox(width: compact ? 6 : 10),
+                MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: CoPressable(
+                    onTap: onRemove,
+                    child: Container(
+                      width: compact ? 18 : 20,
+                      height: compact ? 18 : 20,
+                      decoration: const BoxDecoration(
+                        color: AppColors.surfaceLight,
+                        shape: BoxShape.circle,
+                      ),
+                      alignment: Alignment.center,
+                      child: Icon(
+                        Icons.close_rounded,
+                        size: compact ? 11 : 12,
+                        color: AppColors.labelSecondaryLight,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────
+//   ADD MENTEE DIALOG  — searchable list of available drivers
+// ──────────────────────────────────────────────────────────────────────
+
+class _AddMenteeDialog extends StatefulWidget {
+  const _AddMenteeDialog({
+    required this.namesMap,
+    required this.disabledTids,
+    required this.currentMenteeTid,
+  });
+
+  /// transporterId (UPPERCASE) → driver name
+  final Map<String, String> namesMap;
+
+  /// transporterIds that are already used (primary or mentee) in
+  /// this wave. They appear greyed-out / disabled in the picker.
+  final Set<String> disabledTids;
+
+  final String? currentMenteeTid;
+
+  @override
+  State<_AddMenteeDialog> createState() => _AddMenteeDialogState();
+}
+
+class _AddMenteeDialogState extends State<_AddMenteeDialog> {
+  final TextEditingController _q = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _q.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final allEntries = widget.namesMap.entries.toList()
+      ..sort((a, b) =>
+          a.value.toLowerCase().compareTo(b.value.toLowerCase()));
+    final cleanQ = _query.trim().toLowerCase();
+    final filtered = allEntries.where((e) {
+      final tid = e.key.trim().toUpperCase();
+      final isCurrent = widget.currentMenteeTid != null &&
+          widget.currentMenteeTid!.trim().toUpperCase() == tid;
+      final taken = widget.disabledTids.contains(tid) && !isCurrent;
+      if (taken) return false;
+      if (cleanQ.isEmpty) return true;
+      return e.value.toLowerCase().contains(cleanQ) ||
+          tid.toLowerCase().contains(cleanQ);
+    }).toList();
+
+    return Dialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      insetPadding: const EdgeInsets.all(20),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560, maxHeight: 640),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE7F1FE),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.school_outlined,
+                      color: Color(0xFF0A84FF),
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Mentee hinzufügen',
+                          style: AppTypography.title3.copyWith(
+                            color: AppColors.codriverGraphite,
+                          ),
+                        ),
+                        Text(
+                          'Nur Fahrer, die noch nicht in der Wave sind.',
+                          style: AppTypography.footnote.copyWith(
+                            color: AppColors.labelSecondaryLight,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
                     color: AppColors.labelSecondaryLight,
                   ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _q,
+                autofocus: true,
+                onChanged: (v) => setState(() => _query = v),
+                decoration: InputDecoration(
+                  hintText: 'Name oder TID suchen…',
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  filled: true,
+                  fillColor: const Color(0xFFF9FAFB),
+                  isDense: true,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide:
+                        const BorderSide(color: Color(0xFFE5E7EB)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide:
+                        const BorderSide(color: Color(0xFFE5E7EB)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                      color: Color(0xFF0A84FF),
+                      width: 1.4,
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+              Flexible(
+                child: filtered.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 32),
+                        child: Center(
+                          child: Text(
+                            'Keine passenden Fahrer gefunden.',
+                            style: AppTypography.body.copyWith(
+                              color: AppColors.labelSecondaryLight,
+                            ),
+                          ),
+                        ),
+                      )
+                    : ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, __) => const Divider(
+                          height: 1,
+                          color: Color(0xFFE5E7EB),
+                        ),
+                        itemBuilder: (ctx, i) {
+                          final tid = filtered[i].key;
+                          final name = filtered[i].value;
+                          final isCurrent = widget.currentMenteeTid != null &&
+                              widget.currentMenteeTid!.trim().toUpperCase() ==
+                                  tid.trim().toUpperCase();
+                          return CoPressable(
+                            onTap: () => Navigator.of(context).pop(tid),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 12,
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 36,
+                                    height: 36,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFE7F1FE),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: const Icon(
+                                      Icons.person_rounded,
+                                      size: 18,
+                                      color: Color(0xFF0A84FF),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          name.isNotEmpty
+                                              ? name
+                                              : '— kein Name —',
+                                          style: AppTypography.subheadline
+                                              .copyWith(
+                                            color:
+                                                AppColors.codriverGraphite,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        Text(
+                                          tid,
+                                          style:
+                                              AppTypography.caption2.copyWith(
+                                            fontFamily: 'monospace',
+                                            color: AppColors
+                                                .labelSecondaryLight,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (isCurrent)
+                                    const Icon(
+                                      Icons.check_circle_rounded,
+                                      size: 18,
+                                      color: Color(0xFF0A84FF),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -3313,6 +4233,10 @@ class _UnassignedPool extends StatelessWidget {
                             dsp: 'AION',
                             // Pool drivers stay where they are; tap is no-op.
                             onRemove: () {},
+                            // Mentee picker not applicable in the pool.
+                            onMenteeChange: (_) {},
+                            namesMap: const <String, String>{},
+                            inWaveTids: const <String>{},
                           ),
                         ),
                       ),
@@ -3325,3 +4249,122 @@ class _UnassignedPool extends StatelessWidget {
   }
 }
 
+// ──────────────────────────────────────────────────────────────────
+//   SHIFT PLAN BANNER  (top of waveplan)
+// ──────────────────────────────────────────────────────────────────
+
+class _ShiftPlanBanner extends StatelessWidget {
+  const _ShiftPlanBanner({
+    required this.driverCount,
+    required this.offsetMinutes,
+    required this.onShowAll,
+  });
+
+  final int driverCount;
+  final int offsetMinutes;
+  final VoidCallback onShowAll;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+      decoration: BoxDecoration(
+        color: AppColors.green50,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: AppColors.codriverGreen.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.event_note_rounded,
+            size: 18,
+            color: AppColors.codriverDeep,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Shift plan loaded · $driverCount drivers',
+                  style: AppTypography.subheadline.copyWith(
+                    color: AppColors.codriverDeep,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Text(
+                  'Park = dispatch − $offsetMinutes min',
+                  style: AppTypography.caption2.copyWith(
+                    color: AppColors.codriverDeep.withValues(alpha: 0.7),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton.icon(
+            onPressed: onShowAll,
+            icon: const Icon(Icons.visibility_outlined, size: 16),
+            label: const Text('Show times'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.codriverDeep,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 6,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ShiftPlanTimePill extends StatelessWidget {
+  const _ShiftPlanTimePill({
+    required this.label,
+    required this.value,
+    required this.accent,
+  });
+
+  final String label;
+  final String value;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: accent.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: AppTypography.caption2.copyWith(
+              color: accent,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.4,
+            ),
+          ),
+          Text(
+            value,
+            style: AppTypography.subheadline.copyWith(
+              color: accent,
+              fontWeight: FontWeight.w800,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

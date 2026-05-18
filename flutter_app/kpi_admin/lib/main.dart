@@ -11,6 +11,9 @@ import 'Screens/signup_page.dart';
 import 'Screens/verify_email_page.dart';
 import 'Screens/driver_dashboard_page.dart';
 import 'Screens/admin_shell_page.dart';
+import 'Screens/admin_inventory_detail_page.dart';
+import 'Screens/recruiting_form_page.dart';
+import 'models/recruiting_application.dart';
 import 'widgets/app_side_menu.dart'; // for AppNav
 
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -70,7 +73,7 @@ class App extends StatelessWidget {
       animation: localeController,
       builder: (context, _) {
         return MaterialApp(
-          title: 'DSP Copilot',
+          title: 'DSP CODRIVER',
           debugShowCheckedModeBanner: false,
           // 🌍 Current app locale (null = use system locale)
           locale: localeController.locale,
@@ -84,6 +87,39 @@ class App extends StatelessWidget {
           theme: AppTheme.light(),
 
           home: _wrapSelectable(const AuthGate()),
+          onGenerateRoute: (settings) {
+            if (settings.name == '/inventory/item') {
+              final id = (settings.arguments ?? '').toString();
+              return MaterialPageRoute<void>(
+                settings: settings,
+                builder: (_) => _wrapSelectable(
+                  AdminInventoryDetailPage(itemId: id),
+                ),
+              );
+            }
+            // Public recruiting form.
+            //   /recruiting?dsp=<adminUid>&type=local|visa
+            // No auth wrapper — anyone with the link can fill it.
+            final name = settings.name ?? '';
+            if (name.startsWith('/recruiting')) {
+              final uri = Uri.parse(name);
+              final adminUid = uri.queryParameters['dsp'] ?? '';
+              final typeRaw = uri.queryParameters['type'] ?? 'local';
+              final channel = typeRaw.toLowerCase() == 'visa'
+                  ? RecruitingChannel.visa
+                  : RecruitingChannel.local;
+              return MaterialPageRoute<void>(
+                settings: settings,
+                builder: (_) => _wrapSelectable(
+                  RecruitingFormPage(
+                    adminUid: adminUid,
+                    channel: channel,
+                  ),
+                ),
+              );
+            }
+            return null;
+          },
           routes: {
             '/login': (_) => _wrapSelectable(const LoginPage()),
             '/signup': (_) => _wrapSelectable(const SignupPage()),
@@ -100,6 +136,9 @@ class App extends StatelessWidget {
             ),
             '/pod-quality': (_) => _wrapSelectable(
               const AdminShellPage(initialNav: AppNav.podQuality),
+            ),
+            '/concessions': (_) => _wrapSelectable(
+              const AdminShellPage(initialNav: AppNav.concessions),
             ),
             '/drivers': (_) => _wrapSelectable(
               const AdminShellPage(initialNav: AppNav.drivers),
@@ -137,6 +176,15 @@ class App extends StatelessWidget {
                 _wrapSelectable(const AdminShellPage(initialNav: AppNav.faqs)),
             '/admin-approvals': (_) => _wrapSelectable(
               const AdminShellPage(initialNav: AppNav.adminApprovals),
+            ),
+            '/inventory': (_) => _wrapSelectable(
+              const AdminShellPage(initialNav: AppNav.inventory),
+            ),
+            '/cart': (_) => _wrapSelectable(
+              const AdminShellPage(initialNav: AppNav.cart),
+            ),
+            '/shift-plan': (_) => _wrapSelectable(
+              const AdminShellPage(initialNav: AppNav.shiftPlan),
             ),
 
             '/coming-soon': (_) =>

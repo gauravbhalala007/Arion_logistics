@@ -92,11 +92,15 @@ class ReportWriter {
   static Future<void> writeReportAndScores({
     required Map<String, dynamic> parserJson,
     required String storagePath,
+    String? adminUid,
   }) async {
     final db = FirebaseFirestore.instance;
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) throw StateError('Not signed in');
-    final uid = user.uid;
+    // Wenn ein Dispatcher Scorecards hochlädt, schreibt er in den
+    // Namespace des Parent-Admins (übergeben via [adminUid]). Admins
+    // selbst übergeben nichts und schreiben in ihren eigenen Namespace.
+    final uid = adminUid ?? user.uid;
 
     final summary = (parserJson['summary'] as Map?)
             ?.map((k, v) => MapEntry(k.toString(), v)) ??
@@ -115,6 +119,15 @@ class ReportWriter {
     final hasPodQuality = podSummary != null ||
         podRejects != null ||
         drivers.any((d) => d.containsKey('POD_Q_Opportunities'));
+
+    final concessionsSummary = (summary['concessionsSummary'] as Map?)
+        ?.map((k, v) => MapEntry(k.toString(), v));
+    final concessionsFocus = (summary['concessionsFocusBuckets'] as Map?)
+        ?.map((k, v) => MapEntry(k.toString(), v));
+
+    final hasConcessions = concessionsSummary != null ||
+        concessionsFocus != null ||
+        drivers.any((d) => d.containsKey('CONC_TotalDelivered'));
 
     final now = DateTime.now();
     final reportId = makeReportId(summary);
@@ -152,6 +165,13 @@ class ReportWriter {
       summaryUpdate['podQuality'] = {
         if (podSummary != null) 'summary': podSummary,
         if (podRejects != null) 'rejects': podRejects,
+      };
+    }
+
+    if (concessionsSummary != null || concessionsFocus != null) {
+      summaryUpdate['concessions'] = {
+        if (concessionsSummary != null) 'summary': concessionsSummary,
+        if (concessionsFocus != null) 'focusBuckets': concessionsFocus,
       };
     }
 
@@ -258,6 +278,27 @@ class ReportWriter {
         'POD_Q_PackageTooClose',
       ]);
 
+      final hasConcessionsRow = hasConcessions && _hasAnyValue(m, const [
+        'CONC_TotalDelivered',
+        'CONC_TotalDnr',
+        'CONC_DnrDpmo4w',
+        'CONC_DnrCount_W1',
+        'CONC_DnrCount_W2',
+        'CONC_DnrCount_W3',
+        'CONC_DnrCount_W4',
+        'CONC_DnrDpmo_W1',
+        'CONC_DnrDpmo_W2',
+        'CONC_DnrDpmo_W3',
+        'CONC_DnrDpmo_W4',
+        'CONC_Focus_AttendedDnr',
+        'CONC_Focus_PhotoOnDelivery',
+        'CONC_Focus_SuccessfulContact',
+        'CONC_Focus_Delivered25m',
+        'CONC_Focus_FalseScan',
+        'CONC_Focus_Mailbox',
+        'CONC_Focus_DeliveredOtp',
+      ]);
+
       final hasDspRow = _hasAnyValue(m, const [
         'FinalScore',
         'POD_Score',
@@ -302,6 +343,54 @@ class ReportWriter {
           'weekNumber': week,
           'reportDate'   : FieldValue.serverTimestamp(),
           'podQuality'   : podQuality,
+          'computedAt'   : FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+
+      if (hasConcessionsRow) {
+        final concessions = {
+          'totalDelivered': _numFromAny(m, ['CONC_TotalDelivered'])?.toDouble(),
+          'totalDnr': _numFromAny(m, ['CONC_TotalDnr'])?.toDouble(),
+          'dnrDpmo4w': _numFromAny(m, ['CONC_DnrDpmo4w'])?.toDouble(),
+          'dnrCountByWeek': {
+            'w1': _numFromAny(m, ['CONC_DnrCount_W1'])?.toDouble(),
+            'w2': _numFromAny(m, ['CONC_DnrCount_W2'])?.toDouble(),
+            'w3': _numFromAny(m, ['CONC_DnrCount_W3'])?.toDouble(),
+            'w4': _numFromAny(m, ['CONC_DnrCount_W4'])?.toDouble(),
+          },
+          'dnrDpmoByWeek': {
+            'w1': _numFromAny(m, ['CONC_DnrDpmo_W1'])?.toDouble(),
+            'w2': _numFromAny(m, ['CONC_DnrDpmo_W2'])?.toDouble(),
+            'w3': _numFromAny(m, ['CONC_DnrDpmo_W3'])?.toDouble(),
+            'w4': _numFromAny(m, ['CONC_DnrDpmo_W4'])?.toDouble(),
+          },
+          'focusBuckets': {
+            'attendedDnr':
+                _numFromAny(m, ['CONC_Focus_AttendedDnr'])?.toDouble(),
+            'photoOnDelivery':
+                _numFromAny(m, ['CONC_Focus_PhotoOnDelivery'])?.toDouble(),
+            'successfulContact':
+                _numFromAny(m, ['CONC_Focus_SuccessfulContact'])?.toDouble(),
+            'delivered25m':
+                _numFromAny(m, ['CONC_Focus_Delivered25m'])?.toDouble(),
+            'falseScan':
+                _numFromAny(m, ['CONC_Focus_FalseScan'])?.toDouble(),
+            'mailbox': _numFromAny(m, ['CONC_Focus_Mailbox'])?.toDouble(),
+            'deliveredOtp':
+                _numFromAny(m, ['CONC_Focus_DeliveredOtp'])?.toDouble(),
+          },
+        };
+
+        batch.set(scoreRef, {
+          'reportRef'    : reportRef,
+          'reportPath'   : reportRef.path,
+          'reportId'     : reportId,
+          'transporterId': transporterId,
+          'driverName'   : driverName,
+          'year': year,
+          'weekNumber': week,
+          'reportDate'   : FieldValue.serverTimestamp(),
+          'concessions'  : concessions,
           'computedAt'   : FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
       }

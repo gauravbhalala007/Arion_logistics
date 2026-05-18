@@ -4,6 +4,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../theme/app_colors.dart';
+import '../widgets/admin_scope.dart';
+import '../widgets/co_button.dart';
+import '../widgets/co_pressable.dart';
 import 'package:firebase_storage/firebase_storage.dart' as fb;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -206,7 +210,11 @@ class _FaqOrderListItem {
 }
 
 class _AdminFaqPageState extends State<AdminFaqPage> {
-  String? get _uid => FirebaseAuth.instance.currentUser?.uid;
+  String? get _uid {
+    final scoped = AdminScope.maybeOf(context)?.adminUid;
+    if (scoped != null && scoped.isNotEmpty) return scoped;
+    return FirebaseAuth.instance.currentUser?.uid;
+  }
 
   void _showError(String message) {
     if (!mounted) return;
@@ -546,20 +554,14 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
                       const SizedBox(height: 12),
                       Align(
                         alignment: Alignment.centerLeft,
-                        child: OutlinedButton.icon(
+                        child: CoButton(
                           onPressed: imageUploading || translating
                               ? null
                               : translateAllLanguages,
-                          icon: translating
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.translate),
-                          label: Text(t.t('admin_faq_translate_all_languages')),
+                          label: t.t('admin_faq_translate_all_languages'),
+                          icon: Icons.translate,
+                          variant: CoButtonVariant.secondaryOutlined,
+                          busy: translating,
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -629,24 +631,24 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
                 ),
               ),
               actions: [
-                TextButton(
+                CoButton(
                   onPressed: imageUploading || translating
                       ? null
                       : () {
                           dialogOpen = false;
                           Navigator.of(ctx).pop(false);
                         },
-                  child: Text(t.t('admin_faq_cancel')),
+                  label: t.t('admin_faq_cancel'),
+                  variant: CoButtonVariant.quiet,
                 ),
-                FilledButton(
-                  style: FilledButton.styleFrom(backgroundColor: _kFaqGreen),
+                CoButton(
                   onPressed: imageUploading || translating
                       ? null
                       : () {
                           dialogOpen = false;
                           Navigator.of(ctx).pop(true);
                         },
-                  child: Text(t.t('admin_faq_save')),
+                  label: t.t('admin_faq_save'),
                 ),
               ],
             );
@@ -864,20 +866,14 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
                       const SizedBox(height: 12),
                       Align(
                         alignment: Alignment.centerLeft,
-                        child: OutlinedButton.icon(
+                        child: CoButton(
                           onPressed: imageUploading || translating
                               ? null
                               : translateAllLanguages,
-                          icon: translating
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.translate),
-                          label: Text(t.t('admin_faq_translate_all_languages')),
+                          label: t.t('admin_faq_translate_all_languages'),
+                          icon: Icons.translate,
+                          variant: CoButtonVariant.secondaryOutlined,
+                          busy: translating,
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -895,24 +891,24 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
                 ),
               ),
               actions: [
-                TextButton(
+                CoButton(
                   onPressed: imageUploading || translating
                       ? null
                       : () {
                           dialogOpen = false;
                           Navigator.of(ctx).pop(false);
                         },
-                  child: Text(t.t('admin_faq_cancel')),
+                  label: t.t('admin_faq_cancel'),
+                  variant: CoButtonVariant.quiet,
                 ),
-                FilledButton(
-                  style: FilledButton.styleFrom(backgroundColor: _kFaqGreen),
+                CoButton(
                   onPressed: imageUploading || translating
                       ? null
                       : () {
                           dialogOpen = false;
                           Navigator.of(ctx).pop(true);
                         },
-                  child: Text(t.t('admin_faq_save')),
+                  label: t.t('admin_faq_save'),
                 ),
               ],
             );
@@ -1101,14 +1097,15 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
         title: Text(t.t('admin_faq_delete_title')),
         content: Text(t.t('admin_faq_delete_body')),
         actions: [
-          TextButton(
+          CoButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(t.t('admin_faq_cancel')),
+            label: t.t('admin_faq_cancel'),
+            variant: CoButtonVariant.quiet,
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+          CoButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(t.t('admin_faq_delete')),
+            label: t.t('admin_faq_delete'),
+            variant: CoButtonVariant.destructive,
           ),
         ],
       ),
@@ -1151,22 +1148,42 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: col.orderBy('order').snapshots(),
       builder: (context, snap) {
+        final Widget content;
         if (snap.connectionState == ConnectionState.waiting) {
-          return const Padding(
+          content = const Padding(
+            key: ValueKey('loading'),
             padding: EdgeInsets.symmetric(vertical: 12),
-            child: Center(child: CircularProgressIndicator()),
+            child: Center(
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  AppColors.codriverGreen,
+                ),
+              ),
+            ),
           );
+        } else {
+          final docs = snap.data?.docs ?? [];
+          if (docs.isEmpty) {
+            final t = AppLocalizations.of(context);
+            content = Padding(
+              key: const ValueKey('empty'),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text(t.t('admin_faq_no_custom')),
+            );
+          } else {
+            content = _buildCustomFaqList(docs);
+          }
         }
-        final docs = snap.data?.docs ?? [];
-        if (docs.isEmpty) {
-          final t = AppLocalizations.of(context);
-          return Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Text(t.t('admin_faq_no_custom')),
-          );
-        }
+        return CoStateSwitcher(child: content);
+      },
+    );
+  }
 
-        return ListView.separated(
+  Widget _buildCustomFaqList(
+      List<QueryDocumentSnapshot<Map<String, dynamic>>> docs) {
+    return ListView.separated(
+      key: const ValueKey('list'),
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: docs.length,
@@ -1288,8 +1305,6 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
             );
           },
         );
-      },
-    );
   }
 
   Widget _buildLocalizedFaqsSection() {
@@ -1578,40 +1593,19 @@ class _AdminFaqPageState extends State<AdminFaqPage> {
           ),
           const SizedBox(height: 14),
           if (isNarrow)
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () => _openFaqEditor(),
-                icon: const Icon(Icons.add),
-                label: Text(t.t('admin_faq_add_custom')),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _kFaqGreen,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-              ),
+            CoButton(
+              onPressed: () => _openFaqEditor(),
+              label: t.t('admin_faq_add_custom'),
+              icon: Icons.add,
+              fullWidth: true,
             )
           else
             Align(
               alignment: Alignment.centerRight,
-              child: ElevatedButton.icon(
+              child: CoButton(
                 onPressed: () => _openFaqEditor(),
-                icon: const Icon(Icons.add),
-                label: Text(t.t('admin_faq_add_custom')),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _kFaqGreen,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                ),
+                label: t.t('admin_faq_add_custom'),
+                icon: Icons.add,
               ),
             ),
           const SizedBox(height: 14),
@@ -1727,28 +1721,13 @@ class _FaqOrderSectionState extends State<_FaqOrderSection> {
       title: t.t('admin_faq_order_title'),
       subtitle: t.t('admin_faq_order_subtitle'),
       icon: Icons.reorder,
-      trailing: FilledButton.icon(
+      trailing: CoButton(
         onPressed: (_saving || !_pendingRemoteSync || _draftOrder == null)
             ? null
             : () => _saveOrder(_draftOrder!),
-        style: FilledButton.styleFrom(
-          backgroundColor: _kFaqGreen,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(999),
-          ),
-        ),
-        icon: _saving
-            ? const SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-            : const Icon(Icons.save_outlined, size: 16),
-        label: Text(t.t('admin_faq_order_save')),
+        label: t.t('admin_faq_order_save'),
+        icon: Icons.save_outlined,
+        busy: _saving,
       ),
       child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
         stream: faqContentOrderDoc(widget.dspUid).snapshots(),
@@ -1772,7 +1751,14 @@ class _FaqOrderSectionState extends State<_FaqOrderSection> {
                     !orderSnap.hasData) {
                   return const Padding(
                     padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Center(child: CircularProgressIndicator()),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          AppColors.codriverGreen,
+                        ),
+                      ),
+                    ),
                   );
                 }
 
@@ -2080,18 +2066,13 @@ class _FaqActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = danger ? const Color(0xFFE11D48) : _kFaqGreen;
-    return OutlinedButton.icon(
+    return CoButton(
       onPressed: onPressed,
-      icon: Icon(icon, size: 16),
-      label: Text(label),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: color,
-        side: BorderSide(color: color.withValues(alpha: 0.35)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-      ),
+      label: label,
+      icon: icon,
+      variant: danger
+          ? CoButtonVariant.destructiveOutlined
+          : CoButtonVariant.secondaryOutlined,
     );
   }
 }
@@ -2179,28 +2160,18 @@ class _FaqImageEditorCard extends StatelessWidget {
             spacing: 10,
             runSpacing: 10,
             children: [
-              FilledButton.icon(
+              CoButton(
                 onPressed: isUploading ? null : onUpload,
-                style: FilledButton.styleFrom(backgroundColor: _kFaqGreen),
-                icon: isUploading
-                    ? const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.upload_outlined),
-                label: Text(
-                  imageUrl.isEmpty ? 'Upload image' : 'Replace image',
-                ),
+                label: imageUrl.isEmpty ? 'Upload image' : 'Replace image',
+                icon: Icons.upload_outlined,
+                busy: isUploading,
               ),
               if (onRemove != null)
-                OutlinedButton.icon(
+                CoButton(
                   onPressed: isUploading ? null : onRemove,
-                  icon: const Icon(Icons.delete_outline),
-                  label: const Text('Remove image'),
+                  label: 'Remove image',
+                  icon: Icons.delete_outline,
+                  variant: CoButtonVariant.destructiveOutlined,
                 ),
             ],
           ),

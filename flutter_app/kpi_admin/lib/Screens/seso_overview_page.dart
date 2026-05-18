@@ -16,8 +16,9 @@ import '../models/seso_confirmation.dart';
 import '../services/seso_confirmation_repository.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_elevation.dart';
-import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
+import '../widgets/co_button.dart';
+import '../widgets/co_pressable.dart';
 
 class SesoOverviewPage extends StatefulWidget {
   /// The DSP admin UID whose SESO data this page operates on.
@@ -41,7 +42,17 @@ class _SesoOverviewPageState extends State<SesoOverviewPage> {
         stream: _repo.watch(widget.dspUid),
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const CoStateSwitcher(
+              child: Center(
+                key: ValueKey('seso-loading'),
+                child: CircularProgressIndicator(
+                  strokeWidth: 3,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    AppColors.codriverGreen,
+                  ),
+                ),
+              ),
+            );
           }
           final items = snap.data ?? const [];
 
@@ -66,10 +77,10 @@ class _SesoOverviewPageState extends State<SesoOverviewPage> {
                       ),
                     ),
                     const Spacer(),
-                    FilledButton.icon(
+                    CoButton(
                       onPressed: () => _openCreateOrEditDialog(),
-                      icon: const Icon(Icons.add_rounded),
-                      label: const Text('Anlegen'),
+                      icon: Icons.add_rounded,
+                      label: 'Anlegen',
                     ),
                   ],
                 ),
@@ -110,18 +121,24 @@ class _SesoOverviewPageState extends State<SesoOverviewPage> {
                 ),
                 const SizedBox(height: 16),
                 Expanded(
-                  child: items.isEmpty
-                      ? _EmptyState(onAdd: _openCreateOrEditDialog)
-                      : ListView.separated(
-                          itemCount: items.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: 12),
-                          itemBuilder: (_, i) => _ConfirmationCard(
-                            dspUid: widget.dspUid,
-                            confirmation: items[i],
-                            onTap: () => _openDetail(items[i]),
+                  child: CoStateSwitcher(
+                    child: items.isEmpty
+                        ? _EmptyState(
+                            key: const ValueKey('seso-empty'),
+                            onAdd: _openCreateOrEditDialog,
+                          )
+                        : ListView.separated(
+                            key: const ValueKey('seso-list'),
+                            itemCount: items.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 12),
+                            itemBuilder: (_, i) => _ConfirmationCard(
+                              dspUid: widget.dspUid,
+                              confirmation: items[i],
+                              onTap: () => _openDetail(items[i]),
+                            ),
                           ),
-                        ),
+                  ),
                 ),
               ],
             ),
@@ -155,6 +172,52 @@ class _SesoOverviewPageState extends State<SesoOverviewPage> {
 }
 
 String _euro(double v) => '€${v.toStringAsFixed(2)}';
+
+String _dmy(DateTime d) =>
+    '${d.day.toString().padLeft(2, '0')}.'
+    '${d.month.toString().padLeft(2, '0')}.${d.year}';
+
+class _PreviewRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color? color;
+  final bool bold;
+  const _PreviewRow({
+    required this.label,
+    required this.value,
+    this.color,
+    this.bold = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = color ?? AppColors.codriverDeep;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 1),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: AppTypography.footnote.copyWith(
+                color: c,
+                fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
+              ),
+            ),
+          ),
+          Text(
+            value,
+            style: AppTypography.footnote.copyWith(
+              color: c,
+              fontWeight: bold ? FontWeight.w800 : FontWeight.w700,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 // ════════════════════════════════════════════════════════════════════════════
 //  Cards / overview rows
@@ -221,7 +284,7 @@ class _ConfirmationCard extends StatelessWidget {
     final typeColor = c.vehicleType == SesoVehicleType.lwb
         ? const Color(0xFF7B5BFF)
         : AppColors.codriverGreen;
-    return InkWell(
+    return CoPressable(
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
       child: Container(
@@ -469,51 +532,58 @@ class _ConfirmationThumb extends StatelessWidget {
 
 class _EmptyState extends StatelessWidget {
   final VoidCallback onAdd;
-  const _EmptyState({required this.onAdd});
+  const _EmptyState({super.key, required this.onAdd});
 
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppColors.green50,
-              borderRadius: BorderRadius.circular(16),
+      child: SizedBox(
+        width: 360,
+        child: CoStaggerList(
+          children: [
+            Center(
+              child: Container(
+                width: 56,
+                height: 56,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.green50,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Icon(
+                  Icons.event_available_rounded,
+                  size: 28,
+                  color: AppColors.codriverDeep,
+                ),
+              ),
             ),
-            child: const Icon(
-              Icons.event_available_rounded,
-              size: 28,
-              color: AppColors.codriverDeep,
+            const SizedBox(height: 14),
+            Text(
+              'Noch keine SESO-Confirmations.',
+              style: AppTypography.subheadline.copyWith(
+                color: AppColors.codriverGraphite,
+                fontWeight: FontWeight.w700,
+              ),
+              textAlign: TextAlign.center,
             ),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            'Noch keine SESO-Confirmations.',
-            style: AppTypography.subheadline.copyWith(
-              color: AppColors.codriverGraphite,
-              fontWeight: FontWeight.w700,
+            const SizedBox(height: 6),
+            Text(
+              'Lege eine Confirmation an: Fahrzeugtyp, Tagespreis und KWs.',
+              style: AppTypography.footnote.copyWith(
+                color: AppColors.labelSecondaryLight,
+              ),
+              textAlign: TextAlign.center,
             ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Lege eine Confirmation an: Fahrzeugtyp, Tagespreis und KWs.',
-            style: AppTypography.footnote.copyWith(
-              color: AppColors.labelSecondaryLight,
+            const SizedBox(height: 14),
+            Center(
+              child: CoButton(
+                onPressed: onAdd,
+                icon: Icons.add_rounded,
+                label: 'Confirmation anlegen',
+              ),
             ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 14),
-          FilledButton.icon(
-            onPressed: onAdd,
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('Confirmation anlegen'),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -541,16 +611,14 @@ class _SesoEditorDialogState extends State<_SesoEditorDialog> {
   late SesoVehicleType _type;
   bool _offPeak = false;
   late TextEditingController _rateCtrl;
+  late TextEditingController _partnerRateCtrl;
   late TextEditingController _noteCtrl;
   late TextEditingController _transactionIdCtrl;
   late TextEditingController _orderIdCtrl;
-  late TextEditingController _pickupCountCtrl;
-  late TextEditingController _returnCountCtrl;
+  late TextEditingController _vehicleCountCtrl;
   late int _year;
   late Set<int> _selectedWeeks;
   String? _rentalCompanyId;
-  DateTime? _pickupDate;
-  DateTime? _returnDate;
   bool _saving = false;
   String? _error;
   Uint8List? _confirmationFileBytes;
@@ -578,14 +646,19 @@ class _SesoEditorDialogState extends State<_SesoEditorDialog> {
           ? _peakRates[_type]!.toStringAsFixed(2)
           : ex.dailyRate.toStringAsFixed(2),
     );
+    _partnerRateCtrl = TextEditingController(
+      text: (ex?.partnerDailyRate ?? 0) > 0
+          ? ex!.partnerDailyRate.toStringAsFixed(2)
+          : '',
+    );
     _noteCtrl = TextEditingController(text: ex?.note ?? '');
     _transactionIdCtrl = TextEditingController(text: ex?.transactionId ?? '');
     _orderIdCtrl = TextEditingController(text: ex?.orderId ?? '');
-    _pickupCountCtrl = TextEditingController(
-      text: ex?.pickupVehicleCount?.toString() ?? '',
-    );
-    _returnCountCtrl = TextEditingController(
-      text: ex?.returnVehicleCount?.toString() ?? '',
+    final initialCount = ex?.vehicleCount ??
+        ex?.pickupVehicleCount ??
+        ex?.returnVehicleCount;
+    _vehicleCountCtrl = TextEditingController(
+      text: initialCount?.toString() ?? '',
     );
     final now = DateTime.now();
     _year = ex?.weeks.isNotEmpty == true ? ex!.weeks.first.year : now.year;
@@ -593,28 +666,40 @@ class _SesoEditorDialogState extends State<_SesoEditorDialog> {
       for (final w in ex?.weeks ?? const <SesoWeekEntry>[]) w.weekNumber,
     };
     _rentalCompanyId = ex?.rentalCompanyId;
-    _pickupDate = ex?.pickupDate;
-    _returnDate = ex?.returnDate;
   }
 
   @override
   void dispose() {
     _rateCtrl.dispose();
+    _partnerRateCtrl.dispose();
     _noteCtrl.dispose();
     _transactionIdCtrl.dispose();
     _orderIdCtrl.dispose();
-    _pickupCountCtrl.dispose();
-    _returnCountCtrl.dispose();
+    _vehicleCountCtrl.dispose();
     super.dispose();
   }
 
   double get _rate => double.tryParse(_rateCtrl.text.replaceAll(',', '.')) ?? 0;
+  double get _partnerRate =>
+      double.tryParse(_partnerRateCtrl.text.replaceAll(',', '.')) ?? 0;
 
   void _applyStandardRate() {
     final rate =
         (_offPeak ? _offPeakRates[_type]! : _peakRates[_type]!);
     _rateCtrl.text = rate.toStringAsFixed(2);
   }
+
+  /// Monday of the given ISO week (1..53). Matches the week-number
+  /// convention used by `_isoWeek` elsewhere in the app (Jan-4 rule).
+  static DateTime _mondayOfIsoWeek(int year, int week) {
+    final jan4 = DateTime(year, 1, 4);
+    final firstMonday = jan4.subtract(Duration(days: jan4.weekday - 1));
+    return firstMonday.add(Duration(days: (week - 1) * 7));
+  }
+
+  /// Sunday of the given ISO week (= Monday + 6 days).
+  static DateTime _sundayOfIsoWeek(int year, int week) =>
+      _mondayOfIsoWeek(year, week).add(const Duration(days: 6));
 
   Future<void> _pickConfirmationFile() async {
     final result = await FilePicker.platform.pickFiles(
@@ -646,28 +731,9 @@ class _SesoEditorDialogState extends State<_SesoEditorDialog> {
     });
   }
 
-  Future<void> _pickDate(bool isPickup) async {
-    final now = DateTime.now();
-    final initial =
-        (isPickup ? _pickupDate : _returnDate) ?? DateTime(now.year, now.month, now.day);
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: initial,
-      firstDate: DateTime(now.year - 1),
-      lastDate: DateTime(now.year + 2),
-    );
-    if (picked == null) return;
-    setState(() {
-      if (isPickup) {
-        _pickupDate = picked;
-      } else {
-        _returnDate = picked;
-      }
-    });
-  }
-
   Future<void> _save() async {
     final rate = _rate;
+    final partnerRate = _partnerRate;
     final txId = _transactionIdCtrl.text.trim();
     final orderId = _orderIdCtrl.text.trim();
     if (txId.isEmpty && orderId.isEmpty) {
@@ -701,8 +767,13 @@ class _SesoEditorDialogState extends State<_SesoEditorDialog> {
               SesoWeekEntry(year: _year, weekNumber: wn),
       ];
 
-      final pickupCount = int.tryParse(_pickupCountCtrl.text.trim()) ?? 0;
-      final returnCount = int.tryParse(_returnCountCtrl.text.trim()) ?? 0;
+      // Pickup = Monday of first selected KW; Return = Sunday of last.
+      final firstWeek = weeks.first;
+      final lastWeek = weeks.last;
+      final pickupDate = _mondayOfIsoWeek(_year, firstWeek);
+      final returnDate = _sundayOfIsoWeek(_year, lastWeek);
+      final vehicleCount =
+          int.tryParse(_vehicleCountCtrl.text.trim()) ?? 0;
 
       String confirmationId;
       if (existing == null) {
@@ -712,14 +783,14 @@ class _SesoEditorDialogState extends State<_SesoEditorDialog> {
           orderId: orderId,
           vehicleType: _type,
           dailyRate: rate,
+          partnerDailyRate: partnerRate,
           offPeak: _offPeak,
           weeks: newWeeks,
           note: _noteCtrl.text.trim(),
           rentalCompanyId: _rentalCompanyId,
-          pickupDate: _pickupDate,
-          pickupVehicleCount: pickupCount > 0 ? pickupCount : null,
-          returnDate: _returnDate,
-          returnVehicleCount: returnCount > 0 ? returnCount : null,
+          pickupDate: pickupDate,
+          returnDate: returnDate,
+          vehicleCount: vehicleCount > 0 ? vehicleCount : null,
         );
       } else {
         confirmationId = existing.id;
@@ -730,17 +801,15 @@ class _SesoEditorDialogState extends State<_SesoEditorDialog> {
           orderId: orderId,
           vehicleType: _type,
           dailyRate: rate,
+          partnerDailyRate: partnerRate,
           offPeak: _offPeak,
           weeks: newWeeks,
           note: _noteCtrl.text.trim(),
           rentalCompanyId: _rentalCompanyId,
           clearRentalCompany: _rentalCompanyId == null,
-          pickupDate: _pickupDate,
-          clearPickupDate: _pickupDate == null,
-          pickupVehicleCount: pickupCount > 0 ? pickupCount : null,
-          returnDate: _returnDate,
-          clearReturnDate: _returnDate == null,
-          returnVehicleCount: returnCount > 0 ? returnCount : null,
+          pickupDate: pickupDate,
+          returnDate: returnDate,
+          vehicleCount: vehicleCount > 0 ? vehicleCount : null,
         );
       }
 
@@ -783,8 +852,26 @@ class _SesoEditorDialogState extends State<_SesoEditorDialog> {
   Widget build(BuildContext context) {
     final isEdit = widget.existing != null;
     final weekCount = _selectedWeeks.length;
-    final weeklyCost = sesoWeeklyCost(_rate);
-    final totalCost = sesoTotalCost(_rate, weekCount);
+    final vehicleCount =
+        int.tryParse(_vehicleCountCtrl.text.trim()) ?? 0;
+    final units = vehicleCount > 0 ? vehicleCount : 1;
+    final weeklyCost = sesoWeeklyCost(_rate) * units;
+    final totalCost = sesoTotalCost(_rate, weekCount) * units;
+    final weeklyPartner = _partnerRate * 7 * units;
+    final totalPartner = weeklyPartner * weekCount;
+    final dailyDiff = _rate - _partnerRate;
+    final weeklyDiff = dailyDiff * 7 * units;
+    final totalDiff = weeklyDiff * weekCount;
+    final hasPartner = _partnerRate > 0;
+
+    // Derived period — Monday of first selected KW → Sunday of last.
+    DateTime? periodStart;
+    DateTime? periodEnd;
+    if (_selectedWeeks.isNotEmpty) {
+      final sorted = _selectedWeeks.toList()..sort();
+      periodStart = _mondayOfIsoWeek(_year, sorted.first);
+      periodEnd = _sundayOfIsoWeek(_year, sorted.last);
+    }
 
     return AlertDialog(
       title: Text(isEdit ? 'Confirmation bearbeiten' : 'Neue Confirmation'),
@@ -935,70 +1022,53 @@ class _SesoEditorDialogState extends State<_SesoEditorDialog> {
                 },
               ),
               const SizedBox(height: 10),
-              // Pickup + Return for the calendar.
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: _DatePickerField(
-                      label: 'Abholung',
-                      date: _pickupDate,
-                      onTap: () => _pickDate(true),
-                      onClear: _pickupDate == null
-                          ? null
-                          : () => setState(() => _pickupDate = null),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  SizedBox(
-                    width: 80,
-                    child: TextField(
-                      controller: _pickupCountCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Anz.',
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: _DatePickerField(
-                      label: 'Abgabe',
-                      date: _returnDate,
-                      onTap: () => _pickDate(false),
-                      onClear: _returnDate == null
-                          ? null
-                          : () => setState(() => _returnDate = null),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  SizedBox(
-                    width: 80,
-                    child: TextField(
-                      controller: _returnCountCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Anz.',
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
+              // Number of vehicles for the whole period (not per
+              // pickup/return). Pickup-date = Monday of first selected
+              // KW, return-date = Sunday of last selected KW — both
+              // derived from the KW grid below.
               TextField(
-                controller: _rateCtrl,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
+                controller: _vehicleCountCtrl,
+                keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
-                  labelText: 'Tagespreis (€) — überschreibbar',
-                  prefixText: '€ ',
+                  labelText: 'Anzahl Fahrzeuge im Zeitraum',
+                  prefixIcon: Icon(Icons.local_shipping_outlined),
                 ),
                 onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 12),
+              // Side-by-side: DSP-Vergütung (Income) ↔ Mietpartner-Kosten
+              // (Cost). Beide pro Tag und Fahrzeug. Differenz = Marge/Tag.
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _rateCtrl,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                        labelText: 'Vergüteter DSP-Tagespreis (netto)',
+                        helperText: 'Was Amazon pro Tag zahlt',
+                        prefixText: '€ ',
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: _partnerRateCtrl,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                        labelText: 'Tatsächlicher Mietpreis / Tag',
+                        helperText: 'Was die Mietfirma pro Tag berechnet',
+                        prefixText: '€ ',
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
               Row(
@@ -1068,20 +1138,70 @@ class _SesoEditorDialogState extends State<_SesoEditorDialog> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Wochenpreis: ${_euro(weeklyCost)}',
-                      style: AppTypography.footnote.copyWith(
-                        color: AppColors.codriverDeep,
-                        fontWeight: FontWeight.w700,
+                    if (periodStart != null && periodEnd != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Text(
+                          'Zeitraum: ${_dmy(periodStart)} → ${_dmy(periodEnd)}',
+                          style: AppTypography.caption2.copyWith(
+                            color: AppColors.codriverDeep,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
                       ),
+                    _PreviewRow(
+                      label: vehicleCount > 0
+                          ? 'Wochenpreis ($vehicleCount Fahrzeug${vehicleCount == 1 ? '' : 'e'})'
+                          : 'Wochenpreis',
+                      value: _euro(weeklyCost),
                     ),
-                    Text(
-                      'Gesamt: ${_euro(totalCost)}  ($weekCount × ${_euro(weeklyCost)})',
-                      style: AppTypography.subheadline.copyWith(
-                        color: AppColors.codriverDeep,
-                        fontWeight: FontWeight.w800,
+                    _PreviewRow(
+                      label: 'Gesamt DSP',
+                      value:
+                          '${_euro(totalCost)}  ($weekCount × ${_euro(weeklyCost)})',
+                      bold: true,
+                    ),
+                    if (hasPartner) ...[
+                      const Divider(height: 16, thickness: 0.5),
+                      _PreviewRow(
+                        label: vehicleCount > 0
+                            ? 'Mietpartner pro Woche ($vehicleCount Fahrzeug${vehicleCount == 1 ? '' : 'e'})'
+                            : 'Mietpartner pro Woche',
+                        value: _euro(weeklyPartner),
                       ),
-                    ),
+                      _PreviewRow(
+                        label: 'Gesamt Mietpartner',
+                        value: _euro(totalPartner),
+                        bold: true,
+                      ),
+                      const SizedBox(height: 6),
+                      _PreviewRow(
+                        label: 'Differenz / Tag',
+                        value:
+                            '${dailyDiff >= 0 ? '+' : ''}${dailyDiff.toStringAsFixed(2)} €',
+                        color: dailyDiff >= 0
+                            ? AppColors.success
+                            : AppColors.error,
+                      ),
+                      _PreviewRow(
+                        label: 'Marge Woche',
+                        value:
+                            '${weeklyDiff >= 0 ? '+' : ''}${_euro(weeklyDiff)}',
+                        color: weeklyDiff >= 0
+                            ? AppColors.success
+                            : AppColors.error,
+                      ),
+                      _PreviewRow(
+                        label: 'Marge Gesamt',
+                        value:
+                            '${totalDiff >= 0 ? '+' : ''}${_euro(totalDiff)}',
+                        color: totalDiff >= 0
+                            ? AppColors.success
+                            : AppColors.error,
+                        bold: true,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -1123,19 +1243,15 @@ class _SesoEditorDialogState extends State<_SesoEditorDialog> {
         ),
       ),
       actions: [
-        TextButton(
+        CoButton(
           onPressed: _saving ? null : () => Navigator.of(context).pop(),
-          child: const Text('Abbrechen'),
+          label: 'Abbrechen',
+          variant: CoButtonVariant.quiet,
         ),
-        FilledButton(
+        CoButton(
           onPressed: _saving ? null : _save,
-          child: _saving
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Speichern'),
+          label: 'Speichern',
+          busy: _saving,
         ),
       ],
     );
@@ -1235,14 +1351,15 @@ class _SesoDetailPageState extends State<_SesoDetailPage> {
         title: const Text('Confirmation löschen?'),
         content: const Text('Alle Wochen-Einträge und Screenshots werden entfernt.'),
         actions: [
-          TextButton(
+          CoButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Abbrechen'),
+            label: 'Abbrechen',
+            variant: CoButtonVariant.quiet,
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+          CoButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Löschen'),
+            label: 'Löschen',
+            variant: CoButtonVariant.destructive,
           ),
         ],
       ),
@@ -1272,16 +1389,33 @@ class _SesoDetailPageState extends State<_SesoDetailPage> {
       body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
         stream: _stream(),
         builder: (context, snap) {
+          final Widget content;
           if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            content = const Center(
+              key: ValueKey('seso-detail-loading'),
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  AppColors.codriverGreen,
+                ),
+              ),
+            );
+            return CoStateSwitcher(child: content);
           }
           if (!snap.hasData || !snap.data!.exists) {
-            return const Center(child: Text('Eintrag nicht gefunden.'));
+            return const CoStateSwitcher(
+              child: Center(
+                key: ValueKey('seso-detail-missing'),
+                child: Text('Eintrag nicht gefunden.'),
+              ),
+            );
           }
           final c = SesoConfirmation.fromDoc(snap.data!);
-          return Padding(
-            padding: const EdgeInsets.all(24),
-            child: ListView(
+          return CoStateSwitcher(
+            child: Padding(
+              key: const ValueKey('seso-detail-loaded'),
+              padding: const EdgeInsets.all(24),
+              child: ListView(
               children: [
                 Row(
                   children: [
@@ -1423,6 +1557,7 @@ class _SesoDetailPageState extends State<_SesoDetailPage> {
                 ),
               ],
             ),
+            ),
           );
         },
       ),
@@ -1546,14 +1681,20 @@ class _StorageThumb extends StatelessWidget {
               child: SizedBox(
                 width: 14,
                 height: 14,
-                child: CircularProgressIndicator(strokeWidth: 2),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    AppColors.codriverGreen,
+                  ),
+                ),
               ),
             ),
           );
         }
         final isPdf = path.toLowerCase().endsWith('.pdf');
-        return GestureDetector(
+        return CoPressable(
           onTap: () => _openFullscreen(context, snap.data!, isPdf),
+          borderRadius: BorderRadius.circular(8),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: isPdf
@@ -1592,13 +1733,21 @@ class _StoragePreview extends StatelessWidget {
               color: AppColors.surfaceLight,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Center(child: CircularProgressIndicator()),
+            child: const Center(
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  AppColors.codriverGreen,
+                ),
+              ),
+            ),
           );
         }
         final isPdf = path.toLowerCase().endsWith('.pdf');
         if (isPdf) {
-          return GestureDetector(
+          return CoPressable(
             onTap: () => _openFullscreen(context, snap.data!, true),
+            borderRadius: BorderRadius.circular(12),
             child: Container(
               height: 100,
               decoration: BoxDecoration(
@@ -1611,8 +1760,9 @@ class _StoragePreview extends StatelessWidget {
             ),
           );
         }
-        return GestureDetector(
+        return CoPressable(
           onTap: () => _openFullscreen(context, snap.data!, false),
+          borderRadius: BorderRadius.circular(12),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: Image.network(snap.data!, fit: BoxFit.contain),
@@ -1636,9 +1786,10 @@ Future<void> _openFullscreen(
         constraints: const BoxConstraints(maxWidth: 900, maxHeight: 700),
         child: isPdf
             ? Center(
-                child: TextButton.icon(
-                  icon: const Icon(Icons.open_in_new_rounded),
-                  label: const Text('PDF im neuen Tab öffnen'),
+                child: CoButton(
+                  icon: Icons.open_in_new_rounded,
+                  label: 'PDF im neuen Tab öffnen',
+                  variant: CoButtonVariant.quiet,
                   onPressed: () {
                     // Web-only: opens in a new tab via window.open.
                     final ref = FirebaseStorage.instance.refFromURL(url);
@@ -1653,53 +1804,8 @@ Future<void> _openFullscreen(
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-//  Editor helpers (date picker field, file pick row, rental-company dialog)
+//  Editor helpers (file pick row, rental-company dialog)
 // ════════════════════════════════════════════════════════════════════════════
-
-class _DatePickerField extends StatelessWidget {
-  final String label;
-  final DateTime? date;
-  final VoidCallback onTap;
-  final VoidCallback? onClear;
-  const _DatePickerField({
-    required this.label,
-    required this.date,
-    required this.onTap,
-    this.onClear,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: label,
-          suffixIcon: onClear == null
-              ? const Icon(Icons.event_rounded)
-              : IconButton(
-                  onPressed: onClear,
-                  icon: const Icon(Icons.close_rounded, size: 18),
-                ),
-        ),
-        child: Text(
-          date == null
-              ? '— Datum wählen —'
-              : '${date!.day.toString().padLeft(2, '0')}.'
-                  '${date!.month.toString().padLeft(2, '0')}.${date!.year}',
-          style: AppTypography.subheadline.copyWith(
-            color: date == null
-                ? AppColors.labelTertiaryLight
-                : AppColors.codriverGraphite,
-            fontWeight: FontWeight.w700,
-            fontFeatures: const [FontFeature.tabularFigures()],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class _FilePickRow extends StatelessWidget {
   final String label;
@@ -1717,10 +1823,11 @@ class _FilePickRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        OutlinedButton.icon(
+        CoButton(
           onPressed: onPick,
-          icon: const Icon(Icons.attach_file_rounded),
-          label: Text(label),
+          icon: Icons.attach_file_rounded,
+          label: label,
+          variant: CoButtonVariant.secondaryOutlined,
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -1778,14 +1885,15 @@ class _RentalCompaniesDialog extends StatelessWidget {
         title: const Text('Mietfirma löschen?'),
         content: Text('"${c.name}" wirklich löschen?'),
         actions: [
-          TextButton(
+          CoButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Abbrechen'),
+            label: 'Abbrechen',
+            variant: CoButtonVariant.quiet,
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+          CoButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Löschen'),
+            label: 'Löschen',
+            variant: CoButtonVariant.destructive,
           ),
         ],
       ),
@@ -1815,15 +1923,30 @@ class _RentalCompaniesDialog extends StatelessWidget {
           stream: repo.watchRentalCompanies(dspUid),
           builder: (context, snap) {
             if (snap.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+              return const CoStateSwitcher(
+                child: Center(
+                  key: ValueKey('rentals-loading'),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      AppColors.codriverGreen,
+                    ),
+                  ),
+                ),
+              );
             }
             final items = snap.data ?? const <RentalCompany>[];
             if (items.isEmpty) {
-              return const Center(
-                child: Text('Noch keine Mietfirmen angelegt.'),
+              return const CoStateSwitcher(
+                child: Center(
+                  key: ValueKey('rentals-empty'),
+                  child: Text('Noch keine Mietfirmen angelegt.'),
+                ),
               );
             }
-            return ListView.separated(
+            return CoStateSwitcher(
+              child: ListView.separated(
+              key: const ValueKey('rentals-list'),
               itemCount: items.length,
               separatorBuilder: (_, __) => const Divider(height: 1),
               itemBuilder: (_, i) {
@@ -1858,14 +1981,16 @@ class _RentalCompaniesDialog extends StatelessWidget {
                   ),
                 );
               },
+              ),
             );
           },
         ),
       ),
       actions: [
-        TextButton(
+        CoButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Schliessen'),
+          label: 'Schliessen',
+          variant: CoButtonVariant.quiet,
         ),
       ],
     );
@@ -2013,19 +2138,15 @@ class _RentalCompanyEditorState extends State<_RentalCompanyEditor> {
         ),
       ),
       actions: [
-        TextButton(
+        CoButton(
           onPressed: _saving ? null : () => Navigator.of(context).pop(),
-          child: const Text('Abbrechen'),
+          label: 'Abbrechen',
+          variant: CoButtonVariant.quiet,
         ),
-        FilledButton(
+        CoButton(
           onPressed: _saving ? null : _save,
-          child: _saving
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Speichern'),
+          label: 'Speichern',
+          busy: _saving,
         ),
       ],
     );

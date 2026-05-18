@@ -230,6 +230,20 @@ class FleetVehicleEventRepository {
             'isDeleted': false,
             'updatedAt': FieldValue.serverTimestamp(),
           });
+      if (upload != null) {
+        final oldStoragePath = _eventStoragePath(
+          dspUid: dspUid,
+          plateNumber: plateNumber,
+          eventId: eventId,
+          fileName: existingEvent.fileName,
+        );
+        if (oldStoragePath.isNotEmpty &&
+            oldStoragePath != upload.storagePath) {
+          try {
+            await _storage.ref().child(oldStoragePath).delete();
+          } catch (_) {}
+        }
+      }
     } catch (e) {
       if (upload != null) {
         try {
@@ -268,11 +282,14 @@ class FleetVehicleEventRepository {
 
     final ref = _storage
         .ref()
-        .child('vehicles')
-        .child(dspUid)
-        .child(normalizePlateNumber(plateNumber))
-        .child('events')
-        .child('${eventId}_$safeFileName');
+        .child(
+          _eventStoragePath(
+            dspUid: dspUid,
+            plateNumber: plateNumber,
+            eventId: eventId,
+            fileName: safeFileName,
+          ),
+        );
 
     await ref.putData(
       fileBytes,
@@ -285,6 +302,21 @@ class FleetVehicleEventRepository {
       fileUrl: url,
       storagePath: ref.fullPath,
     );
+  }
+
+  String _eventStoragePath({
+    required String dspUid,
+    required String plateNumber,
+    required String eventId,
+    required String fileName,
+  }) {
+    final trimmedFileName = fileName.trim();
+    if (trimmedFileName.isEmpty) return '';
+    return 'vehicles/'
+        '$dspUid/'
+        '${normalizePlateNumber(plateNumber)}/'
+        'events/'
+        '${eventId}_$trimmedFileName';
   }
 
   void _validateDraft(FleetVehicleEventDraft draft) {

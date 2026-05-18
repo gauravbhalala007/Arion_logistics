@@ -7,6 +7,7 @@ import '../localization/app_localizations.dart';
 import '../data/driver_faq_keys.dart';
 import '../data/faq_ordering.dart';
 import '../widgets/web_preview.dart';
+import '../widgets/motion_helpers.dart';
 
 const String _localizedFaqCollection = 'faqs_localized';
 const String _insertAtEnd = '__end__';
@@ -454,21 +455,42 @@ class _SearchBar extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: const Color(0xFFE5E5EA),
+          width: 0.6,
+        ),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14),
       child: Row(
         children: [
-          const Icon(Icons.search, color: Color(0xFF6B7280)),
-          const SizedBox(width: 8),
+          const Icon(
+            Icons.search_rounded,
+            color: Color(0xFF6B7280),
+            size: 20,
+          ),
+          const SizedBox(width: 10),
           Expanded(
             child: TextField(
               controller: controller,
               onChanged: onChanged,
+              style: const TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF1C1C1E),
+              ),
               decoration: InputDecoration(
                 hintText: hint,
+                hintStyle: const TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF9CA3AF),
+                ),
                 border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                isDense: true,
               ),
             ),
           ),
@@ -477,9 +499,17 @@ class _SearchBar extends StatelessWidget {
             builder: (context, value, _) {
               final show = value.text.trim().isNotEmpty;
               if (!show) return const SizedBox.shrink();
-              return IconButton(
-                onPressed: onClear,
-                icon: const Icon(Icons.close, color: Color(0xFF6B7280)),
+              return InkWell(
+                onTap: onClear,
+                borderRadius: BorderRadius.circular(999),
+                child: const Padding(
+                  padding: EdgeInsets.all(6),
+                  child: Icon(
+                    Icons.close_rounded,
+                    color: Color(0xFF6B7280),
+                    size: 18,
+                  ),
+                ),
               );
             },
           ),

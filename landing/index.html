@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5">
+  <meta name="theme-color" content="#0B1220">
+  <title>CoDriver — Operations-Plattform für Amazon DSPs</title>
+  <meta name="description" content="Die Operations-Plattform für Amazon Delivery Service Provider. Scorecards, Drivers Hub, Waveplan, Fleet, Kalender und Compliance an einem Ort. 30 Tage kostenlos testen.">
+  <meta property="og:title" content="CoDriver — Operations-Plattform für DSPs">
+  <meta property="og:description" content="Scorecards, Drivers Hub, Waveplan, Fleet, Kalender und Compliance an einem Ort. 30 Tage kostenlos testen — €100 pro Station / Monat danach.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="/assets/og.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" type="image/png" href="/assets/favicon.png">
+</head>
+<body>
+
+  <!-- ═════════════════════════════ NAV ═════════════════════════════ -->
+  <header class="nav" id="nav">
+    <div class="container nav__inner">
+      <a class="logo" href="#top">
+        <span class="logo__mark">C</span>
+        <span class="logo__word">CoDriver</span>
+      </a>
+      <nav class="nav__links" aria-label="Hauptnavigation">
+        <a href="#features">Features</a>
+        <a href="#how">So funktioniert's</a>
+        <a href="#pricing">Preise</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+      <div class="nav__cta">
+        <a class="btn btn-ghost" href="https://gaurav-arion-001-3d94a.web.app">Login</a>
+        <a class="btn btn-primary" href="https://gaurav-arion-001-3d94a.web.app#/signup">
+          30 Tage testen
+        </a>
+      </div>
+      <button class="nav__burger" id="navBurger" aria-label="Menü öffnen">
+        <span class="material-symbols-rounded">menu</span>
+      </button>
+    </div>
+    <div class="nav__mobile" id="navMobile" hidden>
+      <a href="#features">Features</a>
+      <a href="#how">So funktioniert's</a>
+      <a href="#pricing">Preise</a>
+      <a href="#faq">FAQ</a>
+      <a class="btn btn-ghost" href="https://gaurav-arion-001-3d94a.web.app">Login</a>
+      <a class="btn btn-primary" href="https://gaurav-arion-001-3d94a.web.app#/signup">
+        30 Tage testen
+      </a>
+    </div>
+  </header>
+
+  <!-- ═════════════════════════════ HERO ════════════════════════════ -->
+  <section class="hero" id="top">
+    <div class="container hero__inner">
+      <div class="hero__copy">
+        <div class="eyebrow">
+          <span class="dot"></span>
+          Für Amazon Delivery Service Provider
+        </div>
+        <h1>
+          Operations ohne<br>
+          <span class="grad-text">Excel-Chaos.</span>
+        </h1>
+        <p class="lead">
+          CoDriver vereint Scorecards, Drivers Hub, Waveplan, Fleet, Calendar
+          und Compliance in einer Apple-mäßigen Plattform — gebaut für DSPs,
+          die ihre Station souverän führen wollen.
+        </p>
+        <div class="hero__ctas">
+          <a class="btn btn-primary btn-lg" href="https://gaurav-arion-001-3d94a.web.app#/signup">
+            <span class="material-symbols-rounded">bolt</span>
+            30 Tage kostenlos testen
+          </a>
+          <a class="btn btn-subtle btn-lg" href="#features">
+            Features ansehen
+          </a>
+        </div>
+        <div class="hero__notes">
+          <span><span class="material-symbols-rounded">check_circle</span> Karte hinterlegen, kein Auto-Charge</span>
+          <span><span class="material-symbols-rounded">check_circle</span> Mehrsprachig &amp; rollenbasiert</span>
+          <span><span class="material-symbols-rounded">check_circle</span> Hosted in der EU</span>
+        </div>
+      </div>
+
+      <div class="hero__visual" aria-hidden="true">
+        <!-- App-Mockup als Stack von Cards -->
+        <div class="mock mock--bg"></div>
+        <div class="mock mock--hero">
+          <div class="mock__eyebrow">SCORECARD · LAST WEEK</div>
+          <div class="mock__big">91,19 <span>%</span></div>
+          <div class="mock__pill">↗ +0,20 % from last week</div>
+        </div>
+        <div class="mock mock--tile mock--tile-1">
+          <div class="mock__label">SCORE · YEAR 2026</div>
+          <div class="mock__value">82,57 %</div>
+        </div>
+        <div class="mock mock--tile mock--tile-2">
+          <div class="mock__label">RELIABILITY · LW</div>
+          <div class="mock__value">103,23 %</div>
+        </div>
+        <div class="mock mock--chart">
+          <div class="bar" style="height: 60%;"></div>
+          <div class="bar" style="height: 78%;"></div>
+          <div class="bar bar--accent" style="height: 88%;"></div>
+          <div class="bar" style="height: 72%;"></div>
+          <div class="bar" style="height: 82%;"></div>
+          <div class="bar" style="height: 65%;"></div>
+          <div class="bar" style="height: 90%;"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════ TRUST ════════════════════════════ -->
+  <section class="trust">
+    <div class="container trust__inner">
+      <div class="trust__metric">
+        <div class="trust__num">9</div>
+        <div class="trust__lbl">Sprachen</div>
+      </div>
+      <div class="trust__metric">
+        <div class="trust__num">EU</div>
+        <div class="trust__lbl">Hosted Region</div>
+      </div>
+      <div class="trust__metric">
+        <div class="trust__num">DSGVO</div>
+        <div class="trust__lbl">Konform</div>
+      </div>
+      <div class="trust__metric">
+        <div class="trust__num">24/7</div>
+        <div class="trust__lbl">Real-Time-Sync</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════ FEATURES ═══════════════════════════ -->
+  <section class="section section--features" id="features">
+    <div class="container">
+      <div class="section__head">
+        <div class="eyebrow eyebrow--dark">01 — Features</div>
+        <h2>Alles was eine Station täglich braucht.</h2>
+        <p>
+          Sechs Module, ein konsistentes Interface. Dispatcher-Sub-Accounts
+          sehen exakt das gleiche wie der Hauptadmin — eine einzige Quelle
+          der Wahrheit.
+        </p>
+      </div>
+
+      <div class="feat-grid">
+        <article class="feat">
+          <div class="feat__ico"><span class="material-symbols-rounded">leaderboard</span></div>
+          <h3>Scorecards</h3>
+          <p>
+            PDF hochladen — der Parser liest Overall-Score, Reliability,
+            Driver-KPIs (DCR, POD, CC, CE, LoR/DSC/CDF DPMO) und berechnet
+            den FinalScore plus Tier. Jahres-Trend, Best-Driver-Leaderboard,
+            Wochen-Detail mit allen Fahrern.
+          </p>
+        </article>
+
+        <article class="feat">
+          <div class="feat__ico"><span class="material-symbols-rounded">groups</span></div>
+          <h3>Drivers Hub</h3>
+          <p>
+            Stammdaten, Dokumente (Vertrag, Aufenthalt, ID, Pass,
+            Führerschein), Onboarding-PDF, Document-Expiry-Notifications,
+            ZIP-Export pro Fahrer. Fehlt ein Dokument, siehst du es sofort.
+          </p>
+        </article>
+
+        <article class="feat">
+          <div class="feat__ico"><span class="material-symbols-rounded">waves</span></div>
+          <h3>Waveplan</h3>
+          <p>
+            Atlas-Liste reinkopieren, fertig. Drei Programme (Sameday A,
+            Nextday, Sameday C) mit eigenen Tabs, Disptacher-Auswahl,
+            ein Klick zum Publizieren.
+          </p>
+        </article>
+
+        <article class="feat">
+          <div class="feat__ico"><span class="material-symbols-rounded">local_shipping</span></div>
+          <h3>Fleet Hub</h3>
+          <p>
+            Fahrzeuge inkl. SESO-Confirmations, Mietfirmen-Verwaltung,
+            Pickup/Return-Kalender-Sync, DSP-vs-Mietpartner-Marge auf
+            einen Blick.
+          </p>
+        </article>
+
+        <article class="feat">
+          <div class="feat__ico"><span class="material-symbols-rounded">calendar_month</span></div>
+          <h3>Kalender</h3>
+          <p>
+            Schichten, Mietfahrzeug-Termine, Compliance-Erinnerungen.
+            Mobile- und Desktop-Layout, Drag-to-Edit, Events direkt aus
+            dem Dashboard.
+          </p>
+        </article>
+
+        <article class="feat">
+          <div class="feat__ico"><span class="material-symbols-rounded">support_agent</span></div>
+          <h3>Dispatcher-Center</h3>
+          <p>
+            Sub-Accounts mit eigenem Login, beliebig viele inkludiert.
+            Pill-Kontaktdaten, Smart-Todo-Liste mit wiederholten Aufgaben,
+            Übergaben strukturiert.
+          </p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════ HOW ══════════════════════════════ -->
+  <section class="section section--how" id="how">
+    <div class="container">
+      <div class="section__head">
+        <div class="eyebrow eyebrow--dark">02 — So funktioniert's</div>
+        <h2>In 3 Minuten produktiv.</h2>
+      </div>
+
+      <div class="how-steps">
+        <div class="step">
+          <div class="step__num">01</div>
+          <h3>Account anlegen</h3>
+          <p>
+            Email-Adresse + Stations-Code reicht. Karte einmalig hinterlegen,
+            dann läuft der 30-Tage-Trial. <strong>Keine automatische
+            Abbuchung</strong> — du entscheidest am Tag 30, ob es weitergeht.
+          </p>
+        </div>
+        <div class="step">
+          <div class="step__num">02</div>
+          <h3>Daten reinziehen</h3>
+          <p>
+            Driver-CSV importieren, erste Scorecard-PDF hochladen, ggf.
+            Mietfirmen anlegen. CoDriver erkennt automatisch deine
+            Station — und legt sie zur Abrechnung an.
+          </p>
+        </div>
+        <div class="step">
+          <div class="step__num">03</div>
+          <h3>Dispatcher einladen</h3>
+          <p>
+            Sub-Account anlegen, Berechtigungen vergeben, Login-Link
+            versenden. Dispatcher sieht <em>exakt</em> deine Daten — fertig.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════ PRICING ═══════════════════════════ -->
+  <section class="section section--pricing" id="pricing">
+    <div class="container">
+      <div class="section__head">
+        <div class="eyebrow eyebrow--dark">03 — Pricing</div>
+        <h2>Ein Plan. Pro Station.</h2>
+        <p>
+          Transparent, ohne Setup-Gebühr. Jede zusätzliche Station kostet
+          den gleichen Preis — Stripe rechnet anteilig ab.
+        </p>
+      </div>
+
+      <div class="price-card">
+        <div class="price-card__head">
+          <span class="price-card__badge">CoDriver Pro</span>
+          <span class="price-card__trial">30 Tage gratis</span>
+        </div>
+        <div class="price-card__amount">
+          <span class="price-card__currency">€</span>
+          <span class="price-card__big">100</span>
+          <span class="price-card__per">/ Station / Monat</span>
+        </div>
+        <p class="price-card__tax">zzgl. USt., über Stripe automatisch berechnet</p>
+
+        <ul class="price-card__list">
+          <li><span class="material-symbols-rounded">check</span> Alle Features inklusive</li>
+          <li><span class="material-symbols-rounded">check</span> Unbegrenzte Fahrer pro Station</li>
+          <li><span class="material-symbols-rounded">check</span> Unbegrenzte Dispatcher-Sub-Accounts</li>
+          <li><span class="material-symbols-rounded">check</span> Stationen werden automatisch erkannt</li>
+          <li><span class="material-symbols-rounded">check</span> EU-Hosting, DSGVO-konform</li>
+          <li><span class="material-symbols-rounded">check</span> Email-Support &amp; deutsche Doku</li>
+        </ul>
+
+        <a class="btn btn-primary btn-lg btn-block" href="https://gaurav-arion-001-3d94a.web.app#/signup">
+          Jetzt 30 Tage testen
+        </a>
+        <p class="price-card__fineprint">
+          Trial läuft nach 30 Tagen <strong>automatisch ab</strong> — kein
+          ungewolltes Abo, du musst aktiv reaktivieren.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════ FAQ ══════════════════════════════ -->
+  <section class="section section--faq" id="faq">
+    <div class="container">
+      <div class="section__head">
+        <div class="eyebrow eyebrow--dark">04 — FAQ</div>
+        <h2>Häufige Fragen.</h2>
+      </div>
+
+      <div class="faq-list">
+        <details class="faq-item">
+          <summary>Was passiert nach den 30 Tagen?</summary>
+          <p>
+            Nichts automatisch. Die Subscription wird durch Stripe gecancelt,
+            keine Abbuchung. Du fällst in einen 14-tägigen Read-only-Modus —
+            Daten bleiben einsehbar, aber keine Änderungen. Reaktivierst du
+            den Plan, geht es nahtlos weiter.
+          </p>
+        </details>
+        <details class="faq-item">
+          <summary>Wie wird „Station" gezählt?</summary>
+          <p>
+            CoDriver liest den Station-Code aus den hochgeladenen Scorecards.
+            Sobald ein neuer Code auftaucht, wird er zur Abrechnung
+            hinzugefügt. Du siehst alle erkannten Stationen im Billing-Bereich
+            und bekommst Bescheid, bevor eine neue Station ins Abo aufgenommen
+            wird.
+          </p>
+        </details>
+        <details class="faq-item">
+          <summary>Können meine Dispatcher alles sehen?</summary>
+          <p>
+            Ja, standardmäßig 1:1 wie der Admin — gleicher Login, gleiche
+            Daten, nur auf deinen DSP-Namespace gescoped. Wenn du
+            granular einschränken willst, kannst du pro Modul Berechtigungen
+            entziehen.
+          </p>
+        </details>
+        <details class="faq-item">
+          <summary>Wo werden meine Daten gespeichert?</summary>
+          <p>
+            Firebase Firestore + Storage, Region EU (Frankfurt/Belgien). Wir
+            verarbeiten ausschließlich nach DSGVO. AV-Vertrag auf Anfrage,
+            Datenexport jederzeit über die ZIP-Funktion im Drivers-Hub.
+          </p>
+        </details>
+        <details class="faq-item">
+          <summary>Kann ich einen einzelnen Fahrer exportieren?</summary>
+          <p>
+            Ja. Im Drivers-Hub-Detail-Dialog gibt's einen
+            „Als ZIP exportieren"-Button. Du bekommst Stammdaten als JSON
+            plus alle hochgeladenen Dokumente (Vertrag, Pass, Führerschein
+            usw.) in einem sauber benannten ZIP-Ordner.
+          </p>
+        </details>
+        <details class="faq-item">
+          <summary>Was ist mit dem Scorecard-PDF-Format?</summary>
+          <p>
+            CoDriver parst Amazons offizielle DSP-Scorecard-PDFs. Wir lesen
+            Overall-Score, Tier, Rank, Reliability, plus pro Fahrer alle
+            KPIs (Delivered, DCR, POD, CC, CE, LoR/DSC/CDF DPMO) und
+            berechnen einen aggregierten FinalScore mit transparenten
+            Strafstaffeln.
+          </p>
+        </details>
+        <details class="faq-item">
+          <summary>Gibt es eine API?</summary>
+          <p>
+            Direkter API-Zugang nicht im Standard-Plan, aber für individuelle
+            Integrationen sprich uns an. Per ZIP-/CSV-Export lassen sich alle
+            Daten manuell überführen.
+          </p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════ FINAL CTA ════════════════════════ -->
+  <section class="final-cta">
+    <div class="container">
+      <div class="final-cta__card">
+        <div class="final-cta__content">
+          <div class="eyebrow eyebrow--light">Ready when you are</div>
+          <h2>Schluss mit Excel-Listen.</h2>
+          <p>
+            30 Tage Vollzugriff. Karte hinterlegen, dann läuft's. Kein
+            automatischer Übergang ins Abo — du entscheidest, ob's
+            weitergeht.
+          </p>
+        </div>
+        <div class="final-cta__actions">
+          <a class="btn btn-white btn-lg" href="https://gaurav-arion-001-3d94a.web.app#/signup">
+            Trial starten
+          </a>
+          <a class="btn btn-ghost-light btn-lg" href="mailto:info@arion-logistics.de">
+            Frage stellen
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════ FOOTER ════════════════════════════ -->
+  <footer class="footer">
+    <div class="container footer__inner">
+      <div class="footer__brand">
+        <div class="logo">
+          <span class="logo__mark">C</span>
+          <span class="logo__word">CoDriver</span>
+        </div>
+        <p>
+          Operations-Plattform für Amazon Delivery Service Provider.
+          Hosted in der EU. © 2026 ARION Logistics GmbH.
+        </p>
+      </div>
+      <div class="footer__cols">
+        <div class="footer__col">
+          <h4>Produkt</h4>
+          <a href="#features">Features</a>
+          <a href="#pricing">Preise</a>
+          <a href="#faq">FAQ</a>
+        </div>
+        <div class="footer__col">
+          <h4>Account</h4>
+          <a href="https://gaurav-arion-001-3d94a.web.app">Login</a>
+          <a href="https://gaurav-arion-001-3d94a.web.app#/signup">Sign Up</a>
+        </div>
+        <div class="footer__col">
+          <h4>Rechtliches</h4>
+          <a href="/impressum.html">Impressum</a>
+          <a href="/datenschutz.html">Datenschutz</a>
+          <a href="/agb.html">AGB</a>
+        </div>
+        <div class="footer__col">
+          <h4>Kontakt</h4>
+          <a href="mailto:info@arion-logistics.de">info@arion-logistics.de</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="app.js" defer></script>
+</body>
+</html>

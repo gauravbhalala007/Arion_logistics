@@ -1,9 +1,22 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../localization/app_localizations.dart';
+import '../widgets/motion_helpers.dart';
+
+/// Driver-Whitelist als Fallback, falls der Admin das Add-On Flag noch
+/// nicht explizit aktiviert hat. Alle anderen Driver sehen co:timer nur,
+/// wenn ihr DSP-Admin `users/{adminUid}.addons.timeTracking == true`
+/// gesetzt hat (über den co:timer Setup-Tab).
+const Set<String> _kCotimerVisibleForDrivers = {
+  'albert.dobra@arion-logistics.de',
+  'test@arion-logistics.de',
+};
 
 const double _kTopCardHeight = 142;
 
@@ -20,6 +33,7 @@ class DriverHomePage extends StatelessWidget {
   final VoidCallback onOpenIncidentReport;
   final VoidCallback onOpenWaveplan;
   final VoidCallback onOpenComingSoon;
+  final VoidCallback onOpenCotimer;
 
   const DriverHomePage({
     super.key,
@@ -35,6 +49,7 @@ class DriverHomePage extends StatelessWidget {
     required this.onOpenIncidentReport,
     required this.onOpenWaveplan,
     required this.onOpenComingSoon,
+    required this.onOpenCotimer,
   });
 
   @override
@@ -52,6 +67,7 @@ class DriverHomePage extends StatelessWidget {
       onOpenIncidentReport: onOpenIncidentReport,
       onOpenWaveplan: onOpenWaveplan,
       onOpenComingSoon: onOpenComingSoon,
+      onOpenCotimer: onOpenCotimer,
     );
   }
 }
@@ -69,6 +85,7 @@ class _DriverHomePageBody extends StatefulWidget {
   final VoidCallback onOpenIncidentReport;
   final VoidCallback onOpenWaveplan;
   final VoidCallback onOpenComingSoon;
+  final VoidCallback onOpenCotimer;
 
   const _DriverHomePageBody({
     required this.dspUid,
@@ -83,6 +100,7 @@ class _DriverHomePageBody extends StatefulWidget {
     required this.onOpenIncidentReport,
     required this.onOpenWaveplan,
     required this.onOpenComingSoon,
+    required this.onOpenCotimer,
   });
 
   @override
@@ -93,6 +111,49 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
   static const _settingsCollection = 'settings';
   static const _dispatcherPillDoc = 'dispatcher_pill';
   int _selectedDispatcher = 0;
+  // Reaktives Flag: ist co:timer Add-On vom Admin freigeschaltet?
+  // Wird per Stream auf users/{dspUid}.addons.timeTracking live gehalten.
+  bool _cotimerAddonEnabled = false;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _addonSub;
+
+  @override
+  void initState() {
+    super.initState();
+    final dsp = widget.dspUid.trim();
+    if (dsp.isNotEmpty) {
+      _addonSub = FirebaseFirestore.instance
+          .collection('users')
+          .doc(dsp)
+          .snapshots()
+          .listen((snap) {
+        final addons = (snap.data()?['addons'] as Map?) ?? const {};
+        final enabled = addons['timeTracking'] == true;
+        if (mounted && enabled != _cotimerAddonEnabled) {
+          setState(() => _cotimerAddonEnabled = enabled);
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _addonSub?.cancel();
+    super.dispose();
+  }
+
+  /// Test-phase access gate for the Shift Plan feature. Drivers can
+  /// peek at the new view only after entering the shared password
+  /// 4002. Remove this dialog (and the inline onTap wrapper) once the
+  /// feature is opened to everyone.
+  Future<void> _promptShiftPlanPassword(BuildContext ctx) async {
+    final ok = await showDialog<bool>(
+      context: ctx,
+      builder: (dialogCtx) => const _ShiftPlanPasswordDialog(),
+    );
+    if (ok == true && mounted) {
+      widget.onOpenShiftPlan();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -211,6 +272,28 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
         iconBackground: const Color(0xFFE6F8F2),
         onTap: widget.onOpenWaveplan,
       ),
+      // Page: DriverCotimerClockPage  (Add-On-Modul)
+      // Wiring: driver_home_shell.dart -> DriverView.cotimer
+      // Sichtbar wenn:
+      //   • Admin hat `addons.timeTracking == true` gesetzt (UI im
+      //     co:timer Setup-Tab), ODER
+      //   • Driver-Email auf Test-Whitelist (legacy fallback).
+      if (_cotimerAddonEnabled ||
+          _kCotimerVisibleForDrivers.contains(
+            (FirebaseAuth.instance.currentUser?.email ?? '')
+                .toLowerCase()
+                .trim(),
+          ))
+        _HomeCardData(
+          title: 'co:timer',
+          subtitle: 'Stempel-Uhr · Beta',
+          icon: Icons.timer_outlined,
+          iconColor: const Color(0xFF006047),
+          iconBackground: const Color(0xFFE6F8F2),
+          badgeText: 'BETA',
+          badgeColor: const Color(0xFFB7791F),
+          onTap: widget.onOpenCotimer,
+        ),
     ];
 
     return SingleChildScrollView(
@@ -257,14 +340,16 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
               ),
               const SizedBox(width: 8),
               Expanded(
-                // Page: DriverShiftPlanPage
-                // Wiring: driver_home_shell.dart -> DriverView.comingSoon for now
+                // Page: DriverShiftPlanView
+                // Test phase: tap shows a 4-digit password gate. On
+                // success the shift plan opens via onOpenShiftPlan.
+                // Remove the gate once the feature ships to all DSPs.
                 child: _TopFeatureCard(
                   title: t.t('driver_home_shift_plan_title'),
                   subtitle: t.t('driver_home_shift_plan_subtitle'),
-                  icon: Icons.calendar_today_rounded,
+                  icon: Icons.event_note_rounded,
                   badgeText: t.t('coming_soon'),
-                  onTap: null,
+                  onTap: () => _promptShiftPlanPassword(context),
                 ),
               ),
             ],
@@ -276,14 +361,19 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
               return Wrap(
                 spacing: 10,
                 runSpacing: 10,
-                children: cards
-                    .map(
-                      (card) => SizedBox(
-                        width: itemWidth,
-                        child: _HomeFeatureCard(data: card),
+                children: [
+                  for (var i = 0; i < cards.length; i++)
+                    SizedBox(
+                      width: itemWidth,
+                      // Stagger Fade-In beim Mount (Emil-Pattern):
+                      // 30 ms je Item, kumulativ max ~300 ms.
+                      child: StaggeredFadeIn(
+                        delay: Duration(milliseconds: 30 * i),
+                        slideOffsetY: 0.06,
+                        child: _HomeFeatureCard(data: cards[i]),
                       ),
-                    )
-                    .toList(),
+                    ),
+                ],
               );
             },
           ),
@@ -750,57 +840,59 @@ class _HomeFeatureCard extends StatelessWidget {
     final isEnabled = data.onTap != null;
 
     final inner = Container(
-      height: 92,
+      height: 96, // 8 px Rhythmus, +4 px vs alt für luftigeren Look
       decoration: BoxDecoration(
-        color: isEnabled ? Colors.white : const Color(0xFFF8FAFB),
-        borderRadius: BorderRadius.circular(14),
+        color: isEnabled ? Colors.white : const Color(0xFFFAFBFC),
+        borderRadius: BorderRadius.circular(16),
         border: data.borderGradient == null
             ? Border.all(
-                color: isEnabled
-                    ? (data.borderColor ?? const Color(0xFFDDE3E7))
-                    : const Color(0xFFDDE3E7),
-                width: 1.6,
+                color: const Color(0xFFE5E5EA), // hairline neutral
+                width: 0.6,
               )
             : null,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isEnabled ? 0.06 : 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
+            color: Colors.black.withValues(alpha: isEnabled ? 0.04 : 0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
-      padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+      padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
       child: Row(
         children: [
           Container(
-            width: 44,
-            height: 44,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
-              color: isEnabled ? data.iconBackground : const Color(0xFFEEF2F4),
-              shape: BoxShape.circle,
+              color: isEnabled
+                  ? data.iconBackground
+                  : const Color(0xFFEEF2F4),
+              borderRadius: BorderRadius.circular(10),
             ),
             child: data.iconAsset != null
                 ? Center(
                     child: SvgPicture.asset(
                       data.iconAsset!,
-                      width: 22,
-                      height: 22,
+                      width: 20,
+                      height: 20,
                       colorFilter: ColorFilter.mode(
-                        isEnabled ? data.iconColor : const Color(0xFF9AA4B2),
+                        isEnabled
+                            ? data.iconColor
+                            : const Color(0xFF9CA3AF),
                         BlendMode.srcIn,
                       ),
                     ),
                   )
                 : Icon(
                     data.icon,
-                    size: 23,
+                    size: 20,
                     color: isEnabled
                         ? data.iconColor
-                        : const Color(0xFF9AA4B2),
+                        : const Color(0xFF9CA3AF),
                   ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -811,24 +903,28 @@ class _HomeFeatureCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 29 / 2,
+                    fontFamily: 'Inter',
+                    fontSize: 15,
                     fontWeight: FontWeight.w800,
+                    letterSpacing: -0.2,
                     color: isEnabled
-                        ? const Color(0xFF1F2937)
-                        : const Color(0xFF4B5563),
+                        ? const Color(0xFF1C1C1E)
+                        : const Color(0xFF6B7280),
                   ),
                 ),
-                const SizedBox(height: 1),
+                const SizedBox(height: 2),
                 Text(
                   data.subtitle,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontFamily: 'Inter',
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w500,
                     color: isEnabled
-                        ? const Color(0xFF7A8699)
-                        : const Color(0xFF98A2B3),
-                    height: 1.2,
+                        ? const Color(0xFF6B7280)
+                        : const Color(0xFF9CA3AF),
+                    height: 1.3,
                   ),
                 ),
               ],
@@ -842,19 +938,17 @@ class _HomeFeatureCard extends StatelessWidget {
         ? inner
         : Container(
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(16),
               gradient: data.borderGradient,
             ),
-            padding: const EdgeInsets.all(2),
+            padding: const EdgeInsets.all(1.4),
             child: inner,
           );
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: data.onTap,
-        child: Stack(
+    return PressFeedback(
+      onTap: data.onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Stack(
           clipBehavior: Clip.none,
           children: [
             cardBody,
@@ -895,7 +989,6 @@ class _HomeFeatureCard extends StatelessWidget {
               ),
           ],
         ),
-      ),
     );
   }
 }
@@ -973,5 +1066,229 @@ class _DispatcherContact {
     final wa = whatsapp.trim();
     if (wa.isNotEmpty) return wa;
     return phone;
+  }
+}
+
+/// Test-phase password gate for the Shift Plan tile. Returns `true`
+/// on correct passcode, `false` (or null) on cancel/wrong code. The
+/// shared passcode is "4002"; remove this widget when the feature
+/// rolls out to all drivers.
+class _ShiftPlanPasswordDialog extends StatefulWidget {
+  const _ShiftPlanPasswordDialog();
+
+  @override
+  State<_ShiftPlanPasswordDialog> createState() =>
+      _ShiftPlanPasswordDialogState();
+}
+
+class _ShiftPlanPasswordDialogState
+    extends State<_ShiftPlanPasswordDialog> {
+  static const _passcode = '4002';
+  final TextEditingController _ctrl = TextEditingController();
+  final FocusNode _focus = FocusNode();
+  bool _wrong = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focus.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (_ctrl.text.trim() == _passcode) {
+      Navigator.of(context).pop(true);
+    } else {
+      setState(() => _wrong = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 380),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(22, 22, 22, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE7F5EE),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    alignment: Alignment.center,
+                    child: const Icon(
+                      Icons.lock_outline_rounded,
+                      color: Color(0xFF1D7F5A),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Text(
+                          'Shift plan · Beta',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF111827),
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Enter the 4-digit test passcode.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF6B7280),
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _ctrl,
+                focusNode: _focus,
+                keyboardType: TextInputType.number,
+                obscureText: true,
+                autocorrect: false,
+                enableSuggestions: false,
+                maxLength: 4,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 8,
+                  color: Color(0xFF111827),
+                ),
+                onChanged: (_) {
+                  if (_wrong) setState(() => _wrong = false);
+                },
+                onSubmitted: (_) => _submit(),
+                decoration: InputDecoration(
+                  counterText: '',
+                  hintText: '••••',
+                  hintStyle: const TextStyle(
+                    color: Color(0xFFD1D5DB),
+                    letterSpacing: 8,
+                  ),
+                  filled: true,
+                  fillColor: const Color(0xFFF9FAFB),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                      color: _wrong
+                          ? const Color(0xFFB91C1C)
+                          : const Color(0xFFE5E7EB),
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                      color: _wrong
+                          ? const Color(0xFFB91C1C)
+                          : const Color(0xFFE5E7EB),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                      color: _wrong
+                          ? const Color(0xFFB91C1C)
+                          : const Color(0xFF1D7F5A),
+                      width: 1.6,
+                    ),
+                  ),
+                ),
+              ),
+              if (_wrong) ...[
+                const SizedBox(height: 6),
+                const Text(
+                  'Wrong passcode. Ask your dispatcher.',
+                  style: TextStyle(
+                    color: Color(0xFFB91C1C),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12.5,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () =>
+                          Navigator.of(context).pop(false),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 14,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(
+                          color: Color(0xFF6B7280),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: _submit,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF1D7F5A),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 14,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: const Text(
+                        'Unlock',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

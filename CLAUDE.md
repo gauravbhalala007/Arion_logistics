@@ -48,3 +48,22 @@ Im laufenden Prozess:
 - `r` → Hot Reload (UI-Änderungen, ~1–2 s)
 - `R` → Hot Restart (Struktur-Änderungen, ~3–5 s)
 - `q` → Beenden
+
+## Auto-Deploy
+
+Nach jeder funktionalen Änderung an `flutter_app/kpi_admin/` automatisch deployen — **nicht** nochmal nachfragen:
+
+```bash
+cd "flutter_app/kpi_admin"
+flutter build web --release
+firebase deploy --only hosting
+```
+
+Voraussetzung: `flutter analyze lib/` zeigt keine Errors (pre-existing Warnings/Infos sind OK). Bei Errors erst fixen, dann deployen.
+
+Production-URL: https://dsp-codriver.de (Fallback: https://gaurav-arion-001-3d94a.web.app — beide bedient durch denselben Hosting-Site)
+
+Ausnahmen (vorher fragen):
+- destruktive Git-Operationen (`reset --hard`, `push --force`, Branches löschen)
+- Firestore-Rules- oder Functions-Deploys (`firebase deploy --only firestore` / `--only functions`)
+- Schema-Migrationen, die existierende Daten ändern

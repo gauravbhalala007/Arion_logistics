@@ -1,13 +1,16 @@
 // lib/screens/notifications_page.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../widgets/admin_scope.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
 import '../localization/app_localizations.dart';
-import '../theme/app_button_style.dart';
+import '../theme/app_colors.dart';
 import '../utils/driver_activity.dart';
+import '../widgets/co_button.dart';
+import '../widgets/co_pressable.dart';
 
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
@@ -33,7 +36,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
   ];
   late _NotifType _selectedType = _types.first;
 
-  String? get _uid => FirebaseAuth.instance.currentUser?.uid;
+  String? get _uid {
+    final scoped = AdminScope.maybeOf(context)?.adminUid;
+    if (scoped != null && scoped.isNotEmpty) return scoped;
+    return FirebaseAuth.instance.currentUser?.uid;
+  }
 
   @override
   void dispose() {
@@ -393,7 +400,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
                       builder: (ctx, snap) {
                         if (snap.connectionState == ConnectionState.waiting) {
                           return const Center(
-                            child: CircularProgressIndicator(),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 3,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                AppColors.codriverGreen,
+                              ),
+                            ),
                           );
                         }
 
@@ -445,9 +457,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
                   const SizedBox(height: 10),
                   Align(
                     alignment: Alignment.centerRight,
-                    child: TextButton(
+                    child: CoButton(
                       onPressed: () => Navigator.of(ctx).pop(),
-                      child: Text(l10n.t('notifications_page_close')),
+                      label: l10n.t('notifications_page_close'),
+                      variant: CoButtonVariant.quiet,
                     ),
                   ),
                 ],
@@ -781,26 +794,15 @@ class _ComposerCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: OutlinedButton.icon(
+                child: CoButton(
                   onPressed: onTranslateAll,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF1D7F5A),
-                    side: const BorderSide(color: Color(0xFF1D7F5A)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
-                  icon: translating
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.translate, size: 18),
-                  label: Text(
-                    translating ? 'Translating...' : 'Translate all languages',
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
+                  icon: Icons.translate,
+                  label: translating
+                      ? 'Translating...'
+                      : 'Translate all languages',
+                  variant: CoButtonVariant.secondaryOutlined,
+                  fullWidth: true,
+                  busy: translating,
                 ),
               ),
             ],
@@ -945,28 +947,11 @@ class _ComposerCard extends StatelessWidget {
             alignment: Alignment.center,
             child: SizedBox(
               width: 220,
-              child: FilledButton(
+              child: CoButton(
                 onPressed: onPublish,
-                style: AppButtonStyle.of(AppButtonVariant.primary),
-                child: publishing
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.white,
-                          ),
-                        ),
-                      )
-                    : Text(
-                        l10n.t('notifications_page_publish'),
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 15,
-                          letterSpacing: 0.2,
-                        ),
-                      ),
+                label: l10n.t('notifications_page_publish'),
+                fullWidth: true,
+                busy: publishing,
               ),
             ),
           ),
@@ -1057,73 +1042,93 @@ class _HistoryCard extends StatelessWidget {
                             .orderBy('createdAt', descending: true)
                             .snapshots(),
                         builder: (ctx, snap) {
-                          if (snap.connectionState == ConnectionState.waiting) {
-                            return const Center(
-                              child: CircularProgressIndicator(),
+                          final Widget content;
+                          if (snap.connectionState ==
+                              ConnectionState.waiting) {
+                            content = const Center(
+                              key: ValueKey('loading'),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 3,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  AppColors.codriverGreen,
+                                ),
+                              ),
                             );
-                          }
-                          if (snap.hasError) {
-                            return Center(
+                          } else if (snap.hasError) {
+                            content = Center(
+                              key: const ValueKey('error'),
                               child: Text(
                                 l10n.tf('notifications_page_error_generic', {
                                   'error': '${snap.error}',
                                 }),
                               ),
                             );
-                          }
-
-                          final docs = snap.data?.docs ?? [];
-                          if (docs.isEmpty) {
-                            return Center(
-                              child: Text(
-                                l10n.t('notifications_page_no_notifications'),
-                                style: const TextStyle(color: Colors.black54),
-                              ),
-                            );
-                          }
-
-                          return ListView.separated(
-                            itemCount: docs.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(height: 10),
-                            itemBuilder: (_, i) {
-                              final d = docs[i];
-                              final data = d.data();
-                              final title = (data['title'] ?? '').toString();
-                              final body = (data['body'] ?? '').toString();
-                              final type = (data['type'] ?? 'rule').toString();
-                              final confirmedCount =
-                                  (data['confirmedCount'] as num?)?.toInt() ??
-                                  0;
-                              final targetCount =
-                                  (data['targetCount'] as num?)?.toInt() ?? 0;
-
-                              final ts = data['createdAt'];
-                              final dt = ts is Timestamp ? ts.toDate() : null;
-
-                              return InkWell(
-                                borderRadius: BorderRadius.circular(16),
-                                onTap: () {
-                                  onOpenMissing(
-                                    d.id,
-                                    confirmedCount,
-                                    targetCount,
-                                  );
-                                },
-                                child: _HistoryTile(
-                                  dspUid: dspUid,
-                                  notificationId: d.id,
-                                  title: title,
-                                  body: body,
-                                  type: type,
-                                  dateTime: dt,
-                                  confirmedCount: confirmedCount,
-                                  targetCount: targetCount,
-                                  currentDriverCount: currentDriverCount,
+                          } else {
+                            final docs = snap.data?.docs ?? [];
+                            if (docs.isEmpty) {
+                              content = Center(
+                                key: const ValueKey('empty'),
+                                child: Text(
+                                  l10n.t(
+                                      'notifications_page_no_notifications'),
+                                  style: const TextStyle(
+                                      color: Colors.black54),
                                 ),
                               );
-                            },
-                          );
+                            } else {
+                              content = ListView.separated(
+                                key: const ValueKey('list'),
+                                itemCount: docs.length,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(height: 10),
+                                itemBuilder: (_, i) {
+                                  final d = docs[i];
+                                  final data = d.data();
+                                  final title =
+                                      (data['title'] ?? '').toString();
+                                  final body =
+                                      (data['body'] ?? '').toString();
+                                  final type =
+                                      (data['type'] ?? 'rule').toString();
+                                  final confirmedCount =
+                                      (data['confirmedCount'] as num?)
+                                              ?.toInt() ??
+                                          0;
+                                  final targetCount =
+                                      (data['targetCount'] as num?)
+                                              ?.toInt() ??
+                                          0;
+
+                                  final ts = data['createdAt'];
+                                  final dt =
+                                      ts is Timestamp ? ts.toDate() : null;
+
+                                  return CoPressable(
+                                    borderRadius: BorderRadius.circular(16),
+                                    onTap: () {
+                                      onOpenMissing(
+                                        d.id,
+                                        confirmedCount,
+                                        targetCount,
+                                      );
+                                    },
+                                    child: _HistoryTile(
+                                      dspUid: dspUid,
+                                      notificationId: d.id,
+                                      title: title,
+                                      body: body,
+                                      type: type,
+                                      dateTime: dt,
+                                      confirmedCount: confirmedCount,
+                                      targetCount: targetCount,
+                                      currentDriverCount: currentDriverCount,
+                                    ),
+                                  );
+                                },
+                              );
+                            }
+                          }
+                          return CoStateSwitcher(child: content);
                         },
                       );
                     },
@@ -1205,7 +1210,14 @@ class _RulesOrderSectionState extends State<_RulesOrderSection> {
         if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
           return const SizedBox(
             height: 56,
-            child: Center(child: CircularProgressIndicator()),
+            child: Center(
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  AppColors.codriverGreen,
+                ),
+              ),
+            ),
           );
         }
 
@@ -1498,18 +1510,19 @@ class _HistoryTile extends StatelessWidget {
               ),
             ),
             actions: [
-              TextButton(
+              CoButton(
                 onPressed: () => Navigator.of(ctx).pop(),
-                child: Text(l10n.t('notifications_page_cancel')),
+                label: l10n.t('notifications_page_cancel'),
+                variant: CoButtonVariant.quiet,
               ),
-              ElevatedButton(
+              CoButton(
                 onPressed: () {
                   Navigator.of(ctx).pop({
                     'title': titleCtrl.text.trim(),
                     'body': bodyCtrl.text.trim(),
                   });
                 },
-                child: Text(l10n.t('notifications_page_save')),
+                label: l10n.t('notifications_page_save'),
               ),
             ],
           );
@@ -1629,20 +1642,15 @@ class _HistoryTile extends StatelessWidget {
           title: Text(l10n.t('notifications_page_delete_question')),
           content: Text(l10n.t('notifications_page_delete_body')),
           actions: [
-            TextButton(
+            CoButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(l10n.t('notifications_page_cancel')),
+              label: l10n.t('notifications_page_cancel'),
+              variant: CoButtonVariant.quiet,
             ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFE11D48),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
+            CoButton(
               onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text(l10n.t('notifications_page_delete')),
+              label: l10n.t('notifications_page_delete'),
+              variant: CoButtonVariant.destructive,
             ),
           ],
         );

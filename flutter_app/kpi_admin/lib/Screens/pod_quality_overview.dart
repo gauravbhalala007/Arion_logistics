@@ -3,12 +3,16 @@ import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../widgets/admin_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../services/parser_api.dart';
 import '../services/report_writer.dart';
 import '../localization/app_localizations.dart';
+import '../theme/app_colors.dart';
+import '../widgets/co_button.dart';
+import '../widgets/co_pressable.dart';
 import 'pod_quality_week.dart';
 
 final _pct = NumberFormat.decimalPattern('de');
@@ -78,7 +82,7 @@ class _PodQualityOverviewPageState extends State<PodQualityOverviewPage> {
 
   Stream<List<_PodReportVM>> _podReportsStream() {
     final t = AppLocalizations.of(context);
-    final uid = FirebaseAuth.instance.currentUser!.uid;
+    final uid = AdminScope.adminUidOf(context)!;
     return FirebaseFirestore.instance
         .collection('users')
         .doc(uid)
@@ -229,14 +233,13 @@ class _PodQualityOverviewPageState extends State<PodQualityOverviewPage> {
                           ),
                     ),
                     const SizedBox(height: 10),
-                    FilledButton.icon(
+                    CoButton(
                       onPressed: _busyUpload ? null : _uploadPodQualityPdf,
-                      icon: const Icon(Icons.upload_file),
-                      label: Text(
-                        _busyUpload
-                            ? t.t('uploading')
-                            : t.t('pod_quality_upload_pdf'),
-                      ),
+                      icon: Icons.upload_file,
+                      label: _busyUpload
+                          ? t.t('uploading')
+                          : t.t('pod_quality_upload_pdf'),
+                      busy: _busyUpload,
                     ),
                   ],
                 )
@@ -253,14 +256,13 @@ class _PodQualityOverviewPageState extends State<PodQualityOverviewPage> {
                             ),
                       ),
                     ),
-                    FilledButton.icon(
+                    CoButton(
                       onPressed: _busyUpload ? null : _uploadPodQualityPdf,
-                      icon: const Icon(Icons.upload_file),
-                      label: Text(
-                        _busyUpload
-                            ? t.t('uploading')
-                            : t.t('pod_quality_upload_pdf'),
-                      ),
+                      icon: Icons.upload_file,
+                      label: _busyUpload
+                          ? t.t('uploading')
+                          : t.t('pod_quality_upload_pdf'),
+                      busy: _busyUpload,
                     ),
                   ],
                 ),
@@ -269,26 +271,42 @@ class _PodQualityOverviewPageState extends State<PodQualityOverviewPage> {
                 child: StreamBuilder<List<_PodReportVM>>(
                   stream: _podReportsStream(),
                   builder: (context, snap) {
+                    Widget content;
                     if (snap.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
+                      content = const Center(
+                        key: ValueKey('loading'),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 3,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            AppColors.codriverGreen,
+                          ),
+                        ),
+                      );
+                      return CoStateSwitcher(child: content);
                     }
                     if (snap.hasError) {
-                      return Center(
+                      content = Center(
+                        key: const ValueKey('error'),
                         child: Text(
                           t.tf('admin_home_error_generic', {
                             'error': '${snap.error}',
                           }),
                         ),
                       );
+                      return CoStateSwitcher(child: content);
                     }
                     final list = snap.data ?? const <_PodReportVM>[];
                     if (list.isEmpty) {
-                      return Center(
+                      content = Center(
+                        key: const ValueKey('empty'),
                         child: Text(t.t('pod_quality_no_reports_uploaded')),
                       );
+                      return CoStateSwitcher(child: content);
                     }
 
-                    return ListView.separated(
+                    return CoStateSwitcher(
+                      child: ListView.separated(
+                      key: const ValueKey('list'),
                       itemCount: list.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 14),
                       itemBuilder: (context, index) {
@@ -300,7 +318,7 @@ class _PodQualityOverviewPageState extends State<PodQualityOverviewPage> {
                           summary['opportunitiesCount'],
                         );
 
-                        return InkWell(
+                        return CoPressable(
                           onTap: () => _openWeek(r.ref),
                           borderRadius: BorderRadius.circular(20),
                           child: Container(
@@ -435,6 +453,7 @@ class _PodQualityOverviewPageState extends State<PodQualityOverviewPage> {
                           ),
                         );
                       },
+                      ),
                     );
                   },
                 ),

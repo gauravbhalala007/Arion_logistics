@@ -5,7 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../Screens/login_page.dart';
 import '../Screens/admin_shell_page.dart';
-import '../Screens/dispatcher_shell_page.dart';
+import '../widgets/admin_scope.dart';
 import '../widgets/app_side_menu.dart';
 
 import '../Screens/driver_home_shell.dart';
@@ -84,8 +84,10 @@ class AuthGate extends StatelessWidget {
 
               final role = (data['role'] ?? '').toString().trim();
 
-              // ✅ DISPATCHER sub-account — runs its own shell scoped
-              // to the parent admin's data namespace.
+              // ✅ DISPATCHER sub-account — wir verwenden die *identische*
+              // AdminShellPage wie ein echter Admin, nur eingewickelt in
+              // einen `AdminScope(parentAdminUid)`, sodass alle Reads
+              // und Writes in den Namespace des Parent-Admins gehen.
               if (role == 'dispatcher') {
                 final parentAdminUid =
                     (data['parentAdminUid'] ?? '').toString();
@@ -96,7 +98,10 @@ class AuthGate extends StatelessWidget {
                 if (!active) {
                   return _AwaitApproval(email: user.email ?? '');
                 }
-                return DispatcherShellPage(parentAdminUid: parentAdminUid);
+                return AdminScope(
+                  adminUid: parentAdminUid,
+                  child: const AdminShellPage(initialNav: AppNav.home),
+                );
               }
 
               // ✅ DRIVER account stored in users/{uid}

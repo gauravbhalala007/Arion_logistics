@@ -1,0 +1,118 @@
+rules_version = '2';
+
+// CoDriver — Firestore Rules für die `time-tracking` Database (eur3)
+//
+// Diese DB enthält ausschließlich Zeiterfassungs-Daten:
+//   • time_entries  (Stempel-Events)
+//   • shifts        (aggregierte Schichten)
+//   • time_account  (monatliche Soll/Ist-Summen)
+//   • correction_requests
+//   • audit_log
+//
+// Stammdaten (Driver, Reports, Vehicles) liegen weiterhin in der
+// Default-DB (nam5). Zeit-Daten dürfen NUR über Cloud Functions
+// geschrieben werden — kein direkter Client-Write. So bleibt
+// Server-Zeit + Geofence-Check unangetastet.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helpers ──────────────────────────────────────────────────
+    function signedIn() {
+      return request.auth != null;
+    }
+    function isSelf(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+    function isAdminOf(adminUid) {
+      // Wir lesen das role-Feld aus der DEFAULT-DB (nam5)
+      // → in Multi-DB-Rules zurzeit nicht direkt möglich;
+      //   wir verlassen uns auf Custom-Claims (token.role == 'admin').
+      return signedIn() && request.auth.token.role == 'admin'
+        && request.auth.uid == adminUid;
+    }
+    function isDispatcherOf(adminUid) {
+      return signedIn()
+        && request.auth.token.role == 'dispatcher'
+        && request.auth.token.parentAdminUid == adminUid;
+    }
+    function isDriverOf(adminUid, driverId) {
+      return signedIn()
+        && request.auth.token.role == 'driver'
+        && request.auth.token.dspUid == adminUid
+        && request.auth.token.driverId == driverId;
+    }
+
+    // ─── Stammdaten-Spiegelung (read-only von Server) ─────────────
+    // Der Cloud-Function-Server (mit Admin SDK) bypasst diese Rules.
+    // Clients haben keinen direkten Schreibzugriff auf Zeit-Collections.
+
+    match /users/{adminUid}/drivers/{driverId} {
+
+      // ─── time_entries — Stempel-Events ────────────────────────
+      match /time_entries/{entryId} {
+        // Driver darf seine eigenen Entries lesen
+        allow read: if isDriverOf(adminUid, driverId)
+                    || isAdminOf(adminUid)
+                    || isDispatcherOf(adminUid);
+        // Schreiben nur via Cloud Function (server-side)
+        allow write: if false;
+      }
+
+      // ─── shifts — aggregierte Schichten ───────────────────────
+      match /shifts/{shiftId} {
+        allow read: if isDriverOf(adminUid, driverId)
+                    || isAdminOf(adminUid)
+                    || isDispatcherOf(adminUid);
+        allow write: if false;
+      }
+
+      // ─── time_account — monatliche Aggregate ──────────────────
+      match /time_account/{yearMonth} {
+        allow read: if isDriverOf(adminUid, driverId)
+                    || isAdminOf(adminUid)
+                    || isDispatcherOf(adminUid);
+        allow write: if false;
+      }
+
+      // ─── correction_requests — Korrektur-Anträge ──────────────
+      match /correction_requests/{reqId} {
+        allow read: if isDriverOf(adminUid, driverId)
+                    || isAdminOf(adminUid)
+                    || isDispatcherOf(adminUid);
+        // Driver darf seine eigenen Anträge erstellen
+        allow create: if isDriverOf(adminUid, driverId)
+                      && request.resource.data.status == 'pending';
+        // Update nur via Cloud Function (Genehmigung wandert durchs
+        // Server-Function um Audit-Log + Shift-Recompute zu triggern)
+        allow update, delete: if false;
+      }
+    }
+
+    // ─── Audit-Log — read-only, append-only via Server ──────────
+    match /users/{adminUid}/time_audit_log/{auditId} {
+      allow read: if isAdminOf(adminUid) || isDispatcherOf(adminUid);
+      allow write: if false;
+    }
+
+    // ─── Stations + Geofences ──────────────────────────────────
+    // Werden via Admin-UI bearbeitet (Admin = Self), Driver liest nur.
+    match /users/{adminUid}/stations/{stationCode} {
+      allow read: if isAdminOf(adminUid)
+                  || isDispatcherOf(adminUid)
+                  || (signedIn() && request.auth.token.dspUid == adminUid);
+      allow write: if isAdminOf(adminUid);
+    }
+
+    // ─── Global-Holidays (cached pro Bundesland) ───────────────
+    match /global_holidays/{holidayId} {
+      allow read: if signedIn();
+      allow write: if false; // Nur Scheduled Cloud Function
+    }
+
+    // Default-Deny für alles andere in dieser DB
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

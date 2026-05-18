@@ -1291,6 +1291,64 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
                                   )
                                 : null;
 
+                            final concessionsRaw = myData['concessions'];
+                            final concessionsMap = concessionsRaw is Map
+                                ? Map<String, dynamic>.from(
+                                    concessionsRaw as Map,
+                                  )
+                                : <String, dynamic>{};
+                            final byWeekMap =
+                                concessionsMap['dnrCountByWeek'] is Map
+                                ? Map<String, dynamic>.from(
+                                    concessionsMap['dnrCountByWeek'] as Map,
+                                  )
+                                : <String, dynamic>{};
+                            final focusMap =
+                                concessionsMap['focusBuckets'] is Map
+                                ? Map<String, dynamic>.from(
+                                    concessionsMap['focusBuckets'] as Map,
+                                  )
+                                : <String, dynamic>{};
+
+                            final concessions = concessionsMap.isNotEmpty
+                                ? _ConcessionsStats(
+                                    totalDelivered: _numOr0(
+                                      concessionsMap['totalDelivered'],
+                                    ).toDouble(),
+                                    totalDnr: _numOr0(
+                                      concessionsMap['totalDnr'],
+                                    ).toDouble(),
+                                    dnrDpmo4w: _numOr0(
+                                      concessionsMap['dnrDpmo4w'],
+                                    ).toDouble(),
+                                    dnrW1: _numOr0(byWeekMap['w1']).toDouble(),
+                                    dnrW2: _numOr0(byWeekMap['w2']).toDouble(),
+                                    dnrW3: _numOr0(byWeekMap['w3']).toDouble(),
+                                    dnrW4: _numOr0(byWeekMap['w4']).toDouble(),
+                                    attendedDnr: _numOr0(
+                                      focusMap['attendedDnr'],
+                                    ).toDouble(),
+                                    photoOnDelivery: _numOr0(
+                                      focusMap['photoOnDelivery'],
+                                    ).toDouble(),
+                                    successfulContact: _numOr0(
+                                      focusMap['successfulContact'],
+                                    ).toDouble(),
+                                    delivered25m: _numOr0(
+                                      focusMap['delivered25m'],
+                                    ).toDouble(),
+                                    falseScan: _numOr0(
+                                      focusMap['falseScan'],
+                                    ).toDouble(),
+                                    mailbox: _numOr0(
+                                      focusMap['mailbox'],
+                                    ).toDouble(),
+                                    deliveredOtp: _numOr0(
+                                      focusMap['deliveredOtp'],
+                                    ).toDouble(),
+                                  )
+                                : null;
+
                             final totalDrivers = docs.length;
 
                             return Column(
@@ -1325,6 +1383,7 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
                                   cdfScore: cdfScore,
                                   cdfValue: cdfValue,
                                   podQuality: podQuality,
+                                  concessions: concessions,
                                 ),
                               ],
                             );
@@ -2881,6 +2940,7 @@ class _MyScoreKpiList extends StatelessWidget {
   final double cdfValue;
 
   final _PodQualityStats? podQuality;
+  final _ConcessionsStats? concessions;
 
   const _MyScoreKpiList({
     required this.totalScore,
@@ -2903,6 +2963,7 @@ class _MyScoreKpiList extends StatelessWidget {
     required this.cdfScore,
     required this.cdfValue,
     required this.podQuality,
+    required this.concessions,
   });
 
   Color _kpiColorFromScore(double s) {
@@ -2929,6 +2990,7 @@ class _MyScoreKpiList extends StatelessWidget {
           description: loc.t('kpi_desc_dcr'),
           proTip: loc.t('kpi_tip_dcr'),
           podQuality: null,
+          concessions: null,
         ),
         _ExpandableKpiTile(
           code: 'DSC DPMO',
@@ -2939,6 +3001,7 @@ class _MyScoreKpiList extends StatelessWidget {
           description: loc.t('kpi_desc_dnr'),
           proTip: loc.t('kpi_tip_dnr'),
           podQuality: null,
+          concessions: concessions,
         ),
         _ExpandableKpiTile(
           code: 'LoR',
@@ -2949,6 +3012,7 @@ class _MyScoreKpiList extends StatelessWidget {
           description: loc.t('kpi_desc_lor'),
           proTip: loc.t('kpi_tip_lor'),
           podQuality: null,
+          concessions: null,
         ),
         _ExpandableKpiTile(
           code: 'POD',
@@ -2959,6 +3023,7 @@ class _MyScoreKpiList extends StatelessWidget {
           description: loc.t('kpi_desc_pod'),
           proTip: loc.t('kpi_tip_pod'),
           podQuality: podQuality,
+          concessions: null,
         ),
         _ExpandableKpiTile(
           code: 'CC',
@@ -2969,6 +3034,7 @@ class _MyScoreKpiList extends StatelessWidget {
           description: loc.t('kpi_desc_cc'),
           proTip: loc.t('kpi_tip_cc'),
           podQuality: null,
+          concessions: null,
         ),
         _ExpandableKpiTile(
           code: 'CE',
@@ -2979,6 +3045,7 @@ class _MyScoreKpiList extends StatelessWidget {
           description: loc.t('kpi_desc_ce'),
           proTip: loc.t('kpi_tip_ce'),
           podQuality: null,
+          concessions: null,
         ),
         _ExpandableKpiTile(
           code: 'CDF',
@@ -2989,6 +3056,7 @@ class _MyScoreKpiList extends StatelessWidget {
           description: loc.t('kpi_desc_cdf'),
           proTip: loc.t('kpi_tip_cdf'),
           podQuality: null,
+          concessions: null,
         ),
         const SizedBox(height: 24),
       ],
@@ -3006,6 +3074,7 @@ class _ExpandableKpiTile extends StatefulWidget {
   final String description;
   final String proTip;
   final _PodQualityStats? podQuality;
+  final _ConcessionsStats? concessions;
 
   const _ExpandableKpiTile({
     required this.code,
@@ -3016,6 +3085,7 @@ class _ExpandableKpiTile extends StatefulWidget {
     required this.description,
     required this.proTip,
     required this.podQuality,
+    required this.concessions,
   });
 
   @override
@@ -3162,6 +3232,10 @@ class _ExpandableKpiTileState extends State<_ExpandableKpiTile> {
                 children: [
                   if (widget.podQuality != null) ...[
                     _PodQualityInline(stats: widget.podQuality!),
+                    const SizedBox(height: 12),
+                  ],
+                  if (widget.concessions != null) ...[
+                    _ConcessionsInline(stats: widget.concessions!),
                     const SizedBox(height: 12),
                   ],
                   Row(
@@ -3443,6 +3517,152 @@ class _PodMiniStat extends StatelessWidget {
               fontWeight: FontWeight.w800,
               color: Color(0xFF111827),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// Concessions (DSC) — driver-level personal scorecard card
+// ============================================================================
+
+class _ConcessionsStats {
+  final double totalDelivered;
+  final double totalDnr;
+  final double dnrDpmo4w;
+  final double dnrW1;
+  final double dnrW2;
+  final double dnrW3;
+  final double dnrW4;
+  final double attendedDnr;
+  final double photoOnDelivery;
+  final double successfulContact;
+  final double delivered25m;
+  final double falseScan;
+  final double mailbox;
+  final double deliveredOtp;
+
+  const _ConcessionsStats({
+    required this.totalDelivered,
+    required this.totalDnr,
+    required this.dnrDpmo4w,
+    required this.dnrW1,
+    required this.dnrW2,
+    required this.dnrW3,
+    required this.dnrW4,
+    required this.attendedDnr,
+    required this.photoOnDelivery,
+    required this.successfulContact,
+    required this.delivered25m,
+    required this.falseScan,
+    required this.mailbox,
+    required this.deliveredOtp,
+  });
+}
+
+class _ConcessionsInline extends StatelessWidget {
+  final _ConcessionsStats stats;
+
+  const _ConcessionsInline({required this.stats});
+
+  String _fmtInt(double v) => v.toStringAsFixed(0).replaceAll('.', ',');
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  loc.t('concessions_title'),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.1,
+                    color: Color(0xFF4B5563),
+                  ),
+                ),
+              ),
+              _PodStatPill(
+                label: loc.t('concessions_dnr_count'),
+                value: _fmtInt(stats.totalDnr),
+                tone: _PodTone.warn,
+              ),
+              const SizedBox(width: 8),
+              _PodStatPill(
+                label: loc.t('concessions_dnr_dpmo_4w'),
+                value: _fmtInt(stats.dnrDpmo4w),
+                tone: _PodTone.warn,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _PodMiniStat(
+                label: loc.t('concessions_delivered'),
+                value: _fmtInt(stats.totalDelivered),
+              ),
+              _PodMiniStat(
+                label: loc.tf('concessions_week_w', {'week': '1'}),
+                value: _fmtInt(stats.dnrW1),
+              ),
+              _PodMiniStat(
+                label: loc.tf('concessions_week_w', {'week': '2'}),
+                value: _fmtInt(stats.dnrW2),
+              ),
+              _PodMiniStat(
+                label: loc.tf('concessions_week_w', {'week': '3'}),
+                value: _fmtInt(stats.dnrW3),
+              ),
+              _PodMiniStat(
+                label: loc.tf('concessions_week_w', {'week': '4'}),
+                value: _fmtInt(stats.dnrW4),
+              ),
+              _PodMiniStat(
+                label: loc.t('concessions_focus_attended_dnr'),
+                value: _fmtInt(stats.attendedDnr),
+              ),
+              _PodMiniStat(
+                label: loc.t('concessions_focus_photo_on_delivery'),
+                value: _fmtInt(stats.photoOnDelivery),
+              ),
+              _PodMiniStat(
+                label: loc.t('concessions_focus_successful_contact'),
+                value: _fmtInt(stats.successfulContact),
+              ),
+              _PodMiniStat(
+                label: loc.t('concessions_focus_delivered_25m'),
+                value: _fmtInt(stats.delivered25m),
+              ),
+              _PodMiniStat(
+                label: loc.t('concessions_focus_false_scan'),
+                value: _fmtInt(stats.falseScan),
+              ),
+              _PodMiniStat(
+                label: loc.t('concessions_focus_mailbox'),
+                value: _fmtInt(stats.mailbox),
+              ),
+              _PodMiniStat(
+                label: loc.t('concessions_focus_delivered_otp'),
+                value: _fmtInt(stats.deliveredOtp),
+              ),
+            ],
           ),
         ],
       ),

@@ -1,6 +1,9 @@
+import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -32,6 +35,12 @@ class _DriverAbsencePageState extends State<DriverAbsencePage> {
   DateTime? _from;
   DateTime? _to;
   bool _saving = false;
+
+  /// AU-Bescheinigung (Arbeitsunfähigkeitsbescheinigung) file, kept in
+  /// memory until submit. Required for `_type == 'sick_leave'`.
+  Uint8List? _auBytes;
+  String _auFilename = '';
+  String _auMime = '';
 
   String get _driverId => widget.driverTransporterId.toUpperCase().trim();
 
@@ -124,6 +133,14 @@ class _DriverAbsencePageState extends State<DriverAbsencePage> {
         return false;
       }
     }
+    if (_type == 'sick_leave' &&
+        (_auBytes == null || _auBytes!.isEmpty)) {
+      _showSnack(
+        'AU-Bescheinigung ist Pflicht — bitte PDF oder Foto hochladen.',
+        error: true,
+      );
+      return false;
+    }
 
     setState(() => _saving = true);
     try {
@@ -151,6 +168,11 @@ class _DriverAbsencePageState extends State<DriverAbsencePage> {
         'status': 'pending',
         'submittedAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
+        if (_type == 'sick_leave' && _auBytes != null) ...{
+          'auFileBase64': base64Encode(_auBytes!),
+          'auFilename': _auFilename,
+          'auMimeType': _auMime,
+        },
       };
 
       final driverDocRef = _driverRequestsCol(_driverId).doc(requestId);
@@ -165,6 +187,9 @@ class _DriverAbsencePageState extends State<DriverAbsencePage> {
         _from = null;
         _to = null;
         _reasonCtrl.clear();
+        _auBytes = null;
+        _auFilename = '';
+        _auMime = '';
       });
       _showSnack(labels.submitSuccess);
       return true;
@@ -290,6 +315,63 @@ class _DriverAbsencePageState extends State<DriverAbsencePage> {
                       },
                     ),
                     const SizedBox(height: 12),
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOut,
+                      child: _type == 'sick_leave'
+                          ? _AuUploadSection(
+                              bytes: _auBytes,
+                              filename: _auFilename,
+                              onPick: () async {
+                                final res = await FilePicker.platform.pickFiles(
+                                  type: FileType.custom,
+                                  allowedExtensions: const [
+                                    'pdf', 'png', 'jpg', 'jpeg', 'heic',
+                                  ],
+                                  withData: true,
+                                );
+                                if (res == null || res.files.isEmpty) return;
+                                final f = res.files.first;
+                                if (f.bytes == null) return;
+                                // Firestore-Dokumente sind auf ~1 MB
+                                // limitiert. base64 fügt ~33 % hinzu,
+                                // also blocken wir bei > 700 KB Rohgröße.
+                                const maxBytes = 700 * 1024;
+                                if (f.bytes!.lengthInBytes > maxBytes) {
+                                  _showSnack(
+                                    'Datei zu groß (max. 700 KB). Bitte als Foto neu '
+                                    'aufnehmen oder PDF komprimieren.',
+                                    error: true,
+                                  );
+                                  return;
+                                }
+                                setState(() {
+                                  _auBytes = f.bytes;
+                                  _auFilename = f.name;
+                                  final ext =
+                                      f.extension?.toLowerCase() ?? '';
+                                  _auMime = ext == 'pdf'
+                                      ? 'application/pdf'
+                                      : ext == 'png'
+                                          ? 'image/png'
+                                          : ext == 'heic'
+                                              ? 'image/heic'
+                                              : 'image/jpeg';
+                                });
+                                setSheetState(() {});
+                              },
+                              onClear: () {
+                                setState(() {
+                                  _auBytes = null;
+                                  _auFilename = '';
+                                  _auMime = '';
+                                });
+                                setSheetState(() {});
+                              },
+                            )
+                          : const SizedBox(width: double.infinity),
+                    ),
+                    if (_type == 'sick_leave') const SizedBox(height: 12),
                     Row(
                       children: [
                         Expanded(
@@ -1250,5 +1332,135 @@ class _AbsenceLabels {
     return vacationLimitExceededTemplate
         .replaceAll('{requested}', requested)
         .replaceAll('{available}', available);
+  }
+}
+
+/// Driver-side AU-Bescheinigung upload card. Required for sick leave;
+/// the parent form's `_submit` blocks until a file is attached. Uses
+/// the canonical orange-accent (matches the sheet's submit button)
+/// when empty, green-checkmark layout when a file is selected.
+class _AuUploadSection extends StatelessWidget {
+  const _AuUploadSection({
+    required this.bytes,
+    required this.filename,
+    required this.onPick,
+    required this.onClear,
+  });
+
+  final Uint8List? bytes;
+  final String filename;
+  final VoidCallback onPick;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasFile = bytes != null && bytes!.isNotEmpty;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+      decoration: BoxDecoration(
+        color: hasFile
+            ? const Color(0xFFE7F5EE)
+            : const Color(0xFFFFF7ED),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: hasFile
+              ? const Color(0xFF86EFAC)
+              : const Color(0xFFFED7AA),
+          width: hasFile ? 1.4 : 1.2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                hasFile
+                    ? Icons.check_circle_rounded
+                    : Icons.medical_services_outlined,
+                size: 18,
+                color: hasFile
+                    ? const Color(0xFF166534)
+                    : const Color(0xFF9A3412),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  hasFile
+                      ? 'AU-Bescheinigung hochgeladen'
+                      : 'AU-Bescheinigung (Pflicht)',
+                  style: TextStyle(
+                    color: hasFile
+                        ? const Color(0xFF166534)
+                        : const Color(0xFF9A3412),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            hasFile
+                ? filename.isNotEmpty
+                    ? filename
+                    : 'Datei bereit zum Senden.'
+                : 'Bitte lade die AU als PDF oder Foto hoch. Ohne AU kann die Krankmeldung nicht eingereicht werden.',
+            style: TextStyle(
+              color: hasFile
+                  ? const Color(0xFF166534)
+                  : const Color(0xFF9A3412),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onPick,
+                  icon: Icon(
+                    hasFile
+                        ? Icons.swap_horiz_rounded
+                        : Icons.upload_file_rounded,
+                    size: 18,
+                  ),
+                  label: Text(
+                    hasFile ? 'Andere Datei' : 'Datei wählen',
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: hasFile
+                        ? const Color(0xFF166534)
+                        : const Color(0xFF9A3412),
+                    side: BorderSide(
+                      color: hasFile
+                          ? const Color(0xFF86EFAC)
+                          : const Color(0xFFFED7AA),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ),
+              if (hasFile) ...[
+                const SizedBox(width: 8),
+                IconButton(
+                  onPressed: onClear,
+                  icon: const Icon(Icons.close_rounded),
+                  color: const Color(0xFF166534),
+                  tooltip: 'Entfernen',
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }

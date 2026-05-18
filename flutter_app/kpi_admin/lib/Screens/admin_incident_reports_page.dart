@@ -1,8 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../widgets/admin_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+import '../theme/app_colors.dart';
+import '../widgets/co_button.dart';
+import '../widgets/co_pressable.dart';
 
 class AdminIncidentReportsPage extends StatefulWidget {
   const AdminIncidentReportsPage({super.key});
@@ -17,12 +22,15 @@ class _AdminIncidentReportsPageState extends State<AdminIncidentReportsPage> {
   static const _settingsDoc = 'incident_report';
   static const _reportsCollection = 'incident_reports';
 
-  static const Color _kGreen = Color(0xFF1D7F5A);
   static const Color _kText = Color(0xFF111827);
   static const Color _kMuted = Color(0xFF6B7280);
   static const Color _kBorder = Color(0xFFE5E7EB);
 
-  String? get _uid => FirebaseAuth.instance.currentUser?.uid;
+  String? get _uid {
+    final scoped = AdminScope.maybeOf(context)?.adminUid;
+    if (scoped != null && scoped.isNotEmpty) return scoped;
+    return FirebaseAuth.instance.currentUser?.uid;
+  }
   String? _resolvedDspUid;
 
   bool _loading = true;
@@ -350,9 +358,10 @@ class _AdminIncidentReportsPageState extends State<AdminIncidentReportsPage> {
             ),
           ),
           actions: [
-            TextButton(
+            CoButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Close'),
+              label: 'Close',
+              variant: CoButtonVariant.quiet,
             ),
           ],
         );
@@ -361,8 +370,9 @@ class _AdminIncidentReportsPageState extends State<AdminIncidentReportsPage> {
   }
 
   Widget _urlPreview(String url) {
-    return GestureDetector(
+    return CoPressable(
       onTap: () => _openUrl(url),
+      borderRadius: BorderRadius.circular(10),
       child: Container(
         width: 170,
         height: 120,
@@ -376,9 +386,10 @@ class _AdminIncidentReportsPageState extends State<AdminIncidentReportsPage> {
           url,
           fit: BoxFit.cover,
           errorBuilder: (_, __, ___) => Center(
-            child: TextButton(
+            child: CoButton(
               onPressed: () => _openUrl(url),
-              child: const Text('Open image'),
+              label: 'Open image',
+              variant: CoButtonVariant.quiet,
             ),
           ),
         ),
@@ -403,14 +414,25 @@ class _AdminIncidentReportsPageState extends State<AdminIncidentReportsPage> {
     if (_uid == null) {
       return const Center(child: Text('You must be logged in as admin.'));
     }
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
+    return CoStateSwitcher(
+      child: _loading
+          ? const Center(
+              key: ValueKey('loading'),
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                valueColor:
+                    AlwaysStoppedAnimation<Color>(AppColors.codriverGreen),
+              ),
+            )
+          : _buildLoaded(context),
+    );
+  }
 
+  Widget _buildLoaded(BuildContext context) {
     final scopeUid = _scopeUid ?? '';
     final reportsCol = _reportsCol;
-
     return Padding(
+      key: const ValueKey('loaded'),
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -443,28 +465,17 @@ class _AdminIncidentReportsPageState extends State<AdminIncidentReportsPage> {
             spacing: 10,
             runSpacing: 10,
             children: [
-              OutlinedButton.icon(
+              CoButton(
                 onPressed: _loading ? null : _loadSettings,
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Reload settings'),
+                icon: Icons.refresh_rounded,
+                label: 'Reload settings',
+                variant: CoButtonVariant.secondaryOutlined,
               ),
-              ElevatedButton.icon(
+              CoButton(
                 onPressed: _saving ? null : _saveSettings,
-                icon: _saving
-                    ? const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.save_outlined),
-                label: Text(_saving ? 'Saving...' : 'Save settings'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _kGreen,
-                  foregroundColor: Colors.white,
-                ),
+                icon: Icons.save_outlined,
+                label: _saving ? 'Saving...' : 'Save settings',
+                busy: _saving,
               ),
             ],
           ),
@@ -596,73 +607,88 @@ class _AdminIncidentReportsPageState extends State<AdminIncidentReportsPage> {
                         .limit(150)
                         .snapshots(),
                     builder: (context, snap) {
+                      final Widget content;
                       if (snap.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      if (snap.hasError) {
-                        return Center(
+                        content = const Center(
+                          key: ValueKey('loading'),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              AppColors.codriverGreen,
+                            ),
+                          ),
+                        );
+                      } else if (snap.hasError) {
+                        content = Center(
+                          key: const ValueKey('error'),
                           child: Text('Failed to load reports: ${snap.error}'),
                         );
-                      }
-                      final docs = snap.data?.docs ?? const [];
-                      if (docs.isEmpty) {
-                        return const Center(
-                          child: Text('No incident reports yet.'),
-                        );
-                      }
+                      } else {
+                        final docs = snap.data?.docs ?? const [];
+                        if (docs.isEmpty) {
+                          content = const Center(
+                            key: ValueKey('empty'),
+                            child: Text('No incident reports yet.'),
+                          );
+                        } else {
+                          content = ListView.separated(
+                            key: const ValueKey('list'),
+                            itemCount: docs.length,
+                            separatorBuilder: (_, __) =>
+                                const Divider(height: 1),
+                            itemBuilder: (context, index) {
+                              final data = docs[index].data();
+                              final driverName = _firstNonEmpty([
+                                _stringOf(data['driverName']),
+                                _stringOf(data['driverTransporterId']),
+                                'Unknown driver',
+                              ]);
+                              final driverId = _stringOf(
+                                data['driverTransporterId'],
+                              );
+                              final location = _stringOf(data['location']);
+                              final submittedAt = _formatTimestamp(
+                                data['submittedAt'],
+                              );
+                              final police = data['policeInvolved'] == true
+                                  ? 'Yes'
+                                  : 'No';
 
-                      return ListView.separated(
-                        itemCount: docs.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1),
-                        itemBuilder: (context, index) {
-                          final data = docs[index].data();
-                          final driverName = _firstNonEmpty([
-                            _stringOf(data['driverName']),
-                            _stringOf(data['driverTransporterId']),
-                            'Unknown driver',
-                          ]);
-                          final driverId = _stringOf(
-                            data['driverTransporterId'],
+                              return ListTile(
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 2,
+                                  vertical: 4,
+                                ),
+                                leading: const CircleAvatar(
+                                  radius: 18,
+                                  backgroundColor: Color(0xFFFFF1E8),
+                                  child: Icon(
+                                    Icons.warning_amber_rounded,
+                                    color: Color(0xFFFF7A18),
+                                    size: 18,
+                                  ),
+                                ),
+                                title: Text(
+                                  driverName,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    color: _kText,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  '$driverId\n${location.isEmpty ? '-' : location}\nPolice: $police\n$submittedAt',
+                                  style: const TextStyle(height: 1.3),
+                                ),
+                                isThreeLine: true,
+                                trailing:
+                                    const Icon(Icons.chevron_right_rounded),
+                                onTap: () => _showReportDetails(data),
+                              );
+                            },
                           );
-                          final location = _stringOf(data['location']);
-                          final submittedAt = _formatTimestamp(
-                            data['submittedAt'],
-                          );
-                          final police = data['policeInvolved'] == true
-                              ? 'Yes'
-                              : 'No';
-
-                          return ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 2,
-                              vertical: 4,
-                            ),
-                            leading: const CircleAvatar(
-                              radius: 18,
-                              backgroundColor: Color(0xFFFFF1E8),
-                              child: Icon(
-                                Icons.warning_amber_rounded,
-                                color: Color(0xFFFF7A18),
-                                size: 18,
-                              ),
-                            ),
-                            title: Text(
-                              driverName,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w800,
-                                color: _kText,
-                              ),
-                            ),
-                            subtitle: Text(
-                              '$driverId\n${location.isEmpty ? '-' : location}\nPolice: $police\n$submittedAt',
-                              style: const TextStyle(height: 1.3),
-                            ),
-                            isThreeLine: true,
-                            trailing: const Icon(Icons.chevron_right_rounded),
-                            onTap: () => _showReportDetails(data),
-                          );
-                        },
-                      );
+                        }
+                      }
+                      return CoStateSwitcher(child: content);
                     },
                   ),
           ),

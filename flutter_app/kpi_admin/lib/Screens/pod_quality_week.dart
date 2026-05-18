@@ -1,8 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../widgets/admin_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../localization/app_localizations.dart';
+import '../theme/app_colors.dart';
+import '../widgets/co_pressable.dart';
 
 final _pct = NumberFormat.decimalPattern('de');
 final _int = NumberFormat.decimalPattern('de');
@@ -48,7 +51,7 @@ class _PodQualityWeekPageState extends State<PodQualityWeekPage> {
   late final Stream<DocumentSnapshot<Map<String, dynamic>>> _reportStream;
 
   Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _scores() {
-    final uid = FirebaseAuth.instance.currentUser!.uid;
+    final uid = AdminScope.adminUidOf(context)!;
     return FirebaseFirestore.instance
         .collection('users')
         .doc(uid)
@@ -73,7 +76,17 @@ class _PodQualityWeekPageState extends State<PodQualityWeekPage> {
         stream: _reportStream,
         builder: (context, reportSnap) {
           if (reportSnap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const CoStateSwitcher(
+              child: Center(
+                key: ValueKey('loading'),
+                child: CircularProgressIndicator(
+                  strokeWidth: 3,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    AppColors.codriverGreen,
+                  ),
+                ),
+              ),
+            );
           }
           final report = reportSnap.data?.data() ?? {};
           final summary =
@@ -95,7 +108,9 @@ class _PodQualityWeekPageState extends State<PodQualityWeekPage> {
           final successPct = _num(podSummary['successPct']);
           final rejectsPct = _num(podSummary['rejectsPct']);
 
-          return Column(
+          return CoStateSwitcher(
+            child: Column(
+            key: const ValueKey('loaded'),
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
@@ -250,8 +265,16 @@ class _PodQualityWeekPageState extends State<PodQualityWeekPage> {
                       builder: (context, scoreSnap) {
                         if (scoreSnap.connectionState ==
                             ConnectionState.waiting) {
-                          return const Center(
-                            child: CircularProgressIndicator(),
+                          return const CoStateSwitcher(
+                            child: Center(
+                              key: ValueKey('scores-loading'),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 3,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  AppColors.codriverGreen,
+                                ),
+                              ),
+                            ),
                           );
                         }
                         final docs = scoreSnap.data ?? const [];
@@ -262,12 +285,17 @@ class _PodQualityWeekPageState extends State<PodQualityWeekPage> {
                             .toList();
 
                         if (rows.isEmpty) {
-                          return Center(
-                            child: Text(t.t('pod_quality_no_data_week')),
+                          return CoStateSwitcher(
+                            child: Center(
+                              key: const ValueKey('scores-empty'),
+                              child: Text(t.t('pod_quality_no_data_week')),
+                            ),
                           );
                         }
 
-                        return Column(
+                        return CoStateSwitcher(
+                          child: Column(
+                          key: const ValueKey('scores-list'),
                           children: [
                             Padding(
                               padding: const EdgeInsets.fromLTRB(24, 4, 24, 8),
@@ -475,11 +503,13 @@ class _PodQualityWeekPageState extends State<PodQualityWeekPage> {
                               ),
                             ),
                           ],
+                          ),
                         );
                       },
                     ),
               ),
             ],
+            ),
           );
         },
       ),

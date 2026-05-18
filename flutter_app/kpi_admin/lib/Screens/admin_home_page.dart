@@ -4,8 +4,12 @@ import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../widgets/admin_scope.dart';
 import 'package:flutter/material.dart';
 import '../localization/app_localizations.dart';
+import '../theme/app_colors.dart';
+import '../widgets/co_button.dart';
+import '../widgets/co_pressable.dart';
 import '../utils/driver_activity.dart';
 import 'admin_calendar_page.dart';
 
@@ -27,7 +31,11 @@ class AdminHomePage extends StatefulWidget {
 }
 
 class _AdminHomePageState extends State<AdminHomePage> {
-  String? get _uid => FirebaseAuth.instance.currentUser?.uid;
+  String? get _uid {
+    final scoped = AdminScope.maybeOf(context)?.adminUid;
+    if (scoped != null && scoped.isNotEmpty) return scoped;
+    return FirebaseAuth.instance.currentUser?.uid;
+  }
 
   // ------------------------------------------------------------
   // Popup: Not confirmed by (copied logic from NotificationsPage)
@@ -194,7 +202,12 @@ class _AdminHomePageState extends State<AdminHomePage> {
                       builder: (ctx, snap) {
                         if (snap.connectionState == ConnectionState.waiting) {
                           return const Center(
-                            child: CircularProgressIndicator(),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 3,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                AppColors.codriverGreen,
+                              ),
+                            ),
                           );
                         }
 
@@ -244,9 +257,10 @@ class _AdminHomePageState extends State<AdminHomePage> {
                   const SizedBox(height: 10),
                   Align(
                     alignment: Alignment.centerRight,
-                    child: TextButton(
+                    child: CoButton(
                       onPressed: () => Navigator.of(ctx).pop(),
-                      child: Text(t.t('admin_home_close')),
+                      label: t.t('admin_home_close'),
+                      variant: CoButtonVariant.quiet,
                     ),
                   ),
                 ],
@@ -520,7 +534,11 @@ class _ScorecardCardState extends State<_ScorecardCard> {
   //  Y|YYYY                  -> year aggregation
   String _selectedKey = 'W|__LAST__';
 
-  String? get _uid => FirebaseAuth.instance.currentUser?.uid;
+  String? get _uid {
+    final scoped = AdminScope.maybeOf(context)?.adminUid;
+    if (scoped != null && scoped.isNotEmpty) return scoped;
+    return FirebaseAuth.instance.currentUser?.uid;
+  }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> _reportsStream() {
     final uid = _uid;
@@ -1367,9 +1385,9 @@ class _MiniRankingLive extends StatelessWidget {
               vertical: _r(10, scale),
             ),
             decoration: BoxDecoration(
-              color: isAlt ? const Color(0xFFF6F7F9) : const Color(0xFFF9FAFB),
+              color: isAlt ? const Color(0xFFF9FAFB) : const Color(0xFFF9FAFB),
               borderRadius: BorderRadius.circular(_r(12, scale)),
-              border: Border.all(color: const Color(0xFFEDEFF3)),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
             ),
             child: Row(
               children: [
@@ -1514,32 +1532,48 @@ class _NotificationHistoryCardState extends State<_NotificationHistoryCard> {
                             .orderBy('createdAt', descending: true)
                             .snapshots(),
                         builder: (ctx, snap) {
+                          final Widget body;
                           if (snap.connectionState == ConnectionState.waiting) {
-                            return const Center(
-                              child: CircularProgressIndicator(),
+                            body = const Center(
+                              key: ValueKey('notif-loading'),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 3,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  AppColors.codriverGreen,
+                                ),
+                              ),
                             );
+                            return CoStateSwitcher(child: body);
                           }
                           if (snap.hasError) {
-                            return Center(
+                            body = Center(
+                              key: const ValueKey('notif-error'),
                               child: Text(
                                 t.tf('admin_home_error_generic', {
                                   'error': '${snap.error}',
                                 }),
                               ),
                             );
+                            return CoStateSwitcher(child: body);
                           }
 
                           final docs = snap.data?.docs ?? [];
                           if (docs.isEmpty) {
-                            return Center(
-                              child: Text(
-                                t.t('admin_home_no_notifications_yet'),
-                                style: const TextStyle(color: Colors.black54),
+                            return CoStateSwitcher(
+                              child: Center(
+                                key: const ValueKey('notif-empty'),
+                                child: Text(
+                                  t.t('admin_home_no_notifications_yet'),
+                                  style:
+                                      const TextStyle(color: Colors.black54),
+                                ),
                               ),
                             );
                           }
 
-                          return Scrollbar(
+                          return CoStateSwitcher(
+                            child: Scrollbar(
+                            key: const ValueKey('notif-list'),
                             controller: _scrollCtrl,
                             thumbVisibility: true,
                             child: ListView.separated(
@@ -1567,7 +1601,16 @@ class _NotificationHistoryCardState extends State<_NotificationHistoryCard> {
                                 final type = (data['type'] ?? 'rule')
                                     .toString();
 
-                                return InkWell(
+                                return CoPressable(
+                                  borderRadius: BorderRadius.circular(
+                                    _r(16, scale),
+                                  ),
+                                  onTap: () => onOpenMissing(
+                                    d.id,
+                                    confirmedCount,
+                                    targetCount,
+                                  ),
+                                  child: InkWell(
                                   borderRadius: BorderRadius.circular(
                                     _r(16, scale),
                                   ),
@@ -1588,9 +1631,11 @@ class _NotificationHistoryCardState extends State<_NotificationHistoryCard> {
                                     targetCount: targetCount,
                                     currentDriverCount: currentDriverCount,
                                   ),
+                                  ),
                                 );
                               },
                             ),
+                          ),
                           );
                         },
                       );
@@ -1714,18 +1759,19 @@ class _NotificationHistoryTileLive extends StatelessWidget {
               ),
             ),
             actions: [
-              TextButton(
+              CoButton(
                 onPressed: () => Navigator.of(ctx).pop(),
-                child: Text(t.t('admin_home_cancel')),
+                label: t.t('admin_home_cancel'),
+                variant: CoButtonVariant.quiet,
               ),
-              ElevatedButton(
+              CoButton(
                 onPressed: () {
                   Navigator.of(ctx).pop({
                     'title': titleCtrl.text.trim(),
                     'body': bodyCtrl.text.trim(),
                   });
                 },
-                child: Text(t.t('admin_home_save')),
+                label: t.t('admin_home_save'),
               ),
             ],
           );
@@ -1840,20 +1886,15 @@ class _NotificationHistoryTileLive extends StatelessWidget {
           title: Text(t.t('admin_home_delete_notification_question')),
           content: Text(t.t('admin_home_delete_notification_body')),
           actions: [
-            TextButton(
+            CoButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(t.t('admin_home_cancel')),
+              label: t.t('admin_home_cancel'),
+              variant: CoButtonVariant.quiet,
             ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFE11D48),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
+            CoButton(
               onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text(t.t('admin_home_delete')),
+              label: t.t('admin_home_delete'),
+              variant: CoButtonVariant.destructive,
             ),
           ],
         );
@@ -2172,7 +2213,7 @@ class _FleetHubCardState extends State<_FleetHubCard> {
   }
 
   Future<void> _initializeFleetHub() async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final uid = AdminScope.adminUidOf(context);
     if (uid == null) {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -2378,40 +2419,47 @@ class _FleetHubCardState extends State<_FleetHubCard> {
       width: double.infinity,
       padding: EdgeInsets.all(_r(12, scale)),
       decoration: BoxDecoration(
-        color: const Color(0xFFF7F8F8),
+        color: const Color(0xFFF9FAFB),
         borderRadius: BorderRadius.circular(_r(18, scale)),
         border: Border.all(color: const Color(0xFFE5E7EB)),
       ),
-      child: _loading
-          ? Center(
-              child: Text(
-                t.t('admin_home_loading_documents'),
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: _r(14, scale),
-                  fontWeight: FontWeight.w700,
-                  color: AdminHomePage._kMuted,
+      child: CoStateSwitcher(
+        child: _loading
+            ? Center(
+                key: const ValueKey('fleet-loading'),
+                child: Text(
+                  t.t('admin_home_loading_documents'),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: _r(14, scale),
+                    fontWeight: FontWeight.w700,
+                    color: AdminHomePage._kMuted,
+                  ),
                 ),
-              ),
-            )
-          : _loadError != null || items.isEmpty
-          ? Center(
-              child: Text(
-                t.t('admin_home_no_items'),
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: _r(14, scale),
-                  fontWeight: FontWeight.w700,
-                  color: AdminHomePage._kMuted,
-                ),
-              ),
-            )
-          : _FleetComplianceList(
-              scale: scale,
-              adaptiveHeight: widget.adaptiveHeight,
-              items: items,
-              expiryTextBuilder: (item) => _expiryText(context, item),
-            ),
+              )
+            : _loadError != null || items.isEmpty
+                ? Center(
+                    key: const ValueKey('fleet-empty'),
+                    child: Text(
+                      t.t('admin_home_no_items'),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: _r(14, scale),
+                        fontWeight: FontWeight.w700,
+                        color: AdminHomePage._kMuted,
+                      ),
+                    ),
+                  )
+                : KeyedSubtree(
+                    key: const ValueKey('fleet-list'),
+                    child: _FleetComplianceList(
+                      scale: scale,
+                      adaptiveHeight: widget.adaptiveHeight,
+                      items: items,
+                      expiryTextBuilder: (item) => _expiryText(context, item),
+                    ),
+                  ),
+      ),
     );
 
     return _AdminCard(
@@ -2626,7 +2674,7 @@ class _FleetComplianceTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(_r(12, scale)),
-        border: Border.all(color: const Color(0xFFEDEFF3)),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
       ),
       child: Row(
         children: [
@@ -2889,9 +2937,9 @@ class _FleetList extends StatelessWidget {
                   vertical: _r(10, scale),
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF6F7F9),
+                  color: const Color(0xFFF9FAFB),
                   borderRadius: BorderRadius.circular(_r(12, scale)),
-                  border: Border.all(color: const Color(0xFFEDEFF3)),
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
                 ),
                 child: Row(
                   children: [
@@ -2959,9 +3007,9 @@ class _FleetListCompact extends StatelessWidget {
                 vertical: _r(10, scale),
               ),
               decoration: BoxDecoration(
-                color: const Color(0xFFF6F7F9),
+                color: const Color(0xFFF9FAFB),
                 borderRadius: BorderRadius.circular(_r(12, scale)),
-                border: Border.all(color: const Color(0xFFEDEFF3)),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
               ),
               child: Row(
                 children: [
@@ -3047,7 +3095,11 @@ class _DriverDocumentsCard extends StatefulWidget {
 }
 
 class _DriverDocumentsCardState extends State<_DriverDocumentsCard> {
-  String? get _uid => FirebaseAuth.instance.currentUser?.uid;
+  String? get _uid {
+    final scoped = AdminScope.maybeOf(context)?.adminUid;
+    if (scoped != null && scoped.isNotEmpty) return scoped;
+    return FirebaseAuth.instance.currentUser?.uid;
+  }
 
   static const int _kSoonDays = 30;
   static const int _kProbezeitExpiredGraceDays = 7;
@@ -4428,7 +4480,7 @@ class _PillPopupDropdown extends StatelessWidget {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: _r(12, scale)),
       decoration: BoxDecoration(
-        color: const Color(0xFFF6F7F9),
+        color: const Color(0xFFF9FAFB),
         borderRadius: BorderRadius.circular(pillRadius),
         border: Border.all(color: const Color(0xFFE5E7EB)),
       ),
@@ -4438,7 +4490,7 @@ class _PillPopupDropdown extends StatelessWidget {
           highlightColor: Colors.transparent,
           hoverColor: Colors.transparent,
           popupMenuTheme: PopupMenuThemeData(
-            color: const Color(0xFFF6F7F9),
+            color: const Color(0xFFF9FAFB),
             elevation: 10,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(menuRadius),

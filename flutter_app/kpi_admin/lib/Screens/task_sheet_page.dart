@@ -1,10 +1,14 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+﻿import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../widgets/admin_scope.dart';
 import 'package:flutter/material.dart';
 
 import '../localization/app_localizations.dart';
 import '../models/task_sheet_task.dart';
+import '../theme/app_colors.dart';
 import '../utils/driver_activity.dart';
+import '../widgets/co_button.dart';
+import '../widgets/co_pressable.dart';
 
 enum _TaskComposerKind { standard, feedbackText, feedbackChoice }
 
@@ -52,7 +56,11 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
   String _driverQuery = '';
   _TaskComposerKind _taskKind = _TaskComposerKind.standard;
 
-  String? get _uid => FirebaseAuth.instance.currentUser?.uid;
+  String? get _uid {
+    final scoped = AdminScope.maybeOf(context)?.adminUid;
+    if (scoped != null && scoped.isNotEmpty) return scoped;
+    return FirebaseAuth.instance.currentUser?.uid;
+  }
 
   CollectionReference<Map<String, dynamic>> _tasksCol() {
     return FirebaseFirestore.instance
@@ -353,13 +361,15 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
           l10n.tf('task_sheet_delete_task_confirm', {'title': task.title}),
         ),
         actions: [
-          TextButton(
+          CoButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(l10n.t('task_sheet_cancel')),
+            label: l10n.t('task_sheet_cancel'),
+            variant: CoButtonVariant.quiet,
           ),
-          FilledButton(
+          CoButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(l10n.t('task_sheet_delete')),
+            label: l10n.t('task_sheet_delete'),
+            variant: CoButtonVariant.destructive,
           ),
         ],
       ),
@@ -386,13 +396,15 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
           }),
         ),
         actions: [
-          TextButton(
+          CoButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(l10n.t('task_sheet_cancel')),
+            label: l10n.t('task_sheet_cancel'),
+            variant: CoButtonVariant.quiet,
           ),
-          FilledButton(
+          CoButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(l10n.t('task_sheet_delete_all')),
+            label: l10n.t('task_sheet_delete_all'),
+            variant: CoButtonVariant.destructive,
           ),
         ],
       ),
@@ -500,7 +512,7 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
         ? const Color(0xFF1D7F5A)
         : const Color(0xFF6B7280);
 
-    return InkWell(
+    return CoPressable(
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
       child: Container(
@@ -1078,14 +1090,13 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
                                   ),
                                 ),
                               ),
-                              TextButton.icon(
+                              CoButton(
                                 onPressed: _feedbackOptionCtrls.length >= 6
                                     ? null
                                     : _addFeedbackOption,
-                                icon: const Icon(Icons.add_rounded, size: 18),
-                                label: Text(
-                                  l10n.t('task_sheet_feedback_add_option'),
-                                ),
+                                icon: Icons.add_rounded,
+                                label: l10n.t('task_sheet_feedback_add_option'),
+                                variant: CoButtonVariant.quiet,
                               ),
                             ],
                           ),
@@ -1182,38 +1193,10 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
                   const SizedBox(height: 14),
                   Align(
                     alignment: Alignment.center,
-                    child: SizedBox(
-                      height: 44,
-                      width: 220,
-                      child: ElevatedButton(
-                        onPressed: _creating ? null : _createTask,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1D7F5A),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                        ),
-                        child: _creating
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white,
-                                  ),
-                                ),
-                              )
-                            : Text(
-                                l10n.t('task_sheet_publish'),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 15,
-                                  letterSpacing: 0.2,
-                                ),
-                              ),
-                      ),
+                    child: CoButton(
+                      onPressed: _creating ? null : _createTask,
+                      label: l10n.t('task_sheet_publish'),
+                      busy: _creating,
                     ),
                   ),
                 ],
@@ -1270,14 +1253,25 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
       stream: _tasksCol().orderBy('createdAt', descending: true).snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const CoStateSwitcher(
+            child: Center(
+              key: ValueKey('tasks-loading'),
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.codriverGreen),
+              ),
+            ),
+          );
         }
         if (snapshot.hasError) {
-          return Center(
-            child: Text(
-              l10n.tf('task_sheet_error_generic', {
-                'error': '${snapshot.error}',
-              }),
+          return CoStateSwitcher(
+            child: Center(
+              key: const ValueKey('tasks-error'),
+              child: Text(
+                l10n.tf('task_sheet_error_generic', {
+                  'error': '${snapshot.error}',
+                }),
+              ),
             ),
           );
         }
@@ -1288,15 +1282,20 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
         final taskItems = _groupTaskItemsForAdmin(tasks);
 
         if (tasks.isEmpty) {
-          return Center(
-            child: Text(
-              l10n.t('task_sheet_no_tasks'),
-              style: const TextStyle(color: Colors.black54),
+          return CoStateSwitcher(
+            child: Center(
+              key: const ValueKey('tasks-empty'),
+              child: Text(
+                l10n.t('task_sheet_no_tasks'),
+                style: const TextStyle(color: Colors.black54),
+              ),
             ),
           );
         }
 
-        return ListView.separated(
+        return CoStateSwitcher(
+          child: ListView.separated(
+          key: const ValueKey('tasks-list'),
           itemCount: taskItems.length,
           separatorBuilder: (_, __) => const SizedBox(height: 10),
           itemBuilder: (_, i) {
@@ -1710,6 +1709,7 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
               ),
             );
           },
+          ),
         );
       },
     );
@@ -1799,7 +1799,7 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    first.description.isEmpty ? 'â€”' : first.description,
+                    first.description.isEmpty ? '-' : first.description,
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -2143,9 +2143,10 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
                 const SizedBox(height: 10),
                 Align(
                   alignment: Alignment.centerRight,
-                  child: TextButton(
+                  child: CoButton(
                     onPressed: () => Navigator.of(ctx).pop(),
-                    child: Text(l10n.t('task_sheet_close')),
+                    label: l10n.t('task_sheet_close'),
+                    variant: CoButtonVariant.quiet,
                   ),
                 ),
               ],
@@ -2186,7 +2187,7 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
     required Color borderColor,
     required VoidCallback onTap,
   }) {
-    return InkWell(
+    return CoPressable(
       onTap: onTap,
       borderRadius: BorderRadius.circular(999),
       child: Container(
@@ -2312,9 +2313,10 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
                 const SizedBox(height: 10),
                 Align(
                   alignment: Alignment.centerRight,
-                  child: TextButton(
+                  child: CoButton(
                     onPressed: () => Navigator.of(ctx).pop(),
-                    child: Text(l10n.t('task_sheet_close')),
+                    label: l10n.t('task_sheet_close'),
+                    variant: CoButtonVariant.quiet,
                   ),
                 ),
               ],
@@ -2375,3 +2377,4 @@ class _TaskListItem {
 
   bool get isGroup => batchId != null;
 }
+

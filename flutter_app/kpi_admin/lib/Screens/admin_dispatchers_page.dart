@@ -11,6 +11,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../widgets/admin_scope.dart';
+import '../widgets/co_button.dart';
+import '../widgets/co_pressable.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
@@ -75,10 +78,10 @@ class AdminDispatchersPage extends StatelessWidget {
                     ),
                   ),
                   const Spacer(),
-                  FilledButton.icon(
+                  CoButton(
                     onPressed: () => _showCreateDialog(context, adminUid),
-                    icon: const Icon(Icons.add_rounded),
-                    label: const Text('Anlegen'),
+                    label: 'Anlegen',
+                    icon: Icons.add_rounded,
                   ),
                 ],
               ),
@@ -92,33 +95,45 @@ class AdminDispatchersPage extends StatelessWidget {
                       .orderBy('createdAt', descending: true)
                       .snapshots(),
                   builder: (context, snap) {
+                    final Widget content;
                     if (snap.connectionState == ConnectionState.waiting) {
-                      return const Center(
-                        child: CircularProgressIndicator(),
-                      );
-                    }
-                    final docs = snap.data?.docs ?? const [];
-                    if (docs.isEmpty) {
-                      return Center(
-                        child: Text(
-                          'Noch keine Dispatcher angelegt.\n'
-                          'Tipp: oben rechts auf „Anlegen" klicken.',
-                          textAlign: TextAlign.center,
-                          style: AppTypography.footnote.copyWith(
-                            color: AppColors.labelSecondaryLight,
+                      content = const Center(
+                        key: ValueKey('loading'),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 3,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            AppColors.codriverGreen,
                           ),
                         ),
                       );
+                    } else {
+                      final docs = snap.data?.docs ?? const [];
+                      if (docs.isEmpty) {
+                        content = Center(
+                          key: const ValueKey('empty'),
+                          child: Text(
+                            'Noch keine Dispatcher angelegt.\n'
+                            'Tipp: oben rechts auf „Anlegen" klicken.',
+                            textAlign: TextAlign.center,
+                            style: AppTypography.footnote.copyWith(
+                              color: AppColors.labelSecondaryLight,
+                            ),
+                          ),
+                        );
+                      } else {
+                        content = ListView.separated(
+                          key: const ValueKey('list'),
+                          itemCount: docs.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: AppSpacing.sm),
+                          itemBuilder: (_, i) => _DispatcherRow(
+                            adminUid: adminUid,
+                            doc: docs[i],
+                          ),
+                        );
+                      }
                     }
-                    return ListView.separated(
-                      itemCount: docs.length,
-                      separatorBuilder: (_, __) =>
-                          const SizedBox(height: AppSpacing.sm),
-                      itemBuilder: (_, i) => _DispatcherRow(
-                        adminUid: adminUid,
-                        doc: docs[i],
-                      ),
-                    );
+                    return CoStateSwitcher(child: content);
                   },
                 ),
               ),
@@ -146,7 +161,7 @@ class _DispatcherRow extends StatelessWidget {
         const <String, bool>{};
     final allowedCount = permissions.values.where((v) => v).length;
 
-    return InkWell(
+    return CoPressable(
       onTap: () => _showEditSheet(
         context,
         adminUid: adminUid,
@@ -334,19 +349,15 @@ Future<void> _showCreateDialog(BuildContext context, String adminUid) async {
               ),
             ),
             actions: [
-              TextButton(
+              CoButton(
                 onPressed: submitting ? null : () => Navigator.of(ctx).pop(),
-                child: const Text('Abbrechen'),
+                label: 'Abbrechen',
+                variant: CoButtonVariant.quiet,
               ),
-              FilledButton(
+              CoButton(
                 onPressed: submitting ? null : submit,
-                child: submitting
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Anlegen'),
+                label: 'Anlegen',
+                busy: submitting,
               ),
             ],
           );
@@ -420,16 +431,15 @@ Future<void> _showEditSheet(
                   'wird unwiderruflich entfernt.',
                 ),
                 actions: [
-                  TextButton(
+                  CoButton(
                     onPressed: () => Navigator.of(c).pop(false),
-                    child: const Text('Abbrechen'),
+                    label: 'Abbrechen',
+                    variant: CoButtonVariant.quiet,
                   ),
-                  FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.error,
-                    ),
+                  CoButton(
                     onPressed: () => Navigator.of(c).pop(true),
-                    child: const Text('Löschen'),
+                    label: 'Löschen',
+                    variant: CoButtonVariant.destructive,
                   ),
                 ],
               ),
@@ -534,41 +544,26 @@ Future<void> _showEditSheet(
                   const SizedBox(height: AppSpacing.md),
                   Row(
                     children: [
-                      TextButton.icon(
+                      CoButton(
                         onPressed: deleting || saving ? null : delete,
-                        icon: deleting
-                            ? const SizedBox(
-                                width: 14,
-                                height: 14,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(
-                                Icons.delete_outline_rounded,
-                                color: AppColors.error,
-                              ),
-                        label: const Text(
-                          'Löschen',
-                          style: TextStyle(color: AppColors.error),
-                        ),
+                        label: 'Löschen',
+                        icon: Icons.delete_outline_rounded,
+                        variant: CoButtonVariant.destructiveQuiet,
+                        busy: deleting,
                       ),
                       const Spacer(),
-                      TextButton(
+                      CoButton(
                         onPressed: saving || deleting
                             ? null
                             : () => Navigator.of(sheetCtx).pop(),
-                        child: const Text('Abbrechen'),
+                        label: 'Abbrechen',
+                        variant: CoButtonVariant.quiet,
                       ),
                       const SizedBox(width: AppSpacing.xs),
-                      FilledButton(
+                      CoButton(
                         onPressed: saving || deleting ? null : save,
-                        child: saving
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Text('Speichern'),
+                        label: 'Speichern',
+                        busy: saving,
                       ),
                     ],
                   ),

@@ -1,5 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../theme/app_colors.dart';
+import '../widgets/admin_scope.dart';
+import '../widgets/co_button.dart';
+import '../widgets/co_pressable.dart';
 import 'package:flutter/material.dart';
 
 const String _settingsCollection = 'settings';
@@ -14,7 +18,11 @@ class AdminDispatcherPillPage extends StatefulWidget {
 }
 
 class _AdminDispatcherPillPageState extends State<AdminDispatcherPillPage> {
-  String? get _uid => FirebaseAuth.instance.currentUser?.uid;
+  String? get _uid {
+    final scoped = AdminScope.maybeOf(context)?.adminUid;
+    if (scoped != null && scoped.isNotEmpty) return scoped;
+    return FirebaseAuth.instance.currentUser?.uid;
+  }
 
   String? _resolvedDspUid;
   bool _loading = true;
@@ -223,11 +231,23 @@ class _AdminDispatcherPillPageState extends State<AdminDispatcherPillPage> {
       return const Center(child: Text('You must be logged in as admin.'));
     }
 
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
+    return CoStateSwitcher(
+      child: _loading
+          ? const Center(
+              key: ValueKey('loading'),
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                    AppColors.codriverGreen),
+              ),
+            )
+          : _buildLoaded(context, scopeUid),
+    );
+  }
 
+  Widget _buildLoaded(BuildContext context, String scopeUid) {
     return Padding(
+      key: const ValueKey('loaded'),
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -263,33 +283,23 @@ class _AdminDispatcherPillPageState extends State<AdminDispatcherPillPage> {
             spacing: 10,
             runSpacing: 10,
             children: [
-              OutlinedButton.icon(
+              CoButton(
                 onPressed: _loading ? null : _loadRows,
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Reload'),
+                label: 'Reload',
+                icon: Icons.refresh_rounded,
+                variant: CoButtonVariant.secondaryOutlined,
               ),
-              OutlinedButton.icon(
+              CoButton(
                 onPressed: _saving ? null : _addRow,
-                icon: const Icon(Icons.add),
-                label: const Text('Add dispatcher'),
+                label: 'Add dispatcher',
+                icon: Icons.add,
+                variant: CoButtonVariant.secondaryOutlined,
               ),
-              ElevatedButton.icon(
+              CoButton(
                 onPressed: _saving ? null : _save,
-                icon: _saving
-                    ? const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.save_outlined),
-                label: Text(_saving ? 'Saving...' : 'Save'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1D7F5A),
-                  foregroundColor: Colors.white,
-                ),
+                label: _saving ? 'Saving...' : 'Save',
+                icon: Icons.save_outlined,
+                busy: _saving,
               ),
             ],
           ),
@@ -303,22 +313,28 @@ class _AdminDispatcherPillPageState extends State<AdminDispatcherPillPage> {
           ),
           const SizedBox(height: 14),
           Expanded(
-            child: _rows.isEmpty
-                ? const Center(child: Text('No dispatchers configured.'))
-                : ListView.separated(
-                    itemCount: _rows.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
-                    itemBuilder: (context, index) {
-                      final row = _rows[index];
-                      return _DispatcherEditorCard(
-                        index: index,
-                        row: row,
-                        onDelete: _rows.length == 1
-                            ? null
-                            : () => _removeRow(index),
-                      );
-                    },
-                  ),
+            child: CoStateSwitcher(
+              child: _rows.isEmpty
+                  ? const Center(
+                      key: ValueKey('empty'),
+                      child: Text('No dispatchers configured.'),
+                    )
+                  : ListView.separated(
+                      key: const ValueKey('list'),
+                      itemCount: _rows.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      itemBuilder: (context, index) {
+                        final row = _rows[index];
+                        return _DispatcherEditorCard(
+                          index: index,
+                          row: row,
+                          onDelete: _rows.length == 1
+                              ? null
+                              : () => _removeRow(index),
+                        );
+                      },
+                    ),
+            ),
           ),
         ],
       ),

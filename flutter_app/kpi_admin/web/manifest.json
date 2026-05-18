@@ -1,11 +1,11 @@
 {
-    "name": "DSP-CoPilot",
-    "short_name": "DSP-CoPilot",
+    "name": "DSP CODRIVER",
+    "short_name": "CODRIVER",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A logistics and operations management application designed to streamline driver onboarding, document verification, user administration, and internal workflows. The platform supports role-based access, real-time data handling, and multi-language localization with a modular and scalable architecture.",
+    "background_color": "#0B1220",
+    "theme_color": "#00B287",
+    "description": "Operations-Plattform für Amazon Delivery Service Provider: Scorecards, Driver Management, Fleet Hub, Waveplan, Kalender und Compliance an einem Ort.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

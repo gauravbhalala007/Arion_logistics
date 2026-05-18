@@ -1,14 +1,27 @@
-// RESPONSIVE + DESKTOP-STYLE DRIVER ROW — scorecard_week.dart
+// lib/Screens/scorecard_week.dart
+//
+// Score Card — Wochendetailseite. Apple-Style nach CoDriver-Styleguide:
+//  • Inter durchgehend via AppTypography
+//  • Hero-Karte (codriverGreen) für den Company-Score
+//  • Weiße Sekundär-Tiles für Reliability + Rank
+//  • Filter-Bar mit Search-Pille + Status-Pille + Upload-Button
+//  • Driver-Cards mit Tier-Pill, klarer Score-Headline, KPI-Grid
+//
+// Datenfluss bleibt: report/{id}, users/{adminUid}/scores, driverNames.
+
 import '../services/driver_csv.dart';
 import 'package:file_picker/file_picker.dart';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-
-// 🔸 Added: need current user id to read scores under users/{uid}/scores
 import 'package:firebase_auth/firebase_auth.dart';
 import '../localization/app_localizations.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_elevation.dart';
+import '../theme/app_typography.dart';
+import '../widgets/admin_scope.dart';
+import '../widgets/co_button.dart';
+import '../widgets/co_pressable.dart';
 
 final _pct = NumberFormat.decimalPattern('de');
 final _int = NumberFormat.decimalPattern('de');
@@ -18,11 +31,11 @@ String _s(dynamic v) => (v == null) ? '' : v.toString();
 String _normTid(dynamic v) => DriverCsvService.normalizeTransporterId(_s(v));
 
 String _pctStr(num? v) {
-  if (v == null) return '';
+  if (v == null) return '—';
   try {
     return '${_pct.format(v)} %';
   } catch (_) {
-    return '';
+    return '—';
   }
 }
 
@@ -32,16 +45,14 @@ double _ceDisplayPenalty(num? ceCount) {
   return -(50.0 * count);
 }
 
-String _ceDisplayStr(num? ceCount) {
-  return _pctStr(_ceDisplayPenalty(ceCount));
-}
+String _ceDisplayStr(num? ceCount) => _pctStr(_ceDisplayPenalty(ceCount));
 
 String _intStr(num? v) {
-  if (v == null) return '';
+  if (v == null) return '—';
   try {
     return _int.format(v);
   } catch (_) {
-    return '';
+    return '—';
   }
 }
 
@@ -69,29 +80,8 @@ Map<String, dynamic> _strMap(dynamic v) {
   return <String, dynamic>{};
 }
 
-// --------- responsive scale helpers ---------
-double _scaleForWidth(double w) {
-  if (w >= 1440) return 1.0;
-  if (w >= 1200) return 0.93 + (w - 1200) / 240 * (1.0 - 0.93);
-  if (w >= 1000) return 0.86 + (w - 1000) / 200 * (0.93 - 0.86);
-  if (w >= 800) return 0.78 + (w - 800) / 200 * (0.86 - 0.78);
-  if (w >= 600) return 0.70 + (w - 600) / 200 * (0.78 - 0.70);
-  if (w >= 420) return 0.62 + (w - 420) / 180 * (0.70 - 0.62);
-  return 0.60;
-}
-
-double _sp(double base, double w) => base * _scaleForWidth(w);
-double _pad(double base, double w) => base * _scaleForWidth(w);
-
-bool _isCompactRow(double w) => w < 960;
-int _summaryCols(double w) => w < 720 ? 1 : (w < 1200 ? 2 : 3);
-int _kpiCols(double w) => w < 520 ? 2 : (w < 820 ? 3 : 4);
-
-// ============================================
-
 class ScorecardWeekPage extends StatefulWidget {
   const ScorecardWeekPage({super.key, required this.reportRef});
-
   final DocumentReference<Map<String, dynamic>> reportRef;
 
   @override
@@ -102,10 +92,8 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
   bool _busyUpload = false;
   late final Stream<DocumentSnapshot<Map<String, dynamic>>> _reportStream;
 
-  // UI controls (search + bucket filter)
   String _query = '';
-  String _bucket =
-      'ALL'; // ALL | FANTASTIC_PLUS | FANTASTIC | GREAT | FAIR | POOR
+  String _bucket = 'ALL';
   static const _bucketItems = <String>[
     'ALL',
     'FANTASTIC_PLUS',
@@ -115,9 +103,10 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
     'POOR',
   ];
 
-  // 🔧 Updated: read from users/{uid}/scores instead of global 'scores'
   Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _scores() {
-    final uid = FirebaseAuth.instance.currentUser!.uid;
+    final uid = AdminScope.adminUidOf(context) ??
+        FirebaseAuth.instance.currentUser?.uid ??
+        '';
     return FirebaseFirestore.instance
         .collection('users')
         .doc(uid)
@@ -127,7 +116,6 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
         .map((s) => s.docs);
   }
 
-  /// Per-week names under reports/{reportId}/driverNames
   Stream<Map<String, String>> _driverNamesForWeek() {
     return widget.reportRef.collection('driverNames').snapshots().map((snap) {
       final m = <String, String>{};
@@ -141,11 +129,10 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
     });
   }
 
-  /// Global fallback (/drivers)
   Stream<Map<String, String>> _driversNameMapGlobal() {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final uid = AdminScope.adminUidOf(context) ??
+        FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return Stream.value(const <String, String>{});
-
     return FirebaseFirestore.instance
         .collection('users')
         .doc(uid)
@@ -169,27 +156,10 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
     _reportStream = widget.reportRef.snapshots();
   }
 
-  Widget _fitNameText(String name, double fontSize) {
-    return SizedBox(
-      width: double.infinity,
-      child: FittedBox(
-        alignment: Alignment.centerLeft,
-        fit: BoxFit.scaleDown,
-        child: Text(
-          name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(fontWeight: FontWeight.w800, fontSize: fontSize),
-        ),
-      ),
-    );
-  }
-
-  // ===== API bucket mapping (driver rows) =====
-  String _prettyBucket(String raw, AppLocalizations t) {
+  String _prettyBucket(String raw) {
     switch (_s(raw).trim().toUpperCase()) {
       case 'FANTASTIC_PLUS':
-        return 'Fantastic Plus';
+        return 'Fantastic+';
       case 'FANTASTIC':
         return 'Fantastic';
       case 'GREAT':
@@ -203,19 +173,20 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
     }
   }
 
-  Color _colorFromApiBucket(String apiBucket) {
+  Color _tierColor(String apiBucket) {
     switch (_s(apiBucket).trim().toUpperCase()) {
       case 'FANTASTIC_PLUS':
+        return AppColors.tierFantasticPlus;
       case 'FANTASTIC':
-        return const Color(0xFF16A34A);
+        return AppColors.tierFantastic;
       case 'GREAT':
-        return const Color(0xFF22C55E);
+        return AppColors.tierGreat;
       case 'FAIR':
-        return const Color(0xFFF59E0B);
+        return AppColors.tierFair;
       case 'POOR':
-        return const Color(0xFFEF4444);
+        return AppColors.tierPoor;
       default:
-        return const Color(0xFF64748B);
+        return AppColors.labelTertiaryLight;
     }
   }
 
@@ -235,11 +206,13 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
       }
       final f = picked.files.single;
       final bytes = f.bytes;
-      if (bytes == null)
+      if (bytes == null) {
         throw Exception(t.t('scorecard_overview_no_file_bytes'));
+      }
 
-      // ✅ NEW: user-scoped update so ALL of this user’s reports/scores get names
-      final uid = FirebaseAuth.instance.currentUser!.uid;
+      final uid = AdminScope.adminUidOf(context) ??
+          FirebaseAuth.instance.currentUser?.uid ??
+          '';
       final result = await DriverCsvService.importForUser(
         uid: uid,
         csvBytes: bytes,
@@ -269,10 +242,23 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
     }
   }
 
-  // Compute ISO week date range (Mon–Sun)
+  Future<void> _openReassignDialog({required String unmatchedTid}) async {
+    final uid = AdminScope.adminUidOf(context) ??
+        FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null || unmatchedTid.isEmpty) return;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => _ReassignDriverDialog(
+        dspUid: uid,
+        unmatchedTid: unmatchedTid,
+        reportRef: widget.reportRef,
+      ),
+    );
+  }
+
   String _isoWeekRange(int year, int week) {
     final jan4 = DateTime(year, 1, 4);
-    final jan4IsoWeekday = (jan4.weekday + 6) % 7; // Mon=0..Sun=6
+    final jan4IsoWeekday = (jan4.weekday + 6) % 7;
     final mondayW1 = jan4.subtract(Duration(days: jan4IsoWeekday));
     final monday = mondayW1.add(Duration(days: (week - 1) * 7));
     final sunday = monday.add(const Duration(days: 6));
@@ -283,974 +269,513 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
   @override
   Widget build(BuildContext context) {
     final w = MediaQuery.of(context).size.width;
+    final isMobile = w < 800;
+    final padH = isMobile ? 16.0 : 24.0;
+
+    return Scaffold(
+      backgroundColor: AppColors.surfaceLight,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1200),
+            child: ListView(
+              padding: EdgeInsets.fromLTRB(padH, isMobile ? 8 : 16, padH, 80),
+              children: [
+                _buildHeroStrip(isMobile),
+                const SizedBox(height: 18),
+                _buildFilterBar(isMobile),
+                const SizedBox(height: 18),
+                _buildDriversList(isMobile),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════════════════
+  //  Hero KPI strip (Company Score · Reliability · Rank)
+  // ════════════════════════════════════════════════════════════════════════
+
+  Widget _buildHeroStrip(bool isMobile) {
     final t = AppLocalizations.of(context);
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: _reportStream,
+      builder: (context, snap) {
+        final data = snap.data?.data() ?? const <String, dynamic>{};
+        final summary = _strMap(data['summary']);
 
-    // Your original page body (unchanged)
-    final pageBody = Padding(
-      padding: EdgeInsets.all(_pad(18, w)),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ===== Top bar: Title + date + controls =====
-            StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-              stream: _reportStream,
-              builder: (context, snap) {
-                final Map<String, dynamic> report =
-                    snap.data?.data() ?? <String, dynamic>{};
-                final rawSummary = report['summary'];
-                final summary = rawSummary is Map
-                    ? Map<String, dynamic>.from(rawSummary as Map)
-                    : <String, dynamic>{};
+        final overall = (summary['overallScore'] as num?)?.toDouble();
+        final overallStatus = _s(summary['overallStatus']);
+        final relNext = (summary['reliabilityNextDay'] as num?)?.toDouble();
+        final relGeneric =
+            (summary['reliabilityScore'] as num?)?.toDouble();
+        final reliability = relNext ?? relGeneric;
+        final rank = (summary['rankAtStation'] as num?)?.toInt();
+        final stationCount = (summary['stationCount'] as num?)?.toInt();
+        final station =
+            _s(summary['stationCode'] ?? data['stationCode']).toUpperCase();
 
-                final weekNumber =
-                    (summary['weekNumber'] as num?)?.toInt() ??
-                    (report['weekNumber'] as num?)?.toInt();
-                final year =
-                    (summary['year'] as num?)?.toInt() ??
-                    (report['year'] as num?)?.toInt();
-                final range = (weekNumber != null && year != null)
-                    ? _isoWeekRange(year, weekNumber)
-                    : '';
+        final rankText = rank == null
+            ? '—'
+            : (stationCount != null && stationCount > 0
+                ? '#$rank / $stationCount'
+                : '#$rank');
 
-                final title = Text(
-                  weekNumber != null
-                      ? t.tf('dash_scorecard_week', {'week': '$weekNumber'})
-                      : '${t.t('nav_scorecard').toUpperCase()} ${t.t('dash_week').toUpperCase()}',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontSize: _sp(26, w),
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.5,
-                  ),
-                );
+        final tierColor = _tierColor(overallStatus);
 
-                final dateLbl = Text(
-                  _s(range),
-                  style: TextStyle(
-                    color: Colors.black54,
-                    fontWeight: FontWeight.w600,
-                    fontSize: _sp(13, w),
-                  ),
-                );
-
-                final controls = Wrap(
-                  alignment: WrapAlignment.end,
-                  spacing: _pad(12, w),
-                  runSpacing: _pad(8, w),
-                  children: [
-                    ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: w < 600 ? w : 380 * _scaleForWidth(w),
-                      ),
-                      child: SizedBox(
-                        width: w < 600
-                            ? double.infinity
-                            : 360 * _scaleForWidth(w),
-                        child: TextField(
-                          style: TextStyle(fontSize: _sp(14, w)),
-                          decoration: InputDecoration(
-                            prefixIcon: const Icon(Icons.search),
-                            hintText: t.t('dash_search_name_or_id'),
-                            isDense: true,
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: _pad(12, w),
-                              vertical: _pad(12, w),
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          onChanged: (s) => setState(() => _query = s.trim()),
-                        ),
-                      ),
-                    ),
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: _pad(12, w)),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        border: Border.all(color: Colors.black12),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          dropdownColor: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          value: _bucketItems.contains(_bucket)
-                              ? _bucket
-                              : 'ALL',
-                          items: [
-                            DropdownMenuItem(
-                              value: 'ALL',
-                              child: Text(t.t('dash_all_status')),
-                            ),
-                            DropdownMenuItem(
-                              value: 'FANTASTIC_PLUS',
-                              child: const Text('Fantastic Plus'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'FANTASTIC',
-                              child: const Text('Fantastic'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'GREAT',
-                              child: const Text('Great'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'FAIR',
-                              child: const Text('Fair'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'POOR',
-                              child: const Text('Poor'),
-                            ),
-                          ],
-                          onChanged: (v) =>
-                              setState(() => _bucket = v ?? 'ALL'),
-                        ),
-                      ),
-                    ),
-                    FilledButton.icon(
-                      onPressed: _busyUpload ? null : _uploadDriverCsv,
-                      icon: const Icon(Icons.upload),
-                      label: Text(
-                        _busyUpload
-                            ? t.t('uploading')
-                            : t.t('dash_upload_driver_csv'),
-                        style: TextStyle(fontSize: _sp(14, w)),
-                      ),
-                    ),
-                  ],
-                );
-
-                if (w < 880) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      title,
-                      SizedBox(height: _pad(6, w)),
-                      dateLbl,
-                      SizedBox(height: _pad(12, w)),
-                      controls,
-                    ],
-                  );
-                }
-                return Row(
+        if (isMobile) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                height: 168,
+                child: _HeroCompanyCard(
+                  score: overall,
+                  tierColor: tierColor,
+                  tierLabel: _prettyBucket(overallStatus),
+                ),
+              ),
+              const SizedBox(height: 10),
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          title,
-                          SizedBox(height: _pad(6, w)),
-                          dateLbl,
-                        ],
+                      child: _StatTile(
+                        label:
+                            t.t('scorecard_overview_reliability_score'),
+                        value: reliability == null
+                            ? '—'
+                            : '${_pct.format(reliability)} %',
+                        sub: '',
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(child: controls),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _StatTile(
+                        label: t.t('dash_rank_in_station'),
+                        value: rankText,
+                        sub: station,
+                      ),
+                    ),
                   ],
-                );
-              },
-            ),
+                ),
+              ),
+            ],
+          );
+        }
 
-            SizedBox(height: _pad(16, w)),
+        return SizedBox(
+          height: 168,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                flex: 5,
+                child: _HeroCompanyCard(
+                  score: overall,
+                  tierColor: tierColor,
+                  tierLabel: _prettyBucket(overallStatus),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 3,
+                child: _StatTile(
+                  label: t.t('scorecard_overview_reliability_score'),
+                  value: reliability == null
+                      ? '—'
+                      : '${_pct.format(reliability)} %',
+                  sub: '',
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 3,
+                child: _StatTile(
+                  label: t.t('dash_rank_in_station'),
+                  value: rankText,
+                  sub: station,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
-            // ===== Summary cards (unchanged) =====
-            StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-              stream: _reportStream,
-              builder: (context, snap) {
-                final Map<String, dynamic> report =
-                    snap.data?.data() ?? <String, dynamic>{};
-                final rawSummary = report['summary'];
-                final summary = rawSummary is Map
-                    ? Map<String, dynamic>.from(rawSummary as Map)
-                    : <String, dynamic>{};
+  // ════════════════════════════════════════════════════════════════════════
+  //  Filter Bar
+  // ════════════════════════════════════════════════════════════════════════
 
-                final overall = (summary['overallScore'] as num?)?.toDouble();
-                final overallStatus = _s(summary['overallStatus']);
-                final relNext = (summary['reliabilityNextDay'] as num?)
-                    ?.toDouble();
-                final relGeneric = (summary['reliabilityScore'] as num?)
-                    ?.toDouble();
-                final reliability = relNext ?? relGeneric;
+  Widget _buildFilterBar(bool isMobile) {
+    final t = AppLocalizations.of(context);
 
-                final rankAtStation = (summary['rankAtStation'] as num?)
-                    ?.toInt();
-                final stationCount = (summary['stationCount'] as num?)?.toInt();
-                final rankText = () {
-                  if (rankAtStation == null) return '—';
-                  if (stationCount != null && stationCount > 0) {
-                    return t.tf('dash_rank_of_total', {
-                      'rank': '$rankAtStation',
-                      'total': '$stationCount',
-                    });
-                  }
-                  return '$rankAtStation';
-                }();
+    final search = SizedBox(
+      height: 44,
+      child: TextField(
+        style: AppTypography.subheadline.copyWith(
+          color: AppColors.codriverGraphite,
+          fontWeight: FontWeight.w500,
+        ),
+        decoration: InputDecoration(
+          isDense: true,
+          filled: true,
+          fillColor: AppColors.surfaceElevatedLight,
+          prefixIcon: const Icon(
+            Icons.search_rounded,
+            color: AppColors.labelSecondaryLight,
+            size: 20,
+          ),
+          hintText: t.t('dash_search_name_or_id'),
+          hintStyle: AppTypography.subheadline.copyWith(
+            color: AppColors.labelTertiaryLight,
+            fontWeight: FontWeight.w500,
+          ),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFFE5E5EA), width: 0.6),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFFE5E5EA), width: 0.6),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide:
+                const BorderSide(color: AppColors.codriverGreen, width: 1.4),
+          ),
+        ),
+        onChanged: (s) => setState(() => _query = s.trim()),
+      ),
+    );
 
-                final stationName = _s(
-                  summary['stationCode'] ?? report['stationCode'],
-                );
-
-                final w = MediaQuery.of(context).size.width;
-
-                return Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1200),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.06),
-                            blurRadius: 18,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      padding: EdgeInsets.all(_pad(16, w)),
-                      child: LayoutBuilder(
-                        builder: (context, cns) {
-                          final double maxW = cns.maxWidth;
-                          final int cols = maxW >= 1024
-                              ? 3
-                              : (maxW >= 680 ? 2 : 1);
-                          final gap = _pad(16, w);
-                          final childW = (maxW - gap * (cols - 1)) / cols;
-
-                          return Wrap(
-                            spacing: gap,
-                            runSpacing: gap,
-                            alignment: WrapAlignment.center,
-                            runAlignment: WrapAlignment.center,
-                            children: [
-                              SizedBox(
-                                width: childW,
-                                child: _InnerSummaryPanel(
-                                  w: w,
-                                  title: t.t('admin_home_company_score'),
-                                  big: overall == null
-                                      ? '—'
-                                      : '${_pct.format(overall)} %',
-                                  small: overall == null
-                                      ? ''
-                                      : _prettyBucket(overallStatus, t),
-                                  accent: const Color(0xFF16A34A),
-                                ),
-                              ),
-                              SizedBox(
-                                width: childW,
-                                child: _InnerSummaryPanel(
-                                  w: w,
-                                  title: t.t('dash_rank_in_station'),
-                                  big: rankText,
-                                  small: stationName,
-                                  accent: Colors.black87,
-                                ),
-                              ),
-                              SizedBox(
-                                width: childW,
-                                child: _InnerSummaryPanel(
-                                  w: w,
-                                  title: t.t(
-                                    'scorecard_overview_reliability_score',
-                                  ),
-                                  big: reliability == null
-                                      ? '—'
-                                      : '${_pct.format(reliability)} %',
-                                  small: '',
-                                  accent: const Color(0xFF16A34A),
-                                ),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-
-            SizedBox(height: _pad(16, w)),
-
-            // ===== Drivers list =====
-            StreamBuilder<Map<String, String>>(
-              stream: _driverNamesForWeek(),
-              builder: (context, weekNamesSnap) {
-                final weekNames =
-                    weekNamesSnap.data ?? const <String, String>{};
-
-                return StreamBuilder<Map<String, String>>(
-                  stream: _driversNameMapGlobal(),
-                  builder: (context, globalNamesSnap) {
-                    final globalNames =
-                        globalNamesSnap.data ?? const <String, String>{};
-
-                    final nameMap = <String, String>{}
-                      ..addAll(globalNames)
-                      ..addAll(weekNames);
-
-                    return StreamBuilder<
-                      List<QueryDocumentSnapshot<Map<String, dynamic>>>
-                    >(
-                      stream: _scores(),
-                      builder: (context, scoreSnap) {
-                        if (scoreSnap.connectionState ==
-                            ConnectionState.waiting) {
-                          return const Center(
-                            child: CircularProgressIndicator(),
-                          );
-                        }
-                        var docs = scoreSnap.data ?? [];
-                        if (docs.isEmpty) {
-                          return Center(
-                            child: Text(t.t('dash_no_scores_period')),
-                          );
-                        }
-
-                        // Filter by bucket
-                        if (_bucket != 'ALL') {
-                          docs = docs.where((d) {
-                            final b = _s(
-                              d.data()['statusBucket'],
-                            ).toUpperCase();
-                            return b == _bucket;
-                          }).toList();
-                        }
-
-                        // Filter by search
-                        final q = _query.toLowerCase();
-                        if (q.isNotEmpty) {
-                          docs = docs.where((d) {
-                            final normalizedId = _normTid(
-                              d.data()['transporterId'],
-                            );
-                            final id = normalizedId.toLowerCase();
-                            final name = _s(
-                              nameMap[normalizedId],
-                            ).toLowerCase();
-                            return id.contains(q) || name.contains(q);
-                          }).toList();
-                        }
-
-                        // Sort: rank if present else FinalScore desc
-                        final hasAnyRank = docs.any(
-                          (d) => (d.data()['rank'] != null),
-                        );
-                        docs.sort((a, b) {
-                          if (hasAnyRank) {
-                            final ra =
-                                (a.data()['rank'] as num?)?.toInt() ?? 999999;
-                            final rb =
-                                (b.data()['rank'] as num?)?.toInt() ?? 999999;
-                            return ra.compareTo(rb);
-                          }
-                          final ca = _strMap(a.data()['comp']);
-                          final cb = _strMap(b.data()['comp']);
-                          final fa = _numOr0(ca['FinalScore']);
-                          final fb = _numOr0(cb['FinalScore']);
-                          return fb.compareTo(fa);
-                        });
-
-                        if (docs.isEmpty) {
-                          return Center(
-                            child: Text(t.t('dash_no_drivers_match')),
-                          );
-                        }
-
-                        final maxRowWidth = w >= 1400
-                            ? 1200.0
-                            : (w >= 1100 ? 1100.0 : w - _pad(18, w) * 2);
-                        final useCompact = _isCompactRow(w);
-
-                        return ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: docs.length,
-                          separatorBuilder: (_, __) =>
-                              SizedBox(height: _pad(12, w)),
-                          itemBuilder: (context, i) {
-                            try {
-                              final data = docs[i].data();
-
-                              final compRaw = (data['comp'] ?? {});
-                              final kpisRaw = (data['kpis'] ?? {});
-                              final comp = compRaw is Map
-                                  ? Map<String, dynamic>.from(compRaw as Map)
-                                  : <String, dynamic>{};
-                              final kpis = kpisRaw is Map
-                                  ? Map<String, dynamic>.from(kpisRaw as Map)
-                                  : <String, dynamic>{};
-
-                              final transporterId = _s(
-                                data['transporterId'],
-                              ).trim();
-                              final normalizedTid = _normTid(transporterId);
-                              final name = _s(nameMap[normalizedTid]).isNotEmpty
-                                  ? _s(nameMap[normalizedTid])
-                                  : t.t('dash_no_name');
-
-                              final score = _numOr0(comp['FinalScore']);
-                              final dcr = _numOr0(comp['DCR_Score']);
-                              final pod = _numOr0(comp['POD_Score']);
-                              final cc = _numOr0(comp['CC_Score']);
-                              final ceCount = _numOr0(
-                                kpis['CE'] ?? kpis['CE %'] ?? kpis['CE_PCT'],
-                              );
-
-                              final delivered = _numOr0(
-                                kpis['Delivered'] ??
-                                    kpis['DELIVERED'] ??
-                                    kpis['delivered'],
-                              );
-                              final dnr = _numOr0(
-                                kpis['DNR'] ?? kpis['DNR DPMO'],
-                              );
-                              final lor = _numOr0(
-                                kpis['LoR'] ?? kpis['LoR DPMO'],
-                              );
-                              final cdf = _numOr0(
-                                kpis['CDF'] ?? kpis['CDF DPMO'],
-                              );
-
-                              final rank = (data['rank'] as num?)?.toInt();
-                              final apiBucketRaw = _s(data['statusBucket']);
-                              final statusText = _prettyBucket(apiBucketRaw, t);
-                              final statusColor = _colorFromApiBucket(
-                                apiBucketRaw,
-                              );
-
-                              return Center(
-                                child: ConstrainedBox(
-                                  constraints: BoxConstraints(
-                                    maxWidth: maxRowWidth,
-                                  ),
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(
-                                        28 * _scaleForWidth(w),
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.06),
-                                          blurRadius: 18,
-                                          offset: const Offset(0, 8),
-                                        ),
-                                      ],
-                                    ),
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: _pad(18, w),
-                                      vertical: _pad(16, w),
-                                    ),
-                                    child: useCompact
-                                        // ====== COMPACT ======
-                                        ? Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Row(
-                                                children: [
-                                                  Expanded(
-                                                    child: Column(
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .start,
-                                                      children: [
-                                                        _fitNameText(
-                                                          _s(name),
-                                                          _sp(16, w),
-                                                        ),
-                                                        SizedBox(
-                                                          height: _pad(2, w),
-                                                        ),
-                                                        Text(
-                                                          _s(transporterId),
-                                                          maxLines: 1,
-                                                          overflow: TextOverflow
-                                                              .ellipsis,
-                                                          style: TextStyle(
-                                                            color:
-                                                                Colors.black54,
-                                                            fontSize: _sp(
-                                                              12,
-                                                              w,
-                                                            ),
-                                                            fontWeight:
-                                                                FontWeight.w600,
-                                                          ),
-                                                        ),
-                                                        SizedBox(
-                                                          height: _pad(6, w),
-                                                        ),
-                                                        Container(
-                                                          padding:
-                                                              EdgeInsets.symmetric(
-                                                                horizontal:
-                                                                    _pad(10, w),
-                                                                vertical: _pad(
-                                                                  6,
-                                                                  w,
-                                                                ),
-                                                              ),
-                                                          decoration: BoxDecoration(
-                                                            color: statusColor
-                                                                .withOpacity(
-                                                                  0.12,
-                                                                ),
-                                                            borderRadius:
-                                                                BorderRadius.circular(
-                                                                  999,
-                                                                ),
-                                                          ),
-                                                          child: Text(
-                                                            _s(statusText),
-                                                            style: TextStyle(
-                                                              fontSize: _sp(
-                                                                11,
-                                                                w,
-                                                              ),
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w800,
-                                                              color:
-                                                                  statusColor,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                  Wrap(
-                                                    spacing: _pad(10, w),
-                                                    runSpacing: _pad(6, w),
-                                                    children: [
-                                                      _ChipStat(
-                                                        title: t.t('dash_rank'),
-                                                        value: rank != null
-                                                            ? '#$rank'
-                                                            : '—',
-                                                        w: w,
-                                                      ),
-                                                      _ChipStat(
-                                                        title: t.t(
-                                                          'dash_total_score',
-                                                        ),
-                                                        value: _pctStr(score),
-                                                        w: w,
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ],
-                                              ),
-                                              SizedBox(height: _pad(14, w)),
-                                              const Divider(height: 1),
-                                              SizedBox(height: _pad(10, w)),
-                                              LayoutBuilder(
-                                                builder: (context, cns) {
-                                                  final cols = _kpiCols(
-                                                    cns.maxWidth,
-                                                  );
-                                                  final gap = _pad(12, w);
-                                                  final cellW =
-                                                      (cns.maxWidth -
-                                                          (cols - 1) * gap) /
-                                                      cols;
-                                                  final cells = [
-                                                    _KpiCell(
-                                                      label: t
-                                                          .t('dash_delivered')
-                                                          .toUpperCase(),
-                                                      value: _intStr(
-                                                        delivered.round(),
-                                                      ),
-                                                      w: w,
-                                                    ),
-                                                    _KpiCell(
-                                                      label: 'DCR',
-                                                      value: _pctStr(dcr),
-                                                      w: w,
-                                                    ),
-                                                    _KpiCell(
-                                                      label: 'DSC DPMO',
-                                                      value: _intStr(
-                                                        dnr.round(),
-                                                      ),
-                                                      w: w,
-                                                    ),
-                                                    _KpiCell(
-                                                      label: 'LoR DPMO',
-                                                      value: _intStr(
-                                                        lor.round(),
-                                                      ),
-                                                      w: w,
-                                                    ),
-                                                    _KpiCell(
-                                                      label: 'POD',
-                                                      value: _pctStr(pod),
-                                                      w: w,
-                                                    ),
-                                                    _KpiCell(
-                                                      label: 'CC',
-                                                      value: _pctStr(cc),
-                                                      w: w,
-                                                    ),
-                                                    _KpiCell(
-                                                      label: 'CE',
-                                                      value: _ceDisplayStr(
-                                                        ceCount,
-                                                      ),
-                                                      w: w,
-                                                    ),
-                                                    _KpiCell(
-                                                      label: 'CDF DPMO',
-                                                      value: _intStr(
-                                                        cdf.round(),
-                                                      ),
-                                                      w: w,
-                                                    ),
-                                                  ];
-                                                  return Wrap(
-                                                    spacing: gap,
-                                                    runSpacing: _pad(10, w),
-                                                    children: cells
-                                                        .map(
-                                                          (c) => SizedBox(
-                                                            width: cellW,
-                                                            child: c,
-                                                          ),
-                                                        )
-                                                        .toList(),
-                                                  );
-                                                },
-                                              ),
-                                            ],
-                                          )
-                                        // ====== DESKTOP ======
-                                        : IntrinsicHeight(
-                                            child: Row(
-                                              children: [
-                                                Expanded(
-                                                  flex: 28,
-                                                  child: Row(
-                                                    children: [
-                                                      Expanded(
-                                                        child: Column(
-                                                          crossAxisAlignment:
-                                                              CrossAxisAlignment
-                                                                  .start,
-                                                          mainAxisAlignment:
-                                                              MainAxisAlignment
-                                                                  .center,
-                                                          children: [
-                                                            _fitNameText(
-                                                              _s(name),
-                                                              _sp(18, w),
-                                                            ),
-                                                            SizedBox(
-                                                              height: _pad(
-                                                                2,
-                                                                w,
-                                                              ),
-                                                            ),
-                                                            Text(
-                                                              _s(transporterId),
-                                                              maxLines: 1,
-                                                              overflow:
-                                                                  TextOverflow
-                                                                      .ellipsis,
-                                                              style: TextStyle(
-                                                                color: Colors
-                                                                    .black54,
-                                                                fontSize: _sp(
-                                                                  13,
-                                                                  w,
-                                                                ),
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w600,
-                                                              ),
-                                                            ),
-                                                            SizedBox(
-                                                              height: _pad(
-                                                                6,
-                                                                w,
-                                                              ),
-                                                            ),
-                                                            Text(
-                                                              _s(statusText),
-                                                              style: TextStyle(
-                                                                fontSize: _sp(
-                                                                  13,
-                                                                  w,
-                                                                ),
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w800,
-                                                                color:
-                                                                    statusColor,
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                                VerticalDivider(
-                                                  width: _pad(22, w),
-                                                  thickness: 1,
-                                                  color: Colors.black12,
-                                                ),
-
-                                                _MetricCol(
-                                                  title: t.t('dash_rank'),
-                                                  value: rank != null
-                                                      ? '#$rank'
-                                                      : '—',
-                                                  w: w,
-                                                ),
-                                                VerticalDivider(
-                                                  width: _pad(22, w),
-                                                  thickness: 1,
-                                                  color: Colors.black12,
-                                                ),
-
-                                                _MetricCol(
-                                                  title: t.t(
-                                                    'dash_total_score',
-                                                  ),
-                                                  value: _intStr(score),
-                                                  w: w,
-                                                ),
-                                                VerticalDivider(
-                                                  width: _pad(22, w),
-                                                  thickness: 1,
-                                                  color: Colors.black12,
-                                                ),
-
-                                                _MetricCol(
-                                                  title: t
-                                                      .t('dash_delivered')
-                                                      .toUpperCase(),
-                                                  value: _intStr(
-                                                    delivered.round(),
-                                                  ),
-                                                  w: w,
-                                                ),
-                                                VerticalDivider(
-                                                  width: _pad(22, w),
-                                                  thickness: 1,
-                                                  color: Colors.black12,
-                                                ),
-
-                                                _MetricCol(
-                                                  title: 'DCR',
-                                                  value: _intStr(dcr),
-                                                  w: w,
-                                                ),
-                                                VerticalDivider(
-                                                  width: _pad(22, w),
-                                                  thickness: 1,
-                                                  color: Colors.black12,
-                                                ),
-
-                                                _MetricCol(
-                                                  title: 'DSC DPMO',
-                                                  value: _intStr(dnr.round()),
-                                                  w: w,
-                                                ),
-                                                VerticalDivider(
-                                                  width: _pad(22, w),
-                                                  thickness: 1,
-                                                  color: Colors.black12,
-                                                ),
-
-                                                _MetricCol(
-                                                  title: 'LoR DPMO',
-                                                  value: _intStr(lor.round()),
-                                                  w: w,
-                                                ),
-                                                VerticalDivider(
-                                                  width: _pad(22, w),
-                                                  thickness: 1,
-                                                  color: Colors.black12,
-                                                ),
-
-                                                _MetricCol(
-                                                  title: 'POD',
-                                                  value: _intStr(pod),
-                                                  w: w,
-                                                ),
-                                                VerticalDivider(
-                                                  width: _pad(22, w),
-                                                  thickness: 1,
-                                                  color: Colors.black12,
-                                                ),
-
-                                                _MetricCol(
-                                                  title: 'CC',
-                                                  value: _intStr(cc),
-                                                  w: w,
-                                                ),
-                                                VerticalDivider(
-                                                  width: _pad(22, w),
-                                                  thickness: 1,
-                                                  color: Colors.black12,
-                                                ),
-
-                                                _MetricCol(
-                                                  title: 'CE',
-                                                  value: _ceDisplayStr(ceCount),
-                                                  w: w,
-                                                ),
-                                                VerticalDivider(
-                                                  width: _pad(22, w),
-                                                  thickness: 1,
-                                                  color: Colors.black12,
-                                                ),
-
-                                                _MetricCol(
-                                                  title: 'CDF DPMO',
-                                                  value: _intStr(cdf.round()),
-                                                  w: w,
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                  ),
-                                ),
-                              );
-                            } catch (e, st) {
-                              debugPrint('Driver row render error: $e\n$st');
-                              return const SizedBox.shrink();
-                            }
-                          },
-                        );
-                      },
-                    );
-                  },
-                );
-              },
-            ),
+    final bucketDropdown = Container(
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceElevatedLight,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E5EA), width: 0.6),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          dropdownColor: AppColors.surfaceElevatedLight,
+          borderRadius: BorderRadius.circular(12),
+          value: _bucketItems.contains(_bucket) ? _bucket : 'ALL',
+          icon: const Icon(Icons.keyboard_arrow_down_rounded,
+              color: AppColors.codriverDeep),
+          style: AppTypography.subheadline.copyWith(
+            color: AppColors.codriverDeep,
+            fontWeight: FontWeight.w700,
+          ),
+          items: [
+            DropdownMenuItem(
+                value: 'ALL', child: Text(t.t('dash_all_status'))),
+            for (final v in _bucketItems.skip(1))
+              DropdownMenuItem(value: v, child: Text(_prettyBucket(v))),
           ],
+          onChanged: (v) => setState(() => _bucket = v ?? 'ALL'),
         ),
       ),
     );
 
-    return Material(color: const Color(0xFFF5F7F9), child: pageBody);
+    final uploadBtn = CoButton(
+      onPressed: _busyUpload ? null : _uploadDriverCsv,
+      icon: Icons.upload_rounded,
+      label: _busyUpload
+          ? t.t('uploading')
+          : t.t('dash_upload_driver_csv'),
+      busy: _busyUpload,
+    );
+
+    if (isMobile) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          search,
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(child: bucketDropdown),
+              const SizedBox(width: 8),
+              uploadBtn,
+            ],
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(flex: 3, child: search),
+        const SizedBox(width: 10),
+        bucketDropdown,
+        const SizedBox(width: 10),
+        uploadBtn,
+      ],
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════════════════
+  //  Drivers list
+  // ════════════════════════════════════════════════════════════════════════
+
+  Widget _buildDriversList(bool isMobile) {
+    final t = AppLocalizations.of(context);
+    return StreamBuilder<Map<String, String>>(
+      stream: _driverNamesForWeek(),
+      builder: (context, weekNamesSnap) {
+        final weekNames = weekNamesSnap.data ?? const <String, String>{};
+        return StreamBuilder<Map<String, String>>(
+          stream: _driversNameMapGlobal(),
+          builder: (context, globalNamesSnap) {
+            final globalNames =
+                globalNamesSnap.data ?? const <String, String>{};
+            final nameMap = <String, String>{}
+              ..addAll(globalNames)
+              ..addAll(weekNames);
+
+            return StreamBuilder<
+                List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+              stream: _scores(),
+              builder: (context, scoreSnap) {
+                if (scoreSnap.connectionState == ConnectionState.waiting) {
+                  return const CoStateSwitcher(
+                    child: Padding(
+                      key: ValueKey('drivers-loading'),
+                      padding: EdgeInsets.symmetric(vertical: 60),
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          strokeWidth: 3,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            AppColors.codriverGreen,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }
+                var docs = scoreSnap.data ?? [];
+                if (docs.isEmpty) {
+                  return CoStateSwitcher(
+                    child: _EmptyState(
+                      key: const ValueKey('drivers-empty-period'),
+                      label: t.t('dash_no_scores_period'),
+                    ),
+                  );
+                }
+
+                if (_bucket != 'ALL') {
+                  docs = docs.where((d) {
+                    final b = _s(d.data()['statusBucket']).toUpperCase();
+                    return b == _bucket;
+                  }).toList();
+                }
+
+                final q = _query.toLowerCase();
+                if (q.isNotEmpty) {
+                  docs = docs.where((d) {
+                    final normalizedId =
+                        _normTid(d.data()['transporterId']);
+                    final id = normalizedId.toLowerCase();
+                    final name =
+                        _s(nameMap[normalizedId]).toLowerCase();
+                    return id.contains(q) || name.contains(q);
+                  }).toList();
+                }
+
+                final hasAnyRank =
+                    docs.any((d) => (d.data()['rank'] != null));
+                docs.sort((a, b) {
+                  if (hasAnyRank) {
+                    final ra =
+                        (a.data()['rank'] as num?)?.toInt() ?? 999999;
+                    final rb =
+                        (b.data()['rank'] as num?)?.toInt() ?? 999999;
+                    return ra.compareTo(rb);
+                  }
+                  final ca = _strMap(a.data()['comp']);
+                  final cb = _strMap(b.data()['comp']);
+                  final fa = _numOr0(ca['FinalScore']);
+                  final fb = _numOr0(cb['FinalScore']);
+                  return fb.compareTo(fa);
+                });
+
+                if (docs.isEmpty) {
+                  return CoStateSwitcher(
+                    child: _EmptyState(
+                      key: const ValueKey('drivers-empty-filter'),
+                      label: t.t('dash_no_drivers_match'),
+                    ),
+                  );
+                }
+
+                return CoStateSwitcher(
+                  child: Column(
+                  key: const ValueKey('drivers-loaded'),
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4, bottom: 10),
+                      child: Row(
+                        children: [
+                          Text(
+                            t.t('drivers_hub_title').toUpperCase(),
+                            style: AppTypography.caption2.copyWith(
+                              color: AppColors.labelSecondaryLight,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.codriverGreen
+                                  .withValues(alpha: 0.14),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              '${docs.length}',
+                              style: AppTypography.caption2.copyWith(
+                                color: AppColors.codriverDeep,
+                                fontWeight: FontWeight.w800,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures()
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    for (var i = 0; i < docs.length; i++) ...[
+                      _DriverCard(
+                        data: docs[i].data(),
+                        nameMap: nameMap,
+                        isMobile: isMobile,
+                        prettyBucket: _prettyBucket,
+                        tierColor: _tierColor,
+                        onAssignTid: () => _openReassignDialog(
+                          unmatchedTid: _s(
+                            docs[i].data()['transporterId'],
+                          ).trim(),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                  ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
   }
 }
 
-// ===== Widgets (unchanged from your version) =====
+// ════════════════════════════════════════════════════════════════════════
+//  Hero Company Score Card (grüner Marken-Hero)
+// ════════════════════════════════════════════════════════════════════════
 
-class _SummaryCard extends StatelessWidget {
-  final String title;
-  final String big;
-  final String small;
-  final Color accent;
-  final double w;
-  final bool centered;
-  const _SummaryCard({
-    required this.title,
-    required this.big,
-    required this.small,
-    required this.accent,
-    required this.w,
-    this.centered = false,
+class _HeroCompanyCard extends StatelessWidget {
+  final double? score;
+  final Color tierColor;
+  final String tierLabel;
+  const _HeroCompanyCard({
+    required this.score,
+    required this.tierColor,
+    required this.tierLabel,
   });
 
   @override
   Widget build(BuildContext context) {
-    final align = centered
-        ? CrossAxisAlignment.center
-        : CrossAxisAlignment.start;
-    final textAlign = centered ? TextAlign.center : TextAlign.start;
-
-    return Card(
-      elevation: 0.5,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: _pad(22, w),
-          vertical: _pad(22, w),
-        ),
-        child: Column(
-          crossAxisAlignment: align,
-          children: [
-            Text(
-              _s(title),
-              textAlign: textAlign,
-              style: TextStyle(
-                fontSize: _sp(13, w),
-                color: Colors.black54,
-                letterSpacing: 0.6,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            SizedBox(height: _pad(10, w)),
-            Text(
-              _s(big),
-              textAlign: textAlign,
-              style: TextStyle(
-                fontSize: _sp(30, w),
-                fontWeight: FontWeight.w800,
-                color: accent,
-              ),
-            ),
-            SizedBox(height: _pad(6, w)),
-            if (_s(small).isNotEmpty)
-              Text(
-                _s(small),
-                textAlign: textAlign,
-                style: TextStyle(
-                  fontSize: _sp(13, w),
-                  color: Colors.black54,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ChipStat extends StatelessWidget {
-  final String title;
-  final String value;
-  final double w;
-  const _ChipStat({required this.title, required this.value, required this.w});
-
-  @override
-  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: _pad(14, w),
-        vertical: _pad(10, w),
-      ),
+      width: double.infinity,
+      height: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 16, 16, 18),
       decoration: BoxDecoration(
-        color: const Color(0xFFF3F4F6),
-        borderRadius: BorderRadius.circular(16),
+        color: AppColors.codriverGreen,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: AppElevation.level2,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            _s(title),
-            style: TextStyle(
-              fontSize: _sp(11, w),
-              letterSpacing: 0.6,
-              color: Colors.black54,
-              fontWeight: FontWeight.w700,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  t.t('admin_home_company_score').toUpperCase(),
+                  style: AppTypography.caption2.copyWith(
+                    color: Colors.white.withValues(alpha: 0.85),
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ),
+              if (tierLabel.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    tierLabel.toUpperCase(),
+                    style: AppTypography.caption2.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ),
+            ],
           ),
-          SizedBox(height: _pad(4, w)),
-          Text(
-            _s(value),
-            style: TextStyle(fontSize: _sp(15, w), fontWeight: FontWeight.w800),
+          Expanded(
+            child: Center(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: RichText(
+                  text: TextSpan(
+                    children: [
+                      TextSpan(
+                        text: score != null ? _pct.format(score) : '—',
+                        style: TextStyle(
+                          fontFamily: AppTypography.fontFamily,
+                          fontSize: 60,
+                          height: 1.0,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          letterSpacing: -1.4,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                      TextSpan(
+                        text: '  %',
+                        style: TextStyle(
+                          fontFamily: AppTypography.fontFamily,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white.withValues(alpha: 0.7),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -1258,136 +783,708 @@ class _ChipStat extends StatelessWidget {
   }
 }
 
+// ════════════════════════════════════════════════════════════════════════
+//  Stat Tile (white)
+// ════════════════════════════════════════════════════════════════════════
+
+class _StatTile extends StatelessWidget {
+  final String label;
+  final String value;
+  final String sub;
+  const _StatTile({
+    required this.label,
+    required this.value,
+    required this.sub,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceElevatedLight,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: AppElevation.level1,
+        border: Border.all(color: const Color(0xFFE5E5EA), width: 0.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: AppTypography.caption2.copyWith(
+              color: AppColors.labelSecondaryLight,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.0,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: AppTypography.title1.copyWith(
+                color: AppColors.codriverDeep,
+                fontWeight: FontWeight.w800,
+                fontFeatures: const [FontFeature.tabularFigures()],
+                letterSpacing: -0.6,
+              ),
+            ),
+          ),
+          if (sub.isNotEmpty)
+            Text(
+              sub,
+              style: AppTypography.caption1.copyWith(
+                color: AppColors.labelSecondaryLight,
+                fontWeight: FontWeight.w600,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            )
+          else
+            const SizedBox(height: 14),
+        ],
+      ),
+    );
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  Driver Card
+// ════════════════════════════════════════════════════════════════════════
+
+class _DriverCard extends StatelessWidget {
+  final Map<String, dynamic> data;
+  final Map<String, String> nameMap;
+  final bool isMobile;
+  final String Function(String raw) prettyBucket;
+  final Color Function(String raw) tierColor;
+  final VoidCallback? onAssignTid;
+
+  const _DriverCard({
+    required this.data,
+    required this.nameMap,
+    required this.isMobile,
+    required this.prettyBucket,
+    required this.tierColor,
+    this.onAssignTid,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+
+    final compRaw = data['comp'];
+    final kpisRaw = data['kpis'];
+    final comp = compRaw is Map
+        ? Map<String, dynamic>.from(compRaw as Map)
+        : <String, dynamic>{};
+    final kpis = kpisRaw is Map
+        ? Map<String, dynamic>.from(kpisRaw as Map)
+        : <String, dynamic>{};
+
+    final transporterId = _s(data['transporterId']).trim();
+    final normalizedTid = _normTid(transporterId);
+    final mappedName = _s(nameMap[normalizedTid]);
+    final isUnmatched = mappedName.isEmpty;
+    final name = isUnmatched ? t.t('dash_no_name') : mappedName;
+
+    final score = _numOr0(comp['FinalScore']);
+    final dcr = _numOr0(comp['DCR_Score']);
+    final pod = _numOr0(comp['POD_Score']);
+    final cc = _numOr0(comp['CC_Score']);
+    final ceCount =
+        _numOr0(kpis['CE'] ?? kpis['CE %'] ?? kpis['CE_PCT']);
+    final delivered = _numOr0(
+        kpis['Delivered'] ?? kpis['DELIVERED'] ?? kpis['delivered']);
+    final dnr = _numOr0(kpis['DNR'] ?? kpis['DNR DPMO']);
+    final lor = _numOr0(kpis['LoR'] ?? kpis['LoR DPMO']);
+    final cdf = _numOr0(kpis['CDF'] ?? kpis['CDF DPMO']);
+
+    final rank = (data['rank'] as num?)?.toInt();
+    final apiBucketRaw = _s(data['statusBucket']);
+    final tier = tierColor(apiBucketRaw);
+    final tierText = prettyBucket(apiBucketRaw);
+
+    final kpis8 = <_Kpi>[
+      _Kpi('Delivered', _intStr(delivered.round())),
+      _Kpi('DCR', _pctStr(dcr)),
+      _Kpi('DSC DPMO', _intStr(dnr.round())),
+      _Kpi('LoR DPMO', _intStr(lor.round())),
+      _Kpi('POD', _pctStr(pod)),
+      _Kpi('CC', _pctStr(cc)),
+      _Kpi('CE', _ceDisplayStr(ceCount)),
+      _Kpi('CDF DPMO', _intStr(cdf.round())),
+    ];
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surfaceElevatedLight,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: AppElevation.level1,
+        border: Border.all(color: const Color(0xFFE5E5EA), width: 0.5),
+      ),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 14 : 18,
+        vertical: isMobile ? 14 : 16,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── Top row: rank badge + name + tier pill + score ──
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              _RankBadge(rank: rank, tierColor: tier),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.headline.copyWith(
+                        color: AppColors.codriverDeep,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            transporterId,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.caption1.copyWith(
+                              color: AppColors.labelSecondaryLight,
+                              fontWeight: FontWeight.w600,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures()
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: tier.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            tierText.toUpperCase(),
+                            style: AppTypography.caption2.copyWith(
+                              color: tier,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ),
+                        if (isUnmatched && onAssignTid != null) ...[
+                          const SizedBox(width: 6),
+                          CoPressable(
+                            onTap: onAssignTid,
+                            borderRadius: BorderRadius.circular(999),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: AppColors.codriverGreen,
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.person_add_alt_1_rounded,
+                                    size: 12,
+                                    color: Colors.white,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Zuordnen',
+                                    style:
+                                        AppTypography.caption2.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.3,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    'SCORE',
+                    style: AppTypography.caption2.copyWith(
+                      color: AppColors.labelSecondaryLight,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.0,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _pctStr(score),
+                    style: AppTypography.title3.copyWith(
+                      color: AppColors.codriverDeep,
+                      fontWeight: FontWeight.w800,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                      letterSpacing: -0.4,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          const Divider(height: 1, color: Color(0xFFE5E5EA)),
+          const SizedBox(height: 12),
+          // ── KPI grid ──
+          LayoutBuilder(
+            builder: (context, c) {
+              final cols = c.maxWidth >= 720
+                  ? 8
+                  : c.maxWidth >= 520
+                      ? 4
+                      : c.maxWidth >= 360
+                          ? 4
+                          : 2;
+              const gap = 12.0;
+              final cellW = (c.maxWidth - gap * (cols - 1)) / cols;
+              return Wrap(
+                spacing: gap,
+                runSpacing: 12,
+                children: [
+                  for (final k in kpis8)
+                    SizedBox(
+                      width: cellW,
+                      child: _KpiCell(label: k.label, value: k.value),
+                    ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Kpi {
+  final String label;
+  final String value;
+  _Kpi(this.label, this.value);
+}
+
 class _KpiCell extends StatelessWidget {
   final String label;
   final String value;
-  final double w;
-  const _KpiCell({required this.label, required this.value, required this.w});
+  const _KpiCell({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          _s(label),
-          style: TextStyle(
-            fontSize: _sp(12, w),
-            color: Colors.black54,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.4,
+          label.toUpperCase(),
+          style: AppTypography.caption2.copyWith(
+            color: AppColors.labelSecondaryLight,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.8,
           ),
         ),
-        SizedBox(height: _pad(4, w)),
-        Text(
-          _s(value),
-          style: TextStyle(fontSize: _sp(15, w), fontWeight: FontWeight.w800),
+        const SizedBox(height: 4),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            value,
+            style: AppTypography.subheadline.copyWith(
+              color: AppColors.codriverDeep,
+              fontWeight: FontWeight.w800,
+              fontFeatures: const [FontFeature.tabularFigures()],
+              letterSpacing: -0.2,
+            ),
+          ),
         ),
       ],
     );
   }
 }
 
-class _MetricCol extends StatelessWidget {
-  final String title;
-  final String value;
-  final double w;
-  const _MetricCol({required this.title, required this.value, required this.w});
+class _RankBadge extends StatelessWidget {
+  final int? rank;
+  final Color tierColor;
+  const _RankBadge({required this.rank, required this.tierColor});
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      flex: 9,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            _s(title).toUpperCase(),
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: _sp(12, w),
-              color: Colors.black54,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.4,
-            ),
+    if (rank == null) {
+      return Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          color: AppColors.surfaceLight,
+          shape: BoxShape.circle,
+          border: Border.all(color: const Color(0xFFE5E5EA)),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          '—',
+          style: AppTypography.subheadline.copyWith(
+            color: AppColors.labelTertiaryLight,
+            fontWeight: FontWeight.w800,
           ),
-          SizedBox(height: _pad(6, w)),
-          Text(
-            _s(value),
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: _sp(20, w), fontWeight: FontWeight.w800),
-          ),
-        ],
+        ),
+      );
+    }
+    return Container(
+      width: 38,
+      height: 38,
+      decoration: BoxDecoration(
+        color: tierColor.withValues(alpha: 0.14),
+        shape: BoxShape.circle,
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        '$rank',
+        style: AppTypography.subheadline.copyWith(
+          color: tierColor,
+          fontWeight: FontWeight.w800,
+          fontFeatures: const [FontFeature.tabularFigures()],
+        ),
       ),
     );
   }
 }
 
-class _InnerSummaryPanel extends StatelessWidget {
-  final double w;
-  final String title;
-  final String big;
-  final String small;
-  final Color accent;
+class _EmptyState extends StatelessWidget {
+  final String label;
+  const _EmptyState({super.key, required this.label});
 
-  const _InnerSummaryPanel({
-    required this.w,
-    required this.title,
-    required this.big,
-    required this.small,
-    required this.accent,
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 60),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: AppColors.green50,
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: const Icon(
+                Icons.search_off_rounded,
+                color: AppColors.codriverDeep,
+                size: 26,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: AppTypography.subheadline.copyWith(
+                color: AppColors.labelSecondaryLight,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+// ─── Reassign Dialog ─────────────────────────────────────────────────
+//
+// Opens from a scorecard row whose Transporter-ID does not match any of
+// the admin's drivers. Lists drivers with `tidPending: true` (their TID
+// is still a generated PENDING-XXXXXX placeholder). Picking one writes
+// the real TID onto that driver and refreshes the report's driverNames
+// map so the row immediately shows the correct name.
+class _ReassignDriverDialog extends StatelessWidget {
+  final String dspUid;
+  final String unmatchedTid;
+  final DocumentReference<Map<String, dynamic>> reportRef;
+
+  const _ReassignDriverDialog({
+    required this.dspUid,
+    required this.unmatchedTid,
+    required this.reportRef,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7F9F5),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.black12.withOpacity(0.15)),
-      ),
-      padding: EdgeInsets.symmetric(
-        horizontal: _pad(22, w),
-        vertical: _pad(26, w),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Text(
-            title.toUpperCase(),
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: _sp(14, w),
-              color: Colors.black45,
-              letterSpacing: 1.0,
-              fontWeight: FontWeight.w800,
-            ),
+    final mediaW = MediaQuery.of(context).size.width;
+    final dialogW = mediaW < 480 ? mediaW - 32 : 460.0;
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      insetPadding:
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: dialogW, maxHeight: 620),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'TID zuordnen',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF111827),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Wähle den Fahrer, zu dem die TID '
+                '$unmatchedTid '
+                'gehört. Die TID wird beim Fahrer gespeichert und '
+                'die Scorecard wird neu gematcht.',
+                style: const TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 12.5,
+                  height: 1.4,
+                  color: Color(0xFF6B7280),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Flexible(
+                child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(dspUid)
+                      .collection('drivers')
+                      .where('tidPending', isEqualTo: true)
+                      .snapshots(),
+                  builder: (ctx, snap) {
+                    if (snap.connectionState == ConnectionState.waiting) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 40),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              AppColors.codriverGreen,
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+                    final docs = snap.data?.docs ?? [];
+                    if (docs.isEmpty) {
+                      return Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF9FAFB),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Text(
+                          'Keine Fahrer mit ausstehender TID gefunden. '
+                          'Lege den Fahrer im Drivers Hub neu an, '
+                          'ohne TID einzutragen.',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 13,
+                            height: 1.4,
+                            color: Color(0xFF6B7280),
+                          ),
+                        ),
+                      );
+                    }
+                    docs.sort((a, b) {
+                      final an =
+                          (a.data()['driverName'] ?? '').toString();
+                      final bn =
+                          (b.data()['driverName'] ?? '').toString();
+                      return an.toLowerCase().compareTo(bn.toLowerCase());
+                    });
+                    return ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: docs.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 6),
+                      itemBuilder: (ctx, i) {
+                        final d = docs[i];
+                        final data = d.data();
+                        final name =
+                            (data['driverName'] ?? '').toString();
+                        final placeholderTid = d.id;
+                        return _PendingDriverTile(
+                          name: name.isEmpty ? 'Ohne Name' : name,
+                          placeholderTid: placeholderTid,
+                          onTap: () => _assign(
+                            context,
+                            driverDoc: d.reference,
+                            driverName: name,
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: CoButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  label: 'Abbrechen',
+                  variant: CoButtonVariant.quiet,
+                ),
+              ),
+            ],
           ),
-          SizedBox(height: _pad(14, w)),
-          Text(
-            big,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: _sp(36, w),
-              fontWeight: FontWeight.w900,
-              color: accent,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _assign(
+    BuildContext context, {
+    required DocumentReference<Map<String, dynamic>> driverDoc,
+    required String driverName,
+  }) async {
+    final realTid = unmatchedTid.trim().toUpperCase();
+    if (realTid.isEmpty) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
+    try {
+      // Update the driver doc: real TID + flip tidPending off.
+      await driverDoc.set({
+        'transporterId': realTid,
+        'tidPending': false,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      // Write the name into the report's driverNames subcollection so
+      // this week's scorecard rows render the driver name immediately.
+      await reportRef
+          .collection('driverNames')
+          .doc(realTid)
+          .set({
+        'transporterId': realTid,
+        'driverName': driverName,
+        'assignedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      navigator.pop();
+      messenger.showSnackBar(
+        SnackBar(content: Text('TID $realTid → $driverName zugeordnet.')),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Fehler beim Zuordnen: $e')),
+      );
+    }
+  }
+}
+
+class _PendingDriverTile extends StatelessWidget {
+  final String name;
+  final String placeholderTid;
+  final VoidCallback onTap;
+
+  const _PendingDriverTile({
+    required this.name,
+    required this.placeholderTid,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return CoPressable(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: const Color(0xFFE5E5EA)),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: const BoxDecoration(
+                color: Color(0xFFF2F2F7),
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: const Icon(Icons.person_rounded,
+                  size: 18, color: Color(0xFF6B7280)),
             ),
-          ),
-          SizedBox(height: _pad(12, w)),
-          if (small.isNotEmpty)
-            Text(
-              small,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: _sp(16, w),
-                color: Colors.black54,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.3,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF111827),
+                    ),
+                  ),
+                  Text(
+                    placeholderTid,
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF9CA3AF),
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ],
               ),
             ),
-        ],
+            const Icon(Icons.chevron_right_rounded,
+                color: Color(0xFF9CA3AF)),
+          ],
+        ),
       ),
     );
   }
 }
+

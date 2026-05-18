@@ -11,6 +11,11 @@ class WaveplanRoute {
   final String? transporterId; // null when unassigned
   final String? assignedDsp; // AION
 
+  /// Optional second driver riding along with the primary driver
+  /// for training / shadowing. The mentee sees the **same** waveplan
+  /// view as the mentor.
+  final String? menteeTransporterId;
+
   const WaveplanRoute({
     required this.routeCode,
     required this.routeId,
@@ -21,6 +26,7 @@ class WaveplanRoute {
     required this.serviceType,
     this.transporterId,
     this.assignedDsp,
+    this.menteeTransporterId,
   });
 
   WaveplanRoute copyWith({
@@ -28,6 +34,8 @@ class WaveplanRoute {
     bool clearTransporterId = false,
     String? assignedDsp,
     bool clearAssignedDsp = false,
+    String? menteeTransporterId,
+    bool clearMenteeTransporterId = false,
   }) {
     return WaveplanRoute(
       routeCode: routeCode,
@@ -41,10 +49,15 @@ class WaveplanRoute {
           ? null
           : (transporterId ?? this.transporterId),
       assignedDsp: clearAssignedDsp ? null : (assignedDsp ?? this.assignedDsp),
+      menteeTransporterId: clearMenteeTransporterId
+          ? null
+          : (menteeTransporterId ?? this.menteeTransporterId),
     );
   }
 
   bool get isAssigned => transporterId != null && transporterId!.isNotEmpty;
+  bool get hasMentee =>
+      menteeTransporterId != null && menteeTransporterId!.isNotEmpty;
 
   /// Numeric tail of the dispatch area (e.g. STG-B_RED.7 → 7) used for
   /// stable sort within a wave.

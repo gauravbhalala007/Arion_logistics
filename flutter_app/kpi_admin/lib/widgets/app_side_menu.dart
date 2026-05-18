@@ -6,12 +6,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/admin_expiry_aggregator.dart';
 import '../services/auth_service.dart';
 import '../localization/app_localizations.dart';
+import '../utils/inventory_l10n.dart';
 import 'admin_notification_bell.dart';
 
 enum AppNav {
   home,
   dashboard,
   podQuality,
+  concessions,
   drivers,
   waveplan,
   calendar,
@@ -28,6 +30,11 @@ enum AppNav {
   adminApprovals,
   dispatchers,
   profile,
+  styleguide,
+  cotimer,
+  inventory,
+  cart,
+  shiftPlan,
 }
 
 class AppSideMenu extends StatelessWidget {
@@ -87,6 +94,12 @@ class AppSideMenu extends StatelessWidget {
         active: active == AppNav.podQuality,
         onTap: () => _handleNav(context, AppNav.podQuality, '/pod-quality'),
       ),
+      _SubMenuItem(
+        icon: Icons.report_gmailerrorred_outlined,
+        label: 'Concessions',
+        active: active == AppNav.concessions,
+        onTap: () => _handleNav(context, AppNav.concessions, '/concessions'),
+      ),
       StreamBuilder<int>(
         stream: () {
           final uid = FirebaseAuth.instance.currentUser?.uid;
@@ -142,9 +155,49 @@ class AppSideMenu extends StatelessWidget {
         active: active == AppNav.tasks,
         onTap: () => _handleNav(context, AppNav.tasks, '/tasks'),
       ),
+      StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: _userDocStream(),
+        builder: (context, snap) {
+          final data = snap.data?.data() ?? const <String, dynamic>{};
+          final role = (data['role'] ?? '').toString().trim().toLowerCase();
+          final approved = data['approved'] == true;
+          final canSee = approved &&
+              (role == 'admin' || role == 'user' || role == 'developer');
+          if (!canSee) return const SizedBox.shrink();
+          return _MenuItem(
+            icon: Icons.event_note_rounded,
+            label: 'Shift Plan',
+            active: active == AppNav.shiftPlan,
+            onTap: () =>
+                _handleNav(context, AppNav.shiftPlan, '/shift-plan'),
+            betaBadge: true,
+          );
+        },
+      ),
+      StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: _userDocStream(),
+        builder: (context, snap) {
+          final data = snap.data?.data() ?? const <String, dynamic>{};
+          final role = (data['role'] ?? '')
+              .toString()
+              .trim()
+              .toLowerCase();
+          final approved = data['approved'] == true;
+          final canAccessInventory = approved &&
+              (role == 'admin' || role == 'user' || role == 'developer');
+          if (!canAccessInventory) return const SizedBox.shrink();
+          return _MenuItem(
+            icon: Icons.inventory_2_outlined,
+            label: InvL10n.of(context).inventory,
+            active: active == AppNav.inventory,
+            onTap: () => _handleNav(context, AppNav.inventory, '/inventory'),
+            betaBadge: true,
+          );
+        },
+      ),
       _MenuItem(
         icon: Icons.schedule_rounded,
-        label: 'Zeiten & Abwesenheiten',
+        label: 'Time & Absence',
         active: active == AppNav.shiftAbsence,
         onTap: () => _handleNav(context, AppNav.shiftAbsence, '/shift-absence'),
       ),
@@ -190,13 +243,22 @@ class AppSideMenu extends StatelessWidget {
         onTap: () => _handleNav(context, AppNav.feedback, '/feedback'),
       ),
 
-      // ---- Admin-only items (auto-detect from Firestore user role) ----
-      StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-        stream: _userDocStream(),
-        builder: (context, snap) {
-          final role = (snap.data?.data()?['role'] ?? '').toString();
-          final isAdmin = role == 'admin';
-          if (!isAdmin) return const SizedBox.shrink();
+      // ---- Owner-only items (User Approvals + Styleguide). Sichtbar
+      // ausschließlich für den CoDriver-Owner-Account — andere Admins
+      // und Dispatcher bekommen sie nicht zu sehen, selbst wenn sie
+      // in einen AdminScope eingebettet sind.
+      Builder(
+        builder: (context) {
+          final email = FirebaseAuth.instance.currentUser?.email
+                  ?.toLowerCase() ??
+              '';
+          const ownerEmails = <String>{
+            'admin@arion-logistics.de',
+            'test@arion-logistics.de',
+          };
+          if (!ownerEmails.contains(email)) {
+            return const SizedBox.shrink();
+          }
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -211,9 +273,19 @@ class AppSideMenu extends StatelessWidget {
                   '/admin-approvals',
                 ),
               ),
-              // Sub-accounts now live as Tab 2 of the Dispatcher
-              // Center; this standalone entry is intentionally hidden
-              // so the side menu doesn't repeat itself.
+              _MenuItem(
+                icon: Icons.palette_outlined,
+                label: 'Styleguide',
+                active: active == AppNav.styleguide,
+                onTap: () =>
+                    _handleNav(context, AppNav.styleguide, '/styleguide'),
+              ),
+              _MenuItem(
+                icon: Icons.timer_outlined,
+                label: 'co:timer',
+                active: active == AppNav.cotimer,
+                onTap: () => _handleNav(context, AppNav.cotimer, '/cotimer'),
+              ),
             ],
           );
         },
@@ -388,12 +460,17 @@ class _MenuItem extends StatelessWidget {
   /// Hub item to show how many expiry notifications are open).
   final int? badgeCount;
 
+  /// Optional green "BETA" tag rendered to the right of the label —
+  /// used to mark menu entries whose feature is still in beta.
+  final bool betaBadge;
+
   const _MenuItem({
     required this.icon,
     required this.label,
     required this.active,
     required this.onTap,
     this.badgeCount,
+    this.betaBadge = false,
   });
 
   @override
@@ -426,6 +503,30 @@ class _MenuItem extends StatelessWidget {
                 ),
               ),
             ),
+            if (betaBadge)
+              Container(
+                margin: const EdgeInsets.only(left: 6, right: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00B287).withOpacity(0.18),
+                  border: Border.all(
+                    color: const Color(0xFF00B287).withOpacity(0.55),
+                  ),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  'BETA',
+                  style: TextStyle(
+                    color: Color(0xFF7DDDBE),
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ),
             if (badgeCount != null && badgeCount! > 0)
               Container(
                 padding: const EdgeInsets.symmetric(

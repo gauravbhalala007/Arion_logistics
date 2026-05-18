@@ -1,9 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../widgets/admin_scope.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_storage/firebase_storage.dart' as fb;
+import '../theme/app_colors.dart';
+import '../widgets/co_button.dart';
+import '../widgets/co_pressable.dart';
 
 const String _academyTestsCollection = 'academy_tests';
 const Color _kAcademyGreen = Color(0xFF1D7F5A);
@@ -68,7 +72,11 @@ class AdminAcademyPage extends StatefulWidget {
 }
 
 class _AdminAcademyPageState extends State<AdminAcademyPage> {
-  String? get _uid => FirebaseAuth.instance.currentUser?.uid;
+  String? get _uid {
+    final scoped = AdminScope.maybeOf(context)?.adminUid;
+    if (scoped != null && scoped.isNotEmpty) return scoped;
+    return FirebaseAuth.instance.currentUser?.uid;
+  }
   String? _resolvedDspUid;
 
   String _selectedTestId = '';
@@ -202,14 +210,10 @@ class _AdminAcademyPageState extends State<AdminAcademyPage> {
                       ),
                     ),
                   ),
-                  ElevatedButton.icon(
+                  CoButton(
                     onPressed: _openCategoryEditor,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add Category'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _kAcademyGreen,
-                      foregroundColor: Colors.white,
-                    ),
+                    icon: Icons.add,
+                    label: 'Add Category',
                   ),
                 ],
               ),
@@ -249,8 +253,10 @@ class _AdminAcademyPageState extends State<AdminAcademyPage> {
                   borderRadius: BorderRadius.circular(18),
                   border: Border.all(color: _kAcademyCardBorder),
                 ),
-                child: options.isEmpty
+                child: CoStateSwitcher(
+                  child: options.isEmpty
                     ? Container(
+                        key: const ValueKey('cats-empty'),
                         width: double.infinity,
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
@@ -267,6 +273,7 @@ class _AdminAcademyPageState extends State<AdminAcademyPage> {
                         ),
                       )
                     : ConstrainedBox(
+                        key: const ValueKey('cats-list'),
                         constraints: const BoxConstraints(maxHeight: 320),
                         child: ListView.separated(
                           shrinkWrap: true,
@@ -310,20 +317,32 @@ class _AdminAcademyPageState extends State<AdminAcademyPage> {
                           },
                         ),
                       ),
+                ),
               ),
               const SizedBox(height: 14),
               Expanded(
-                child: effectiveSelected.isEmpty
-                    ? _buildNoCategoryState()
-                    : _activeTab == _AcademyTab.builder
-                    ? _buildTestBuilder(
-                        testId: effectiveSelected,
-                        testOptions: options,
-                      )
-                    : _buildResults(
-                        testId: effectiveSelected,
-                        testOptions: options,
-                      ),
+                child: CoStateSwitcher(
+                  child: effectiveSelected.isEmpty
+                      ? KeyedSubtree(
+                          key: const ValueKey('no-cat'),
+                          child: _buildNoCategoryState(),
+                        )
+                      : _activeTab == _AcademyTab.builder
+                          ? KeyedSubtree(
+                              key: ValueKey('builder-$effectiveSelected'),
+                              child: _buildTestBuilder(
+                                testId: effectiveSelected,
+                                testOptions: options,
+                              ),
+                            )
+                          : KeyedSubtree(
+                              key: ValueKey('results-$effectiveSelected'),
+                              child: _buildResults(
+                                testId: effectiveSelected,
+                                testOptions: options,
+                              ),
+                            ),
+                ),
               ),
             ],
           ),
@@ -455,7 +474,10 @@ class _AdminAcademyPageState extends State<AdminAcademyPage> {
 
               return Padding(
                 padding: EdgeInsets.only(left: indented ? 16 : 0, top: 8),
-                child: InkWell(
+                child: CoPressable(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: () => setState(() => _previewStepId = step.id),
+                  child: InkWell(
                   borderRadius: BorderRadius.circular(14),
                   onTap: () => setState(() => _previewStepId = step.id),
                   child: Container(
@@ -560,6 +582,7 @@ class _AdminAcademyPageState extends State<AdminAcademyPage> {
                     ),
                   ),
                 ),
+                ),
               );
             }
 
@@ -574,23 +597,26 @@ class _AdminAcademyPageState extends State<AdminAcademyPage> {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      FilledButton.tonalIcon(
+                      CoButton(
                         onPressed: () => _syncTestToDrivers(testId: testId),
-                        icon: const Icon(Icons.sync_outlined),
-                        label: const Text('Sync to drivers'),
+                        icon: Icons.sync_outlined,
+                        label: 'Sync to drivers',
+                        variant: CoButtonVariant.secondaryTinted,
                       ),
-                      OutlinedButton.icon(
+                      CoButton(
                         onPressed: () => _openCategoryEditor(
                           categoryId: testId,
                           initialData: testData,
                         ),
-                        icon: const Icon(Icons.edit_outlined),
-                        label: const Text('Edit category'),
+                        icon: Icons.edit_outlined,
+                        label: 'Edit category',
+                        variant: CoButtonVariant.secondaryOutlined,
                       ),
-                      OutlinedButton.icon(
+                      CoButton(
                         onPressed: () => _deleteCategory(testId: testId),
-                        icon: const Icon(Icons.delete_outline),
-                        label: const Text('Delete category'),
+                        icon: Icons.delete_outline,
+                        label: 'Delete category',
+                        variant: CoButtonVariant.destructiveOutlined,
                       ),
                     ],
                   ),
@@ -657,47 +683,35 @@ class _AdminAcademyPageState extends State<AdminAcademyPage> {
                         spacing: 8,
                         runSpacing: 8,
                         children: [
-                          ElevatedButton.icon(
+                          CoButton(
                             onPressed: canAddSubcategoryAtRoot
                                 ? () => _openQuestionEditor(
                                     testId: testId,
                                     initialStepType: 'subcategory',
                                   )
                                 : null,
-                            icon: const Icon(Icons.folder_copy_outlined),
-                            label: const Text('Add subcategory'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF6D28D9),
-                              foregroundColor: Colors.white,
-                            ),
+                            icon: Icons.folder_copy_outlined,
+                            label: 'Add subcategory',
                           ),
-                          ElevatedButton.icon(
+                          CoButton(
                             onPressed: canAddRootPlayable
                                 ? () => _openQuestionEditor(
                                     testId: testId,
                                     initialStepType: 'content',
                                   )
                                 : null,
-                            icon: const Icon(Icons.article_outlined),
-                            label: const Text('Add content'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF047857),
-                              foregroundColor: Colors.white,
-                            ),
+                            icon: Icons.article_outlined,
+                            label: 'Add content',
                           ),
-                          ElevatedButton.icon(
+                          CoButton(
                             onPressed: canAddRootPlayable
                                 ? () => _openQuestionEditor(
                                     testId: testId,
                                     initialStepType: 'question',
                                   )
                                 : null,
-                            icon: const Icon(Icons.quiz_outlined),
-                            label: const Text('Add question'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF0369A1),
-                              foregroundColor: Colors.white,
-                            ),
+                            icon: Icons.quiz_outlined,
+                            label: 'Add question',
                           ),
                         ],
                       ),
@@ -853,7 +867,7 @@ class _AdminAcademyPageState extends State<AdminAcademyPage> {
                                                 spacing: 8,
                                                 runSpacing: 8,
                                                 children: [
-                                                  OutlinedButton.icon(
+                                                  CoButton(
                                                     onPressed: () =>
                                                         _openQuestionEditor(
                                                           testId: testId,
@@ -863,15 +877,14 @@ class _AdminAcademyPageState extends State<AdminAcademyPage> {
                                                               .subcategory!
                                                               .id,
                                                         ),
-                                                    icon: const Icon(
-                                                      Icons.article_outlined,
-                                                      size: 18,
-                                                    ),
-                                                    label: const Text(
-                                                      'Add content in this subcategory',
-                                                    ),
+                                                    icon: Icons
+                                                        .article_outlined,
+                                                    label:
+                                                        'Add content in this subcategory',
+                                                    variant: CoButtonVariant
+                                                        .secondaryOutlined,
                                                   ),
-                                                  OutlinedButton.icon(
+                                                  CoButton(
                                                     onPressed: () =>
                                                         _openQuestionEditor(
                                                           testId: testId,
@@ -881,13 +894,11 @@ class _AdminAcademyPageState extends State<AdminAcademyPage> {
                                                               .subcategory!
                                                               .id,
                                                         ),
-                                                    icon: const Icon(
-                                                      Icons.quiz_outlined,
-                                                      size: 18,
-                                                    ),
-                                                    label: const Text(
-                                                      'Add question in this subcategory',
-                                                    ),
+                                                    icon: Icons.quiz_outlined,
+                                                    label:
+                                                        'Add question in this subcategory',
+                                                    variant: CoButtonVariant
+                                                        .secondaryOutlined,
                                                   ),
                                                 ],
                                               ),
@@ -979,31 +990,32 @@ class _AdminAcademyPageState extends State<AdminAcademyPage> {
                                 spacing: 8,
                                 runSpacing: 8,
                                 children: [
-                                  OutlinedButton.icon(
+                                  CoButton(
                                     onPressed: () => _openQuestionEditor(
                                       testId: testId,
                                       initialStepType: 'subcategory',
                                     ),
-                                    icon: const Icon(
-                                      Icons.folder_copy_outlined,
-                                    ),
-                                    label: const Text('Add subcategory'),
+                                    icon: Icons.folder_copy_outlined,
+                                    label: 'Add subcategory',
+                                    variant: CoButtonVariant.secondaryOutlined,
                                   ),
-                                  OutlinedButton.icon(
+                                  CoButton(
                                     onPressed: () => _openQuestionEditor(
                                       testId: testId,
                                       initialStepType: 'content',
                                     ),
-                                    icon: const Icon(Icons.article_outlined),
-                                    label: const Text('Add content'),
+                                    icon: Icons.article_outlined,
+                                    label: 'Add content',
+                                    variant: CoButtonVariant.secondaryOutlined,
                                   ),
-                                  OutlinedButton.icon(
+                                  CoButton(
                                     onPressed: () => _openQuestionEditor(
                                       testId: testId,
                                       initialStepType: 'question',
                                     ),
-                                    icon: const Icon(Icons.quiz_outlined),
-                                    label: const Text('Add question'),
+                                    icon: Icons.quiz_outlined,
+                                    label: 'Add question',
+                                    variant: CoButtonVariant.secondaryOutlined,
                                   ),
                                 ],
                               ),
@@ -1227,11 +1239,12 @@ class _AdminAcademyPageState extends State<AdminAcademyPage> {
             ),
           ),
           actions: [
-            TextButton(
+            CoButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancel'),
+              label: 'Cancel',
+              variant: CoButtonVariant.quiet,
             ),
-            ElevatedButton(
+            CoButton(
               onPressed: () async {
                 var id = idCtrl.text.trim();
                 if (id.isEmpty) {
@@ -1285,7 +1298,7 @@ class _AdminAcademyPageState extends State<AdminAcademyPage> {
                   _showSnack('Failed to save category: $e', error: true);
                 }
               },
-              child: const Text('Save'),
+              label: 'Save',
             ),
           ],
         ),
@@ -1315,13 +1328,15 @@ class _AdminAcademyPageState extends State<AdminAcademyPage> {
           'This will remove category "$testId" and all of its steps.',
         ),
         actions: [
-          TextButton(
+          CoButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            label: 'Cancel',
+            variant: CoButtonVariant.quiet,
           ),
-          TextButton(
+          CoButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Delete'),
+            label: 'Delete',
+            variant: CoButtonVariant.destructiveQuiet,
           ),
         ],
       ),
@@ -1442,7 +1457,14 @@ class _AdminAcademyPageState extends State<AdminAcademyPage> {
                   child: resultSnap.connectionState == ConnectionState.waiting
                       ? const Padding(
                           padding: EdgeInsets.symmetric(vertical: 12),
-                          child: Center(child: CircularProgressIndicator()),
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              strokeWidth: 3,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                AppColors.codriverGreen,
+                              ),
+                            ),
+                          ),
                         )
                       : results.isEmpty
                       ? const Text(
@@ -1960,7 +1982,7 @@ class _AdminAcademyPageState extends State<AdminAcademyPage> {
                           spacing: 8,
                           runSpacing: 8,
                           children: [
-                            ElevatedButton.icon(
+                            CoButton(
                               onPressed: isUploadingMedia
                                   ? null
                                   : () async {
@@ -1982,31 +2004,23 @@ class _AdminAcademyPageState extends State<AdminAcademyPage> {
                                         isUploadingMedia = false;
                                       });
                                     },
-                              icon: isUploadingMedia
-                                  ? const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : const Icon(Icons.upload_outlined),
-                              label: Text(
-                                mediaType == 'video'
-                                    ? 'Upload video'
-                                    : 'Upload image',
-                              ),
+                              icon: Icons.upload_outlined,
+                              label: mediaType == 'video'
+                                  ? 'Upload video'
+                                  : 'Upload image',
+                              busy: isUploadingMedia,
                             ),
                             if (mediaUrlCtrl.text.trim().isNotEmpty)
-                              OutlinedButton.icon(
+                              CoButton(
                                 onPressed: isUploadingMedia
                                     ? null
                                     : () => setInnerState(
                                         () => mediaUrlCtrl.clear(),
                                       ),
-                                icon: const Icon(Icons.delete_outline),
-                                label: const Text('Remove media'),
+                                icon: Icons.delete_outline,
+                                label: 'Remove media',
+                                variant:
+                                    CoButtonVariant.destructiveOutlined,
                               ),
                           ],
                         ),
@@ -2035,7 +2049,10 @@ class _AdminAcademyPageState extends State<AdminAcademyPage> {
                               ),
                               child: const Center(
                                 child: CircularProgressIndicator(
-                                  strokeWidth: 2.2,
+                                  strokeWidth: 3,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    AppColors.codriverGreen,
+                                  ),
                                 ),
                               ),
                             );
@@ -2129,7 +2146,7 @@ class _AdminAcademyPageState extends State<AdminAcademyPage> {
                   const SizedBox(height: 8),
                   Align(
                     alignment: Alignment.centerRight,
-                    child: OutlinedButton.icon(
+                    child: CoButton(
                       onPressed: isAutoTranslating
                           ? null
                           : () async {
@@ -2143,18 +2160,12 @@ class _AdminAcademyPageState extends State<AdminAcademyPage> {
                               if (!mounted || !ctx.mounted) return;
                               setInnerState(() => isAutoTranslating = false);
                             },
-                      icon: isAutoTranslating
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.translate_outlined),
-                      label: Text(
-                        isAutoTranslating
-                            ? 'Translating...'
-                            : 'Auto translate missing',
-                      ),
+                      icon: Icons.translate_outlined,
+                      label: isAutoTranslating
+                          ? 'Translating...'
+                          : 'Auto translate missing',
+                      variant: CoButtonVariant.secondaryOutlined,
+                      busy: isAutoTranslating,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -2232,11 +2243,12 @@ class _AdminAcademyPageState extends State<AdminAcademyPage> {
             ),
           ),
           actions: [
-            TextButton(
+            CoButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancel'),
+              label: 'Cancel',
+              variant: CoButtonVariant.quiet,
             ),
-            ElevatedButton(
+            CoButton(
               onPressed: () async {
                 if (stepType == 'question') {
                   await _autoTranslateMissingQuestionFields(
@@ -2396,7 +2408,7 @@ class _AdminAcademyPageState extends State<AdminAcademyPage> {
                   _showSnack('Failed to save question: $e', error: true);
                 }
               },
-              child: const Text('Save'),
+              label: 'Save',
             ),
           ],
         ),
@@ -2436,13 +2448,15 @@ class _AdminAcademyPageState extends State<AdminAcademyPage> {
           ),
         ),
         actions: [
-          TextButton(
+          CoButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            label: 'Cancel',
+            variant: CoButtonVariant.quiet,
           ),
-          TextButton(
+          CoButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Delete'),
+            label: 'Delete',
+            variant: CoButtonVariant.destructiveQuiet,
           ),
         ],
       ),
@@ -3218,7 +3232,10 @@ class _AdminCategoryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
+    return CoPressable(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
@@ -3317,6 +3334,7 @@ class _AdminCategoryTile extends StatelessWidget {
           ),
         ),
       ),
+      ),
     );
   }
 }
@@ -3367,19 +3385,22 @@ class _AdminDriverPreviewCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final currentStep = step;
     if (currentStep == null) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: _kAcademyCardBorder),
-        ),
-        child: const Text(
-          'Select a step to preview it in driver layout.',
-          style: TextStyle(
-            color: _kAcademySubText,
-            fontWeight: FontWeight.w600,
+      return CoStateSwitcher(
+        child: Container(
+          key: const ValueKey('preview-empty'),
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: _kAcademyCardBorder),
+          ),
+          child: const Text(
+            'Select a step to preview it in driver layout.',
+            style: TextStyle(
+              color: _kAcademySubText,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       );
@@ -3392,7 +3413,9 @@ class _AdminDriverPreviewCard extends StatelessWidget {
         ? 'Question'
         : 'Content';
 
-    return Container(
+    return CoStateSwitcher(
+      child: Container(
+      key: ValueKey('preview-${currentStep.id}'),
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -3484,7 +3507,11 @@ class _AdminDriverPreviewCard extends StatelessWidget {
                                         ),
                                         child: const Center(
                                           child: CircularProgressIndicator(
-                                            strokeWidth: 2.2,
+                                            strokeWidth: 3,
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                  AppColors.codriverGreen,
+                                                ),
                                           ),
                                         ),
                                       );
@@ -3677,19 +3704,22 @@ class _AdminDriverPreviewCard extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
-              OutlinedButton.icon(
+              CoButton(
                 onPressed: onEdit,
-                icon: const Icon(Icons.edit_outlined),
-                label: const Text('Edit selected'),
+                icon: Icons.edit_outlined,
+                label: 'Edit selected',
+                variant: CoButtonVariant.secondaryOutlined,
               ),
-              OutlinedButton.icon(
+              CoButton(
                 onPressed: onDelete,
-                icon: const Icon(Icons.delete_outline),
-                label: const Text('Delete selected'),
+                icon: Icons.delete_outline,
+                label: 'Delete selected',
+                variant: CoButtonVariant.destructiveOutlined,
               ),
             ],
           ),
         ],
+      ),
       ),
     );
   }

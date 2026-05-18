@@ -23,6 +23,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_elevation.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
+import '../widgets/pill_tab_bar.dart';
 
 class DriverWaveplanView extends StatefulWidget {
   /// UID of the DSP/admin that owns this driver — used to read the
@@ -59,11 +60,11 @@ class _DriverWaveplanViewState extends State<DriverWaveplanView>
     super.dispose();
   }
 
-  /// Today's published-waveplan docs across all programs. Each
-  /// `(date, program)` pair lives under
-  /// `users/{dspUid}/published_waveplans/{YYYY-MM-DD_program}` so we
-  /// query the whole collection and filter in-memory.
-  Stream<List<DocumentSnapshot<Map<String, dynamic>>>> _todayDocsStream() {
+  /// Today's published-waveplan docs across all programs. Drivers are
+  /// always pinned to the current day — vergangene Waveplans bleiben
+  /// in Firestore (für Admin sichtbar via Date-Strip), werden dem
+  /// Driver aber nicht angezeigt.
+  Stream<List<DocumentSnapshot<Map<String, dynamic>>>> _docsStream() {
     return FirebaseFirestore.instance
         .collection('users')
         .doc(widget.dspUid)
@@ -90,7 +91,7 @@ class _DriverWaveplanViewState extends State<DriverWaveplanView>
           padding: const EdgeInsets.all(AppSpacing.lg),
           child: StreamBuilder<
               List<DocumentSnapshot<Map<String, dynamic>>>>(
-            stream: _todayDocsStream(),
+            stream: _docsStream(),
             builder: (context, snap) {
               if (snap.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
@@ -105,12 +106,17 @@ class _DriverWaveplanViewState extends State<DriverWaveplanView>
                 final dd = d.data();
                 if (dd == null) continue;
                 final routes = _routesFrom(dd);
-                final hit = routes.any((r) =>
-                    (r['transporterId'] ?? '')
-                        .toString()
-                        .trim()
-                        .toUpperCase() ==
-                    me);
+                final hit = routes.any((r) {
+                  final tid = (r['transporterId'] ?? '')
+                      .toString()
+                      .trim()
+                      .toUpperCase();
+                  final mentee = (r['menteeTransporterId'] ?? '')
+                      .toString()
+                      .trim()
+                      .toUpperCase();
+                  return tid == me || mentee == me;
+                });
                 if (hit) {
                   data = dd;
                   break;
@@ -184,7 +190,9 @@ class _DriverWaveplanViewState extends State<DriverWaveplanView>
     final me = widget.driverTransporterId.trim().toUpperCase();
     for (final r in routes) {
       final tid = (r['transporterId'] ?? '').toString().trim().toUpperCase();
-      if (tid.isNotEmpty && tid == me) return r;
+      final mentee =
+          (r['menteeTransporterId'] ?? '').toString().trim().toUpperCase();
+      if (tid.isNotEmpty && (tid == me || mentee == me)) return r;
     }
     return null;
   }
@@ -396,47 +404,13 @@ class _SegmentedTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 46,
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceElevatedLight,
-        borderRadius: BorderRadius.circular(999),
-        boxShadow: AppElevation.level1,
-        border: Border.all(
-          color: AppColors.separatorLight.withOpacity(0.4),
-          width: 0.5,
-        ),
-      ),
-      child: TabBar(
-        controller: controller,
-        indicator: BoxDecoration(
-          color: AppColors.codriverGreen,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        indicatorSize: TabBarIndicatorSize.tab,
-        labelPadding: EdgeInsets.zero,
-        labelColor: Colors.white,
-        unselectedLabelColor: AppColors.labelSecondaryLight,
-        labelStyle: AppTypography.subheadline.copyWith(
-          fontWeight: FontWeight.w700,
-        ),
-        unselectedLabelStyle: AppTypography.subheadline.copyWith(
-          fontWeight: FontWeight.w500,
-        ),
-        dividerColor: Colors.transparent,
-        splashFactory: NoSplash.splashFactory,
-        overlayColor: WidgetStateProperty.all(Colors.transparent),
-        tabs: [
-          Tab(
-            text: AppLocalizations.of(context).t('driver_waveplan_tab_my_wave'),
-          ),
-          Tab(
-            text:
-                AppLocalizations.of(context).t('driver_waveplan_tab_all_drivers'),
-          ),
-        ],
-      ),
+    final t = AppLocalizations.of(context);
+    return PillTabBar(
+      controller: controller,
+      tabs: [
+        t.t('driver_waveplan_tab_my_wave'),
+        t.t('driver_waveplan_tab_all_drivers'),
+      ],
     );
   }
 }
@@ -880,7 +854,9 @@ class _AllDriversTab extends StatelessWidget {
       itemBuilder: (_, i) {
         final r = waveRoutes[i];
         final tid = (r['transporterId'] ?? '').toString().trim().toUpperCase();
-        final isMe = tid == me;
+        final mentee =
+            (r['menteeTransporterId'] ?? '').toString().trim().toUpperCase();
+        final isMe = tid == me || mentee == me;
         final spur = (r['spur'] ?? '').toString().toLowerCase();
         final isLeft = spur == 'links';
         final spurColor = isLeft

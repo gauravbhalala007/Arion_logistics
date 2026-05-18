@@ -19,6 +19,7 @@ import '../theme/app_elevation.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import '../widgets/admin_scope.dart';
+import '../widgets/pill_tab_bar.dart';
 import 'admin_dispatcher_pill_page.dart';
 import 'admin_dispatchers_page.dart';
 
@@ -37,18 +38,17 @@ class AdminDispatcherCenterPage extends StatelessWidget {
       length: 3,
       child: Column(
         children: [
-          Material(
-            color: const Color(0xFFF3F6F7),
-            child: TabBar(
-              indicatorColor: AppColors.codriverGreen,
-              labelColor: AppColors.codriverGraphite,
-              unselectedLabelColor: AppColors.labelSecondaryLight,
-              labelStyle: const TextStyle(fontWeight: FontWeight.w700),
-              tabs: const [
-                Tab(text: 'Dispatcher (Kontakt)'),
-                Tab(text: 'Sub-Accounts'),
-                Tab(text: 'Aufgaben'),
-              ],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            child: Builder(
+              builder: (ctx) => PillTabBar(
+                controller: DefaultTabController.of(ctx),
+                tabs: const [
+                  'Dispatcher (Kontakt)',
+                  'Sub-Accounts',
+                  'Aufgaben',
+                ],
+              ),
             ),
           ),
           Expanded(

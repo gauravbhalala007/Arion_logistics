@@ -19,6 +19,9 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../widgets/admin_scope.dart';
+import '../widgets/co_button.dart';
+import '../widgets/co_pressable.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -365,8 +368,9 @@ class _AddEventButton extends StatelessWidget {
     final h = isMobile ? 32.0 : 38.0;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      child: GestureDetector(
+      child: CoPressable(
         onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
         child: Container(
           height: h,
           padding: EdgeInsets.symmetric(
@@ -417,7 +421,7 @@ class _RoundIconButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      child: GestureDetector(
+      child: CoPressable(
         onTap: onTap,
         child: Container(
           width: size,
@@ -446,8 +450,9 @@ class _PillButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      child: GestureDetector(
+      child: CoPressable(
         onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
         child: Container(
           height: 38,
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
@@ -659,8 +664,9 @@ class _DayCell extends StatelessWidget {
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      child: GestureDetector(
+      child: CoPressable(
         onTap: onTap,
+        borderRadius: BorderRadius.circular(isMobile ? 8 : 10),
         child: Container(
           margin: EdgeInsets.all(isMobile ? 1.5 : 3),
           padding: isMobile
@@ -858,8 +864,7 @@ class _EventBar extends StatelessWidget {
     if (onTap == null) return bar;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
+      child: CoPressable(
         onTap: onTap,
         child: bar,
       ),
@@ -953,45 +958,47 @@ class _DayEventsPanel extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
-          if (filtered.isEmpty)
-            Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.event_busy_rounded,
-                      size: 28,
-                      color: AppColors.labelTertiaryLight.withOpacity(0.6),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Keine Termine an diesem Tag.',
-                      style: AppTypography.footnote.copyWith(
-                        color: AppColors.labelTertiaryLight,
+          Expanded(
+            child: CoStateSwitcher(
+              child: filtered.isEmpty
+                  ? Center(
+                      key: const ValueKey('day-events-empty'),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.event_busy_rounded,
+                            size: 28,
+                            color: AppColors.labelTertiaryLight.withOpacity(0.6),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Keine Termine an diesem Tag.',
+                            style: AppTypography.footnote.copyWith(
+                              color: AppColors.labelTertiaryLight,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          CoButton(
+                            onPressed: onAddForSelected,
+                            label: 'Termin hinzufügen',
+                            icon: Icons.add_rounded,
+                            variant: CoButtonVariant.quiet,
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.separated(
+                      key: const ValueKey('day-events-list'),
+                      itemCount: filtered.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 6),
+                      itemBuilder: (_, i) => _EventTile(
+                        event: filtered[i],
+                        onTap: () => onEventTap(filtered[i]),
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.sm),
-                    TextButton.icon(
-                      onPressed: onAddForSelected,
-                      icon: const Icon(Icons.add_rounded, size: 16),
-                      label: const Text('Termin hinzufügen'),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          else
-            Expanded(
-              child: ListView.separated(
-                itemCount: filtered.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 6),
-                itemBuilder: (_, i) => _EventTile(
-                  event: filtered[i],
-                  onTap: () => onEventTap(filtered[i]),
-                ),
-              ),
             ),
+          ),
         ],
       ),
     );
@@ -1149,9 +1156,9 @@ class _EventTile extends StatelessWidget {
     if (onTap == null) return card;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
+      child: CoPressable(
         onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
         child: card,
       ),
     );
@@ -1614,23 +1621,24 @@ Future<void> showCalendarEventDetail(
       ),
       actions: [
         if (event.id.startsWith('cal:')) ...[
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+          CoButton(
             onPressed: () async {
               Navigator.of(ctx).pop();
               await deleteCalendarEvent(context, event);
             },
-            child: const Text('Löschen'),
+            label: 'Löschen',
+            variant: CoButtonVariant.destructiveQuiet,
           ),
-          TextButton(
+          CoButton(
             onPressed: () async {
               Navigator.of(ctx).pop();
               await editCalendarEvent(context, event);
             },
-            child: const Text('Bearbeiten'),
+            label: 'Bearbeiten',
+            variant: CoButtonVariant.quiet,
           ),
         ] else if (event.id.startsWith('fleet:'))
-          TextButton(
+          CoButton(
             onPressed: () {
               Navigator.of(ctx).pop();
               ScaffoldMessenger.of(context).showSnackBar(
@@ -1640,11 +1648,13 @@ Future<void> showCalendarEventDetail(
                 ),
               );
             },
-            child: const Text('Fleet-Hub'),
+            label: 'Fleet-Hub',
+            variant: CoButtonVariant.quiet,
           ),
-        TextButton(
+        CoButton(
           onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('Schließen'),
+          label: 'Schließen',
+          variant: CoButtonVariant.quiet,
         ),
       ],
     ),
@@ -2127,13 +2137,14 @@ class _AddEventDialogState extends State<_AddEventDialog> {
         ),
       ),
       actions: [
-        TextButton(
+        CoButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Abbrechen'),
+          label: 'Abbrechen',
+          variant: CoButtonVariant.quiet,
         ),
-        FilledButton(
+        CoButton(
           onPressed: _valid ? _submit : null,
-          child: const Text('Speichern'),
+          label: 'Speichern',
         ),
       ],
     );
@@ -2289,7 +2300,9 @@ class _CodriverDatePickerDialogState extends State<_CodriverDatePickerDialog> {
                         cursor: widget.allowWeekSelection
                             ? SystemMouseCursors.click
                             : SystemMouseCursors.basic,
-                        child: GestureDetector(
+                        child: CoPressable(
+                          enabled: widget.allowWeekSelection,
+                          borderRadius: BorderRadius.circular(8),
                           onTap: widget.allowWeekSelection
                               ? () {
                                   Navigator.of(context).pop(
@@ -2346,9 +2359,10 @@ class _CodriverDatePickerDialogState extends State<_CodriverDatePickerDialog> {
             const SizedBox(height: AppSpacing.sm),
             Align(
               alignment: Alignment.centerRight,
-              child: TextButton(
+              child: CoButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Abbrechen'),
+                label: 'Abbrechen',
+                variant: CoButtonVariant.quiet,
               ),
             ),
           ],
@@ -2387,7 +2401,7 @@ class _PickerDayCell extends StatelessWidget {
     final fgToday = isSelected ? Colors.white : AppColors.codriverDeep;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      child: GestureDetector(
+      child: CoPressable(
         onTap: onTap,
         child: Container(
           margin: const EdgeInsets.all(3),
@@ -2427,7 +2441,7 @@ class _MiniIconButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      child: GestureDetector(
+      child: CoPressable(
         onTap: onTap,
         child: Container(
           width: 32,
@@ -2468,8 +2482,9 @@ class _DateRow extends StatelessWidget {
           ),
         ),
         Expanded(
-          child: GestureDetector(
+          child: CoPressable(
             onTap: onPick,
+            borderRadius: BorderRadius.circular(10),
             child: Container(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.sm,

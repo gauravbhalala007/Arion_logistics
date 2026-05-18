@@ -16,9 +16,13 @@ import 'scorecard_week.dart';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import '../localization/app_localizations.dart';
-import '../theme/app_button_style.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_elevation.dart';
+import '../theme/app_typography.dart';
+import '../widgets/admin_scope.dart';
+import '../widgets/co_button.dart';
+import '../widgets/co_pressable.dart';
+import '../widgets/pill_tab_bar.dart';
 
 /// Simple German-style number formatting
 final _pct2 = NumberFormat.decimalPattern('de')
@@ -166,25 +170,63 @@ class ScorecardWeekShellPage extends StatelessWidget {
   }
 }
 
-class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
+class _ScorecardOverviewPageState extends State<ScorecardOverviewPage>
+    with TickerProviderStateMixin {
   bool _busyUpload = false; // PDFs (bottom-left)
   bool _busyCsv = false; // CSVs (top-right)
 
-  _PeriodFilter _periodFilter = _PeriodFilter.month;
+  // Default-Filter ist die Jahresansicht — zeigt sofort die Top-Driver
+  // über das ganze Jahr ohne dass der Admin erst auf „Year" klicken muss.
+  _PeriodFilter _periodFilter = _PeriodFilter.year;
   String? _selectedMonthKey;
   int? _selectedYear;
   String? _selectedStationCode;
 
-  late final Stream<Map<String, String>> _globalNamesStreamCached;
+  /// Top segmented control: 0 = Company Score view, 1 = Best Driver view.
+  /// Replaces the previous Best-Drivers popup dialog — Best-Drivers is now
+  /// just the second tab on this page.
+  int _topTab = 0;
+  late final TabController _topTabController = TabController(
+    length: 2,
+    vsync: this,
+  )..addListener(() {
+      if (_topTabController.indexIsChanging) return;
+      if (_topTabController.index == _topTab) return;
+      setState(() => _topTab = _topTabController.index);
+    });
+
+  /// Schwebender Upload-Plus-Button — true wenn die zwei Upload-Optionen
+  /// (Scorecard-PDF + Drivers-CSV) ausgeklappt sind.
+  bool _fabOpen = false;
+
+  /// Wirksamer Admin-Namespace für alle Reads/Writes — `AdminScope` gibt
+  /// den Parent-Admin zurück, wenn ein Dispatcher eingeloggt ist, sonst
+  /// die UID des aktuellen Users.
+  String? _currentAdminUid;
+
+  /// Cache-Stream für Driver-Names — wird neu aufgebaut, wenn sich der
+  /// Admin-Scope ändert (z.B. Erst-Initialisierung im Dispatcher-Shell).
+  late Stream<Map<String, String>> _globalNamesStreamCached =
+      const Stream<Map<String, String>>.empty();
 
   @override
-  void initState() {
-    super.initState();
-    _globalNamesStreamCached = _driversNameMapGlobal();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final next = AdminScope.adminUidOf(context);
+    if (next != _currentAdminUid) {
+      _currentAdminUid = next;
+      _globalNamesStreamCached = _driversNameMapGlobal();
+    }
+  }
+
+  @override
+  void dispose() {
+    _topTabController.dispose();
+    super.dispose();
   }
 
   Stream<List<_ReportVM>> _reportsStream() {
-    final uid = FirebaseAuth.instance.currentUser!.uid;
+    final uid = _currentAdminUid ?? FirebaseAuth.instance.currentUser?.uid ?? '';
     return FirebaseFirestore.instance
         .collection('users')
         .doc(uid)
@@ -225,7 +267,7 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
       return Stream.value(<QueryDocumentSnapshot<Map<String, dynamic>>>[]);
     }
 
-    final uid = FirebaseAuth.instance.currentUser!.uid;
+    final uid = _currentAdminUid ?? FirebaseAuth.instance.currentUser?.uid ?? '';
     return FirebaseFirestore.instance
         .collection('users')
         .doc(uid)
@@ -250,7 +292,7 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
   }
 
   Stream<Map<String, String>> _driversNameMapGlobal() {
-    final uid = FirebaseAuth.instance.currentUser!.uid;
+    final uid = _currentAdminUid ?? FirebaseAuth.instance.currentUser?.uid ?? '';
     return FirebaseFirestore.instance
         .collection('users')
         .doc(uid)
@@ -420,31 +462,41 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
             onChanged: () => setDialogState(() {}),
           ),
         ),
-        SizedBox(height: _pad(10, w)),
+        const SizedBox(height: 16),
         if (subtitle != null && subtitle.isNotEmpty)
           Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text(
-              isMonthView
-                  ? t.t('scorecard_overview_best_drivers_month')
-                  : t.t('scorecard_overview_best_drivers_year'),
-              style: TextStyle(
-                fontSize: _sp(12, w),
-                fontWeight: FontWeight.w700,
-                color: _UI.textSecondary,
-              ),
-            ),
-          ),
-        if (subtitle != null && subtitle.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Text(
-              subtitle,
-              style: TextStyle(
-                fontSize: _sp(13, w),
-                fontWeight: FontWeight.w800,
-                color: _UI.textPrimary,
-              ),
+            padding: const EdgeInsets.only(bottom: 12, left: 4),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.codriverGreen.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    (isMonthView
+                            ? t.t('scorecard_overview_best_drivers_month')
+                            : t.t('scorecard_overview_best_drivers_year'))
+                        .toUpperCase(),
+                    style: AppTypography.caption2.copyWith(
+                      color: AppColors.codriverDeep,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.0,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  subtitle,
+                  style: AppTypography.subheadline.copyWith(
+                    color: AppColors.codriverDeep,
+                    fontWeight: FontWeight.w800,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
             ),
           ),
         StreamBuilder<Map<String, String>>(
@@ -458,19 +510,58 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
               stream: scoreStream,
               builder: (context, scoreSnap) {
                 if (scoreSnap.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      child: CircularProgressIndicator(),
+                  return const CoStateSwitcher(
+                    child: Center(
+                      key: ValueKey('best-loading'),
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 3,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            AppColors.codriverGreen,
+                          ),
+                        ),
+                      ),
                     ),
                   );
                 }
 
                 final docs = scoreSnap.data ?? [];
                 if (docs.isEmpty) {
-                  return Text(
-                    t.t('scorecard_overview_no_drivers_period'),
-                    style: TextStyle(fontSize: 12, color: _UI.textSecondary),
+                  return CoStateSwitcher(
+                    child: Padding(
+                    key: const ValueKey('best-empty'),
+                    padding: const EdgeInsets.symmetric(vertical: 40),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 52,
+                            height: 52,
+                            decoration: const BoxDecoration(
+                              color: AppColors.green50,
+                              shape: BoxShape.circle,
+                            ),
+                            alignment: Alignment.center,
+                            child: const Icon(
+                              Icons.emoji_events_outlined,
+                              color: AppColors.codriverDeep,
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            t.t('scorecard_overview_no_drivers_period'),
+                            style: AppTypography.subheadline.copyWith(
+                              color: AppColors.labelSecondaryLight,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    ),
                   );
                 }
 
@@ -516,25 +607,38 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                     ? _selectedStationCode
                     : null;
 
-                return Column(
+                return CoStateSwitcher(
+                  child: Column(
+                  key: const ValueKey('best-loaded'),
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     for (final station in stationsSorted)
                       if (activeStation == null ||
                           station == activeStation) ...[
                         Padding(
-                          padding: const EdgeInsets.only(bottom: 6, top: 8),
-                          child: Text(
-                            station == 'UNKNOWN'
-                                ? t.t('scorecard_overview_station')
-                                : t.tf('scorecard_overview_station_code', {
-                                    'code': station,
-                                  }),
-                            style: TextStyle(
-                              fontSize: _sp(12, w),
-                              fontWeight: FontWeight.w800,
-                              color: _UI.textPrimary,
-                            ),
+                          padding: const EdgeInsets.only(
+                              top: 14, bottom: 10, left: 4),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.place_outlined,
+                                size: 14,
+                                color: AppColors.labelSecondaryLight,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                station == 'UNKNOWN'
+                                    ? t
+                                        .t('scorecard_overview_station')
+                                        .toUpperCase()
+                                    : station,
+                                style: AppTypography.caption2.copyWith(
+                                  color: AppColors.labelSecondaryLight,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1.0,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         _buildStationDriverList(
@@ -544,6 +648,7 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                         ),
                       ],
                   ],
+                  ),
                 );
               },
             );
@@ -922,6 +1027,7 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
         await ReportWriter.writeReportAndScores(
           parserJson: parsed,
           storagePath: pseudoPath,
+          adminUid: _currentAdminUid,
         );
 
         successCount++;
@@ -973,8 +1079,8 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
       if (bytes == null)
         throw Exception(t.t('scorecard_overview_no_file_bytes'));
 
-      // ✅ NEW: user-scoped update so ALL of this user’s reports/scores get names
-      final uid = FirebaseAuth.instance.currentUser!.uid;
+      // ✅ NEW: user-scoped update so ALL of this user's reports/scores get names
+      final uid = _currentAdminUid ?? FirebaseAuth.instance.currentUser?.uid ?? '';
       final result = await DriverCsvService.importForUser(
         uid: uid,
         csvBytes: bytes,
@@ -1021,14 +1127,15 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
           t.tf('scorecard_overview_delete_report_body', {'title': titleLabel}),
         ),
         actions: [
-          TextButton(
+          CoButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(t.t('admin_home_cancel')),
+            label: t.t('admin_home_cancel'),
+            variant: CoButtonVariant.quiet,
           ),
-          FilledButton(
-            style: AppButtonStyle.of(AppButtonVariant.destructive),
+          CoButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(t.t('admin_home_delete')),
+            label: t.t('admin_home_delete'),
+            variant: CoButtonVariant.destructive,
           ),
         ],
       ),
@@ -1037,7 +1144,7 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
     if (ok != true) return;
 
     try {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
+      final uid = _currentAdminUid ?? FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) throw Exception(t.t('admin_home_not_logged_in'));
       final db = FirebaseFirestore.instance;
       final scoresCol = db.collection('users').doc(uid).collection('scores');
@@ -1174,17 +1281,14 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                               ],
                             ),
                           ),
-                          FilledButton.icon(
+                          CoButton(
                             onPressed: _busyCsv ? null : _uploadDriverCsv,
-                            style: AppButtonStyle.of(
-                              AppButtonVariant.secondary,
-                            ),
-                            icon: const Icon(Icons.upload_file),
-                            label: Text(
-                              _busyCsv
-                                  ? t.t('uploading')
-                                  : t.t('dash_upload_driver_csv'),
-                            ),
+                            icon: Icons.upload_file,
+                            label: _busyCsv
+                                ? t.t('uploading')
+                                : t.t('dash_upload_driver_csv'),
+                            busy: _busyCsv,
+                            variant: CoButtonVariant.secondaryTinted,
                           ),
                         ],
                       ),
@@ -1195,16 +1299,27 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                         stream: _reportsStream(),
                         builder: (context, snap) {
                           if (snap.connectionState == ConnectionState.waiting) {
-                            return const Center(
-                              child: CircularProgressIndicator(),
+                            return const CoStateSwitcher(
+                              child: Center(
+                                key: ValueKey('reports-loading'),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 3,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    AppColors.codriverGreen,
+                                  ),
+                                ),
+                              ),
                             );
                           }
                           if (snap.hasError) {
-                            return Center(
-                              child: Text(
-                                t.tf('admin_home_error_generic', {
-                                  'error': '${snap.error}',
-                                }),
+                            return CoStateSwitcher(
+                              child: Center(
+                                key: const ValueKey('reports-error'),
+                                child: Text(
+                                  t.tf('admin_home_error_generic', {
+                                    'error': '${snap.error}',
+                                  }),
+                                ),
                               ),
                             );
                           }
@@ -1219,73 +1334,15 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                                 color: _UI.textSecondary,
                                 size: _sp(20, w),
                               ),
-                              child: LayoutBuilder(
-                                builder: (context, c) {
-                                  final iconSize = w < 380
-                                      ? _sp(28, w)
-                                      : _sp(34, w);
-                                  final gap = w < 380 ? _pad(6, w) : _pad(8, w);
-                                  return Container(
-                                    constraints: const BoxConstraints(
-                                      minHeight: 120,
-                                    ),
-                                    padding: EdgeInsets.symmetric(
-                                      vertical: _pad(12, w),
-                                    ),
-                                    alignment: Alignment.center,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(
-                                        16 * sc,
-                                      ),
-                                      border: Border.all(color: _UI.border),
-                                      color: _UI.bg,
-                                    ),
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.upload_rounded,
-                                          size: iconSize,
-                                        ),
-                                        SizedBox(height: gap),
-                                        Text(
-                                          _busyUpload
-                                              ? t.t('uploading')
-                                              : t.t(
-                                                  'scorecard_overview_upload_prompt',
-                                                ),
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            fontSize: _sp(13, w),
-                                            color: _UI.textSecondary,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                        SizedBox(height: gap),
-                                        ConstrainedBox(
-                                          constraints: const BoxConstraints(
-                                            minWidth: 140,
-                                          ),
-                                          child: FilledButton(
-                                            onPressed: _busyUpload
-                                                ? null
-                                                : _uploadWeeklyPdf,
-                                            style: AppButtonStyle.of(
-                                              AppButtonVariant.primary,
-                                            ),
-                                            child: Text(
-                                              t.t(
-                                                'scorecard_overview_choose_file',
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                },
+                              child: _UploadDropZone(
+                                busy: _busyUpload,
+                                onPick: _uploadWeeklyPdf,
+                                promptText: _busyUpload
+                                    ? t.t('uploading')
+                                    : t.t(
+                                        'scorecard_overview_upload_prompt'),
+                                buttonLabel:
+                                    t.t('scorecard_overview_choose_file'),
                               ),
                             );
 
@@ -1378,11 +1435,9 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                             }
                           }
 
-                          final chart = list
-                              .take(12)
-                              .toList()
-                              .reversed
-                              .toList();
+                          // Alle Wochen ab KW 1 bis jetzt zeigen — scrollt
+                          // horizontal wenn es viele werden.
+                          final chart = list.reversed.toList();
 
                           final yearsAvailable = <int>{};
                           final Map<int, Set<int>> monthsByYear = {};
@@ -1415,281 +1470,136 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                               yoyRelDelta: yoyRelDelta,
                               yearLabel: latest.year.toString(),
                             ),
-                            SizedBox(height: _pad(16, w)),
-                            _Panel(
-                              title: t.t('scorecard_overview_chart_title'),
-                              child: _MiniBarChart(
-                                points: chart
-                                    .map(
-                                      (p) => _BarPoint(
-                                        label:
-                                            'W${p.week.toString().padLeft(2, '0')}',
-                                        value: p.overall ?? 0,
-                                        ref: p.ref,
-                                        overallStatus: p.overallStatus,
-                                      ),
-                                    )
-                                    .toList(),
+                            SizedBox(height: _pad(20, w)),
+                            // Section-Header für das Chart — kein Panel-
+                            // Wrapper, damit die Balken volle Breite haben.
+                            Padding(
+                              padding:
+                                  const EdgeInsets.fromLTRB(4, 0, 4, 10),
+                              child: Text(
+                                t.t('scorecard_overview_chart_title'),
+                                style: AppTypography.headline.copyWith(
+                                  color: AppColors.codriverDeep,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.3,
+                                ),
                               ),
                             ),
-                            SizedBox(height: _pad(16, w)),
-                            _Panel(
-                              title: t.t('scorecard_overview_upload_pdf'),
-                              trailing: Icon(
-                                Icons.more_horiz,
-                                color: _UI.textSecondary,
-                                size: _sp(20, w),
-                              ),
-                              child: LayoutBuilder(
-                                builder: (context, c) {
-                                  final iconSize = w < 380
-                                      ? _sp(28, w)
-                                      : _sp(34, w);
-                                  final gap = w < 380 ? _pad(6, w) : _pad(8, w);
-                                  return Container(
-                                    constraints: const BoxConstraints(
-                                      minHeight: 120,
+                            _MiniBarChart(
+                              points: chart
+                                  .map(
+                                    (p) => _BarPoint(
+                                      // Auf Desktop „W12", auf Mobile nur
+                                      // „12" — die Skala wird so leichter.
+                                      label: narrow
+                                          ? p.week
+                                              .toString()
+                                              .padLeft(2, '0')
+                                          : 'W${p.week.toString().padLeft(2, '0')}',
+                                      value: p.overall ?? 0,
+                                      ref: p.ref,
+                                      overallStatus: p.overallStatus,
                                     ),
-                                    padding: EdgeInsets.symmetric(
-                                      vertical: _pad(12, w),
-                                    ),
-                                    alignment: Alignment.center,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(
-                                        16 * sc,
-                                      ),
-                                      border: Border.all(color: _UI.border),
-                                      color: _UI.bg,
-                                    ),
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.upload_rounded,
-                                          size: iconSize,
-                                        ),
-                                        SizedBox(height: gap),
-                                        Text(
-                                          _busyUpload
-                                              ? t.t('uploading')
-                                              : t.t(
-                                                  'scorecard_overview_upload_prompt',
-                                                ),
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            fontSize: _sp(13, w),
-                                            color: _UI.textSecondary,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                        SizedBox(height: gap),
-                                        ConstrainedBox(
-                                          constraints: const BoxConstraints(
-                                            minWidth: 140,
-                                          ),
-                                          child: FilledButton(
-                                            onPressed: _busyUpload
-                                                ? null
-                                                : _uploadWeeklyPdf,
-                                            style: AppButtonStyle.of(
-                                              AppButtonVariant.primary,
-                                            ),
-                                            child: Text(
-                                              t.t(
-                                                'scorecard_overview_choose_file',
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                },
-                              ),
+                                  )
+                                  .toList(),
                             ),
+                            SizedBox(height: _pad(16, w)),
                           ];
 
-                          final bestDriversButton = TextButton.icon(
-                            onPressed: () => _openBestDriversDialog(
-                              context: context,
-                              builder: (ctx, setDialogState) =>
-                                  _buildBestDriversContent(
-                                    context: ctx,
+                          // ----- RIGHT panel (Apple-Style Summary)
+                          final rightPanel = _Panel(
+                            title: t.t('scorecard_overview_summary_title'),
+                            trailing: Icon(
+                              Icons.more_horiz,
+                              color: _UI.textSecondary,
+                              size: _sp(20, w),
+                            ),
+                            child: Column(
+                              children: [
+                                for (var i = 0; i < list.length; i++) ...[
+                                  if (i > 0)
+                                    const Divider(
+                                      height: 1,
+                                      thickness: 0.5,
+                                      color: Color(0xFFE5E5EA),
+                                    ),
+                                  _SummaryRow(
+                                    report: list[i],
+                                    onTap: () =>
+                                        Navigator.of(context).push(
+                                      PageRouteBuilder(
+                                        pageBuilder: (_, __, ___) =>
+                                            ScorecardWeekShellPage(
+                                          reportRef: list[i].ref,
+                                        ),
+                                        transitionDuration:
+                                            Duration.zero,
+                                        reverseTransitionDuration:
+                                            Duration.zero,
+                                      ),
+                                    ),
+                                    onDelete: () =>
+                                        _handleReportMenuAction(
+                                      'delete',
+                                      reportRef: list[i].ref,
+                                      titleLabel: t.tf(
+                                        'scorecard_overview_row_title',
+                                        {
+                                          'year': '${list[i].year}',
+                                          'week': '${list[i].week}',
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          );
+
+                          // ── Tab Bar + Body switch ─────────────────────
+                          final tabBar = Padding(
+                            padding: EdgeInsets.only(bottom: _pad(14, w)),
+                            child: PillTabBar(
+                              controller: _topTabController,
+                              tabs: [
+                                t.t('scorecard_overview_tab_company') ==
+                                        'scorecard_overview_tab_company'
+                                    ? 'Company Score'
+                                    : t.t('scorecard_overview_tab_company'),
+                                t.t('scorecard_overview_best_drivers'),
+                              ],
+                            ),
+                          );
+
+                          // Tab-Bar sitzt fix oben; nur der Inhalt darunter
+                          // scrollt.
+                          final Widget content;
+                          if (_topTab == 1) {
+                            content = ListView(
+                              padding: EdgeInsets.only(
+                                bottom: _pad(96, w),
+                              ),
+                              children: [
+                                _Panel(
+                                  title:
+                                      t.t('scorecard_overview_best_drivers'),
+                                  child: _buildBestDriversContent(
+                                    context: context,
                                     years: sortedYears,
                                     monthsByYear: sortedMonthsByYear,
                                     reports: list,
-                                    setDialogState: setDialogState,
+                                    setDialogState: (fn) =>
+                                        setState(() => fn()),
                                     w: w,
                                   ),
-                            ),
-                            style: TextButton.styleFrom(
-                              foregroundColor: _UI.greenDark,
-                              padding: EdgeInsets.symmetric(
-                                horizontal: _pad(10, w),
-                                vertical: _pad(6, w),
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(999),
-                                side: const BorderSide(
-                                  color: _UI.greenDark,
-                                  width: 1.1,
-                                ),
-                              ),
-                            ),
-                            icon: Icon(
-                              Icons.emoji_events_outlined,
-                              size: _sp(14, w),
-                            ),
-                            label: Text(
-                              t.t('scorecard_overview_best_drivers'),
-                              style: TextStyle(
-                                fontSize: _sp(11, w),
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          );
-
-                          // ----- RIGHT panel (summary list) with 3-dots delete menu
-                          final rightPanel = _Panel(
-                            title: t.t('scorecard_overview_summary_title'),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                bestDriversButton,
-                                SizedBox(width: _pad(6, w)),
-                                Icon(
-                                  Icons.more_horiz,
-                                  color: _UI.textSecondary,
-                                  size: _sp(20, w),
                                 ),
                               ],
-                            ),
-                            child: ListView.separated(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: list.length,
-                              separatorBuilder: (_, __) =>
-                                  Divider(height: 1, color: _UI.border),
-                              itemBuilder: (_, i) {
-                                final p = list[i];
-                                final badge = (p.overall != null)
-                                    ? _pct2.format(p.overall)
-                                    : '—';
-
-                                final start = _isoWeekStartUtc(p.year, p.week);
-                                final end = start.add(const Duration(days: 6));
-                                final dateRange =
-                                    '${_dotted(start)} – ${_dotted(end)}';
-
-                                final rankLine =
-                                    (p.rankAtStation != null &&
-                                        p.stationCount != null)
-                                    ? '${t.t('dash_rank_in_station')}: ${t.tf('dash_rank_of_total', {'rank': '${p.rankAtStation}', 'total': '${p.stationCount}'})}'
-                                    : '${_s(p.stationCode)} • ${_prettyStatus(p.overallStatus, t)}';
-
-                                final rowTitle = t.tf(
-                                  'scorecard_overview_row_title',
-                                  {'year': '${p.year}', 'week': '${p.week}'},
-                                );
-
-                                return ListTile(
-                                  contentPadding: EdgeInsets.symmetric(
-                                    vertical: _pad(8, w),
-                                  ),
-                                  leading: CircleAvatar(
-                                    backgroundColor: _UI.green.withOpacity(.2),
-                                    radius: _pad(26, w),
-                                    child: Text(
-                                      badge,
-                                      style: TextStyle(
-                                        color: _UI.greenDark,
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: _sp(12, w),
-                                      ),
-                                    ),
-                                  ),
-                                  title: Text(
-                                    rowTitle,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: _sp(14, w),
-                                    ),
-                                  ),
-                                  subtitle: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      SizedBox(height: _pad(2, w)),
-                                      Text(
-                                        dateRange,
-                                        style: TextStyle(
-                                          color: _UI.textSecondary,
-                                          fontSize: _sp(12, w),
-                                        ),
-                                      ),
-                                      Text(
-                                        '• $rankLine • ',
-                                        style: TextStyle(
-                                          color: _UI.textSecondary,
-                                          fontSize: _sp(12, w),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  trailing: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      PopupMenuButton<String>(
-                                        tooltip: t.t('scorecard_overview_more'),
-                                        onSelected: (v) =>
-                                            _handleReportMenuAction(
-                                              v,
-                                              reportRef: p.ref,
-                                              titleLabel: rowTitle,
-                                            ),
-                                        itemBuilder: (ctx) => [
-                                          PopupMenuItem<String>(
-                                            value: 'delete',
-                                            child: Text(
-                                              t.t(
-                                                'scorecard_overview_delete_report_menu',
-                                              ),
-                                              style: TextStyle(
-                                                color: Colors.red,
-                                                fontWeight: FontWeight.w700,
-                                                fontSize: _sp(13, w),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                        icon: const Icon(Icons.more_vert),
-                                      ),
-                                      SizedBox(width: _pad(4, w)),
-                                      Icon(
-                                        Icons.chevron_right_rounded,
-                                        size: _sp(22, w),
-                                      ),
-                                    ],
-                                  ),
-                                  onTap: () => Navigator.of(context).push(
-                                    PageRouteBuilder(
-                                      pageBuilder: (_, __, ___) =>
-                                          ScorecardWeekShellPage(
-                                            reportRef: p.ref,
-                                          ),
-                                      transitionDuration: Duration.zero,
-                                      reverseTransitionDuration: Duration.zero,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          );
-
-                          if (narrow) {
-                            return ListView(
+                            );
+                          } else if (narrow) {
+                            content = ListView(
+                              padding: EdgeInsets.only(
+                                bottom: _pad(96, w),
+                              ),
                               children: [
                                 ...leftColumnContent,
                                 SizedBox(height: _pad(16, w)),
@@ -1697,21 +1607,41 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                               ],
                             );
                           } else {
-                            return Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            content = ListView(
+                              padding: EdgeInsets.only(
+                                bottom: _pad(96, w),
+                              ),
                               children: [
-                                Expanded(
-                                  flex: 3,
-                                  child: ListView(children: leftColumnContent),
-                                ),
-                                SizedBox(width: _pad(16, w)),
-                                Expanded(
-                                  flex: 2,
-                                  child: ListView(children: [rightPanel]),
+                                Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      flex: 3,
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: leftColumnContent,
+                                      ),
+                                    ),
+                                    SizedBox(width: _pad(16, w)),
+                                    Expanded(
+                                      flex: 2,
+                                      child: rightPanel,
+                                    ),
+                                  ],
                                 ),
                               ],
                             );
                           }
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              tabBar,
+                              Expanded(child: content),
+                            ],
+                          );
                         },
                       ),
                     ),
@@ -1728,6 +1658,28 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
     return Stack(
       children: [
         Container(color: _UI.bg, child: body),
+
+        // ── Schwebender Upload-Plus-Button (Speed-Dial) ─────────────
+        Positioned(
+          right: 20,
+          bottom: 24,
+          child: _UploadSpeedDial(
+            open: _fabOpen,
+            onToggle: () => setState(() => _fabOpen = !_fabOpen),
+            busyPdf: _busyUpload,
+            busyCsv: _busyCsv,
+            onPickPdf: () {
+              setState(() => _fabOpen = false);
+              _uploadWeeklyPdf();
+            },
+            onPickCsv: () {
+              setState(() => _fabOpen = false);
+              _uploadDriverCsv();
+            },
+            pdfLabel: t.t('scorecard_overview_upload_pdf'),
+            csvLabel: t.t('dash_upload_driver_csv'),
+          ),
+        ),
 
         if (_busyUpload) ...[
           Positioned.fill(
@@ -1753,7 +1705,12 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage> {
                       const SizedBox(
                         width: 26,
                         height: 26,
-                        child: CircularProgressIndicator(strokeWidth: 3),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 3,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            AppColors.codriverGreen,
+                          ),
+                        ),
                       ),
                       const SizedBox(width: 16),
                       Text(
@@ -1786,31 +1743,33 @@ class _Panel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final w = MediaQuery.of(context).size.width;
+    final isMobile = w < 800;
     return Container(
       decoration: BoxDecoration(
         color: _UI.card,
-        borderRadius: BorderRadius.circular(18 * _scaleForWidth(w)),
+        borderRadius: BorderRadius.circular(22),
         boxShadow: AppElevation.level1,
       ),
-      padding: EdgeInsets.all(_pad(20, w)),
+      padding: EdgeInsets.all(isMobile ? 16 : 20),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: _sp(17, w),
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: -0.43,
-                  color: _UI.textPrimary,
+              Expanded(
+                child: Text(
+                  title,
+                  style: AppTypography.headline.copyWith(
+                    color: AppColors.codriverDeep,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                  ),
                 ),
               ),
-              const Spacer(),
               if (trailing != null) trailing!,
             ],
           ),
-          SizedBox(height: _pad(16, w)),
+          SizedBox(height: isMobile ? 12 : 16),
           child,
         ],
       ),
@@ -1835,6 +1794,8 @@ class _DriverEntry {
   });
 }
 
+/// Apple-style Filter-Pille für Period + Station. Hellgrauer 0.5px-
+/// Rahmen, weißer Background, caption2 Eyebrow + Wert in subheadline.
 class _BestDriversPeriodRow extends StatelessWidget {
   final String periodLabel;
   final String? stationLabel;
@@ -1848,82 +1809,107 @@ class _BestDriversPeriodRow extends StatelessWidget {
     this.onStationTap,
   });
 
-  @override
-  Widget build(BuildContext context) {
-    const pillHeight = 38.0;
-
-    BoxDecoration _pillDec() {
-      return BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: _UI.greenDark, width: 1.2),
-      );
-    }
-
-    const pillTextStyle = TextStyle(
-      fontSize: 11,
-      letterSpacing: 0.6,
-      fontWeight: FontWeight.w700,
-      color: Colors.black87,
-    );
-
-    Widget _pill(String text, VoidCallback? onTap) {
-      return InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(999),
-        child: Container(
-          height: pillHeight,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: _pillDec(),
-          child: Center(
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Row(
-                children: [
-                  Text(text.toUpperCase(), style: pillTextStyle),
-                  const SizedBox(width: 6),
-                  const Icon(
-                    Icons.keyboard_arrow_down,
-                    size: 16,
-                    color: Colors.black87,
-                  ),
-                ],
+  Widget _pill({
+    required String eyebrow,
+    required String label,
+    required VoidCallback? onTap,
+  }) {
+    return CoPressable(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+          height: 56,
+          padding: const EdgeInsets.fromLTRB(14, 8, 12, 8),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceElevatedLight,
+            borderRadius: BorderRadius.circular(14),
+            border:
+                Border.all(color: const Color(0xFFE5E5EA), width: 0.6),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      eyebrow.toUpperCase(),
+                      style: AppTypography.caption2.copyWith(
+                        color: AppColors.labelSecondaryLight,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.subheadline.copyWith(
+                        color: AppColors.codriverDeep,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
+              const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 20,
+                color: AppColors.codriverDeep,
+              ),
+            ],
           ),
         ),
-      );
-    }
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final periodPill = _pill(
+      eyebrow: 'Period',
+      label: periodLabel,
+      onTap: onPeriodTap,
+    );
 
     if (stationLabel == null || onStationTap == null) {
-      return _pill(periodLabel, onPeriodTap);
+      return periodPill;
     }
+
+    final stationPill = _pill(
+      eyebrow: t.t('scorecard_overview_station'),
+      label: stationLabel!,
+      onTap: onStationTap,
+    );
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isTight = constraints.maxWidth < 520;
-        final periodPill = _pill(periodLabel, onPeriodTap);
-        final stationPill = _pill(stationLabel!, onStationTap);
-
-        if (!isTight) {
-          return Row(
+        if (constraints.maxWidth < 520) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(child: periodPill),
-              const SizedBox(width: 8),
-              Expanded(child: stationPill),
+              periodPill,
+              const SizedBox(height: 10),
+              stationPill,
             ],
           );
         }
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [periodPill, const SizedBox(height: 8), stationPill],
+        return Row(
+          children: [
+            Expanded(child: periodPill),
+            const SizedBox(width: 10),
+            Expanded(child: stationPill),
+          ],
         );
       },
     );
   }
 }
 
+/// Apple-Card-Zeile für die Best-Driver-Leaderboard. Tier-farbiger
+/// Rank-Badge, Name + Tier-Pill, Score rechts mit tabular figures.
 class _BestDriverRow extends StatelessWidget {
   final int rank;
   final double score;
@@ -1941,127 +1927,133 @@ class _BestDriverRow extends StatelessWidget {
     this.backgroundColor,
   });
 
+  /// Olympia-Medaillen-Verlauf für Top-3 als Rank-Badge.
+  Gradient? _medalGradient() {
+    switch (rank) {
+      case 1:
+        return const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFE36F), Color(0xFFE0A91A)],
+        );
+      case 2:
+        return const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFE8E8EE), Color(0xFF9AA0A6)],
+        );
+      case 3:
+        return const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFE6B381), Color(0xFFA86A2C)],
+        );
+      default:
+        return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    final isColored = backgroundColor != null;
-    final textColor = isColored ? Colors.white : _UI.textPrimary;
-    final labelColor = isColored ? Colors.white70 : _UI.textSecondary;
-    final pillTextColor = isColored ? Colors.white : statusColor;
-    final pillBgColor = isColored
-        ? Colors.white.withOpacity(0.2)
-        : statusColor.withOpacity(0.15);
+    final medal = _medalGradient();
+    final isTop3 = medal != null;
+    final displayName = name.isEmpty ? t.t('dash_no_name') : name;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: backgroundColor ?? Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: backgroundColor ?? _UI.border, width: 1.2),
+        color: AppColors.surfaceElevatedLight,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: AppElevation.level1,
+        border: Border.all(color: const Color(0xFFE5E5EA), width: 0.5),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Row(
+          // Rank Badge — Tier-Farbe oder Medaillen-Verlauf für Top-3
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: medal,
+              color: isTop3 ? null : statusColor.withValues(alpha: 0.14),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              '$rank',
+              style: AppTypography.subheadline.copyWith(
+                color: isTop3 ? Colors.white : statusColor,
+                fontWeight: FontWeight.w800,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          // Name + Tier-Pille
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.subheadline.copyWith(
+                    color: AppColors.codriverDeep,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if (statusText.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      statusText.toUpperCase(),
+                      style: AppTypography.caption2.copyWith(
+                        color: statusColor,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Score rechts
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Expanded(
-                child: _bestCol(
-                  label: t.t('dash_rank').toUpperCase(),
-                  value: '#$rank',
-                  labelColor: labelColor,
-                  textColor: textColor,
+              Text(
+                t.t('dash_score').toUpperCase(),
+                style: AppTypography.caption2.copyWith(
+                  color: AppColors.labelSecondaryLight,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.0,
                 ),
               ),
-              _bestDivider(isColored),
-              Expanded(
-                child: _bestCol(
-                  label: t.t('dash_score').toUpperCase(),
-                  value: _pct2.format(score),
-                  labelColor: labelColor,
-                  textColor: textColor,
-                ),
-              ),
-              _bestDivider(isColored),
-              Expanded(
-                flex: 2,
-                child: _bestCol(
-                  label: t.t('dash_name').toUpperCase(),
-                  value: name.isEmpty ? t.t('dash_no_name') : name,
-                  labelColor: labelColor,
-                  textColor: textColor,
+              const SizedBox(height: 2),
+              Text(
+                _pct2.format(score),
+                style: AppTypography.title3.copyWith(
+                  color: AppColors.codriverDeep,
+                  fontWeight: FontWeight.w800,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                  letterSpacing: -0.3,
                 ),
               ),
             ],
           ),
-          if (statusText.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: pillBgColor,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  statusText.toUpperCase(),
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: pillTextColor,
-                  ),
-                ),
-              ),
-            ),
-          ],
         ],
       ),
-    );
-  }
-
-  Widget _bestDivider(bool isColored) {
-    return Container(
-      width: 1,
-      height: 28,
-      margin: const EdgeInsets.symmetric(horizontal: 8),
-      color: isColored ? Colors.white.withOpacity(0.5) : _UI.border,
-    );
-  }
-
-  Widget _bestCol({
-    required String label,
-    required String value,
-    required Color labelColor,
-    required Color textColor,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: 9,
-            letterSpacing: 1.1,
-            color: labelColor,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w800,
-            color: textColor,
-          ),
-        ),
-      ],
     );
   }
 }
@@ -2083,89 +2075,128 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final w = MediaQuery.of(context).size.width;
-    final sc = _scaleForWidth(w);
+    final isMobile = w < 800;
     final isUp = (delta ?? 0) >= 0;
-    final deltaAreaMinHeight = _pad(46, w);
+
+    // Inter durchgehend — kein hand-skaliertes TextStyle mehr. Mobile
+    // bekommt einen großen Hero-Wert (Title 1 = 28pt) statt der vorher
+    // auf ~17pt herunterskalierten Zahl.
+    final labelStyle = AppTypography.caption2.copyWith(
+      color: AppColors.labelSecondaryLight,
+      fontWeight: FontWeight.w800,
+      letterSpacing: 0.8,
+    );
+    final subtitleStyle = AppTypography.caption1.copyWith(
+      color: AppColors.labelSecondaryLight,
+      fontWeight: FontWeight.w600,
+    );
+    final valueStyle =
+        (isMobile ? AppTypography.title1 : AppTypography.largeTitle).copyWith(
+      color: AppColors.codriverDeep,
+      fontWeight: FontWeight.w800,
+      fontFeatures: const [FontFeature.tabularFigures()],
+      letterSpacing: -0.5,
+    );
+    final deltaColor = isUp ? AppColors.codriverGreen : AppColors.error;
+    final deltaStyle = AppTypography.footnote.copyWith(
+      color: deltaColor,
+      fontWeight: FontWeight.w800,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+    final captionStyle = AppTypography.caption1.copyWith(
+      color: AppColors.labelSecondaryLight,
+    );
 
     return Container(
       width: double.infinity,
+      height: double.infinity,
       decoration: BoxDecoration(
         color: _UI.card,
-        borderRadius: BorderRadius.circular(18 * sc),
+        borderRadius: BorderRadius.circular(18),
         boxShadow: AppElevation.level1,
       ),
-      padding: EdgeInsets.all(_pad(20, w)),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 8 : 20,
+        vertical: isMobile ? 12 : 20,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            title.toUpperCase(),
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: _sp(12, w),
-              color: _UI.textSecondary,
-              fontWeight: FontWeight.w600,
-              letterSpacing: .6,
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title.toUpperCase(),
+                textAlign: TextAlign.center,
+                style: labelStyle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                style: subtitleStyle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                value != null ? '${_pct2.format(value)} %' : '—',
+                textAlign: TextAlign.center,
+                style: valueStyle,
+              ),
             ),
           ),
-          SizedBox(height: _pad(4, w)),
-          Text(
-            subtitle,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: _sp(12, w),
-              color: _UI.textSecondary,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          SizedBox(height: _pad(8, w)),
-          Text(
-            value != null ? '${_pct2.format(value)} %' : '—',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: _sp(28, w),
-              fontWeight: FontWeight.w700,
-              color: _UI.textPrimary,
-              letterSpacing: -0.5,
-            ),
-          ),
-          SizedBox(height: _pad(8, w)),
+          // Delta-Bereich — zweizeilig: Icon + Wert oben, Caption darunter.
+          // Fixe Höhe sorgt dafür, dass der Hero-Wert in allen Karten auf
+          // der gleichen Linie sitzt; ohne Delta bleibt der Slot leer.
           SizedBox(
-            width: double.infinity,
-            height: deltaAreaMinHeight,
+            height: isMobile ? 48 : 52,
             child: delta == null
                 ? const SizedBox.shrink()
-                : Padding(
-                    padding: EdgeInsets.only(top: _pad(4, w)),
-                    child: Wrap(
-                      alignment: WrapAlignment.center,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      spacing: _pad(6, w),
-                      runSpacing: _pad(2, w),
-                      children: [
-                        Icon(
-                          isUp ? Icons.trending_up : Icons.trending_down,
-                          size: _sp(16, w),
-                          color: isUp ? _UI.greenDark : Colors.red,
-                        ),
-                        Text(
-                          '${isUp ? '+' : ''}${_pct2.format(delta!.abs())} %',
-                          style: TextStyle(
-                            fontSize: _sp(13, w),
-                            color: isUp ? _UI.greenDark : Colors.red,
-                            fontWeight: FontWeight.w700,
+                : Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isUp ? Icons.trending_up : Icons.trending_down,
+                            size: 16,
+                            color: deltaColor,
+                          ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              '${isUp ? '+' : ''}${_pct2.format(delta!.abs())} %',
+                              style: deltaStyle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (deltaCaption.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            deltaCaption,
+                            style: captionStyle,
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        Text(
-                          deltaCaption,
-                          style: TextStyle(
-                            color: _UI.textSecondary,
-                            fontSize: _sp(12, w),
-                          ),
-                        ),
-                      ],
-                    ),
+                    ],
                   ),
           ),
         ],
@@ -2231,86 +2262,56 @@ class _MiniBarChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final w = MediaQuery.of(context).size.width;
-    final sc = _scaleForWidth(w);
-
-    const axisMax = 100.0;
     final isNarrow = _isNarrow(context);
 
-    final xLabelAreaH = (_pad(36, w)).clamp(28.0, 56.0);
-    final valueLabelH = _pad(22, w).clamp(18.0, 30.0);
-    final chartH = (isNarrow ? _pad(280, w) : _pad(340, w));
+    // Schlanke Balken über die volle Breite. Keine Y-Achse — wenn mehr
+    // Wochen geladen sind als der Screen tragen kann, wird horizontal
+    // gescrollt, ansonsten stretchen die Slots auf den verfügbaren Raum.
+    const minSlotW = 30.0;
+    const xLabelAreaH = 40.0;
+    const valueLabelH = 26.0;
+    final chartH = isNarrow ? 360.0 : 420.0;
 
-    return SizedBox(
+    return Container(
       height: chartH,
+      padding: const EdgeInsets.fromLTRB(0, 16, 0, 8),
       child: LayoutBuilder(
         builder: (context, c) {
-          // Width per slot grows/shrinks with available space and bar count.
-          final slotW =
-              ((c.maxWidth - _pad(60, w)) / points.length).clamp(14.0, 44.0);
-          final barW = (slotW * 0.55).clamp(8.0, 22.0) * sc;
+          final innerH = c.maxHeight;
+          final barsAreaH = innerH - xLabelAreaH - valueLabelH;
+          final visibleW = c.maxWidth;
+          // Slot-Breite wächst, wenn genug Platz da ist — sonst Mindestbreite
+          // + horizontaler Scroll.
+          final naturalSlot = points.isEmpty ? minSlotW : visibleW / points.length;
+          final slotW = naturalSlot < minSlotW ? minSlotW : naturalSlot;
+          final barW = (slotW * 0.7).clamp(16.0, 32.0);
+          final contentW = points.length * slotW;
 
-          return Container(
-            decoration: BoxDecoration(
-              color: AppColors.surfaceElevatedLight,
-              borderRadius: BorderRadius.circular(18 * sc),
-              boxShadow: AppElevation.level1,
-            ),
-            padding: EdgeInsets.all(_pad(20, w)),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Y-axis labels (aligned with the bar area only)
-                Padding(
-                  padding: EdgeInsets.only(
-                    top: valueLabelH,
-                    bottom: xLabelAreaH,
-                  ),
-                  child: SizedBox(
-                    width: _pad(34, w),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: const [100, 80, 60, 40, 20, 0]
-                          .map(
-                            (v) => Text(
-                              '$v',
-                              style: TextStyle(
-                                color: AppColors.labelTertiaryLight,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          )
-                          .toList(),
-                    ),
-                  ),
-                ),
-                SizedBox(width: _pad(8, w)),
-
-                // Chart area
-                Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, area) {
-                      final barsAreaH =
-                          area.maxHeight - xLabelAreaH - valueLabelH;
-
-                      return Stack(
-                        children: [
-                          // Grid lines (5 horizontal lines)
-                          Positioned.fill(
-                            top: valueLabelH,
-                            bottom: xLabelAreaH,
-                            child: Column(
-                              children: List.generate(
-                                5,
-                                (_) => Expanded(
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      border: Border(
-                                        top: BorderSide(
-                                          color: AppColors.separatorLight
-                                              .withOpacity(0.6),
-                                          width: 0.5,
+          return ClipRect(
+            child: Scrollbar(
+              thumbVisibility: false,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: SizedBox(
+                  width: contentW > visibleW ? contentW : visibleW,
+                  child: Stack(
+                    children: [
+                            // Grid lines (5 horizontale Linien) — hellgrau
+                            Positioned.fill(
+                              top: valueLabelH,
+                              bottom: xLabelAreaH,
+                              child: Column(
+                                children: List.generate(
+                                  5,
+                                  (_) => const Expanded(
+                                    child: DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        border: Border(
+                                          top: BorderSide(
+                                            color: Color(0xFFE5E5EA),
+                                            width: 1,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -2318,190 +2319,991 @@ class _MiniBarChart extends StatelessWidget {
                                 ),
                               ),
                             ),
-                          ),
-                          // Bottom baseline (slightly stronger)
-                          Positioned(
-                            left: 0,
-                            right: 0,
-                            bottom: xLabelAreaH - 0.5,
-                            child: Container(
-                              height: 1,
-                              color: AppColors.separatorLight,
+                            // Basislinie — selber Hellgrau-Ton
+                            Positioned(
+                              left: 0,
+                              right: 0,
+                              bottom: xLabelAreaH - 0.5,
+                              child: Container(
+                                height: 1,
+                                color: const Color(0xFFE5E5EA),
+                              ),
                             ),
-                          ),
 
-                          // Bars + value labels (each slot uses Expanded
-                          // so any number of bars fits the available width)
-                          Positioned.fill(
-                            top: 0,
-                            bottom: xLabelAreaH,
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: points.map((p) {
-                                final v = p.value.clamp(0, axisMax).toDouble();
-                                final h = (v / axisMax) * barsAreaH;
-                                final barColor = _colorForStatus(
-                                  p.overallStatus,
-                                );
-                                return Expanded(
-                                  child: MouseRegion(
-                                    cursor: SystemMouseCursors.click,
-                                    child: GestureDetector(
-                                      onTap: () => Navigator.of(context).push(
-                                        PageRouteBuilder(
-                                          pageBuilder: (_, __, ___) =>
-                                              ScorecardWeekShellPage(
-                                                reportRef: p.ref,
-                                              ),
-                                          transitionDuration: Duration.zero,
-                                          reverseTransitionDuration:
-                                              Duration.zero,
+                            // Bars + Wert-Labels
+                            Positioned.fill(
+                              top: 0,
+                              bottom: xLabelAreaH,
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  for (final p in points)
+                                    SizedBox(
+                                      width: slotW,
+                                      child: _BarSlot(
+                                        point: p,
+                                        valueLabelH: valueLabelH,
+                                        barsAreaH: barsAreaH,
+                                        barW: barW,
+                                        color: _colorForStatus(p.overallStatus),
+                                        statusLabel:
+                                            _labelForStatus(p.overallStatus),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+
+                            // X-Labels (KW)
+                            Positioned(
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              height: xLabelAreaH,
+                              child: Row(
+                                children: [
+                                  for (final p in points)
+                                    SizedBox(
+                                      width: slotW,
+                                      child: Padding(
+                                        padding: const EdgeInsets.only(top: 10),
+                                        child: Text(
+                                          p.label,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          textAlign: TextAlign.center,
+                                          style: AppTypography.caption1.copyWith(
+                                            color:
+                                                AppColors.labelSecondaryLight,
+                                            fontWeight: FontWeight.w600,
+                                            fontFeatures: const [
+                                              FontFeature.tabularFigures()
+                                            ],
+                                          ),
                                         ),
                                       ),
-                                      child: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.end,
-                                        children: [
-                                          // Value label above the bar
-                                          SizedBox(
-                                            height: valueLabelH,
-                                            child: Center(
-                                              child: FittedBox(
-                                                fit: BoxFit.scaleDown,
-                                                child: Text(
-                                                  v.toStringAsFixed(0),
-                                                  style: TextStyle(
-                                                    fontSize: _sp(12, w),
-                                                    fontWeight: FontWeight.w700,
-                                                    color: barColor,
-                                                    letterSpacing: -0.3,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          // The bar itself (centered in its slot)
-                                          AnimatedContainer(
-                                            duration: const Duration(
-                                              milliseconds: 320,
-                                            ),
-                                            curve: Curves.easeOutCubic,
-                                            height: h,
-                                            width: barW,
-                                            clipBehavior: Clip.antiAlias,
-                                            decoration: BoxDecoration(
-                                              gradient: LinearGradient(
-                                                begin: Alignment.topCenter,
-                                                end: Alignment.bottomCenter,
-                                                colors: [
-                                                  barColor.withOpacity(0.85),
-                                                  barColor,
-                                                ],
-                                              ),
-                                              borderRadius:
-                                                  const BorderRadius.vertical(
-                                                    top: Radius.circular(8),
-                                                    bottom: Radius.circular(2),
-                                                  ),
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: barColor.withOpacity(
-                                                    0.25,
-                                                  ),
-                                                  blurRadius: 12,
-                                                  offset: const Offset(0, 4),
-                                                ),
-                                              ],
-                                            ),
-                                            // Vertical status label inside the bar
-                                            // Only render when the bar is tall
-                                            // enough to comfortably fit the text.
-                                            child: h < 70
-                                                ? null
-                                                : Padding(
-                                                    padding:
-                                                        const EdgeInsets.symmetric(
-                                                          vertical: 10,
-                                                        ),
-                                                    child: Center(
-                                                      child: RotatedBox(
-                                                        quarterTurns: 3,
-                                                        child: FittedBox(
-                                                          fit: BoxFit.scaleDown,
-                                                          child: Text(
-                                                            _labelForStatus(
-                                                              p.overallStatus,
-                                                            ),
-                                                            maxLines: 1,
-                                                            softWrap: false,
-                                                            overflow:
-                                                                TextOverflow
-                                                                    .clip,
-                                                            style: TextStyle(
-                                                              color: Colors
-                                                                  .white
-                                                                  .withOpacity(
-                                                                    0.55,
-                                                                  ),
-                                                              fontSize: 9,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w800,
-                                                              letterSpacing:
-                                                                  1.4,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                          ),
-                                        ],
-                                      ),
                                     ),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                          ),
-
-                          // X labels strip — each slot uses Expanded so
-                          // every column fits without horizontal overflow
-                          Positioned(
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            height: xLabelAreaH,
-                            child: Row(
-                              children: points.map((p) {
-                                return Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(top: 8),
-                                    child: Text(
-                                      p.label,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: _sp(11, w),
-                                        color: AppColors.labelSecondaryLight,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
+                                ],
+                              ),
                           ),
                         ],
-                      );
-                    },
+                      ),
+                    ),
                   ),
+                ),
+              );
+        },
+      ),
+    );
+  }
+}
+
+/// Ein Slot im Bar-Chart — feste Breite, Tap → Wochenseite, Wert oben,
+/// Bar mit Gradient & Shadow.
+class _BarSlot extends StatelessWidget {
+  final _BarPoint point;
+  final double valueLabelH;
+  final double barsAreaH;
+  final double barW;
+  final Color color;
+  final String statusLabel;
+
+  const _BarSlot({
+    required this.point,
+    required this.valueLabelH,
+    required this.barsAreaH,
+    required this.barW,
+    required this.color,
+    required this.statusLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final v = point.value.clamp(0, 100).toDouble();
+    final h = (v / 100) * barsAreaH;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: CoPressable(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => Navigator.of(context).push(
+          PageRouteBuilder(
+            pageBuilder: (_, __, ___) =>
+                ScorecardWeekShellPage(reportRef: point.ref),
+            transitionDuration: Duration.zero,
+            reverseTransitionDuration: Duration.zero,
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            SizedBox(
+              height: valueLabelH,
+              child: Center(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    v.toStringAsFixed(0),
+                    style: AppTypography.subheadline.copyWith(
+                      color: color,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.2,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 320),
+              curve: Curves.easeOutCubic,
+              height: h,
+              width: barW,
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(8),
+                  bottom: Radius.circular(2),
+                ),
+              ),
+              child: h < 110
+                  ? null
+                  : Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Center(
+                        child: RotatedBox(
+                          quarterTurns: 3,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              statusLabel,
+                              maxLines: 1,
+                              softWrap: false,
+                              overflow: TextOverflow.clip,
+                              style: TextStyle(
+                                fontFamily: AppTypography.fontFamily,
+                                fontSize: 8,
+                                color: Colors.white.withOpacity(0.75),
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1.0,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/* ====================  Summary row (Apple-style)  ==================== */
+
+/// Eine Zeile in der Scorecard-Liste rechts. Apple-Look: leading Score-
+/// Avatar in Tier-Farbe, KW-Bezeichner als Headline, Datum/Status als
+/// Subline, trailing kleines Chevron + Overflow-Menü.
+class _SummaryRow extends StatelessWidget {
+  final _ReportVM report;
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
+  const _SummaryRow({
+    required this.report,
+    required this.onTap,
+    required this.onDelete,
+  });
+
+  Color _tierColor(String? statusCode) {
+    switch (_s(statusCode).trim().toUpperCase()) {
+      case 'FANTASTIC_PLUS':
+        return _kFantasticPlusColor;
+      case 'FANTASTIC':
+        return _kFantasticColor;
+      case 'GREAT':
+        return _kGreatColor;
+      case 'FAIR':
+        return _kFairColor;
+      case 'POOR':
+        return _kPoorColor;
+      default:
+        return AppColors.codriverDeep;
+    }
+  }
+
+  String _tierLabel(String? statusCode) {
+    switch (_s(statusCode).trim().toUpperCase()) {
+      case 'FANTASTIC_PLUS':
+        return 'Fantastic Plus';
+      case 'FANTASTIC':
+        return 'Fantastic';
+      case 'GREAT':
+        return 'Great';
+      case 'FAIR':
+        return 'Fair';
+      case 'POOR':
+        return 'Poor';
+      default:
+        return '';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final p = report;
+    final start = _isoWeekStartUtc(p.year, p.week);
+    final end = start.add(const Duration(days: 6));
+    final dateRange = '${_dotted(start)} – ${_dotted(end)}';
+    final tier = _tierColor(p.overallStatus);
+    final tierLabel = _tierLabel(p.overallStatus);
+    final score = p.overall;
+
+    return CoPressable(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+            horizontal: 4, vertical: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Leading score badge — runder Container in Tier-Farbe @ 12%
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: tier.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  score != null ? _pct2.format(score) : '—',
+                  style: AppTypography.subheadline.copyWith(
+                    color: tier,
+                    fontWeight: FontWeight.w800,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      t.tf('scorecard_overview_row_title', {
+                        'year': '${p.year}',
+                        'week': '${p.week}',
+                      }),
+                      style: AppTypography.subheadline.copyWith(
+                        color: AppColors.codriverDeep,
+                        fontWeight: FontWeight.w800,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      dateRange,
+                      style: AppTypography.caption1.copyWith(
+                        color: AppColors.labelSecondaryLight,
+                        fontWeight: FontWeight.w500,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (tierLabel.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: tier.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          tierLabel.toUpperCase(),
+                          style: AppTypography.caption2.copyWith(
+                            color: tier,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              PopupMenuButton<String>(
+                tooltip: t.t('scorecard_overview_more'),
+                onSelected: (v) {
+                  if (v == 'delete') onDelete();
+                },
+                itemBuilder: (ctx) => [
+                  PopupMenuItem<String>(
+                    value: 'delete',
+                    child: Text(
+                      t.t('scorecard_overview_delete_report_menu'),
+                      style: AppTypography.callout.copyWith(
+                        color: AppColors.error,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+                icon: Icon(
+                  Icons.more_vert,
+                  color: AppColors.labelSecondaryLight,
+                  size: 20,
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.labelTertiaryLight,
+                size: 22,
+              ),
+            ],
+          ),
+        ),
+    );
+  }
+}
+
+/* ====================  Floating upload speed dial  ==================== */
+
+/// Schwebender Plus-Button rechts unten. Tap → klappt zwei Upload-
+/// Optionen aus: Scorecard-PDF und Drivers-CSV. Beide jeweils mit
+/// Label-Pille, deutlich getrennt, Apple-iOS-Pattern.
+class _UploadSpeedDial extends StatelessWidget {
+  final bool open;
+  final VoidCallback onToggle;
+  final bool busyPdf;
+  final bool busyCsv;
+  final VoidCallback onPickPdf;
+  final VoidCallback onPickCsv;
+  final String pdfLabel;
+  final String csvLabel;
+
+  const _UploadSpeedDial({
+    required this.open,
+    required this.onToggle,
+    required this.busyPdf,
+    required this.busyCsv,
+    required this.onPickPdf,
+    required this.onPickCsv,
+    required this.pdfLabel,
+    required this.csvLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        AnimatedSlide(
+          offset: open ? Offset.zero : const Offset(0, 0.2),
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          child: AnimatedOpacity(
+            opacity: open ? 1 : 0,
+            duration: const Duration(milliseconds: 180),
+            child: IgnorePointer(
+              ignoring: !open,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  _MiniFab(
+                    icon: Icons.picture_as_pdf_rounded,
+                    label: pdfLabel,
+                    busy: busyPdf,
+                    onTap: onPickPdf,
+                  ),
+                  const SizedBox(height: 10),
+                  _MiniFab(
+                    icon: Icons.groups_rounded,
+                    label: csvLabel,
+                    busy: busyCsv,
+                    onTap: onPickCsv,
+                  ),
+                  const SizedBox(height: 14),
+                ],
+              ),
+            ),
+          ),
+        ),
+        // Haupt-Plus-Button — dreht sich beim Öffnen leicht zu einem ×.
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onToggle,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: open
+                    ? AppColors.codriverDeep
+                    : AppColors.codriverGreen,
+                shape: BoxShape.circle,
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x33000000),
+                    blurRadius: 16,
+                    offset: Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: AnimatedRotation(
+                turns: open ? 0.125 : 0.0,
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutBack,
+                child: const Icon(
+                  Icons.add_rounded,
+                  color: Colors.white,
+                  size: 30,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MiniFab extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool busy;
+  final VoidCallback onTap;
+  const _MiniFab({
+    required this.icon,
+    required this.label,
+    required this.busy,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Label-Pille links neben dem Mini-Button
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(999),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x1F000000),
+                blurRadius: 10,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Text(
+            label,
+            style: AppTypography.footnote.copyWith(
+              color: AppColors.codriverDeep,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: busy ? null : onTap,
+            child: Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: busy
+                    ? AppColors.codriverGreen.withOpacity(0.5)
+                    : AppColors.codriverGreen,
+                shape: BoxShape.circle,
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x29000000),
+                    blurRadius: 12,
+                    offset: Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: busy
+                  ? const Padding(
+                      padding: EdgeInsets.all(14),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        valueColor: AlwaysStoppedAnimation(Colors.white),
+                      ),
+                    )
+                  : Icon(icon, color: Colors.white, size: 22),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/* ====================  Upload drop zone (Apple-style)  ==================== */
+
+/// Saubere Apple-mäßige Drop-Zone für PDF-Uploads. Gestrichelte Border auf
+/// hellgrauer Fläche, großer Tap-Bereich auf dem gesamten Container, plus
+/// ein klassischer primärer Pill-Button. Die ganze Fläche reagiert auf
+/// Tap — der Button ist nur die visuelle Affordanz.
+class _UploadDropZone extends StatelessWidget {
+  final bool busy;
+  final VoidCallback onPick;
+  final String promptText;
+  final String buttonLabel;
+
+  const _UploadDropZone({
+    required this.busy,
+    required this.onPick,
+    required this.promptText,
+    required this.buttonLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return CoPressable(
+      onTap: busy ? null : onPick,
+      borderRadius: BorderRadius.circular(18),
+      child: CustomPaint(
+        painter: _DashedBorderPainter(
+          color: AppColors.codriverGreen.withOpacity(0.5),
+          radius: 18,
+          strokeWidth: 1.5,
+          dashLength: 6,
+          gapLength: 5,
+        ),
+        child: Container(
+            constraints: const BoxConstraints(minHeight: 160),
+            padding: const EdgeInsets.symmetric(
+                horizontal: 20, vertical: 22),
+            decoration: BoxDecoration(
+              color: AppColors.green50.withOpacity(0.4),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.codriverGreen.withOpacity(0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.upload_file_rounded,
+                    color: AppColors.codriverDeep,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  promptText,
+                  textAlign: TextAlign.center,
+                  style: AppTypography.subheadline.copyWith(
+                    color: AppColors.codriverDeep,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                CoButton(
+                  onPressed: busy ? null : onPick,
+                  label: buttonLabel,
+                  busy: busy,
                 ),
               ],
             ),
+          ),
+        ),
+    );
+  }
+}
+
+class _DashedBorderPainter extends CustomPainter {
+  final Color color;
+  final double radius;
+  final double strokeWidth;
+  final double dashLength;
+  final double gapLength;
+
+  _DashedBorderPainter({
+    required this.color,
+    required this.radius,
+    required this.strokeWidth,
+    required this.dashLength,
+    required this.gapLength,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth;
+
+    final rrect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      Radius.circular(radius),
+    );
+    final path = Path()..addRRect(rrect);
+
+    for (final metric in path.computeMetrics()) {
+      var distance = 0.0;
+      while (distance < metric.length) {
+        final next = (distance + dashLength).clamp(0.0, metric.length);
+        canvas.drawPath(
+          metric.extractPath(distance, next.toDouble()),
+          paint,
+        );
+        distance = next + gapLength;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedBorderPainter old) =>
+      old.color != color ||
+      old.radius != radius ||
+      old.strokeWidth != strokeWidth ||
+      old.dashLength != dashLength ||
+      old.gapLength != gapLength;
+}
+
+/* ====================  Score Hero (Apple-style)  ==================== */
+
+/// Großer Hero mit dem aktuellsten Overall-Score, zentral platziert.
+/// Apple-Wallet-Karten-Look: dunkler Marken-Verlauf, ein dominanter
+/// Zahlenwert in der Mitte, eyebrow oben, Trend-Pille unten.
+class _ScoreHero extends StatelessWidget {
+  final String eyebrow;
+  final double? score;
+  final double? delta;
+  final String deltaCaption;
+
+  const _ScoreHero({
+    required this.eyebrow,
+    required this.score,
+    required this.delta,
+    required this.deltaCaption,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isUp = (delta ?? 0) >= 0;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.codriverGreen, AppColors.codriverDeep],
+        ),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: AppElevation.level2,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Eyebrow links
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              eyebrow,
+              style: AppTypography.caption2.copyWith(
+                color: Colors.white.withOpacity(0.85),
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ),
+          // Zentrierter Hero-Wert
+          Expanded(
+            child: Center(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: RichText(
+                  textAlign: TextAlign.center,
+                  text: TextSpan(
+                    children: [
+                      TextSpan(
+                        text: score != null ? _pct2.format(score) : '—',
+                        style: TextStyle(
+                          fontFamily: AppTypography.fontFamily,
+                          fontSize: 56,
+                          height: 1.0,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          letterSpacing: -1.4,
+                          fontFeatures: const [
+                            FontFeature.tabularFigures()
+                          ],
+                        ),
+                      ),
+                      TextSpan(
+                        text: '  %',
+                        style: TextStyle(
+                          fontFamily: AppTypography.fontFamily,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white.withOpacity(0.7),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // Trend-Pille zentriert unten
+          if (delta != null)
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.16),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isUp ? Icons.trending_up : Icons.trending_down,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${isUp ? '+' : ''}${_pct2.format(delta!.abs())} %  $deltaCaption',
+                    style: AppTypography.footnote.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            const SizedBox(height: 22),
+        ],
+      ),
+    );
+  }
+}
+
+/// Weiße Sekundär-Karte für den YEAR-Score — sitzt rechts neben dem
+/// grünen Hero, exakt gleich hoch, eigenes Padding + Margin.
+class _YearScoreCard extends StatelessWidget {
+  final String label;
+  final double? score;
+
+  const _YearScoreCard({required this.label, required this.score});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 16, 14, 18),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceElevatedLight,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: AppElevation.level1,
+        border: Border.all(
+          color: const Color(0xFFE5E5EA),
+          width: 0.5,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: AppTypography.caption2.copyWith(
+              color: AppColors.labelSecondaryLight,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.0,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          Center(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: RichText(
+                text: TextSpan(
+                  children: [
+                    TextSpan(
+                      text: score != null ? _pct2.format(score) : '—',
+                      style: TextStyle(
+                        fontFamily: AppTypography.fontFamily,
+                        fontSize: 38,
+                        height: 1.0,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.codriverDeep,
+                        letterSpacing: -0.9,
+                        fontFeatures: const [
+                          FontFeature.tabularFigures()
+                        ],
+                      ),
+                    ),
+                    TextSpan(
+                      text: '  %',
+                      style: TextStyle(
+                        fontFamily: AppTypography.fontFamily,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.labelSecondaryLight,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+        ],
+      ),
+    );
+  }
+}
+
+/// Kompakter Stat-Tile. Standard = weiß. Mit `accent: true` wird die
+/// gleiche Anatomie auf dem grünen Markenverlauf gerendert (weiße Schrift)
+/// — gedacht für die wichtigste „Last Week"-Kachel.
+class _StatTile extends StatelessWidget {
+  final String label;
+  final String subtitle;
+  final double? value;
+  final double? delta;
+  final String deltaCaption;
+  final bool accent;
+
+  const _StatTile({
+    required this.label,
+    required this.subtitle,
+    required this.value,
+    this.delta,
+    this.deltaCaption = '',
+    this.accent = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isUp = (delta ?? 0) >= 0;
+
+    final labelColor = accent
+        ? Colors.white.withOpacity(0.85)
+        : AppColors.labelSecondaryLight;
+    final subtitleColor = accent
+        ? Colors.white.withOpacity(0.7)
+        : AppColors.labelTertiaryLight;
+    final valueColor = accent ? Colors.white : AppColors.codriverDeep;
+    final deltaColor = accent
+        ? Colors.white
+        : (isUp ? AppColors.codriverGreen : AppColors.error);
+
+    final decoration = accent
+        ? BoxDecoration(
+            color: AppColors.codriverGreen,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: AppElevation.level2,
+          )
+        : BoxDecoration(
+            color: AppColors.surfaceElevatedLight,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: AppElevation.level1,
+            border: Border.all(
+              color: const Color(0xFFE5E5EA),
+              width: 0.5,
+            ),
           );
-        },
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      decoration: decoration,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: AppTypography.caption2.copyWith(
+              color: labelColor,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.6,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            style: AppTypography.caption1.copyWith(
+              color: subtitleColor,
+              fontWeight: FontWeight.w600,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 6),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value != null ? '${_pct2.format(value)} %' : '—',
+              style: AppTypography.title2.copyWith(
+                color: valueColor,
+                fontWeight: FontWeight.w800,
+                fontFeatures: const [FontFeature.tabularFigures()],
+                letterSpacing: -0.4,
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          if (delta != null)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isUp ? Icons.trending_up : Icons.trending_down,
+                  size: 13,
+                  color: deltaColor,
+                ),
+                const SizedBox(width: 2),
+                Flexible(
+                  child: Text(
+                    '${isUp ? '+' : ''}${_pct2.format(delta!.abs())} %',
+                    style: AppTypography.caption1.copyWith(
+                      color: deltaColor,
+                      fontWeight: FontWeight.w800,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            )
+          else
+            const SizedBox(height: 16),
+        ],
       ),
     );
   }
@@ -2541,137 +3343,178 @@ class _ResponsiveStatStrip extends StatelessWidget {
     final w = MediaQuery.of(context).size.width;
 
     if (w >= 1280) {
-      // Desktop: one row of 4
-      return Row(
-        children: [
-          Expanded(
-            child: _StatCard(
-              title: t.t('nav_scorecard'),
-              subtitle: t.t('admin_home_last_week').toUpperCase(),
-              value: latestOverall,
-              deltaCaption: t.t('scorecard_overview_from_last_week'),
-              delta: lastWeekOverallDelta,
+      // Desktop: one row of 4 — alle Tiles identische Höhe via IntrinsicHeight.
+      return IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: _StatCard(
+                title: t.t('nav_scorecard'),
+                subtitle: t.t('admin_home_last_week').toUpperCase(),
+                value: latestOverall,
+                deltaCaption: t.t('scorecard_overview_from_last_week'),
+                delta: lastWeekOverallDelta,
+              ),
             ),
-          ),
-          SizedBox(width: _pad(12, w)),
-          Expanded(
-            child: _StatCard(
-              title: t.t('nav_scorecard'),
-              subtitle: '${t.t('admin_home_year_prefix')} $yearLabel',
-              value: ytdOverall,
-              deltaCaption: t.t('scorecard_overview_from_last_year'),
-              delta: yoyOverallDelta,
+            SizedBox(width: _pad(12, w)),
+            Expanded(
+              child: _StatCard(
+                title: t.t('nav_scorecard'),
+                subtitle: '${t.t('admin_home_year_prefix')} $yearLabel',
+                value: ytdOverall,
+                deltaCaption: t.t('scorecard_overview_from_last_year'),
+                delta: yoyOverallDelta,
+              ),
             ),
-          ),
-          SizedBox(width: _pad(12, w)),
-          Expanded(
-            child: _StatCard(
-              title: t.t('scorecard_overview_reliability_score'),
-              subtitle: t.t('admin_home_last_week').toUpperCase(),
-              value: latestRel,
-              deltaCaption: t.t('scorecard_overview_from_last_week'),
-              delta: lastWeekRelDelta,
+            SizedBox(width: _pad(12, w)),
+            Expanded(
+              child: _StatCard(
+                title: t.t('scorecard_overview_reliability_score'),
+                subtitle: t.t('admin_home_last_week').toUpperCase(),
+                value: latestRel,
+                deltaCaption: t.t('scorecard_overview_from_last_week'),
+                delta: lastWeekRelDelta,
+              ),
             ),
-          ),
-          SizedBox(width: _pad(12, w)),
-          Expanded(
-            child: _StatCard(
-              title: t.t('scorecard_overview_reliability_score'),
-              subtitle: '${t.t('admin_home_year_prefix')} $yearLabel',
-              value: ytdRel,
-              deltaCaption: t.t('scorecard_overview_from_last_year'),
-              delta: yoyRelDelta,
+            SizedBox(width: _pad(12, w)),
+            Expanded(
+              child: _StatCard(
+                title: t.t('scorecard_overview_reliability_score'),
+                subtitle: '${t.t('admin_home_year_prefix')} $yearLabel',
+                value: ytdRel,
+                deltaCaption: t.t('scorecard_overview_from_last_year'),
+                delta: yoyRelDelta,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       );
     } else if (w >= 800) {
-      // Tablet: 2×2
+      // Tablet: 2×2 — IntrinsicHeight pro Reihe sorgt für identische Höhe.
       return Column(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: _StatCard(
-                  title: t.t('nav_scorecard'),
-                  subtitle: t.t('admin_home_last_week').toUpperCase(),
-                  value: latestOverall,
-                  deltaCaption: t.t('scorecard_overview_from_last_week'),
-                  delta: lastWeekOverallDelta,
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: _StatCard(
+                    title: t.t('nav_scorecard'),
+                    subtitle: t.t('admin_home_last_week').toUpperCase(),
+                    value: latestOverall,
+                    deltaCaption: t.t('scorecard_overview_from_last_week'),
+                    delta: lastWeekOverallDelta,
+                  ),
                 ),
-              ),
-              SizedBox(width: _pad(12, w)),
-              Expanded(
-                child: _StatCard(
-                  title: t.t('nav_scorecard'),
-                  subtitle: '${t.t('admin_home_year_prefix')} $yearLabel',
-                  value: ytdOverall,
-                  deltaCaption: t.t('scorecard_overview_from_last_year'),
-                  delta: yoyOverallDelta,
+                SizedBox(width: _pad(12, w)),
+                Expanded(
+                  child: _StatCard(
+                    title: t.t('nav_scorecard'),
+                    subtitle: '${t.t('admin_home_year_prefix')} $yearLabel',
+                    value: ytdOverall,
+                    deltaCaption: t.t('scorecard_overview_from_last_year'),
+                    delta: yoyOverallDelta,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           SizedBox(height: _pad(12, w)),
-          Row(
-            children: [
-              Expanded(
-                child: _StatCard(
-                  title: t.t('scorecard_overview_reliability_score'),
-                  subtitle: t.t('admin_home_last_week').toUpperCase(),
-                  value: latestRel,
-                  deltaCaption: t.t('scorecard_overview_from_last_week'),
-                  delta: lastWeekRelDelta,
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: _StatCard(
+                    title: t.t('scorecard_overview_reliability_score'),
+                    subtitle: t.t('admin_home_last_week').toUpperCase(),
+                    value: latestRel,
+                    deltaCaption: t.t('scorecard_overview_from_last_week'),
+                    delta: lastWeekRelDelta,
+                  ),
                 ),
-              ),
-              SizedBox(width: _pad(12, w)),
-              Expanded(
-                child: _StatCard(
-                  title: t.t('scorecard_overview_reliability_score'),
-                  subtitle: '${t.t('admin_home_year_prefix')} $yearLabel',
-                  value: ytdRel,
-                  deltaCaption: t.t('scorecard_overview_from_last_year'),
-                  delta: yoyRelDelta,
+                SizedBox(width: _pad(12, w)),
+                Expanded(
+                  child: _StatCard(
+                    title: t.t('scorecard_overview_reliability_score'),
+                    subtitle: '${t.t('admin_home_year_prefix')} $yearLabel',
+                    value: ytdRel,
+                    deltaCaption: t.t('scorecard_overview_from_last_year'),
+                    delta: yoyRelDelta,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       );
     } else {
-      // Mobile: stacked
+      // Mobile — alle vier Tiles in identischer Anatomie. Erste Reihe:
+      // Scorecard Last Week (grün) + Scorecard Year (weiß). Zweite Reihe:
+      // Reliability Last Week + Reliability Year (beide weiß).
       return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _StatCard(
-            title: t.t('nav_scorecard'),
-            subtitle: t.t('admin_home_last_week').toUpperCase(),
-            value: latestOverall,
-            deltaCaption: t.t('scorecard_overview_from_last_week'),
-            delta: lastWeekOverallDelta,
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: _StatTile(
+                    accent: true,
+                    label: t.t('nav_scorecard'),
+                    subtitle: t.t('admin_home_last_week').toUpperCase(),
+                    value: latestOverall,
+                    delta: lastWeekOverallDelta,
+                    deltaCaption:
+                        t.t('scorecard_overview_from_last_week'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _StatTile(
+                    label: t.t('nav_scorecard'),
+                    subtitle:
+                        '${t.t('admin_home_year_prefix')} $yearLabel',
+                    value: ytdOverall,
+                    delta: yoyOverallDelta,
+                    deltaCaption:
+                        t.t('scorecard_overview_from_last_year'),
+                  ),
+                ),
+              ],
+            ),
           ),
-          SizedBox(height: _pad(12, w)),
-          _StatCard(
-            title: t.t('nav_scorecard'),
-            subtitle: '${t.t('admin_home_year_prefix')} $yearLabel',
-            value: ytdOverall,
-            deltaCaption: t.t('scorecard_overview_from_last_year'),
-            delta: yoyOverallDelta,
-          ),
-          SizedBox(height: _pad(12, w)),
-          _StatCard(
-            title: t.t('scorecard_overview_reliability_score'),
-            subtitle: t.t('admin_home_last_week').toUpperCase(),
-            value: latestRel,
-            deltaCaption: t.t('scorecard_overview_from_last_week'),
-            delta: lastWeekRelDelta,
-          ),
-          SizedBox(height: _pad(12, w)),
-          _StatCard(
-            title: t.t('scorecard_overview_reliability_score'),
-            subtitle: '${t.t('admin_home_year_prefix')} $yearLabel',
-            value: ytdRel,
-            deltaCaption: t.t('scorecard_overview_from_last_year'),
-            delta: yoyRelDelta,
+          const SizedBox(height: 10),
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: _StatTile(
+                    label: t.t('scorecard_overview_reliability_score'),
+                    subtitle: t.t('admin_home_last_week').toUpperCase(),
+                    value: latestRel,
+                    delta: lastWeekRelDelta,
+                    deltaCaption:
+                        t.t('scorecard_overview_from_last_week'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _StatTile(
+                    label: t.t('scorecard_overview_reliability_score'),
+                    subtitle:
+                        '${t.t('admin_home_year_prefix')} $yearLabel',
+                    value: ytdRel,
+                    delta: yoyRelDelta,
+                    deltaCaption:
+                        t.t('scorecard_overview_from_last_year'),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       );

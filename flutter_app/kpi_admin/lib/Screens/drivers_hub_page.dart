@@ -15,9 +15,16 @@ import 'package:printing/printing.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:firebase_storage/firebase_storage.dart' as fb;
+import 'package:http/http.dart' as http;
 
 import '../localization/app_localizations.dart';
+import '../models/driver_contract_type.dart';
+import 'add_driver_dialog.dart';
+import 'admin_recruiting_panel.dart';
 import '../services/driver_csv.dart';
+import '../services/driver_export_service.dart';
+import '../widgets/admin_scope.dart';
+import '../widgets/pill_tab_bar.dart';
 import '../widgets/web_preview.dart'
     if (dart.library.html) '../widgets/web_preview_web.dart';
 import '../widgets/notification_pin_dialogs.dart';
@@ -56,14 +63,27 @@ class DriversHubPage extends StatefulWidget {
   State<DriversHubPage> createState() => _DriversHubPageState();
 }
 
-class _DriversHubPageState extends State<DriversHubPage> {
+class _DriversHubPageState extends State<DriversHubPage>
+    with SingleTickerProviderStateMixin {
+  late final TabController _hubTabs;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   User? get _user => _auth.currentUser;
-  String? get _uid => _user?.uid;
+
+  /// Wirksamer Admin-Namespace für alle Reads/Writes. Dispatcher liefern
+  /// hier die UID ihres Parent-Admin zurück (über `AdminScope`); Admins
+  /// fallen auf ihre eigene UID zurück.
+  String? get _uid {
+    final scoped = AdminScope.maybeOf(context)?.adminUid;
+    if (scoped != null && scoped.isNotEmpty) return scoped;
+    return _user?.uid;
+  }
 
   bool _busyCsv = false;
   bool _busyList = false;
+  // Export-Status für den ZIP-Download aller Fahrer-Stammdaten + Dokumente.
+  bool _busyExport = false;
+  String _exportProgress = '';
 
   // 🔹 New: bulk/default password controller + bulk action busy flag
   final TextEditingController _bulkPwdCtrl = TextEditingController(
@@ -105,11 +125,13 @@ class _DriversHubPageState extends State<DriversHubPage> {
   @override
   void initState() {
     super.initState();
+    _hubTabs = TabController(length: 2, vsync: this);
     _bulkPwdCtrl.addListener(_onDefaultPasswordChanged);
   }
 
   @override
   void dispose() {
+    _hubTabs.dispose();
     _defaultPwdSaveDebounce?.cancel();
     unawaited(_persistDefaultDriverPassword());
     _bulkPwdCtrl.removeListener(_onDefaultPasswordChanged);
@@ -174,14 +196,30 @@ class _DriversHubPageState extends State<DriversHubPage> {
   @override
   Widget build(BuildContext context) {
     _loadDefaultDriverPasswordOnce();
+    final adminUid = _uid;
     return Padding(
       padding: const EdgeInsets.all(24.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildHeader(),
-          const SizedBox(height: 16),
-          Expanded(child: _buildDriversList()),
+          const SizedBox(height: 14),
+          PillTabBar(
+            controller: _hubTabs,
+            tabs: const ['Drivers', 'Recruiting'],
+          ),
+          const SizedBox(height: 14),
+          Expanded(
+            child: TabBarView(
+              controller: _hubTabs,
+              children: [
+                _buildDriversList(),
+                adminUid == null
+                    ? const Center(child: Text('—'))
+                    : AdminRecruitingPanel(adminUid: adminUid),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -775,77 +813,100 @@ class _DriversHubPageState extends State<DriversHubPage> {
     final t = AppLocalizations.of(context);
     final width = MediaQuery.of(context).size.width;
     final isSmall = width < 800;
-    final isNarrow = width < 980;
-
-    final importBtn = SizedBox(
-      height: isSmall ? 32 : 36,
-      child: FilledButton.icon(
-        onPressed: _busyCsv ? null : _onImportCsv,
-        icon: _busyCsv
-            ? const SizedBox(
-                height: 18,
-                width: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              )
-            : const Icon(Icons.file_upload_outlined, size: 18),
-        label: Text(
-          t.t('drivers_hub_import_csv'),
-          style: TextStyle(fontSize: isSmall ? 12 : 14),
-        ),
-      ),
-    );
-
-    final addDriverBtn = SizedBox(
-      height: isSmall ? 32 : 36,
-      child: OutlinedButton.icon(
-        onPressed: _busyList ? null : _createDriverManually,
-        icon: const Icon(Icons.person_add_alt_1_outlined, size: 18),
-        label: Text(
-          t.t('drivers_hub_add_driver'),
-          style: TextStyle(fontSize: isSmall ? 12 : 14),
-        ),
-      ),
-    );
-
-    if (isNarrow) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            t.t('drivers_hub_title'),
-            style: TextStyle(
-              fontSize: isSmall ? 20 : 24,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [importBtn, addDriverBtn],
-          ),
-        ],
-      );
-    }
 
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(
-          t.t('drivers_hub_title'),
-          style: TextStyle(
-            fontSize: isSmall ? 20 : 24,
-            fontWeight: FontWeight.w800,
+        Expanded(
+          child: Text(
+            t.t('drivers_hub_title'),
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: isSmall ? 22 : 26,
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF1F2937),
+              letterSpacing: -0.4,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
-        const Spacer(),
-        importBtn,
         const SizedBox(width: 12),
-        addDriverBtn,
+        _NewActionButton(
+          busyCsv: _busyCsv,
+          busyList: _busyList,
+          busyBulkLogins: _busyBulkLogins,
+          onAddDriver: () => _createDriverManually(),
+          onImportCsv: () => _onImportCsv(),
+          onCreateLoginsForAll: () => _onCreateLoginsForAllDrivers(),
+          labelAdd: t.t('drivers_hub_add_driver'),
+          labelImport: t.t('drivers_hub_import_csv'),
+          labelLogins: t.t('drivers_hub_create_login_for_all'),
+          labelNew: 'New',
+        ),
       ],
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Export a single driver's stammdaten + documents as ZIP
+  // ---------------------------------------------------------------------------
+
+  Future<void> _exportDriver({
+    required DocumentReference<Map<String, dynamic>> driverRef,
+    required String driverName,
+    required String transporterId,
+  }) async {
+    final t = AppLocalizations.of(context);
+    final uid = _uid;
+    if (uid == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(t.t('drivers_hub_must_login_import_csv'))),
+      );
+      return;
+    }
+
+    setState(() {
+      _busyExport = true;
+      _exportProgress = '…';
+    });
+
+    try {
+      final bytes = await DriverExportService().buildSingleDriverZip(
+        adminUid: uid,
+        driverRef: driverRef,
+        onProgress: (p) {
+          if (!mounted) return;
+          final pct = p.docsTotal == 0
+              ? 0
+              : ((p.docsDone / p.docsTotal) * 100).round();
+          setState(() => _exportProgress = '$pct %');
+        },
+      );
+
+      final folder = DriverExportService.driverFolderName(
+        driverName: driverName,
+        transporterId: transporterId,
+      );
+      await downloadWebBytes(bytes, 'codriver_$folder.zip');
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(t.t('drivers_hub_export_success'))),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Export fehlgeschlagen: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busyExport = false;
+          _exportProgress = '';
+        });
+      }
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -992,91 +1053,18 @@ class _DriversHubPageState extends State<DriversHubPage> {
       return;
     }
 
-    final nameCtrl = TextEditingController();
-    final idCtrl = TextEditingController();
-    final emailCtrl = TextEditingController();
+    final defaultPwd = _bulkPwdCtrl.text.trim().isEmpty
+        ? kDefaultDriverPassword
+        : _bulkPwdCtrl.text.trim();
 
-    final ok = await showDialog<bool>(
+    final ok = await showAddDriverDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(t.t('drivers_hub_add_edit_driver')),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameCtrl,
-              decoration: InputDecoration(
-                labelText: t.t('drivers_hub_driver_name'),
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: idCtrl,
-              decoration: InputDecoration(
-                labelText: t.t('drivers_hub_transporter_id_login'),
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: emailCtrl,
-              decoration: InputDecoration(
-                labelText: t.t('drivers_hub_email_optional'),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(t.t('admin_home_cancel')),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(t.t('button_save')),
-          ),
-        ],
-      ),
-    );
-
-    if (ok != true) return;
-
-    final name = nameCtrl.text.trim();
-    final tid = idCtrl.text.trim();
-    final email = emailCtrl.text.trim();
-
-    if (tid.isEmpty || name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(t.t('drivers_hub_name_and_transporter_id_required')),
-        ),
-      );
-      return;
-    }
-
-    final db = FirebaseFirestore.instance;
-    final doc = db
-        .collection('users')
-        .doc(_uid!)
-        .collection('drivers')
-        .doc(tid.toUpperCase());
-
-    await doc.set({
-      'transporterId': tid.toUpperCase(),
-      'driverName': name,
-      'email': email.isEmpty ? null : email,
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-      'hasLogin': false,
-      'active': true,
-    }, SetOptions(merge: true));
-
-    await _backfillMissingRuleNotificationsForDriver(
       dspUid: _uid!,
-      driverRef: doc,
+      defaultPassword: defaultPwd,
     );
-
+    if (!ok || !mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(t.tf('drivers_hub_driver_saved', {'name': name}))),
+      const SnackBar(content: Text('Fahrer angelegt.')),
     );
   }
 
@@ -1251,13 +1239,6 @@ class _DriversHubPageState extends State<DriversHubPage> {
     final pwd = pwdCtrl.text.trim();
     final pwd2 = pwd2Ctrl.text.trim();
 
-    if (newTidRaw.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(t.t('drivers_hub_transporter_id_required'))),
-      );
-      return;
-    }
-
     if (email.isEmpty || !email.contains('@')) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(t.t('drivers_hub_valid_driver_email_required'))),
@@ -1274,14 +1255,18 @@ class _DriversHubPageState extends State<DriversHubPage> {
 
     final newTid = newTidRaw.toUpperCase();
     final oldTid = tidOriginal.toUpperCase();
-    final tidChanged = newTid != oldTid;
+    final hasNewTid = newTid.isNotEmpty;
+    // Only treat as "tidChanged" when both old and new TID are non-empty and
+    // differ. Adding/removing a TID is handled via merge on the same doc id
+    // (no doc move) since the original doc id may already be an auto-id.
+    final tidChanged = hasNewTid && oldTid.isNotEmpty && newTid != oldTid;
 
     try {
       // Decide which document we will finally use
       DocumentReference<Map<String, dynamic>> targetRef = driverDoc.reference;
 
       if (tidChanged) {
-        // move driver document to new ID
+        // move driver document to new TID-based ID
         final driversCol = driverDoc.reference.parent;
         final newDocRef = driversCol.doc(newTid);
 
@@ -1295,21 +1280,24 @@ class _DriversHubPageState extends State<DriversHubPage> {
 
         targetRef = newDocRef;
       } else {
-        // just update email + transporterId
+        // just update email + transporterId (if provided)
         await driverDoc.reference.set({
           'email': email,
-          'transporterId': newTid,
+          if (hasNewTid) 'transporterId': newTid,
+          if (hasNewTid) 'tidPending': false,
           'updatedAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
       }
 
-      // Call function with NEW transporterId
+      // Call function — pass driverDocId so it works for both TID-based
+      // doc ids and auto-id docs without a TID.
       final callable = FirebaseFunctions.instance.httpsCallable(
         'createDriverLogin',
       );
       await callable.call(<String, dynamic>{
         'dspUid': _uid!,
-        'transporterId': newTid,
+        if (hasNewTid) 'transporterId': newTid,
+        'driverDocId': targetRef.id,
         'password': pwd,
       });
 
@@ -1330,8 +1318,12 @@ class _DriversHubPageState extends State<DriversHubPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _CopyRow(label: t.t('drivers_hub_transporter_id'), value: newTid),
-              const SizedBox(height: 8),
+              if (hasNewTid)
+                _CopyRow(
+                  label: t.t('drivers_hub_transporter_id'),
+                  value: newTid,
+                ),
+              if (hasNewTid) const SizedBox(height: 8),
               _CopyRow(label: t.t('drivers_hub_email'), value: email),
               const SizedBox(height: 8),
               _CopyRow(label: t.t('drivers_hub_password'), value: pwd),
@@ -1405,7 +1397,9 @@ class _DriversHubPageState extends State<DriversHubPage> {
 
     final data = driverDoc.data() ?? {};
     final name = (data['driverName'] ?? '').toString();
-    final tid = (data['transporterId'] ?? driverDoc.id).toString().trim();
+    final hasTid = (data['transporterId'] ?? '').toString().trim().isNotEmpty;
+    final hasLogin = data['hasLogin'] == true;
+    final authUid = (data['authUid'] ?? '').toString().trim();
 
     final confirm = await showDialog<bool>(
       context: context,
@@ -1428,13 +1422,28 @@ class _DriversHubPageState extends State<DriversHubPage> {
     if (confirm != true) return;
 
     try {
-      final callable = FirebaseFunctions.instance.httpsCallable(
-        'deleteDriverAccount',
-      );
-      await callable.call(<String, dynamic>{
-        'dspUid': _uid,
-        'transporterId': tid,
-      });
+      // Drei Fälle:
+      //  1. Driver hat sowohl TID als auch Login → Cloud Function nutzen
+      //     (löscht Auth-User + Firestore-Doc + users/{authUid})
+      //  2. Driver hat noch keinen Login (frisch angelegt, kein Auth-Account)
+      //     → direkt Firestore-Doc löschen, keine Cloud Function nötig
+      //  3. Driver hat keine TID (Auto-ID-Doc) → ebenfalls Direkt-Delete,
+      //     weil die Cloud Function den Doc-Pfad sonst nicht findet.
+      final needsCloudFunction = hasTid && (hasLogin || authUid.isNotEmpty);
+
+      if (needsCloudFunction) {
+        final tid = (data['transporterId'] as String).trim();
+        final callable = FirebaseFunctions.instance.httpsCallable(
+          'deleteDriverAccount',
+        );
+        await callable.call(<String, dynamic>{
+          'dspUid': _uid,
+          'transporterId': tid,
+        });
+      } else {
+        // Direkter Firestore-Delete für Fahrer ohne Auth-User.
+        await driverDoc.reference.delete();
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1523,11 +1532,6 @@ class _DriversHubPageState extends State<DriversHubPage> {
         final hasLogin = (data['hasLogin'] as bool?) ?? false;
         final tidRaw = (data['transporterId'] ?? '').toString().trim();
 
-        if (tidRaw.isEmpty) {
-          skipped++;
-          continue;
-        }
-
         // Only create logins for drivers that don't already have one
         if (hasLogin) {
           skipped++;
@@ -1535,12 +1539,13 @@ class _DriversHubPageState extends State<DriversHubPage> {
         }
 
         final tid = tidRaw.toUpperCase();
+        final hasTid = tid.isNotEmpty;
 
         // ✅ Ensure driver has an email before calling the function
         final existingEmail = (data['email'] ?? '').toString().trim();
         String emailToUse = existingEmail;
 
-        if (emailToUse.isEmpty) {
+        if (emailToUse.isEmpty && hasTid) {
           final driverName = (data['driverName'] ?? '').toString();
           emailToUse = _buildSuggestedDriverEmail(
             driverName: driverName,
@@ -1548,7 +1553,7 @@ class _DriversHubPageState extends State<DriversHubPage> {
           );
         }
 
-        // If still empty, skip (avoids creating @drivers.dsp-copilot.local)
+        // Need either a real email or a TID to derive one.
         if (emailToUse.isEmpty) {
           skipped++;
           continue;
@@ -1556,15 +1561,17 @@ class _DriversHubPageState extends State<DriversHubPage> {
 
         // ✅ Update driver doc FIRST (same behavior as single-driver flow)
         await d.reference.set({
-          'transporterId': tid,
+          if (hasTid) 'transporterId': tid,
           'email': emailToUse,
           'updatedAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
 
-        // Call function
+        // Call function — pass driverDocId so the function can resolve
+        // both legacy TID-as-doc-id and newer auto-id docs.
         await callable.call(<String, dynamic>{
           'dspUid': _uid!,
-          'transporterId': tid,
+          if (hasTid) 'transporterId': tid,
+          'driverDocId': d.id,
           'password': pwd,
         });
 
@@ -1869,28 +1876,40 @@ class _DriversHubPageState extends State<DriversHubPage> {
   Future<void> _openDriverDetails(
     DocumentSnapshot<Map<String, dynamic>> driverDoc,
   ) async {
-    await showDialog(
-      context: context,
+    await Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (ctx) {
-        final media = MediaQuery.of(ctx).size;
         bool showPin = false;
 
         return StatefulBuilder(
           builder: (ctxState, setStateDialog) {
-            return Dialog(
-              insetPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 16,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: 980,
-                  maxHeight: media.height - 32,
+            return Scaffold(
+              backgroundColor: const Color(0xFFF4F5FB),
+              appBar: AppBar(
+                backgroundColor: Colors.white,
+                surfaceTintColor: Colors.white,
+                elevation: 0,
+                scrolledUnderElevation: 0.5,
+                foregroundColor: const Color(0xFF111827),
+                leading: IconButton(
+                  tooltip: AppLocalizations.of(ctx).t('admin_home_close'),
+                  icon: const Icon(Icons.arrow_back_rounded),
+                  onPressed: () => Navigator.of(ctx).pop(),
                 ),
-                child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                title: Text(
+                  AppLocalizations.of(ctx)
+                      .t('drivers_hub_tooltip_view_details'),
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF111827),
+                  ),
+                ),
+              ),
+              body: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1100),
+                  child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
                   stream: driverDoc.reference.snapshots(),
                   builder: (ctx2, snap) {
                     if (!snap.hasData) {
@@ -1902,6 +1921,11 @@ class _DriversHubPageState extends State<DriversHubPage> {
                     final name = (data['driverName'] ?? '').toString();
                     final email = (data['email'] ?? '').toString();
                     final tid = (data['transporterId'] ?? '').toString();
+                    final employeeNumber =
+                        (data['employeeNumber'] ?? '').toString().trim();
+                    final contractType = DriverContractType.fromValue(
+                      data['contractType'],
+                    );
                     final pin = (data['notificationPin'] ?? '')
                         .toString()
                         .trim();
@@ -1931,14 +1955,9 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                 onboarding['residencePermitExpiry'])
                             .toString();
 
-                    return Container(
-                      color: const Color(0xFFF4F5FB),
+                    return SingleChildScrollView(
                       padding: const EdgeInsets.all(20),
-                      child: Column(
-                        children: [
-                          Expanded(
-                            child: SingleChildScrollView(
-                              child: LayoutBuilder(
+                      child: LayoutBuilder(
                                 builder: (context, constraints) {
                                   final isNarrow = constraints.maxWidth < 1100;
 
@@ -2041,6 +2060,15 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                         ],
                                       ),
                                     ],
+                                  );
+
+                                  // Employment block (Personalnummer
+                                  // + Vertragstyp) — sits between the
+                                  // identity column and the PIN card.
+                                  final employmentCard =
+                                      _EmploymentInfoCard(
+                                    employeeNumber: employeeNumber,
+                                    contractType: contractType,
                                   );
 
                                   final pinCard = Container(
@@ -2163,10 +2191,13 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                                 children: [
                                                   avatar,
                                                   const SizedBox(width: 14),
-                                                  Expanded(child: identityCol),
+                                                  Expanded(
+                                                      child: identityCol),
                                                 ],
                                               ),
                                               const SizedBox(height: 14),
+                                              employmentCard,
+                                              const SizedBox(height: 12),
                                               pinCard,
                                             ],
                                           )
@@ -2177,7 +2208,9 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                               avatar,
                                               const SizedBox(width: 16),
                                               Expanded(child: identityCol),
-                                              const SizedBox(width: 16),
+                                              const SizedBox(width: 12),
+                                              employmentCard,
+                                              const SizedBox(width: 12),
                                               pinCard,
                                             ],
                                           ),
@@ -2627,46 +2660,59 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                       if (tid.isNotEmpty)
                                         const SizedBox(height: 16),
                                       documentsCard,
+                                      const SizedBox(height: 20),
+                                      // Bottom action row — kept in scroll
+                                      // body (instead of fixed bar) so it
+                                      // never overlaps content on small
+                                      // screens. The AppBar's leading
+                                      // button is the primary close.
+                                      Wrap(
+                                        alignment: WrapAlignment.end,
+                                        spacing: 8,
+                                        runSpacing: 8,
+                                        children: [
+                                          OutlinedButton.icon(
+                                            onPressed: () => _exportDriver(
+                                              driverRef:
+                                                  driverDoc.reference,
+                                              driverName: name,
+                                              transporterId: tid,
+                                            ),
+                                            icon: const Icon(
+                                                Icons.download_rounded,
+                                                size: 18),
+                                            label: Text(t
+                                                .t('drivers_hub_export_zip')),
+                                          ),
+                                          FilledButton(
+                                            onPressed: !hasOnboarding
+                                                ? null
+                                                : () {
+                                                    _exportOnboardingPdf(
+                                                      driverName: name,
+                                                      transporterId: tid,
+                                                      onboarding: onboarding,
+                                                    );
+                                                  },
+                                            child: Text(t
+                                                .t('drivers_hub_export_pdf')),
+                                          ),
+                                        ],
+                                      ),
                                     ],
                                   );
                                 },
                               ),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              TextButton(
-                                onPressed: () => Navigator.of(ctx).pop(),
-                                child: Text(t.t('admin_home_close')),
-                              ),
-                              const SizedBox(width: 8),
-                              FilledButton(
-                                onPressed: !hasOnboarding
-                                    ? null
-                                    : () {
-                                        _exportOnboardingPdf(
-                                          driverName: name,
-                                          transporterId: tid,
-                                          onboarding: onboarding,
-                                        );
-                                      },
-                                child: Text(t.t('drivers_hub_export_pdf')),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    );
+                            );
                   },
+                ),
                 ),
               ),
             );
           },
         );
       },
-    );
+    ));
   }
 
   Widget _buildWeeklyScoreSummaryCard({
@@ -3060,6 +3106,129 @@ class _DriversHubPageState extends State<DriversHubPage> {
     );
   }
 
+  /// Holt für einen Fahrer alle hochgeladenen Dokumente aus Storage und
+  /// bereitet sie für die PDF-Einbettung vor. Bilder werden direkt als
+  /// PNG/JPG-Image-Provider zurückgegeben; PDFs werden seitenweise via
+  /// `Printing.raster` zu Bildern rendert, damit sie in das Onboarding-
+  /// PDF kopiert werden können.
+  Future<List<_EmbeddedDoc>> _collectDriverDocsForPdf({
+    required String transporterId,
+  }) async {
+    final uid = _uid;
+    if (uid == null) return const [];
+    final tid = transporterId.trim();
+    if (tid.isEmpty) return const [];
+
+    final driverRef = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('drivers')
+        .doc(tid);
+
+    final snap = await driverRef.collection('documents').get();
+    if (snap.docs.isEmpty) return const [];
+
+    // Stabile Reihenfolge wie im ZIP-Export
+    const order = [
+      'contract',
+      'resident_permit',
+      'tax_id',
+      'insurance',
+      'id_card_front',
+      'id_card_back',
+      'passport_front',
+      'passport_back',
+      'driver_license_front',
+      'driver_license_back',
+    ];
+    const labels = {
+      'contract': 'Arbeitsvertrag',
+      'resident_permit': 'Aufenthaltsgenehmigung',
+      'tax_id': 'Steuer-ID',
+      'insurance': 'Krankenkasse',
+      'id_card_front': 'Personalausweis (Vorne)',
+      'id_card_back': 'Personalausweis (Hinten)',
+      'passport_front': 'Reisepass (Vorne)',
+      'passport_back': 'Reisepass (Hinten)',
+      'driver_license_front': 'Führerschein (Vorne)',
+      'driver_license_back': 'Führerschein (Hinten)',
+    };
+
+    final byType = <String, Map<String, dynamic>>{
+      for (final d in snap.docs)
+        (d.data()['docType'] ?? d.id).toString(): d.data(),
+    };
+    final orderedTypes = <String>[
+      ...order.where(byType.containsKey),
+      ...byType.keys.where((k) => !order.contains(k)),
+    ];
+
+    final out = <_EmbeddedDoc>[];
+    final storage = fb.FirebaseStorage.instance;
+
+    for (final type in orderedTypes) {
+      final docData = byType[type]!;
+      final storagePath = (docData['storagePath'] ?? '').toString();
+      final downloadUrl = (docData['downloadUrl'] ?? '').toString();
+      if (storagePath.isEmpty && downloadUrl.isEmpty) continue;
+
+      final contentType =
+          (docData['contentType'] ?? '').toString().toLowerCase();
+      final fileName = (docData['fileName'] ?? '').toString();
+      final label = labels[type] ?? type;
+
+      try {
+        // Primär direkter HTTP-GET auf die downloadUrl (umgeht den
+        // Type-Cast-Bug im firebase_storage Web-SDK). Falls keine URL
+        // gespeichert ist, fragen wir sie über das SDK ab.
+        Uint8List? bytes;
+        String urlToFetch = downloadUrl;
+        if (urlToFetch.isEmpty && storagePath.isNotEmpty) {
+          try {
+            urlToFetch = await storage.ref(storagePath).getDownloadURL();
+          } catch (_) {}
+        }
+        if (urlToFetch.isNotEmpty) {
+          try {
+            final resp = await http.get(Uri.parse(urlToFetch));
+            if (resp.statusCode == 200) {
+              bytes = resp.bodyBytes;
+            }
+          } catch (_) {}
+        }
+        if (bytes == null) continue;
+
+        final isPdf = contentType == 'application/pdf' ||
+            fileName.toLowerCase().endsWith('.pdf') ||
+            storagePath.toLowerCase().endsWith('.pdf') ||
+            downloadUrl.toLowerCase().contains('.pdf');
+
+        if (isPdf) {
+          // PDF-Seiten via printing.raster zu Bildern konvertieren — so
+          // können sie als Bild-Pages ins Master-PDF eingebettet werden.
+          final pages = <pw.MemoryImage>[];
+          await for (final raster in Printing.raster(bytes, dpi: 150)) {
+            final png = await raster.toPng();
+            pages.add(pw.MemoryImage(png));
+          }
+          if (pages.isNotEmpty) {
+            out.add(_EmbeddedDoc(label: label, pages: pages));
+          }
+        } else {
+          // Bilddatei direkt einbetten
+          out.add(_EmbeddedDoc(
+            label: label,
+            pages: [pw.MemoryImage(bytes)],
+          ));
+        }
+      } catch (_) {
+        // Datei nicht abrufbar — überspringen, Rest läuft weiter.
+      }
+    }
+
+    return out;
+  }
+
   Future<void> _exportOnboardingPdf({
     required String driverName,
     required String transporterId,
@@ -3178,6 +3347,42 @@ class _DriversHubPageState extends State<DriversHubPage> {
       ),
     );
 
+    // ── Dokumente anhängen ──────────────────────────────────────────
+    final embedded = await _collectDriverDocsForPdf(
+      transporterId: transporterId,
+    );
+    for (final ed in embedded) {
+      for (var i = 0; i < ed.pages.length; i++) {
+        final page = ed.pages[i];
+        final pageLabel = ed.pages.length > 1
+            ? '${ed.label} — Seite ${i + 1}/${ed.pages.length}'
+            : ed.label;
+        doc.addPage(
+          pw.Page(
+            margin: const pw.EdgeInsets.all(24),
+            build: (ctx) => pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  pageLabel,
+                  style: pw.TextStyle(
+                    fontSize: 14,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.SizedBox(height: 10),
+                pw.Expanded(
+                  child: pw.Center(
+                    child: pw.Image(page, fit: pw.BoxFit.contain),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    }
+
     await Printing.layoutPdf(
       name: 'onboarding_$transporterId.pdf',
       onLayout: (format) async => doc.save(),
@@ -3195,89 +3400,145 @@ class _DriversHubPageState extends State<DriversHubPage> {
     }
 
     final width = MediaQuery.of(context).size.width;
-    final isSmall = width < 800;
-    final isNarrowControls = width < 980;
+    final isNarrowControls = width < 720;
 
-    final searchField = TextField(
-      decoration: InputDecoration(
-        prefixIcon: const Icon(Icons.search),
-        hintText: t.t('drivers_hub_search_name_or_email'),
-        isDense: isSmall,
-        filled: true,
-        fillColor: const Color(0xFFF9FAFB),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(999),
-          borderSide: BorderSide.none,
+    final searchField = SizedBox(
+      height: 44,
+      child: TextField(
+        style: const TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+          color: Color(0xFF1F2937),
         ),
+        decoration: InputDecoration(
+          prefixIcon: const Icon(
+            Icons.search_rounded,
+            color: Color(0xFF9CA3AF),
+            size: 20,
+          ),
+          hintText: t.t('drivers_hub_search_name_or_email'),
+          hintStyle: const TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF9CA3AF),
+          ),
+          isDense: true,
+          filled: true,
+          fillColor: Colors.white,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(
+                color: Color(0xFFE5E5EA), width: 0.6),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(
+                color: Color(0xFFE5E5EA), width: 0.6),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(
+                color: Color(0xFF00B287), width: 1.4),
+          ),
+        ),
+        onChanged: (value) {
+          setState(() => _search = value.toLowerCase());
+        },
       ),
-      onChanged: (value) {
-        setState(() {
-          _search = value.toLowerCase();
-        });
-      },
     );
 
     final sortField = _DriverSortPill(
-      isSmall: isSmall,
+      isSmall: false,
       valueLabel: _driverSortLabel(_driverSort),
       onSelected: (value) {
-        setState(() {
-          _driverSort = value;
-        });
+        setState(() => _driverSort = value);
       },
     );
 
-    final passwordField = TextField(
-      controller: _bulkPwdCtrl,
-      obscureText: !_bulkPwdVisible,
-      decoration: InputDecoration(
-        labelText: t.t('drivers_hub_default_driver_password'),
-        isDense: isSmall,
-        filled: true,
-        fillColor: const Color(0xFFF9FAFB),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(999),
-          borderSide: BorderSide.none,
-        ),
-        suffixIcon: IconButton(
-          icon: Icon(
-            _bulkPwdVisible
-                ? Icons.visibility_off_outlined
-                : Icons.visibility_outlined,
+    final passwordField = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 2, bottom: 6),
+          child: Text(
+            t.t('drivers_hub_default_driver_password'),
+            style: const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.0,
+              color: Color(0xFF6B7280),
+            ),
           ),
-          onPressed: () {
-            setState(() {
-              _bulkPwdVisible = !_bulkPwdVisible;
-            });
-          },
         ),
-      ),
-    );
-
-    final createLoginsBtn = SizedBox(
-      height: isSmall ? 32 : 36,
-      child: FilledButton.icon(
-        onPressed: _busyBulkLogins ? null : _onCreateLoginsForAllDrivers,
-        icon: _busyBulkLogins
-            ? const SizedBox(
-                height: 18,
-                width: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              )
-            : const Icon(Icons.vpn_key_outlined, size: 18),
-        label: Text(
-          t.t('drivers_hub_create_login_for_all'),
-          style: TextStyle(fontSize: isSmall ? 11 : 13),
+        SizedBox(
+          height: 44,
+          child: TextField(
+            controller: _bulkPwdCtrl,
+            obscureText: !_bulkPwdVisible,
+            style: const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF1F2937),
+            ),
+            decoration: InputDecoration(
+              prefixIcon: const Icon(
+                Icons.lock_outline_rounded,
+                color: Color(0xFF9CA3AF),
+                size: 18,
+              ),
+              hintText: '••••••••',
+              hintStyle: const TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF9CA3AF),
+              ),
+              isDense: true,
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12, vertical: 12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                    color: Color(0xFFE5E5EA), width: 0.6),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                    color: Color(0xFFE5E5EA), width: 0.6),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                    color: Color(0xFF00B287), width: 1.4),
+              ),
+              suffixIcon: IconButton(
+                iconSize: 18,
+                color: const Color(0xFF6B7280),
+                icon: Icon(_bulkPwdVisible
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined),
+                onPressed: () =>
+                    setState(() => _bulkPwdVisible = !_bulkPwdVisible),
+              ),
+            ),
+          ),
         ),
-      ),
+      ],
     );
 
     return Column(
       children: [
-        // 🔹 Top controls: stacked on narrow screens
+        // 🔹 Top controls — Apple-Style: Suche links, Sortier-Pille
+        //    rechts, darunter (optional) das Default-Passwort-Feld.
         if (isNarrowControls)
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -3287,31 +3548,35 @@ class _DriversHubPageState extends State<DriversHubPage> {
               sortField,
               const SizedBox(height: 10),
               passwordField,
-              const SizedBox(height: 10),
-              SizedBox(width: double.infinity, child: createLoginsBtn),
             ],
           )
         else
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(flex: 3, child: searchField),
-              const SizedBox(width: 12),
-              Expanded(flex: 2, child: sortField),
-              const SizedBox(width: 12),
-              Expanded(flex: 2, child: passwordField),
-              const SizedBox(width: 12),
-              createLoginsBtn,
+              Row(
+                children: [
+                  Expanded(flex: 3, child: searchField),
+                  const SizedBox(width: 12),
+                  Expanded(flex: 2, child: sortField),
+                ],
+              ),
+              const SizedBox(height: 10),
+              SizedBox(width: 360, child: passwordField),
             ],
           ),
         const SizedBox(height: 16),
 
         Expanded(
           child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            // Bewusst ohne `orderBy('transporterId')` — Firestore schließt
+            // Docs ohne dieses Feld aus dem Sort aus, was neu angelegte
+            // Fahrer ohne TID (`tidPending: true`) komplett unsichtbar
+            // machte. Sortierung passiert client-seitig im Code unten.
             stream: FirebaseFirestore.instance
                 .collection('users')
                 .doc(_uid!)
                 .collection('drivers')
-                .orderBy('transporterId')
                 .snapshots(),
             builder: (context, snap) {
               if (snap.connectionState == ConnectionState.waiting) {
@@ -3425,6 +3690,13 @@ class _DriversHubPageState extends State<DriversHubPage> {
                   if (c != 0) return c;
                 }
 
+                // 2) Active beats rejected — rejected (active=false)
+                // sinks to the bottom regardless of the chosen sort,
+                // so the visible workforce stays at the top.
+                final aActive = (ad['active'] as bool?) ?? true;
+                final bActive = (bd['active'] as bool?) ?? true;
+                if (aActive != bActive) return aActive ? -1 : 1;
+
                 DateTime? asDate(dynamic v) {
                   if (v is Timestamp) return v.toDate();
                   if (v is DateTime) return v;
@@ -3486,282 +3758,97 @@ class _DriversHubPageState extends State<DriversHubPage> {
                     scoresSnap.data?.docs ?? const [],
                   );
 
-                  // Single desktop-style layout for all sizes.
-                  // On very small screens user can scroll horizontally if needed.
+                  // Contract-type breakdown — counts every ACTIVE
+                  // driver in the unfiltered set so the totals stay
+                  // stable while the admin searches/filters. Rejected
+                  // / inactive drivers (`active: false`) drop out of
+                  // both the total and the per-type counts.
+                  final contractCounts = <DriverContractType?, int>{};
+                  var activeTotal = 0;
+                  for (final d in docs) {
+                    final data = d.data();
+                    final active = (data['active'] as bool?) ?? true;
+                    if (!active) continue;
+                    activeTotal++;
+                    final ct = DriverContractType.fromValue(
+                      data['contractType'],
+                    );
+                    contractCounts[ct] = (contractCounts[ct] ?? 0) + 1;
+                  }
+
                   return LayoutBuilder(
                     builder: (context, constraints) {
-                      final table = Column(
+                      final isCompact = constraints.maxWidth < 720;
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          // header row
-                          Container(
-                            height: 44,
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF9FAFB),
-                              borderRadius: BorderRadius.circular(12),
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              top: 4,
+                              bottom: 12,
                             ),
-                            child: Row(
-                              children: [
-                                _headerCell(
-                                  t.t('drivers_hub_header_profile'),
-                                  flex: 5,
-                                ),
-                                _headerCell(
-                                  t.t('drivers_hub_header_overall'),
-                                  flex: 3,
-                                ),
-                                _headerCell(
-                                  t.t('drivers_hub_header_status'),
-                                  flex: 2,
-                                ),
-                                _headerCell(
-                                  t.t('drivers_hub_header_working'),
-                                  flex: 2,
-                                ),
-                                _headerCell(
-                                  t.t('drivers_hub_header_login'),
-                                  flex: 2,
-                                ),
-                                _headerCell(
-                                  t.t('drivers_hub_header_action'),
-                                  flex: 3,
-                                  alignment: Alignment.centerRight,
-                                ),
-                              ],
+                            child: _ContractTypeStatsRow(
+                              counts: contractCounts,
+                              totalDrivers: activeTotal,
+                              compact: isCompact,
                             ),
                           ),
-                          const SizedBox(height: 8),
                           Expanded(
                             child: ListView.separated(
+                              padding: const EdgeInsets.only(
+                                bottom: 24,
+                              ),
                               itemCount: filtered.length,
                               separatorBuilder: (_, __) =>
-                                  const SizedBox(height: 6),
+                                  const SizedBox(height: 10),
                               itemBuilder: (context, index) {
-                            final d = filtered[index];
-                            final data = d.data();
-                            final name = (data['driverName'] ?? '').toString();
-                            final email = (data['email'] ?? '').toString();
-                            final transporterId = (data['transporterId'] ?? d.id)
-                                .toString()
-                                .trim()
-                                .toUpperCase();
-                            final hasLogin =
-                                (data['hasLogin'] as bool?) ?? false;
-                            final active = (data['active'] as bool?) ?? true;
+                          final d = filtered[index];
+                          final data = d.data();
+                          final name = (data['driverName'] ?? '').toString();
+                          final hasTid =
+                              (data['transporterId'] ?? '').toString().trim().isNotEmpty;
+                          final tidPending = data['tidPending'] == true || !hasTid;
+                          final transporterId = hasTid
+                              ? (data['transporterId'] as String)
+                                  .trim()
+                                  .toUpperCase()
+                              : '';
+                          final hasLogin =
+                              (data['hasLogin'] as bool?) ?? false;
+                          final active = (data['active'] as bool?) ?? true;
+                          final onboardingRaw = data['onboarding'];
+                          final profileImage =
+                              _profileImageFromOnboarding(onboardingRaw);
+                          final overallScore = overallScores[transporterId];
 
-                            final onboardingRaw = data['onboarding'];
-                            bool hasOnboarding = false;
-                            if (onboardingRaw is Map &&
-                                onboardingRaw.isNotEmpty) {
-                              hasOnboarding = true;
-                            }
-
-                            final statusChip = _statusChipFromData(
-                              data,
-                              context,
-                            );
-                            final loginChip = _loginChipFromData(data, context);
-                            final expiryChip = _expiryChipFromOnboardingRaw(
-                              onboardingRaw,
-                              context,
-                            );
-
-                            final profileImage = _profileImageFromOnboarding(
-                              onboardingRaw,
-                            );
-                            final overallScore = overallScores[transporterId];
-
-                            return Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: const Color(0xFFE5E7EB),
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.02),
-                                    blurRadius: 6,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    flex: 5,
-                                    child: InkWell(
-                                      onTap: () => _openDriverDetails(d),
-                                      child: Row(
-                                        children: [
-                                          CircleAvatar(
-                                            radius: 20,
-                                            backgroundColor: const Color(
-                                              0xFFE5E7EB,
-                                            ),
-                                            backgroundImage: profileImage,
-                                            child: profileImage == null
-                                                ? Text(
-                                                    _initials(name),
-                                                    style: const TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                      color: Color(0xFF111827),
-                                                    ),
-                                                  )
-                                                : null,
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                name.isEmpty
-                                                    ? t.t('dash_no_name')
-                                                    : name,
-                                                style: const TextStyle(
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Color(0xFF111827),
-                                                ),
-                                              ),
-                                              if (email.isNotEmpty)
-                                                Text(
-                                                  email,
-                                                  style: const TextStyle(
-                                                    fontSize: 12,
-                                                    color: Color(0xFF6B7280),
-                                                  ),
-                                                ),
-                                              if (hasOnboarding)
-                                                Text(
-                                                  t.t(
-                                                    'drivers_hub_onboarding_completed',
-                                                  ),
-                                                  style: TextStyle(
-                                                    fontSize: 11,
-                                                    color: Color(0xFF9CA3AF),
-                                                  ),
-                                                ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    flex: 3,
-                                    child: _buildOverallScoreCell(
-                                      data: overallScore,
-                                      t: t,
-                                    ),
-                                  ),
-                                  Expanded(
-                                    flex: 2,
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        statusChip,
-                                        const SizedBox(height: 4),
-                                        expiryChip,
-                                      ],
-                                    ),
-                                  ),
-                                  Expanded(
-                                    flex: 2,
-                                    child: Row(
-                                      children: [
-                                        Switch(
-                                          value: active,
-                                          onChanged: (_) =>
-                                              _onToggleActiveDriver(d, active),
-                                          activeColor: const Color(0xFF2563EB),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          active
-                                              ? t.t('drivers_hub_switch_on')
-                                              : t.t('drivers_hub_switch_off'),
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: Color(0xFF4B5563),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Expanded(flex: 2, child: loginChip),
-                                  Expanded(
-                                    flex: 3,
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.end,
-                                      children: [
-                                        IconButton(
-                                          tooltip: t.t(
-                                            'drivers_hub_tooltip_view_details',
-                                          ),
-                                          onPressed: () =>
-                                              _openDriverDetails(d),
-                                          icon: const Icon(
-                                            Icons.remove_red_eye_outlined,
-                                            size: 18,
-                                            color: Color(0xFF6B7280),
-                                          ),
-                                        ),
-                                        IconButton(
-                                          tooltip: hasLogin
-                                              ? t.t(
-                                                  'drivers_hub_tooltip_reset_login',
-                                                )
-                                              : t.t(
-                                                  'drivers_hub_tooltip_create_login',
-                                                ),
-                                          onPressed: () =>
-                                              _onCreateOrResetLogin(d),
-                                          icon: const Icon(
-                                            Icons.vpn_key_outlined,
-                                            size: 18,
-                                            color: Color(0xFF2563EB),
-                                          ),
-                                        ),
-                                        IconButton(
-                                          tooltip: t.t(
-                                            'drivers_hub_tooltip_delete_driver',
-                                          ),
-                                          onPressed: () => _onDeleteDriver(d),
-                                          icon: const Icon(
-                                            Icons.delete_outline,
-                                            size: 18,
-                                            color: Color(0xFFDC2626),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
+                          return _DriverHubRow(
+                            driverDoc: d,
+                            displayName: name.isEmpty
+                                ? t.t('dash_no_name')
+                                : name,
+                            transporterId: transporterId,
+                            tidPending: tidPending,
+                            active: active,
+                            hasLogin: hasLogin,
+                            profileImage: profileImage,
+                            overallScore: overallScore,
+                            contractType: DriverContractType.fromValue(
+                              data['contractType'],
+                            ),
+                            isCompact: isCompact,
+                            onTap: () => _openDriverDetails(d),
+                            onToggleActive: () =>
+                                _onToggleActiveDriver(d, active),
+                            onCreateOrResetLogin: () =>
+                                _onCreateOrResetLogin(d),
+                            onDelete: () => _onDeleteDriver(d),
+                          );
                               },
                             ),
                           ),
                         ],
                       );
-
-                      // If screen is very narrow, allow horizontal scroll so layout stays same.
-                      if (constraints.maxWidth < 860) {
-                        return SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: SizedBox(width: 860, child: table),
-                        );
-                      }
-
-                      return table;
                     },
                   );
                 },
@@ -3895,6 +3982,1065 @@ class _DetailKachel extends StatelessWidget {
   }
 }
 
+/// Ein Dokument, das ins PDF eingebettet werden kann — entweder ein
+/// einzelnes Bild oder mehrere Seiten (für PDFs, die zu Bildern rastert
+/// wurden). Der Label-String erscheint als Headline pro Seite.
+class _EmbeddedDoc {
+  final String label;
+  final List<pw.MemoryImage> pages;
+  const _EmbeddedDoc({required this.label, required this.pages});
+}
+
+/// Kompakte Warn-Pille neben dem Fahrernamen: zeigt wie viele
+/// Onboarding-Dokumente noch fehlen. Beobachtet die `documents`-
+/// Subcollection live — sobald hochgeladen wird, verschwindet das Badge.
+///
+/// Erwartete Doc-Set (8): Vertrag, Aufenthaltsgenehmigung, Steuer-ID,
+/// Krankenkasse, Führerschein vorne/hinten, plus 2 Identitäts-Slots
+/// (Personalausweis oder Reisepass je vorne/hinten).
+class _MissingDocsBadge extends StatelessWidget {
+  final DocumentReference<Map<String, dynamic>> driverRef;
+  const _MissingDocsBadge({required this.driverRef});
+
+  static const _required = {
+    'contract',
+    'resident_permit',
+    'tax_id',
+    'insurance',
+    'driver_license_front',
+    'driver_license_back',
+  };
+  static const _identitySlot = {
+    'id_card_front',
+    'id_card_back',
+    'passport_front',
+    'passport_back',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: driverRef.collection('documents').snapshots(),
+      builder: (ctx, snap) {
+        if (!snap.hasData) return const SizedBox.shrink();
+        final t = AppLocalizations.of(context);
+        final uploaded = snap.data!.docs.map((d) {
+          final data = d.data();
+          return (data['docType'] ?? d.id).toString();
+        }).toSet();
+
+        // 6 Pflicht-Slots prüfen
+        var missing = 0;
+        for (final type in _required) {
+          if (!uploaded.contains(type)) missing++;
+        }
+        // 2 Identitäts-Slots (egal ob ID-Card oder Reisepass)
+        final identityCount = uploaded
+            .where((u) => _identitySlot.contains(u))
+            .length
+            .clamp(0, 2);
+        missing += 2 - identityCount;
+
+        if (missing <= 0) return const SizedBox.shrink();
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFF4E5),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: const Color(0xFFFFB547), width: 0.6),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.warning_amber_rounded,
+                size: 12,
+                color: Color(0xFFB7791F),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                t.tf('drivers_hub_missing_docs', {'count': '$missing'}),
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFFB7791F),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Apple-Style „+ New" Button oben rechts. Tap öffnet ein PopupMenu mit
+/// den drei Hauptaktionen: Fahrer hinzufügen, CSV importieren, Logins
+/// für alle anlegen.
+class _NewActionButton extends StatelessWidget {
+  final bool busyCsv;
+  final bool busyList;
+  final bool busyBulkLogins;
+  final VoidCallback onAddDriver;
+  final VoidCallback onImportCsv;
+  final VoidCallback onCreateLoginsForAll;
+  final String labelAdd;
+  final String labelImport;
+  final String labelLogins;
+  final String labelNew;
+
+  const _NewActionButton({
+    required this.busyCsv,
+    required this.busyList,
+    required this.busyBulkLogins,
+    required this.onAddDriver,
+    required this.onImportCsv,
+    required this.onCreateLoginsForAll,
+    required this.labelAdd,
+    required this.labelImport,
+    required this.labelLogins,
+    required this.labelNew,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final busy = busyCsv || busyList || busyBulkLogins;
+
+    return PopupMenuButton<String>(
+      enabled: !busy,
+      tooltip: labelNew,
+      offset: const Offset(0, 50),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      onSelected: (v) {
+        switch (v) {
+          case 'add':
+            onAddDriver();
+            break;
+          case 'import':
+            onImportCsv();
+            break;
+          case 'logins':
+            onCreateLoginsForAll();
+            break;
+        }
+      },
+      itemBuilder: (ctx) => [
+        PopupMenuItem(
+          value: 'add',
+          child: Row(
+            children: [
+              const Icon(
+                Icons.person_add_alt_1_outlined,
+                size: 18,
+                color: Color(0xFF00B287),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                labelAdd,
+                style: const TextStyle(
+                  fontFamily: 'Inter',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: Color(0xFF1F2937),
+                ),
+              ),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'import',
+          child: Row(
+            children: [
+              const Icon(
+                Icons.file_upload_outlined,
+                size: 18,
+                color: Color(0xFF374151),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                labelImport,
+                style: const TextStyle(
+                  fontFamily: 'Inter',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: Color(0xFF1F2937),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem(
+          value: 'logins',
+          child: Row(
+            children: [
+              const Icon(
+                Icons.vpn_key_outlined,
+                size: 18,
+                color: Color(0xFF2563EB),
+              ),
+              const SizedBox(width: 12),
+              Flexible(
+                child: Text(
+                  labelLogins,
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: Color(0xFF1F2937),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+      child: Container(
+        height: 40,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: const Color(0xFF00B287),
+          borderRadius: BorderRadius.circular(999),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x2900B287),
+              blurRadius: 10,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            busy
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation(Colors.white),
+                    ),
+                  )
+                : const Icon(
+                    Icons.add_rounded,
+                    size: 18,
+                    color: Colors.white,
+                  ),
+            const SizedBox(width: 6),
+            Text(
+              labelNew,
+              style: const TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+                letterSpacing: 0.1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Apple-Card-Zeile für die Drivers-Hub-Übersicht. Saubere Oberfläche:
+/// Avatar links, Name (groß) plus „X Dokumente fehlen"-Badge darunter,
+/// rechts kompakter Score + Aktiv-Switch + 3-Punkt-Menü.
+class _DriverHubRow extends StatelessWidget {
+  final QueryDocumentSnapshot<Map<String, dynamic>> driverDoc;
+  final String displayName;
+  final String transporterId;
+  final bool tidPending;
+  final bool active;
+  final bool hasLogin;
+  final ImageProvider? profileImage;
+  final _DriverOverallScoreData? overallScore;
+  final DriverContractType? contractType;
+  final bool isCompact;
+  final VoidCallback onTap;
+  final VoidCallback onToggleActive;
+  final VoidCallback onCreateOrResetLogin;
+  final VoidCallback onDelete;
+
+  const _DriverHubRow({
+    required this.driverDoc,
+    required this.displayName,
+    required this.transporterId,
+    required this.tidPending,
+    required this.active,
+    required this.hasLogin,
+    required this.profileImage,
+    required this.overallScore,
+    required this.contractType,
+    required this.isCompact,
+    required this.onTap,
+    required this.onToggleActive,
+    required this.onCreateOrResetLogin,
+    required this.onDelete,
+  });
+
+  String _formatScore(double v) {
+    final n = NumberFormatScore.format(v);
+    return '$n %';
+  }
+
+  Color _scoreColor(double v) {
+    if (v >= 93) return const Color(0xFF00B287);
+    if (v >= 85) return const Color(0xFF0082AF);
+    if (v >= 75) return const Color(0xFFF7AA00);
+    if (v >= 65) return const Color(0xFFF47400);
+    return const Color(0xFFCE4121);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final score = overallScore?.averageScore;
+
+    final scoreBlock = score == null
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'SCORE',
+                style: TextStyle(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.0,
+                  color: Colors.grey.shade500,
+                ),
+              ),
+              const SizedBox(height: 2),
+              const Text(
+                '—',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF9CA3AF),
+                ),
+              ),
+            ],
+          )
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'SCORE',
+                style: TextStyle(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.0,
+                  color: Colors.grey.shade500,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                _formatScore(score),
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 19,
+                  fontWeight: FontWeight.w800,
+                  color: _scoreColor(score),
+                  letterSpacing: -0.3,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
+          );
+
+    // Green = active, red = rejected. The red dot calls out drivers
+    // the admin deactivated so they stand out against the active
+    // pool at the top of the list.
+    final activeIndicator = Container(
+      width: 8,
+      height: 8,
+      decoration: BoxDecoration(
+        color: active
+            ? const Color(0xFF34C759)
+            : const Color(0xFFEF4444),
+        shape: BoxShape.circle,
+      ),
+    );
+
+    final menuButton = Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        border: Border.all(color: const Color(0xFFE5E5EA), width: 0.6),
+      ),
+      child: PopupMenuButton<String>(
+        tooltip: t.t('drivers_hub_tooltip_view_details'),
+        padding: EdgeInsets.zero,
+        iconSize: 22,
+        splashRadius: 22,
+        icon: const Icon(
+          Icons.more_horiz_rounded,
+          color: Color(0xFF374151),
+        ),
+        color: Colors.white,
+        elevation: 8,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+      onSelected: (v) {
+        switch (v) {
+          case 'view':
+            onTap();
+            break;
+          case 'toggle':
+            onToggleActive();
+            break;
+          case 'login':
+            onCreateOrResetLogin();
+            break;
+          case 'delete':
+            onDelete();
+            break;
+        }
+      },
+      itemBuilder: (ctx) => [
+        PopupMenuItem(
+          value: 'view',
+          child: Row(
+            children: [
+              const Icon(Icons.remove_red_eye_outlined,
+                  size: 18, color: Color(0xFF374151)),
+              const SizedBox(width: 10),
+              Text(t.t('drivers_hub_tooltip_view_details')),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'toggle',
+          child: Row(
+            children: [
+              Icon(
+                active
+                    ? Icons.toggle_on_rounded
+                    : Icons.toggle_off_outlined,
+                size: 20,
+                color: const Color(0xFF374151),
+              ),
+              const SizedBox(width: 10),
+              Text(active
+                  ? t.t('drivers_hub_switch_off')
+                  : t.t('drivers_hub_switch_on')),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'login',
+          child: Row(
+            children: [
+              const Icon(Icons.vpn_key_outlined,
+                  size: 18, color: Color(0xFF2563EB)),
+              const SizedBox(width: 10),
+              Text(hasLogin
+                  ? t.t('drivers_hub_tooltip_reset_login')
+                  : t.t('drivers_hub_tooltip_create_login')),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem(
+          value: 'delete',
+          child: Row(
+            children: [
+              const Icon(Icons.delete_outline,
+                  size: 18, color: Color(0xFFDC2626)),
+              const SizedBox(width: 10),
+              Text(
+                t.t('drivers_hub_tooltip_delete_driver'),
+                style: const TextStyle(
+                    color: Color(0xFFDC2626),
+                    fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+        ),
+        ],
+      ),
+    );
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: isCompact ? 12 : 16,
+            vertical: 12,
+          ),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: const Color(0xFFE5E5EA),
+              width: 0.5,
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x0A000000),
+                blurRadius: 6,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Avatar
+              Stack(
+                children: [
+                  CircleAvatar(
+                    radius: 22,
+                    backgroundColor: const Color(0xFFE5E7EB),
+                    backgroundImage: profileImage,
+                    child: profileImage == null
+                        ? Text(
+                            _initials(displayName),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF111827),
+                            ),
+                          )
+                        : null,
+                  ),
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: activeIndicator,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 14),
+
+              // Name + Warn-Badges (TID fehlt / Docs fehlen)
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF1F2937),
+                        letterSpacing: -0.1,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        _ContractTypePill(
+                          type: contractType,
+                          onChanged: (newType) async {
+                            await driverDoc.reference.update(
+                              <String, dynamic>{
+                                if (newType == null)
+                                  'contractType':
+                                      FieldValue.delete()
+                                else
+                                  'contractType': newType.value,
+                                'updatedAt':
+                                    FieldValue.serverTimestamp(),
+                              },
+                            );
+                          },
+                        ),
+                        if (tidPending)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF3F4F6),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: const Text(
+                              'TID ausstehend',
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF6B7280),
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                          ),
+                        _MissingDocsBadge(driverRef: driverDoc.reference),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(width: 10),
+              scoreBlock,
+              const SizedBox(width: 4),
+              menuButton,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Compact card surfacing the driver's employee number + contract
+/// type next to the name in the detail-page hero row. Both fields
+/// are read-only here — edits happen via the inline pill in the
+/// driver list (contract) or by editing the driver doc (employee #).
+class _EmploymentInfoCard extends StatelessWidget {
+  const _EmploymentInfoCard({
+    required this.employeeNumber,
+    required this.contractType,
+  });
+
+  final String employeeNumber;
+  final DriverContractType? contractType;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasNumber = employeeNumber.trim().isNotEmpty;
+    final hasContract = contractType != null;
+    if (!hasNumber && !hasContract) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9FAFB),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (hasNumber) ...[
+            Row(
+              children: [
+                const Icon(
+                  Icons.tag_rounded,
+                  size: 14,
+                  color: Color(0xFF6B7280),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'PERSONALNUMMER',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 2),
+            SelectableText(
+              employeeNumber,
+              style: const TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF111827),
+                letterSpacing: -0.2,
+                fontFeatures: [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
+          if (hasNumber && hasContract)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Divider(
+                height: 1,
+                color: Color(0xFFE5E7EB),
+              ),
+            ),
+          if (hasContract) ...[
+            Row(
+              children: [
+                Icon(
+                  Icons.work_outline_rounded,
+                  size: 14,
+                  color: contractType!.pillColor,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'VERTRAGSTYP',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 4,
+              ),
+              decoration: BoxDecoration(
+                color: contractType!.pillColor.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color:
+                      contractType!.pillColor.withValues(alpha: 0.35),
+                ),
+              ),
+              child: Text(
+                contractType!.label,
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: contractType!.pillColor,
+                  letterSpacing: 0.1,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Row of count-tiles, one per contract type, that sits above the
+/// driver list. Desktop renders all six tiles side-by-side; below
+/// 720 px they wrap into a responsive grid. The "Unset" tile
+/// surfaces drivers without a contract assignment so the admin can
+/// see how many still need to be classified.
+class _ContractTypeStatsRow extends StatelessWidget {
+  const _ContractTypeStatsRow({
+    required this.counts,
+    required this.totalDrivers,
+    required this.compact,
+  });
+
+  final Map<DriverContractType?, int> counts;
+  final int totalDrivers;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final tiles = <Widget>[
+      _ContractStatTile(
+        label: 'Active drivers',
+        value: totalDrivers,
+        accent: const Color(0xFF111827),
+        icon: Icons.groups_rounded,
+      ),
+      for (final c in DriverContractType.values)
+        _ContractStatTile(
+          label: c.label,
+          value: counts[c] ?? 0,
+          accent: c.pillColor,
+          icon: Icons.work_outline_rounded,
+        ),
+      if ((counts[null] ?? 0) > 0)
+        _ContractStatTile(
+          label: 'Unset',
+          value: counts[null] ?? 0,
+          accent: const Color(0xFF6B7280),
+          icon: Icons.help_outline_rounded,
+        ),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Desktop: all tiles on one Row, each expanding equally.
+        // Mobile / narrow: Wrap into a flexible 2-column grid.
+        if (!compact && constraints.maxWidth >= 720) {
+          return Row(
+            children: [
+              for (var i = 0; i < tiles.length; i++) ...[
+                Expanded(child: tiles[i]),
+                if (i < tiles.length - 1) const SizedBox(width: 8),
+              ],
+            ],
+          );
+        }
+        final tileWidth =
+            (constraints.maxWidth - 8) / 2; // 2-col grid
+        return Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final t in tiles)
+              SizedBox(width: tileWidth, child: t),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ContractStatTile extends StatelessWidget {
+  const _ContractStatTile({
+    required this.label,
+    required this.value,
+    required this.accent,
+    required this.icon,
+  });
+
+  final String label;
+  final int value;
+  final Color accent;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: accent.withValues(alpha: 0.18),
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A000000),
+            blurRadius: 6,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 14, color: accent),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  label.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    color: accent,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '$value',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: accent,
+              letterSpacing: -0.5,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Tap-to-pick contract-type pill. Lives next to the driver name in
+/// the row. When unset, shows a neutral "Set contract" placeholder
+/// so the admin can classify legacy drivers inline without opening
+/// a separate edit dialog. Selection writes to Firestore via
+/// [onChanged]; the stats tiles above re-count on the next stream
+/// emission.
+class _ContractTypePill extends StatelessWidget {
+  const _ContractTypePill({
+    required this.type,
+    required this.onChanged,
+  });
+  final DriverContractType? type;
+  final Future<void> Function(DriverContractType? next) onChanged;
+
+  static const _unsetAccent = Color(0xFF9CA3AF);
+
+  @override
+  Widget build(BuildContext context) {
+    final isSet = type != null;
+    final accent = isSet ? type!.pillColor : _unsetAccent;
+    final label = isSet ? type!.shortLabel : 'Set contract';
+
+    return PopupMenuButton<_ContractMenuChoice>(
+      tooltip: 'Change contract type',
+      position: PopupMenuPosition.under,
+      color: Colors.white,
+      elevation: 8,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+      ),
+      onSelected: (choice) async {
+        if (choice.clear) {
+          await onChanged(null);
+        } else {
+          await onChanged(choice.type);
+        }
+      },
+      itemBuilder: (ctx) => [
+        for (final c in DriverContractType.values)
+          PopupMenuItem<_ContractMenuChoice>(
+            value: _ContractMenuChoice(type: c),
+            height: 38,
+            child: Row(
+              children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: c.pillColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  c.label,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 13,
+                    fontWeight: type == c
+                        ? FontWeight.w800
+                        : FontWeight.w600,
+                    color: const Color(0xFF111827),
+                  ),
+                ),
+                if (type == c) ...[
+                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.check_rounded,
+                    size: 16,
+                    color: c.pillColor,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        if (isSet) ...[
+          const PopupMenuDivider(),
+          const PopupMenuItem<_ContractMenuChoice>(
+            value: _ContractMenuChoice(clear: true),
+            height: 36,
+            child: Row(
+              children: [
+                Icon(
+                  Icons.clear_rounded,
+                  size: 16,
+                  color: Color(0xFFB91C1C),
+                ),
+                SizedBox(width: 10),
+                Text(
+                  'Clear contract type',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFFB91C1C),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(8, 3, 6, 3),
+        decoration: BoxDecoration(
+          color: isSet
+              ? accent.withValues(alpha: 0.10)
+              : const Color(0xFFF3F4F6),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: accent.withValues(alpha: isSet ? 0.35 : 0.5),
+            style: isSet ? BorderStyle.solid : BorderStyle.solid,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isSet
+                  ? Icons.work_outline_rounded
+                  : Icons.add_circle_outline_rounded,
+              size: 11,
+              color: accent,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 10.5,
+                fontWeight: FontWeight.w800,
+                color: accent,
+                letterSpacing: 0.2,
+              ),
+            ),
+            const SizedBox(width: 3),
+            Icon(
+              Icons.arrow_drop_down_rounded,
+              size: 14,
+              color: accent,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Discriminated choice for the contract-type popup menu — either
+/// pick a [type] or clear it.
+class _ContractMenuChoice {
+  const _ContractMenuChoice({this.type, this.clear = false});
+  final DriverContractType? type;
+  final bool clear;
+}
+
+/// Helper-Klasse, kapselt das Score-Formatting für die Driver-Row.
+class NumberFormatScore {
+  static String format(double v) {
+    if (v.isNaN || v.isInfinite) return '—';
+    final n = (v * 100).round() / 100;
+    if (n == n.truncate().toDouble()) return n.toInt().toString();
+    return n.toStringAsFixed(2).replaceAll('.', ',');
+  }
+}
+
 class _DriverActionButton extends StatelessWidget {
   final String label;
   final Color color;
@@ -3947,17 +5093,16 @@ class _DriverSortPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    const borderColor = Color(0xFF1D7F5A);
-    final height = isSmall ? 36.0 : 40.0;
 
     return SizedBox(
-      height: height,
+      height: 44,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: borderColor, width: 1.4),
+          borderRadius: BorderRadius.circular(12),
+          border:
+              Border.all(color: const Color(0xFFE5E5EA), width: 0.6),
         ),
         child: Theme(
           data: Theme.of(context).copyWith(
@@ -3966,15 +5111,20 @@ class _DriverSortPill extends StatelessWidget {
               elevation: 8,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
-                side: const BorderSide(color: Color(0xFFE5E7EB)),
+              ),
+              textStyle: const TextStyle(
+                fontFamily: 'Inter',
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                color: Color(0xFF1F2937),
               ),
             ),
           ),
           child: PopupMenuButton<_DriverSort>(
             tooltip: '',
-            splashRadius: 18,
+            splashRadius: 0,
             onSelected: onSelected,
-            offset: const Offset(0, 38),
+            offset: const Offset(0, 50),
             itemBuilder: (_) => [
               PopupMenuItem(
                 value: _DriverSort.newest,
@@ -3996,6 +5146,7 @@ class _DriverSortPill extends StatelessWidget {
                 value: _DriverSort.idAsc,
                 child: Text(t.t('drivers_hub_sort_id_asc')),
               ),
+              const PopupMenuDivider(),
               PopupMenuItem(
                 value: _DriverSort.pending,
                 child: Text(t.t('drivers_hub_sort_pending')),
@@ -4012,24 +5163,47 @@ class _DriverSortPill extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
+                const Icon(
+                  Icons.sort_rounded,
+                  size: 18,
+                  color: Color(0xFF6B7280),
+                ),
+                const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    valueLabel.toUpperCase(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      letterSpacing: 0.6,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        'SORT',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.0,
+                          color: Color(0xFF9CA3AF),
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        valueLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF1F2937),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 6),
                 const Icon(
-                  Icons.keyboard_arrow_down,
-                  size: 16,
-                  color: Colors.black87,
+                  Icons.keyboard_arrow_down_rounded,
+                  size: 20,
+                  color: Color(0xFF1F2937),
                 ),
               ],
             ),

@@ -2,12 +2,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../widgets/admin_scope.dart';
 import 'package:firebase_storage/firebase_storage.dart' as fb;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../theme/app_button_style.dart';
 import '../theme/app_colors.dart';
+import '../widgets/co_button.dart';
+import '../widgets/co_pressable.dart';
 import '../widgets/web_preview.dart'
     if (dart.library.html) '../widgets/web_preview_web.dart';
 
@@ -43,7 +45,11 @@ class _FeedbackPageState extends State<FeedbackPage> {
   _DevStatusFilter _devStatus = _DevStatusFilter.open;
   String _devPriority = 'all'; // all | high | medium | low
 
-  String? get _uid => FirebaseAuth.instance.currentUser?.uid;
+  String? get _uid {
+    final scoped = AdminScope.maybeOf(context)?.adminUid;
+    if (scoped != null && scoped.isNotEmpty) return scoped;
+    return FirebaseAuth.instance.currentUser?.uid;
+  }
   String? get _email => FirebaseAuth.instance.currentUser?.email;
 
   @override
@@ -369,14 +375,15 @@ class _FeedbackPageState extends State<FeedbackPage> {
             ),
           ),
           actions: [
-            TextButton(
+            CoButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(_t('Cancel', 'Abbrechen')),
+              label: _t('Cancel', 'Abbrechen'),
+              variant: CoButtonVariant.quiet,
             ),
-            FilledButton(
-              style: AppButtonStyle.of(AppButtonVariant.destructive),
+            CoButton(
               onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text(_t('Delete', 'Löschen')),
+              label: _t('Delete', 'Löschen'),
+              variant: CoButtonVariant.destructive,
             ),
           ],
         );
@@ -431,7 +438,17 @@ class _FeedbackPageState extends State<FeedbackPage> {
       stream: _profileDocStreamFor(uid),
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const CoStateSwitcher(
+            child: Center(
+              key: ValueKey('profile-loading'),
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  AppColors.codriverGreen,
+                ),
+              ),
+            ),
+          );
         }
 
         final me = snap.data?.data() ?? <String, dynamic>{};
@@ -548,7 +565,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
                               ),
                             ),
                             const SizedBox(height: 8),
-                            InkWell(
+                            CoPressable(
                               onTap: _submitting ? null : _pickImage,
                               borderRadius: BorderRadius.circular(18),
                               child: _DashedRRectBorder(
@@ -668,32 +685,13 @@ class _FeedbackPageState extends State<FeedbackPage> {
                               ),
                             ),
                             const SizedBox(height: 16),
-                            SizedBox(
-                              width: double.infinity,
-                              child: FilledButton(
-                                onPressed: _submitting
-                                    ? null
-                                    : () => _submit(role: role),
-                                style: AppButtonStyle.of(
-                                  AppButtonVariant.primary,
-                                ),
-                                child: _submitting
-                                    ? const SizedBox(
-                                        width: 22,
-                                        height: 22,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2.2,
-                                          color: Colors.white,
-                                        ),
-                                      )
-                                    : Text(
-                                        _t('Submit', 'Absenden'),
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w900,
-                                        ),
-                                      ),
-                              ),
+                            CoButton(
+                              onPressed: _submitting
+                                  ? null
+                                  : () => _submit(role: role),
+                              label: _t('Submit', 'Absenden'),
+                              fullWidth: true,
+                              busy: _submitting,
                             ),
                           ],
                         ),
@@ -716,8 +714,16 @@ class _FeedbackPageState extends State<FeedbackPage> {
                       builder: (context, listSnap) {
                         if (listSnap.connectionState ==
                             ConnectionState.waiting) {
-                          return const Center(
-                            child: CircularProgressIndicator(),
+                          return const CoStateSwitcher(
+                            child: Center(
+                              key: ValueKey('fb-loading'),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 3,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  AppColors.codriverGreen,
+                                ),
+                              ),
+                            ),
                           );
                         }
                         if (listSnap.hasError) {
@@ -1059,23 +1065,21 @@ class _FeedbackPageState extends State<FeedbackPage> {
                                                   spacing: 8,
                                                   runSpacing: 8,
                                                   children: [
-                                                    TextButton.icon(
+                                                    CoButton(
                                                       onPressed: () =>
                                                           _openImagePreview(
                                                             attachmentUrl,
                                                           ),
-                                                      icon: const Icon(
-                                                        Icons.image_outlined,
+                                                      icon: Icons.image_outlined,
+                                                      label: _t(
+                                                        'View image',
+                                                        'Bild ansehen',
                                                       ),
-                                                      label: Text(
-                                                        _t(
-                                                          'View image',
-                                                          'Bild ansehen',
-                                                        ),
-                                                      ),
+                                                      variant:
+                                                          CoButtonVariant.quiet,
                                                     ),
                                                     if (isDeveloper)
-                                                      TextButton.icon(
+                                                      CoButton(
                                                         onPressed: () =>
                                                             _downloadAttachment(
                                                               url:
@@ -1086,16 +1090,14 @@ class _FeedbackPageState extends State<FeedbackPage> {
                                                                   ? 'feedback_attachment'
                                                                   : attachmentName,
                                                             ),
-                                                        icon: const Icon(
-                                                          Icons
-                                                              .download_outlined,
+                                                        icon: Icons
+                                                            .download_outlined,
+                                                        label: _t(
+                                                          'Download',
+                                                          'Download',
                                                         ),
-                                                        label: Text(
-                                                          _t(
-                                                            'Download',
-                                                            'Download',
-                                                          ),
-                                                        ),
+                                                        variant: CoButtonVariant
+                                                            .quiet,
                                                       ),
                                                   ],
                                                 ),
@@ -1455,7 +1457,7 @@ class _PriorityButton extends StatelessWidget {
         break;
     }
 
-    return InkWell(
+    return CoPressable(
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
       child: Container(

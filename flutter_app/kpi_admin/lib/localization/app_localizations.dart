@@ -272,7 +272,7 @@ class AppLocalizations {
       'fleet_status_status_grounded': 'Grounded',
       'fleet_status_status_in_service': 'In service',
       'fleet_status_status_defleeted': 'Defleeted',
-      'fleet_status_tuv_valid': 'Valid',
+      'fleet_status_tuv_valid': 'OK',
       'fleet_status_tuv_expired': 'Expired',
       'fleet_status_tuv_pending': 'Pending',
       'fleet_status_tuv_missing': 'Missing',
@@ -9730,6 +9730,10 @@ class AppLocalizations {
     'drivers_hub_header_working': 'Working',
     'drivers_hub_hide_pin': 'Hide PIN',
     'drivers_hub_import_csv': 'Import CSV',
+    'drivers_hub_export_zip': 'Download ZIP',
+    'drivers_hub_missing_docs': '{count} documents missing',
+    'drivers_hub_export_success':
+        'Driver export downloaded successfully.',
     'drivers_hub_join_two': '{a} & {b}',
     'drivers_hub_label_copied': '{label} copied',
     'drivers_hub_label_updated': '{label} updated.',
@@ -9917,6 +9921,10 @@ class AppLocalizations {
       'drivers_hub_header_working': 'Aktiv',
       'drivers_hub_hide_pin': 'PIN ausblenden',
       'drivers_hub_import_csv': 'CSV importieren',
+      'drivers_hub_export_zip': 'Als ZIP exportieren',
+      'drivers_hub_missing_docs': '{count} Dokumente fehlen',
+      'drivers_hub_export_success':
+          'Fahrer-Export wurde heruntergeladen.',
       'drivers_hub_label_copied': '{label} kopiert',
       'drivers_hub_login_created': 'Login erstellt',
       'drivers_hub_must_login_add_driver':
@@ -10095,6 +10103,10 @@ class AppLocalizations {
       'drivers_hub_header_working': 'Aktiv',
       'drivers_hub_hide_pin': 'Fshih PIN',
       'drivers_hub_import_csv': 'Importo CSV',
+      'drivers_hub_export_zip': 'Shkarko si ZIP',
+      'drivers_hub_missing_docs': '{count} dokumente mungojnë',
+      'drivers_hub_export_success':
+          'Eksportimi i shoferëve u shkarkua.',
       'drivers_hub_label_copied': '{label} u kopjua',
       'drivers_hub_login_created': 'Login i krijuar',
       'drivers_hub_must_login_add_driver':
@@ -10276,6 +10288,10 @@ class AppLocalizations {
       'drivers_hub_header_working': 'Aktiv',
       'drivers_hub_hide_pin': 'PIN elrejtese',
       'drivers_hub_import_csv': 'CSV import',
+      'drivers_hub_export_zip': 'ZIP letoltese',
+      'drivers_hub_missing_docs': '{count} dokumentum hianyzik',
+      'drivers_hub_export_success':
+          'Sofor export letoltve.',
       'drivers_hub_label_copied': '{label} masolva',
       'drivers_hub_login_created': 'Belepes letrehozva',
       'drivers_hub_must_login_add_driver':
@@ -10451,6 +10467,10 @@ class AppLocalizations {
       'drivers_hub_header_working': 'Activ',
       'drivers_hub_hide_pin': 'Ascunde PIN',
       'drivers_hub_import_csv': 'Importa CSV',
+      'drivers_hub_export_zip': 'Descarca ZIP',
+      'drivers_hub_missing_docs': 'lipsesc {count} documente',
+      'drivers_hub_export_success':
+          'Export soferi descarcat.',
       'drivers_hub_label_copied': '{label} copiat',
       'drivers_hub_login_created': 'Login creat',
       'drivers_hub_must_login_add_driver':
@@ -10627,6 +10647,10 @@ class AppLocalizations {
       'drivers_hub_header_working': 'Aktivan',
       'drivers_hub_hide_pin': 'Sakrij PIN',
       'drivers_hub_import_csv': 'Uvezi CSV',
+      'drivers_hub_export_zip': 'Preuzmi ZIP',
+      'drivers_hub_missing_docs': 'nedostaje {count} dokumenata',
+      'drivers_hub_export_success':
+          'Izvoz vozaca preuzet.',
       'drivers_hub_label_copied': '{label} kopirano',
       'drivers_hub_login_created': 'Login kreiran',
       'drivers_hub_must_login_add_driver':
@@ -10795,6 +10819,10 @@ class AppLocalizations {
       'drivers_hub_header_working': 'نشط',
       'drivers_hub_hide_pin': 'إخفاء PIN',
       'drivers_hub_import_csv': 'استيراد CSV',
+      'drivers_hub_export_zip': 'تنزيل ZIP',
+      'drivers_hub_missing_docs': '{count} مستندات مفقودة',
+      'drivers_hub_export_success':
+          'تم تنزيل تصدير السائقين.',
       'drivers_hub_label_copied': 'تم نسخ {label}',
       'drivers_hub_login_created': 'تم إنشاء تسجيل الدخول',
       'drivers_hub_must_login_add_driver': 'يجب تسجيل الدخول لإضافة سائقين.',
@@ -10955,6 +10983,10 @@ class AppLocalizations {
       'drivers_hub_header_working': 'Aktif',
       'drivers_hub_hide_pin': 'PIN gizle',
       'drivers_hub_import_csv': 'CSV ice aktar',
+      'drivers_hub_export_zip': 'ZIP olarak indir',
+      'drivers_hub_missing_docs': '{count} belge eksik',
+      'drivers_hub_export_success':
+          'Surucu disa aktarimi indirildi.',
       'drivers_hub_label_copied': '{label} kopyalandi',
       'drivers_hub_login_created': 'Giris olusturuldu',
       'drivers_hub_must_login_add_driver':
@@ -11129,6 +11161,10 @@ class AppLocalizations {
       'drivers_hub_header_working': 'Активен',
       'drivers_hub_hide_pin': 'Скрыть PIN',
       'drivers_hub_import_csv': 'Импорт CSV',
+      'drivers_hub_export_zip': 'Скачать ZIP',
+      'drivers_hub_missing_docs': 'не хватает {count} документов',
+      'drivers_hub_export_success':
+          'Экспорт водителей загружен.',
       'drivers_hub_label_copied': '{label} скопировано',
       'drivers_hub_login_created': 'Вход создан',
       'drivers_hub_must_login_add_driver':
@@ -11823,7 +11859,7 @@ class AppLocalizations {
     'fleet_status_status_grounded': 'Grounded',
     'fleet_status_status_in_service': 'In service',
     'fleet_status_status_defleeted': 'Defleeted',
-    'fleet_status_tuv_valid': 'Valid',
+    'fleet_status_tuv_valid': 'OK',
     'fleet_status_tuv_expired': 'Expired',
     'fleet_status_tuv_pending': 'Pending',
     'fleet_status_tuv_missing': 'Missing',
@@ -12086,6 +12122,7 @@ class AppLocalizations {
       'fleet_status_field_monthly_rate_eur': 'Monatsrate (EUR)',
       'fleet_status_field_purchase_value_eur': 'Kaufwert (EUR)',
       'fleet_status_field_notes': 'Notizen',
+      'fleet_status_field_status': 'Status',
       'fleet_status_provider_owner_required':
           'Anbieter oder Eigentuemer ist erforderlich.',
       'fleet_status_contract_reference_required':
@@ -12111,10 +12148,14 @@ class AppLocalizations {
       'fleet_status_number_invalid': 'Gib eine gueltige Zahl ein.',
       'fleet_status_plate_number_locked':
           'Das Kennzeichen kann nicht geaendert werden.',
+      'fleet_status_column_tuv_status': 'TUV-Status',
       'fleet_status_delete_body':
           'Dies archiviert {vehicleNumber} und blendet es im Fleet Hub aus.',
       'fleet_status_delete_title': 'Fahrzeug archivieren?',
       'fleet_status_delete_success': 'Fahrzeug "{vehicleNumber}" archiviert.',
+      'fleet_status_status_grounded': 'Stillgelegt',
+      'fleet_status_status_in_service': 'Im Service',
+      'fleet_status_status_defleeted': 'Ausgeflottet',
       'fleet_status_vehicle_document_type_rc': 'Fahrzeugschein',
       'fleet_status_vehicle_details_page_title': 'Fleet Hub Details',
       'fleet_status_vehicle_details_page_subtitle':
@@ -12280,13 +12321,104 @@ class AppLocalizations {
       'fleet_status_fleet_type_self_sourced_rental': 'Selbst beschaffte Miete',
       'fleet_status_fleet_type_self_owned_rental': 'Selbst eigenes Fahrzeug',
     },
-    'sq': _fleetHubSharedValues,
-    'hu': _fleetHubSharedValues,
-    'ro': _fleetHubSharedValues,
-    'hr': _fleetHubSharedValues,
-    'ar': _fleetHubSharedValues,
-    'tr': _fleetHubSharedValues,
-    'ru': _fleetHubSharedValues,
+    'sq': {
+      ..._fleetHubSharedValues,
+      'fleet_status_loading': 'Duke u ngarkuar...',
+      'fleet_status_column_tuv_status': 'Statusi TUV',
+      'fleet_status_field_status': 'Statusi',
+      'fleet_status_status_grounded': 'Jashte perdorimit',
+      'fleet_status_status_in_service': 'Ne servis',
+      'fleet_status_status_defleeted': 'Hequr nga flota',
+      'fleet_status_vehicle_documents_status_active': 'Aktiv',
+      'fleet_status_vehicle_documents_status_expiring_soon':
+          'Skadon se shpejti',
+      'fleet_status_vehicle_documents_status_expired': 'I skaduar',
+      'fleet_status_vehicle_documents_status_missing': 'Mungon',
+    },
+    'hu': {
+      ..._fleetHubSharedValues,
+      'fleet_status_loading': 'Betoltes...',
+      'fleet_status_column_tuv_status': 'TUV allapot',
+      'fleet_status_field_status': 'Allapot',
+      'fleet_status_status_grounded': 'Leallitva',
+      'fleet_status_status_in_service': 'Szervizben',
+      'fleet_status_status_defleeted': 'Kivonva a flottabol',
+      'fleet_status_vehicle_documents_status_active': 'Aktiv',
+      'fleet_status_vehicle_documents_status_expiring_soon':
+          'Hamarosan lejar',
+      'fleet_status_vehicle_documents_status_expired': 'Lejart',
+      'fleet_status_vehicle_documents_status_missing': 'Hianyzik',
+    },
+    'ro': {
+      ..._fleetHubSharedValues,
+      'fleet_status_loading': 'Se incarca...',
+      'fleet_status_column_tuv_status': 'Status TUV',
+      'fleet_status_field_status': 'Stare',
+      'fleet_status_status_grounded': 'Imobilizat',
+      'fleet_status_status_in_service': 'In service',
+      'fleet_status_status_defleeted': 'Scos din flota',
+      'fleet_status_vehicle_documents_status_active': 'Activ',
+      'fleet_status_vehicle_documents_status_expiring_soon':
+          'Expira curand',
+      'fleet_status_vehicle_documents_status_expired': 'Expirat',
+      'fleet_status_vehicle_documents_status_missing': 'Lipsa',
+    },
+    'hr': {
+      ..._fleetHubSharedValues,
+      'fleet_status_loading': 'Ucitavanje...',
+      'fleet_status_column_tuv_status': 'TUV status',
+      'fleet_status_field_status': 'Status',
+      'fleet_status_status_grounded': 'Van uporabe',
+      'fleet_status_status_in_service': 'Na servisu',
+      'fleet_status_status_defleeted': 'Uklonjen iz flote',
+      'fleet_status_vehicle_documents_status_active': 'Aktivno',
+      'fleet_status_vehicle_documents_status_expiring_soon':
+          'Uskoro istjece',
+      'fleet_status_vehicle_documents_status_expired': 'Isteklo',
+      'fleet_status_vehicle_documents_status_missing': 'Nedostaje',
+    },
+    'ar': {
+      ..._fleetHubSharedValues,
+      'fleet_status_loading': 'جارٍ التحميل...',
+      'fleet_status_column_tuv_status': 'حالة TUV',
+      'fleet_status_field_status': 'الحالة',
+      'fleet_status_status_grounded': 'متوقف',
+      'fleet_status_status_in_service': 'في الصيانة',
+      'fleet_status_status_defleeted': 'مزال من الأسطول',
+      'fleet_status_vehicle_documents_status_active': 'نشط',
+      'fleet_status_vehicle_documents_status_expiring_soon':
+          'ينتهي قريباً',
+      'fleet_status_vehicle_documents_status_expired': 'منتهي',
+      'fleet_status_vehicle_documents_status_missing': 'مفقود',
+    },
+    'tr': {
+      ..._fleetHubSharedValues,
+      'fleet_status_loading': 'Yukleniyor...',
+      'fleet_status_column_tuv_status': 'TUV durumu',
+      'fleet_status_field_status': 'Durum',
+      'fleet_status_status_grounded': 'Kullanim disi',
+      'fleet_status_status_in_service': 'Serviste',
+      'fleet_status_status_defleeted': 'Filodan cikarildi',
+      'fleet_status_vehicle_documents_status_active': 'Aktif',
+      'fleet_status_vehicle_documents_status_expiring_soon':
+          'Yakinda sona erecek',
+      'fleet_status_vehicle_documents_status_expired': 'Suresi doldu',
+      'fleet_status_vehicle_documents_status_missing': 'Eksik',
+    },
+    'ru': {
+      ..._fleetHubSharedValues,
+      'fleet_status_loading': 'Загрузка...',
+      'fleet_status_column_tuv_status': 'Статус TUV',
+      'fleet_status_field_status': 'Статус',
+      'fleet_status_status_grounded': 'Выведен из эксплуатации',
+      'fleet_status_status_in_service': 'На сервисе',
+      'fleet_status_status_defleeted': 'Выведен из флота',
+      'fleet_status_vehicle_documents_status_active': 'Активен',
+      'fleet_status_vehicle_documents_status_expiring_soon':
+          'Скоро истекает',
+      'fleet_status_vehicle_documents_status_expired': 'Истек',
+      'fleet_status_vehicle_documents_status_missing': 'Отсутствует',
+    },
   };
 
   static final Map<String, String> _miscSharedValues = {
@@ -12361,6 +12493,36 @@ class AppLocalizations {
     'signup_request_password_min': 'Min 6 chars',
     'signup_request_submitting': 'Submitting...',
     'signup_request_submit': 'Submit & Verify Email',
+
+    // ===== Concessions =====
+    'concessions_title': 'Concessions',
+    'concessions_shell_week_title': 'CONCESSIONS - WEEK',
+    'concessions_dashboard_title': 'CONCESSIONS DASHBOARD',
+    'concessions_upload_xlsx': 'Upload XLSX',
+    'concessions_no_reports_uploaded':
+        'No Concessions reports yet. Upload a Concessions XLSX to get started.',
+    'concessions_upload_success_one':
+        '1 Concessions report parsed and saved.',
+    'concessions_upload_success_many':
+        '{count} Concessions reports parsed and saved.',
+    'concessions_upload_parse_failed': 'Upload/parse failed: {error}',
+    'concessions_week_label': 'Week {week}',
+    'concessions_no_data_week': 'No Concessions data for this week.',
+    'concessions_drivers': 'Drivers',
+    'concessions_entries_count': '{count} entries',
+    'concessions_delivered': 'Delivered',
+    'concessions_dnr_count': 'DNRs',
+    'concessions_dnr_dpmo': 'DPMO',
+    'concessions_dnr_dpmo_4w': 'DPMO 4W',
+    'concessions_focus_breakdown': 'Focus areas (last 4 weeks)',
+    'concessions_focus_attended_dnr': 'Attended DNR',
+    'concessions_focus_photo_on_delivery': 'POD',
+    'concessions_focus_successful_contact': 'Successful Contact',
+    'concessions_focus_delivered_25m': '>25 m',
+    'concessions_focus_false_scan': 'False Scan',
+    'concessions_focus_mailbox': 'Mailbox',
+    'concessions_focus_delivered_otp': 'OTP',
+    'concessions_week_w': 'W{week}',
   };
 
   // Shared English defaults for the Waveplan admin page. The literal
@@ -13225,6 +13387,149 @@ class AppLocalizations {
     },
   };
 
+  /// Welcome message templates used when a driver is created. The
+  /// admin picks the driver's preferred language in the add-dialog;
+  /// the copyable text below renders in that language with
+  /// `{name}`, `{email}`, `{password}` and `{appUrl}` substituted in.
+  static const Map<String, Map<String, String>> _driverWelcomeMessage = {
+    'de': {
+      'title': 'Willkommen im Team!',
+      'body':
+          'Hallo {name}, das ist unsere Firmen-App. Hier findest du alles '
+              'Wichtige zu den Firmenregeln, dem Bonussystem und vielem mehr.\n\n'
+              'Link zur App: {appUrl}\n\n'
+              'Deine Anmeldedaten:\n'
+              'E-Mail: {email}\n'
+              'Passwort: {password}\n\n'
+              'Bitte logge dich an deinem ersten Tag ein und lies + bestätige '
+              'die Firmenregeln.',
+    },
+    'en': {
+      'title': 'Welcome to the team!',
+      'body':
+          'Hello {name}, this is our company app. Here you will find '
+              'everything important about company rules, the bonus system, '
+              'and much more.\n\n'
+              'App link: {appUrl}\n\n'
+              'Your login:\n'
+              'Email: {email}\n'
+              'Password: {password}\n\n'
+              'On your first day, please log in and read + confirm the '
+              'company rules.',
+    },
+    'sq': {
+      'title': 'Mire se erdhe ne ekip!',
+      'body':
+          'Pershendetje {name}, kjo eshte aplikacioni i kompanise. Ketu '
+              'gjen gjithcka te rendesishme rreth rregullave, sistemit te '
+              'bonuseve dhe shume me teper.\n\n'
+              'Lidhja e aplikacionit: {appUrl}\n\n'
+              'Te dhenat e tua per hyrje:\n'
+              'Email: {email}\n'
+              'Fjalekalimi: {password}\n\n'
+              'Te lutem futu ne diten e pare te punes dhe lexo + konfirmo '
+              'rregullat e kompanise.',
+    },
+    'hu': {
+      'title': 'Udvozlunk a csapatban!',
+      'body':
+          'Helló {name}, ez a ceges alkalmazasunk. Itt mindent megtalalsz a '
+              'ceges szabalyokrol, a bonus rendszerrol es sok masrol.\n\n'
+              'Alkalmazas linkje: {appUrl}\n\n'
+              'Bejelentkezesi adataid:\n'
+              'Email: {email}\n'
+              'Jelszo: {password}\n\n'
+              'Kerlek elso munkanapodon jelentkezz be es olvasd el + erositsd '
+              'meg a ceges szabalyokat.',
+    },
+    'ro': {
+      'title': 'Bine ai venit in echipa!',
+      'body':
+          'Salut {name}, aceasta este aplicatia companiei noastre. Aici '
+              'vei gasi tot ce este important despre regulile companiei, '
+              'sistemul de bonusuri si multe altele.\n\n'
+              'Link aplicatie: {appUrl}\n\n'
+              'Datele tale de autentificare:\n'
+              'Email: {email}\n'
+              'Parola: {password}\n\n'
+              'Te rog autentifica-te in prima zi de lucru si citeste + '
+              'confirma regulile companiei.',
+    },
+    'hr': {
+      'title': 'Dobrodosao u tim!',
+      'body':
+          'Bok {name}, ovo je aplikacija nase tvrtke. Ovdje ces pronaci '
+              'sve bitno o pravilima tvrtke, sustavu bonusa i jos puno toga.\n\n'
+              'Poveznica na aplikaciju: {appUrl}\n\n'
+              'Tvoji podaci za prijavu:\n'
+              'Email: {email}\n'
+              'Lozinka: {password}\n\n'
+              'Molim te prijavi se prvi radni dan i procitaj + potvrdi '
+              'pravila tvrtke.',
+    },
+    'ar': {
+      'title': 'مرحباً بك في الفريق!',
+      'body':
+          'مرحباً {name}، هذا هو تطبيق شركتنا. ستجد هنا كل ما يهم بخصوص '
+              'قواعد الشركة ونظام المكافآت والكثير غير ذلك.\n\n'
+              'رابط التطبيق: {appUrl}\n\n'
+              'بيانات تسجيل الدخول الخاصة بك:\n'
+              'البريد الإلكتروني: {email}\n'
+              'كلمة المرور: {password}\n\n'
+              'يرجى تسجيل الدخول في يومك الأول وقراءة وتأكيد قواعد الشركة.',
+    },
+    'tr': {
+      'title': 'Ekibe hos geldin!',
+      'body':
+          'Merhaba {name}, bu sirketimizin uygulamasidir. Burada sirket '
+              'kurallari, bonus sistemi ve daha fazlasi hakkinda her seyi '
+              'bulabilirsin.\n\n'
+              'Uygulama bagi: {appUrl}\n\n'
+              'Giris bilgilerin:\n'
+              'E-posta: {email}\n'
+              'Sifre: {password}\n\n'
+              'Lutfen ilk is gununde giris yap ve sirket kurallarini oku + '
+              'onayla.',
+    },
+    'ru': {
+      'title': 'Добро пожаловать в команду!',
+      'body':
+          'Привет {name}, это приложение нашей компании. Здесь ты найдёшь '
+              'всё важное о правилах компании, бонусной системе и многом '
+              'другом.\n\n'
+              'Ссылка на приложение: {appUrl}\n\n'
+              'Твои данные для входа:\n'
+              'Email: {email}\n'
+              'Пароль: {password}\n\n'
+              'Пожалуйста, войди в первый рабочий день и прочитай + '
+              'подтверди правила компании.',
+    },
+  };
+
+  /// Lookup the welcome-message header/body for [languageCode]. Falls
+  /// back to German (project default) if the code isn't known.
+  static String driverWelcomeTitle(String languageCode) {
+    final map = _driverWelcomeMessage[languageCode] ??
+        _driverWelcomeMessage['de']!;
+    return map['title']!;
+  }
+
+  static String driverWelcomeBody(
+    String languageCode, {
+    required String name,
+    required String email,
+    required String password,
+    required String appUrl,
+  }) {
+    final map = _driverWelcomeMessage[languageCode] ??
+        _driverWelcomeMessage['de']!;
+    return map['body']!
+        .replaceAll('{name}', name)
+        .replaceAll('{email}', email)
+        .replaceAll('{password}', password)
+        .replaceAll('{appUrl}', appUrl);
+  }
+
   static final Map<String, Map<String, String>> _miscLocalizedValues = {
     'en': _miscSharedValues,
     'de': {
@@ -13304,6 +13609,38 @@ class AppLocalizations {
       'signup_request_password_min': 'Mindestens 6 Zeichen',
       'signup_request_submitting': 'Wird gesendet...',
       'signup_request_submit': 'Absenden & E-Mail bestätigen',
+
+      // ===== Concessions =====
+      'concessions_title': 'Concessions',
+      'concessions_shell_week_title': 'CONCESSIONS - WOCHE',
+      'concessions_dashboard_title': 'CONCESSIONS DASHBOARD',
+      'concessions_upload_xlsx': 'XLSX hochladen',
+      'concessions_no_reports_uploaded':
+          'Noch keine Concessions-Berichte. Lade eine Concessions-XLSX hoch, um zu starten.',
+      'concessions_upload_success_one':
+          '1 Concessions-Bericht gespeichert.',
+      'concessions_upload_success_many':
+          '{count} Concessions-Berichte gespeichert.',
+      'concessions_upload_parse_failed':
+          'Upload/Parse fehlgeschlagen: {error}',
+      'concessions_week_label': 'KW {week}',
+      'concessions_no_data_week':
+          'Keine Concessions-Daten für diese Woche.',
+      'concessions_drivers': 'Fahrer',
+      'concessions_entries_count': '{count} Einträge',
+      'concessions_delivered': 'Zugestellt',
+      'concessions_dnr_count': 'DNRs',
+      'concessions_dnr_dpmo': 'DPMO',
+      'concessions_dnr_dpmo_4w': 'DPMO 4W',
+      'concessions_focus_breakdown': 'Fokus-Bereiche (letzte 4 Wochen)',
+      'concessions_focus_attended_dnr': 'Attended DNR',
+      'concessions_focus_photo_on_delivery': 'POD',
+      'concessions_focus_successful_contact': 'Erfolgreicher Kontakt',
+      'concessions_focus_delivered_25m': '>25 m',
+      'concessions_focus_false_scan': 'False Scan',
+      'concessions_focus_mailbox': 'Briefkasten',
+      'concessions_focus_delivered_otp': 'OTP',
+      'concessions_week_w': 'KW {week}',
     },
     'sq': {
       ..._miscSharedValues,

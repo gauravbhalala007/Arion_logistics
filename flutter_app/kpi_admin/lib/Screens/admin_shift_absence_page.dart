@@ -2,9 +2,16 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AdminShiftAbsencePage extends StatefulWidget {
-  const AdminShiftAbsencePage({super.key});
+  const AdminShiftAbsencePage({super.key, this.requestType});
+
+  /// When set ('vacation' or 'sick_leave'), this page only shows
+  /// requests of that type — used by the Zeiten & Abwesenheiten
+  /// tab shell to render two distinct pages from the same widget.
+  /// Null = show all (legacy combined behaviour).
+  final String? requestType;
 
   @override
   State<AdminShiftAbsencePage> createState() => _AdminShiftAbsencePageState();
@@ -227,7 +234,7 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
     }
 
     _DriverOption? selectedDriver = driverOptions.first;
-    String type = 'vacation';
+    String type = widget.requestType ?? 'vacation';
     DateTime? fromDate;
     DateTime? toDate;
     final reasonCtrl = TextEditingController();
@@ -554,6 +561,9 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
 
               final allItems = (snap.data?.docs ?? const [])
                   .map(_AbsenceAdminItem.fromDoc)
+                  .where((it) =>
+                      widget.requestType == null ||
+                      it.type == widget.requestType)
                   .toList();
               final items = _applySearch(allItems, _search);
               final today = _dateOnly(DateTime.now());
@@ -647,6 +657,26 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
   }
 
   Widget _buildHeader({required bool isCompact}) {
+    final isSick = widget.requestType == 'sick_leave';
+    final isVacation = widget.requestType == 'vacation';
+    final title = isSick
+        ? 'Krankmeldungen'
+        : isVacation
+            ? 'Urlaubsanträge'
+            : 'Absence Management';
+    final subtitle = isSick
+        ? 'Krankmeldungen prüfen — Pflicht-AU pro Fahrer einsehen, freigeben oder ablehnen.'
+        : isVacation
+            ? 'Urlaubsanträge prüfen, kommende Genehmigungen im Blick behalten, Historie pflegen.'
+            : 'Review pending vacation requests, monitor upcoming approved leave, and keep a clear decision history.';
+    final tileColor = isSick
+        ? const Color(0xFFFEE2E2)
+        : const Color(0xFFE7F5EE);
+    final tileIcon = isSick
+        ? Icons.medical_services_outlined
+        : Icons.event_busy_outlined;
+    final tileIconColor = isSick ? const Color(0xFFB91C1C) : _kGreen;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -654,12 +684,12 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
           width: 52,
           height: 52,
           decoration: BoxDecoration(
-            color: const Color(0xFFE7F5EE),
+            color: tileColor,
             borderRadius: BorderRadius.circular(18),
           ),
-          child: const Icon(
-            Icons.event_busy_outlined,
-            color: _kGreen,
+          child: Icon(
+            tileIcon,
+            color: tileIconColor,
             size: 26,
           ),
         ),
@@ -669,7 +699,7 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Absence Management',
+                title,
                 style: TextStyle(
                   color: _kText,
                   fontSize: isCompact ? 22 : 28,
@@ -677,9 +707,9 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
                 ),
               ),
               const SizedBox(height: 4),
-              const Text(
-                'Review pending vacation requests, monitor upcoming approved leave, and keep a clear decision history.',
-                style: TextStyle(
+              Text(
+                subtitle,
+                style: const TextStyle(
                   color: _kMuted,
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
@@ -692,7 +722,9 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
         FilledButton.icon(
           onPressed: _openAddPastLeaveDialog,
           icon: const Icon(Icons.add_circle_outline),
-          label: const Text('Add past leave'),
+          label: Text(
+            isSick ? 'Krankmeldung erfassen' : 'Urlaub nachtragen',
+          ),
         ),
       ],
     );
@@ -1127,6 +1159,8 @@ class _PendingAbsenceCard extends StatelessWidget {
                 icon: Icons.schedule_send_outlined,
                 text: 'Submitted ${item.submittedAtText}',
               ),
+              if (item.type == 'sick_leave')
+                _AuPill(item: item),
             ],
           ),
           if (item.reason.isNotEmpty) ...[
@@ -1408,6 +1442,12 @@ class _AbsenceAdminItem {
   final DateTime submittedAt;
   final DateTime? reviewedAt;
 
+  /// Krankmeldung-AU upload (Arbeitsunfähigkeitsbescheinigung), only
+  /// set for sick-leave requests. Stored as base64 inline in Firestore.
+  final String auFileBase64;
+  final String auFilename;
+  final String auMimeType;
+
   const _AbsenceAdminItem({
     required this.requestId,
     required this.driverId,
@@ -1419,7 +1459,12 @@ class _AbsenceAdminItem {
     required this.toDate,
     required this.submittedAt,
     required this.reviewedAt,
+    this.auFileBase64 = '',
+    this.auFilename = '',
+    this.auMimeType = '',
   });
+
+  bool get hasAuFile => auFileBase64.trim().isNotEmpty;
 
   factory _AbsenceAdminItem.fromDoc(
     QueryDocumentSnapshot<Map<String, dynamic>> doc,
@@ -1445,6 +1490,9 @@ class _AbsenceAdminItem {
       toDate: toDate,
       submittedAt: submittedAt,
       reviewedAt: _toDate(data['reviewedAt']),
+      auFileBase64: _stringOf(data['auFileBase64']),
+      auFilename: _stringOf(data['auFilename']),
+      auMimeType: _stringOf(data['auMimeType']),
     );
   }
 
@@ -1510,3 +1558,73 @@ class _DriverOption {
     required this.driverName,
   });
 }
+
+/// Compact AU-Bescheinigung pill — green "AU vorhanden" + open icon
+/// when uploaded, red "AU fehlt" when missing. Tap-to-open opens the
+/// base64 in a new tab (web) or share-sheet (mobile) via a data: URL.
+class _AuPill extends StatelessWidget {
+  const _AuPill({required this.item});
+  final _AbsenceAdminItem item;
+
+  Future<void> _openAu(BuildContext context) async {
+    if (!item.hasAuFile) return;
+    final mime = item.auMimeType.trim().isNotEmpty
+        ? item.auMimeType.trim()
+        : 'application/pdf';
+    try {
+      final uri = Uri.parse('data:$mime;base64,${item.auFileBase64}');
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('AU konnte nicht geöffnet werden: $e')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final present = item.hasAuFile;
+    final bg = present ? const Color(0xFFE7F5EE) : const Color(0xFFFEE2E2);
+    final fg = present ? const Color(0xFF166534) : const Color(0xFFB91C1C);
+    final icon = present
+        ? Icons.medical_services_rounded
+        : Icons.warning_amber_rounded;
+    final label = present ? 'AU vorhanden' : 'AU fehlt';
+    final child = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: fg.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: fg),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: fg,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.2,
+            ),
+          ),
+          if (present) ...[
+            const SizedBox(width: 6),
+            Icon(Icons.open_in_new_rounded, size: 13, color: fg),
+          ],
+        ],
+      ),
+    );
+    if (!present) return child;
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: () => _openAu(context),
+      child: child,
+    );
+  }
+}
+
