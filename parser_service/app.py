@@ -13,6 +13,7 @@ app = FastAPI(title="Amazon DSP KPI Parser")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        # Local development
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:4000",
@@ -21,6 +22,14 @@ app.add_middleware(
         "http://127.0.0.1:5000",
         "http://localhost:8080",
         "http://127.0.0.1:8080",
+        # Production (Firebase Hosting + Custom Domain)
+        "https://dsp-codriver.de",
+        "https://www.dsp-codriver.de",
+        "https://codriver-eu.web.app",
+        "https://codriver-eu.firebaseapp.com",
+        # Legacy (old project — bleibt fuer Notfall-Rollback)
+        "https://gaurav-arion-001-3d94a.web.app",
+        "https://gaurav-arion-001-3d94a.firebaseapp.com",
     ],
     allow_credentials=False,
     allow_methods=["*"],
