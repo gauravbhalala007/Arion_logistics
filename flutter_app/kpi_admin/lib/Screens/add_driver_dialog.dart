@@ -231,11 +231,20 @@ class _AddDriverDialogState extends State<_AddDriverDialog> {
           tid: effectiveTid,
           app: srcApp,
         );
-        await _markApplicationConverted(app: srcApp, tid: effectiveTid);
         if (failed.isNotEmpty) {
           docNotice =
               'Einige Dokumente konnten nicht übernommen werden (${failed.join(', ')}). '
               'Bitte im Drivers-Hub manuell nachladen.';
+        }
+        // Markierung darf den bereits erstellten Driver nicht scheitern
+        // lassen — Fehler nur als Hinweis sammeln.
+        try {
+          await _markApplicationConverted(app: srcApp, tid: effectiveTid);
+        } catch (e) {
+          debugPrint('Bewerber-Markierung fehlgeschlagen: $e');
+          docNotice = '${docNotice ?? ''} Bewerber konnte nicht als '
+                  '„übernommen" markiert werden — bitte Status manuell prüfen.'
+              .trim();
         }
       }
 
@@ -329,12 +338,23 @@ class _AddDriverDialogState extends State<_AddDriverDialog> {
           failures.add(d.label);
           continue;
         }
-        final contentType =
-            d.mimeType.trim().isEmpty ? null : d.mimeType.trim();
+        // Die Storage-Rules verlangen einen non-null contentType, der
+        // image/* (Profilbild) bzw. image/* oder application/pdf
+        // (driver_docs) matcht. Recruiting-Docs liefern mimeType nicht
+        // immer mit → aus Endung ableiten, niemals null senden.
+        final mime = d.mimeType.trim();
+        final contentType = mime.isNotEmpty
+            ? mime
+            : (d.filename.toLowerCase().endsWith('.pdf')
+                ? 'application/pdf'
+                : 'image/jpeg');
         final stamp = DateTime.now().millisecondsSinceEpoch;
 
         if (d.label == 'selfie') {
           // Profilbild: nach driver_profile_photos + onboarding-Map.
+          // Pfad ist .jpg, Rule verlangt image/* → notfalls image/jpeg.
+          final photoContentType =
+              mime.startsWith('image/') ? mime : 'image/jpeg';
           final photoRef = storage
               .ref()
               .child('driver_profile_photos')
@@ -342,9 +362,7 @@ class _AddDriverDialogState extends State<_AddDriverDialog> {
               .child('recruiting_$stamp.jpg');
           await photoRef.putData(
             bytes,
-            contentType == null
-                ? null
-                : fb_storage.SettableMetadata(contentType: contentType),
+            fb_storage.SettableMetadata(contentType: photoContentType),
           );
           final url = await photoRef.getDownloadURL();
           await ref.set(<String, dynamic>{
@@ -366,23 +384,22 @@ class _AddDriverDialogState extends State<_AddDriverDialog> {
             .child('${stamp}_$fileName');
         await destRef.putData(
           bytes,
-          contentType == null
-              ? null
-              : fb_storage.SettableMetadata(contentType: contentType),
+          fb_storage.SettableMetadata(contentType: contentType),
         );
         final url = await destRef.getDownloadURL();
         await docsCol.doc(docType).set(<String, dynamic>{
           'fileName': fileName,
           'downloadUrl': url,
           'storagePath': destRef.fullPath,
-          if (contentType != null) 'contentType': contentType,
+          'contentType': contentType,
           'uploadedAt': FieldValue.serverTimestamp(),
           'uploadedAtClient': Timestamp.now(),
           'size': bytes.length,
           'docType': docType,
           'uploadedBy': 'recruiting',
         }, SetOptions(merge: true));
-      } catch (_) {
+      } catch (e) {
+        debugPrint('Recruiting-Doc-Kopie fehlgeschlagen (${d.label}): $e');
         failures.add(d.label);
       }
     }
