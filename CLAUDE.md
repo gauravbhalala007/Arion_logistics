@@ -55,15 +55,28 @@ Nach jeder funktionalen Änderung an `flutter_app/kpi_admin/` automatisch deploy
 
 ```bash
 cd "flutter_app/kpi_admin"
+firebase use   # MUSS "codriver-eu" zurückgeben — sonst abbrechen!
 flutter build web --release
 firebase deploy --only hosting
 ```
 
 Voraussetzung: `flutter analyze lib/` zeigt keine Errors (pre-existing Warnings/Infos sind OK). Bei Errors erst fixen, dann deployen.
 
-Production-URL: https://dsp-codriver.de (Fallback: https://gaurav-arion-001-3d94a.web.app — beide bedient durch denselben Hosting-Site)
+Production-URL: https://dsp-codriver.de (Fallback: https://codriver-eu.web.app — beide bedient durch denselben Hosting-Site auf Projekt `codriver-eu`).
+
+⚠️ Das alte Projekt `gaurav-arion-001-3d94a` ist als `legacy` Alias erhalten, dient nur dem Notfall-Rollback und darf **nicht** bedient werden. Vor jedem `firebase deploy` `firebase use` prüfen — Output muss `codriver-eu` sein.
 
 Ausnahmen (vorher fragen):
 - destruktive Git-Operationen (`reset --hard`, `push --force`, Branches löschen)
-- Firestore-Rules- oder Functions-Deploys (`firebase deploy --only firestore` / `--only functions`)
+- Firestore-Rules-, Storage-Rules- oder Functions-Deploys (`firebase deploy --only firestore` / `--only storage` / `--only functions`)
 - Schema-Migrationen, die existierende Daten ändern
+
+## Arbeitsweise: einfach loslegen
+
+Bei Umsetzungs-Arbeit (Features, Feedback-Tickets, UI-/Logik-Änderungen): **einfach
+starten und durchziehen** — Design selbst sinnvoll festlegen, bauen, `flutter analyze`,
+Hosting deployen, dann Ergebnis melden. **Nicht** nach Freigabe/Bestätigung fragen und
+nicht das Brainstorming-/Design-Approval-Gate abwarten.
+
+Weiterhin gilt: Die oben gelisteten **Ausnahmen** (destruktive Git-Ops, Rules-/Storage-/
+Functions-Deploys, Daten-Migrationen) **vorher fragen** — diese Sicherheits-Asks bleiben.
