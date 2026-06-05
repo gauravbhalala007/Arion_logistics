@@ -19,14 +19,22 @@ enum RecruitingChannel {
 /// Status of a submitted application as seen by the admin. Two
 /// pipelines share the same enum:
 ///
-///   • Local / EU:  newApp → contacted → scheduled → hired (or rejected)
+///   • Local / EU:  newApp → onboarded → scheduledTraining → ready
+///                          (or rejected)
 ///   • Non-EU:      newApp → zavRequest → preApproval → contractEzb
-///                          → hired (or rejected)
+///                          → onboarded → scheduledTraining → hired
+///                          (or rejected)
 ///
 /// The admin selector in [admin_recruiting_panel.dart] only surfaces
-/// the statuses relevant to the application's channel.
+/// the statuses relevant to the application's channel. The legacy
+/// `contacted`, `scheduled`, `hired` values are kept on the enum so
+/// older Firestore docs continue to deserialize, but they no longer
+/// appear in the chip strip for new Local/EU applications.
 enum RecruitingStatus {
   newApp('new'),
+  onboarded('onboarded'),
+  scheduledTraining('scheduled_training'),
+  ready('ready'),
   contacted('contacted'),
   scheduled('scheduled'),
   zavRequest('zav_request'),
@@ -41,6 +49,13 @@ enum RecruitingStatus {
   static RecruitingStatus fromValue(dynamic v) {
     final s = (v ?? '').toString().trim().toLowerCase();
     switch (s) {
+      case 'onboarded':
+        return RecruitingStatus.onboarded;
+      case 'scheduled_training':
+      case 'scheduledtraining':
+        return RecruitingStatus.scheduledTraining;
+      case 'ready':
+        return RecruitingStatus.ready;
       case 'contacted':
         return RecruitingStatus.contacted;
       case 'scheduled':
@@ -69,15 +84,17 @@ enum RecruitingStatus {
         RecruitingStatus.zavRequest,
         RecruitingStatus.preApproval,
         RecruitingStatus.contractEzb,
+        RecruitingStatus.onboarded,
+        RecruitingStatus.scheduledTraining,
         RecruitingStatus.hired,
         RecruitingStatus.rejected,
       ];
     }
     return const <RecruitingStatus>[
       RecruitingStatus.newApp,
-      RecruitingStatus.contacted,
-      RecruitingStatus.scheduled,
-      RecruitingStatus.hired,
+      RecruitingStatus.onboarded,
+      RecruitingStatus.scheduledTraining,
+      RecruitingStatus.ready,
       RecruitingStatus.rejected,
     ];
   }
@@ -87,6 +104,12 @@ enum RecruitingStatus {
     switch (this) {
       case RecruitingStatus.newApp:
         return 'Neu';
+      case RecruitingStatus.onboarded:
+        return 'Onboarded';
+      case RecruitingStatus.scheduledTraining:
+        return 'Scheduled training';
+      case RecruitingStatus.ready:
+        return 'Ready';
       case RecruitingStatus.contacted:
         return 'Contacted';
       case RecruitingStatus.scheduled:
@@ -187,6 +210,7 @@ class RecruitingApplication {
     required this.documents,
     this.adminNote = '',
     this.customAnswers = const <String, dynamic>{},
+    this.convertedToDriver,
   });
 
   final String id;
@@ -232,6 +256,20 @@ class RecruitingApplication {
   /// custom-field ID; values are strings except for date (ISO) and
   /// yes/no (bool).
   final Map<String, dynamic> customAnswers;
+
+  /// Gesetzt, sobald der Bewerber in einen Driver umgewandelt wurde.
+  /// Form: `{ 'tid': <transporterId>, 'at': <Timestamp> }`. `null`,
+  /// solange noch keine Umwandlung erfolgt ist.
+  final Map<String, dynamic>? convertedToDriver;
+
+  bool get isConvertedToDriver => convertedToDriver != null;
+
+  /// Transporter-ID des erzeugten Drivers, oder `null`.
+  String? get convertedDriverTid {
+    final tid = convertedToDriver?['tid'];
+    final s = (tid ?? '').toString().trim();
+    return s.isEmpty ? null : s;
+  }
 
   Map<String, dynamic> toCreatePayload() => <String, dynamic>{
         'adminUid': adminUid,
@@ -296,6 +334,9 @@ class RecruitingApplication {
       customAnswers: (d['customAnswers'] is Map)
           ? Map<String, dynamic>.from(d['customAnswers'] as Map)
           : const <String, dynamic>{},
+      convertedToDriver: (d['convertedToDriver'] is Map)
+          ? Map<String, dynamic>.from(d['convertedToDriver'] as Map)
+          : null,
     );
   }
 
