@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -15,6 +17,7 @@ import '../services/fleet_vehicle_document_service.dart';
 import '../services/fleet_vehicle_event_repository.dart';
 import '../services/fleet_vehicle_event_service.dart';
 import '../services/fleet_vehicle_repository.dart';
+import '../services/cortex_vehicle_importer.dart';
 import '../theme/app_colors.dart';
 import '../widgets/co_button.dart';
 import '../widgets/co_pressable.dart';
@@ -57,6 +60,7 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
   String _role = '';
   bool _isApproved = false;
   bool _loadingScope = true;
+  bool _busyCortex = false;
   String _search = '';
   String _statusFilter = _statusAllValue;
   String _tuvFilter = _tuvAllValue;
@@ -182,6 +186,67 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
     return t.tf('fleet_status_load_failed', {'error': '$error'});
   }
 
+  /// Reads Amazon's Cortex VehiclesData XLSX and adds NEW vehicles only.
+  /// Existing rows (matched by VIN/FIN or plate) are skipped untouched —
+  /// re-running the import as Cortex grows the fleet just appends.
+  Future<void> _importFromCortex() async {
+    final scope = _scopeUid;
+    if (scope == null || scope.isEmpty) return;
+    if (!_canManageVehicles) {
+      _showSnack(
+        AppLocalizations.of(context).t('fleet_status_read_only'),
+        error: true,
+      );
+      return;
+    }
+    setState(() => _busyCortex = true);
+    try {
+      final picked = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['xlsx', 'xls'],
+        withData: true,
+      );
+      if (picked == null || picked.files.isEmpty) {
+        setState(() => _busyCortex = false);
+        return;
+      }
+      final f = picked.files.first;
+      final bytes = f.bytes;
+      if (bytes == null) {
+        setState(() => _busyCortex = false);
+        return;
+      }
+      final report = await CortexVehicleImporter().importFromXlsx(
+        dspUid: scope,
+        bytes: bytes,
+        filename: f.name,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: report.added > 0
+              ? const Color(0xFF067647)
+              : const Color(0xFFB45309),
+          content: Text(
+            'Cortex-Import: ${report.added} neu hinzugefügt, '
+            '${report.skippedDuplicate} bereits vorhanden '
+            '(${report.total} Zeilen gelesen).',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFFB42318),
+          content: Text('Cortex-Import fehlgeschlagen: $e'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _busyCortex = false);
+    }
+  }
+
   Future<void> _showVehicleEditor({FleetVehicle? vehicle}) async {
     final scope = _scopeUid;
     final t = AppLocalizations.of(context);
@@ -258,31 +323,14 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
       );
       return;
     }
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        final media = MediaQuery.of(dialogContext).size;
-        return Dialog(
-          insetPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 16,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: 980,
-              maxHeight: media.height - 32,
-            ),
-            child: _VehicleDetailsPage(
-              vehicle: vehicle,
-              dspUid: scope,
-              canManageDocuments: _canManageVehicles,
-            ),
-          ),
-        );
-      },
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => _VehicleDetailsPage(
+          vehicle: vehicle,
+          dspUid: scope,
+          canManageDocuments: _canManageVehicles,
+        ),
+      ),
     );
   }
 
@@ -476,7 +524,8 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final isNarrow = constraints.maxWidth < 1024;
-        return Container(
+        final isMobile = constraints.maxWidth < 700;
+        final body = Container(
           color: _kPageBg,
           child: StreamBuilder<List<FleetVehicle>>(
             stream: _repository.watchVehicles(dspUid: scope),
@@ -497,11 +546,19 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                   );
 
                   return Padding(
-                    padding: const EdgeInsets.all(24),
+                    padding: EdgeInsets.all(isMobile ? 12 : 24),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildHeader(context, isNarrow: isNarrow),
+                        if (!isMobile) ...[
+                          _buildHeader(context, isNarrow: isNarrow),
+                          const SizedBox(height: 16),
+                        ],
+                        _FleetHero(
+                          vehicles: snapshot.data ?? const [],
+                          compliance: complianceByPlate,
+                          isMobile: isMobile,
+                        ),
                         const SizedBox(height: 16),
                         _buildToolbar(context, isNarrow: isNarrow),
                         const SizedBox(height: 16),
@@ -549,6 +606,113 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
             },
           ),
         );
+
+        if (isMobile && _canManageVehicles) {
+          return Stack(
+            children: [
+              body,
+              Positioned(
+                right: 16,
+                bottom: 16,
+                child: FloatingActionButton(
+                  onPressed: _busyCortex ? null : _showMobileAddSheet,
+                  backgroundColor: const Color(0xFF1D7F5A),
+                  foregroundColor: Colors.white,
+                  elevation: 6,
+                  child: _busyCortex
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.4,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
+                          ),
+                        )
+                      : const Icon(Icons.add_rounded, size: 28),
+                ),
+              ),
+            ],
+          );
+        }
+        return body;
+      },
+    );
+  }
+
+  Future<void> _showMobileAddSheet() async {
+    final t = AppLocalizations.of(context);
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE5E7EB),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                ListTile(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  leading: const Icon(
+                    Icons.cloud_download_outlined,
+                    color: Color(0xFF1D7F5A),
+                  ),
+                  title: const Text(
+                    'Cortex-Import',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  subtitle: const Text(
+                    'Aktuelle Flotte aus Cortex synchronisieren',
+                  ),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    _importFromCortex();
+                  },
+                ),
+                const SizedBox(height: 4),
+                ListTile(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  leading: const Icon(
+                    Icons.add_circle_outline_rounded,
+                    color: Color(0xFF1D7F5A),
+                  ),
+                  title: Text(
+                    t.t('fleet_status_add_vehicle'),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  subtitle: const Text(
+                    'Neues Fahrzeug manuell anlegen',
+                  ),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    _showVehicleEditor();
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
       },
     );
   }
@@ -581,13 +745,35 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
             ],
           ),
         ),
-        if (_canManageVehicles)
+        if (_canManageVehicles) ...[
+          OutlinedButton.icon(
+            onPressed: _busyCortex ? null : _importFromCortex,
+            icon: _busyCortex
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.cloud_download_outlined, size: 18),
+            label: Text(_busyCortex
+                ? 'Importiere…'
+                : 'Cortex-Import'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF1D7F5A),
+              side: const BorderSide(color: Color(0xFF1D7F5A)),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
           CoButton(
             onPressed: () => _showVehicleEditor(),
             icon: Icons.add_rounded,
             label: t.t('fleet_status_add_vehicle'),
-          )
-        else
+          ),
+        ] else
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
@@ -1279,10 +1465,23 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                       vehicle.status,
                     ).withOpacity(0.14),
                   ),
-                  _SoftPill(
-                    label: tuvStatus.label,
-                    textColor: tuvStatus.color,
-                    backgroundColor: tuvStatus.color.withOpacity(0.14),
+                  // Make the TÜV pill clickable so admins can jump
+                  // straight into the detail page when status is
+                  // "missing" / "expired" / "expiring soon" and add
+                  // the certificate.
+                  InkWell(
+                    onTap: () => _showVehicleDetails(vehicle),
+                    borderRadius: BorderRadius.circular(999),
+                    child: Tooltip(
+                      message: 'Klicken um TÜV-Bescheinigung '
+                          'hochzuladen / einzusehen',
+                      child: _SoftPill(
+                        label: tuvStatus.label,
+                        textColor: tuvStatus.color,
+                        backgroundColor:
+                            tuvStatus.color.withOpacity(0.14),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -2195,8 +2394,13 @@ class _VehicleDetailsPageState extends State<_VehicleDetailsPage> {
   }
 
   Future<void> _showDocumentDialog({FleetVehicleDocument? document}) async {
-    final result = await showDialog<_VehicleDocumentDialogResult>(
+    final result = await showModalBottomSheet<_VehicleDocumentDialogResult>(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       builder: (context) => _VehicleDocumentDialog(document: document),
     );
     if (result == null) return;
@@ -2507,6 +2711,10 @@ class _VehicleDetailsPageState extends State<_VehicleDetailsPage> {
 
   List<FleetVehicleEvent> _filterEvents(List<FleetVehicleEvent> events) {
     return events.where((event) {
+      // Wartungs-/Verschleißteil-Einträge haben ihre eigene Sektion.
+      if (event.eventType.trim().toUpperCase() == 'MAINTENANCE') {
+        return false;
+      }
       if (_eventTypeFilter != _eventTypeAllValue &&
           event.eventType != _eventTypeFilter) {
         return false;
@@ -2528,46 +2736,40 @@ class _VehicleDetailsPageState extends State<_VehicleDetailsPage> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    return Container(
-      color: const Color(0xFFF3F6F7),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
+    return Scaffold(
+      backgroundColor: const Color(0xFFF3F6F7),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF111827),
+        elevation: 0,
+        scrolledUnderElevation: 0.5,
+        title: Text(
+          widget.vehicle.plateNumber,
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ),
+        actions: [
+          IconButton(
+            tooltip: AppLocalizations.of(context).t('button_close'),
+            icon: const Icon(Icons.close),
+            onPressed: () => Navigator.of(context).maybePop(),
+          ),
+        ],
+      ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isWide = constraints.maxWidth >= 1100;
+          final left = SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        t.t('fleet_status_vehicle_details_page_title'),
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w900,
-                          color: _FleetStatusPageState._kText,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        t.t('fleet_status_vehicle_details_page_subtitle'),
-                        style: const TextStyle(
-                          color: _FleetStatusPageState._kMuted,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close),
-                ),
-              ],
+            _FahrzeugscheinCard(
+              vehicle: widget.vehicle,
+              dspUid: widget.dspUid,
+              canManage: widget.canManageDocuments,
             ),
-            const SizedBox(height: 18),
-            _ProfileStyleCard(
+            const SizedBox(height: 16),
+                        _ProfileStyleCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -2641,6 +2843,329 @@ class _VehicleDetailsPageState extends State<_VehicleDetailsPage> {
             ),
             const SizedBox(height: 16),
             _ProfileStyleCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    t.t('fleet_status_section_metadata'),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: _FleetStatusPageState._kText,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  ..._metadataRows(context, widget.vehicle),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            _ProfileStyleCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    t.t('fleet_status_section_notes'),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: _FleetStatusPageState._kText,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    widget.vehicle.notes.trim().isEmpty
+                        ? t.t('fleet_status_vehicle_details_not_set')
+                        : widget.vehicle.notes,
+                    style: const TextStyle(
+                      color: _FleetStatusPageState._kText,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _InfoRow(
+                    label: t.t('fleet_status_vehicle_details_created_at'),
+                    value: _formatDateTime(context, widget.vehicle.createdAt),
+                  ),
+                  const SizedBox(height: 10),
+                  _InfoRow(
+                    label: t.t('fleet_status_vehicle_details_updated_at'),
+                    value: _formatDateTime(context, widget.vehicle.updatedAt),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            _ProfileStyleCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          t.t('fleet_status_vehicle_documents_title'),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: _FleetStatusPageState._kText,
+                          ),
+                        ),
+                      ),
+                      if (widget.canManageDocuments)
+                        CoButton(
+                          onPressed: () => _showDocumentDialog(),
+                          icon: Icons.add,
+                          label: t.t(
+                            'fleet_status_vehicle_documents_add_action',
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  StreamBuilder<List<FleetVehicleDocument>>(
+                    stream: _documentService.watchDocuments(
+                      dspUid: widget.dspUid,
+                      plateNumber: widget.vehicle.plateNumber,
+                    ),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting &&
+                          !snapshot.hasData) {
+                        return const CoStateSwitcher(
+                          child: LinearProgressIndicator(
+                            key: ValueKey('docs-loading'),
+                            minHeight: 2,
+                          ),
+                        );
+                      }
+                      if (snapshot.hasError) {
+                        return CoStateSwitcher(
+                          child: Text(
+                            key: const ValueKey('docs-error'),
+                            t.tf('fleet_status_vehicle_documents_load_failed', {
+                              'error': '${snapshot.error}',
+                            }),
+                          ),
+                        );
+                      }
+                      final docs =
+                          snapshot.data ?? const <FleetVehicleDocument>[];
+                      if (docs.isEmpty) {
+                        return CoStateSwitcher(
+                          child: Container(
+                            key: const ValueKey('docs-empty'),
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF9FAFB),
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(
+                                color: _FleetStatusPageState._kBorder,
+                              ),
+                            ),
+                            child: Text(
+                              t.t('fleet_status_vehicle_documents_empty'),
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: _FleetStatusPageState._kMuted,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+                      return CoStateSwitcher(
+                        child: Column(
+                          key: const ValueKey('docs-list'),
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: docs.map((doc) {
+                          final status = _documentStatusFor(
+                            context,
+                            _documentService.getDocumentStatus(
+                              expiryDate: doc.expiryDate,
+                              fileUrl: doc.fileUrl,
+                            ),
+                          );
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: Container(
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF7F8F8),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: const Color(0xFFE1E4EA),
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              // Text(
+                                              //   doc.documentName,
+                                              //   style: const TextStyle(
+                                              //     fontWeight: FontWeight.w800,
+                                              //     color: _FleetStatusPageState
+                                              //         ._kText,
+                                              //   ),
+                                              // ),
+                                              // const SizedBox(height: 6),
+                                              Wrap(
+                                                spacing: 8,
+                                                runSpacing: 8,
+                                                children: [
+                                                  _StatusBadge(
+                                                    label: _documentTypeLabel(
+                                                      doc.documentType,
+                                                    ),
+                                                    color: _FleetStatusPageState
+                                                        ._kBlue,
+                                                  ),
+                                                  _StatusBadge(
+                                                    label: status.label,
+                                                    color: status.color,
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            IconButton(
+                                              tooltip: t.t('button_open'),
+                                              onPressed: () =>
+                                                  _openDocument(doc),
+                                              icon: const Icon(
+                                                Icons.open_in_new_outlined,
+                                              ),
+                                            ),
+                                            if (widget.canManageDocuments)
+                                              const SizedBox(width: 4),
+                                            if (widget.canManageDocuments) ...[
+                                              IconButton(
+                                                tooltip: t.t('button_edit'),
+                                                onPressed: () =>
+                                                    _showDocumentDialog(
+                                                      document: doc,
+                                                    ),
+                                                icon: const Icon(
+                                                  Icons.edit_outlined,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              IconButton(
+                                                tooltip: t.t('button_delete'),
+                                                onPressed: () =>
+                                                    _deleteDocument(doc),
+                                                icon: const Icon(
+                                                  Icons.delete_outline,
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 10),
+                                    _InfoRow(
+                                      label: t.t(
+                                        'fleet_status_vehicle_documents_document_number',
+                                      ),
+                                      value: doc.documentNumber.trim().isEmpty
+                                          ? t.t(
+                                              'fleet_status_vehicle_details_not_set',
+                                            )
+                                          : doc.documentNumber,
+                                    ),
+                                    // const SizedBox(height: 8),
+                                    // _InfoRow(
+                                    //   label: t.t(
+                                    //     'fleet_status_vehicle_documents_issue_date',
+                                    //   ),
+                                    //   value: _formatStoredDate(
+                                    //     context,
+                                    //     doc.issueDate,
+                                    //   ),
+                                    // ),
+                                    const SizedBox(height: 8),
+                                    _InfoRow(
+                                      label: t.t(
+                                        'fleet_status_vehicle_documents_expiry_date',
+                                      ),
+                                      value: _formatStoredDate(
+                                        context,
+                                        doc.expiryDate,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    _InfoRow(
+                                      label: t.t(
+                                        'fleet_status_vehicle_documents_file_name',
+                                      ),
+                                      value: doc.fileName.trim().isEmpty
+                                          ? t.t(
+                                              'fleet_status_vehicle_details_not_set',
+                                            )
+                                          : doc.fileName,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    _InfoRow(
+                                      label: t.t(
+                                        'fleet_status_vehicle_documents_file_type',
+                                      ),
+                                      value: doc.fileType.trim().isEmpty
+                                          ? t.t(
+                                              'fleet_status_vehicle_details_not_set',
+                                            )
+                                          : doc.fileType,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    _InfoRow(
+                                      label: t.t('fleet_status_field_notes'),
+                                      value: doc.notes.trim().isEmpty
+                                          ? t.t(
+                                              'fleet_status_vehicle_details_not_set',
+                                            )
+                                          : doc.notes,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            _VehicleMaintenanceSection(
+              dspUid: widget.dspUid,
+              plateNumber: widget.vehicle.plateNumber,
+              eventService: _eventService,
+              canManage: widget.canManageDocuments,
+            ),
+          ],
+        ),
+          );
+          final right = SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(isWide ? 0 : 24, 24, 24, 24),
+            child: _ProfileStyleCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -3027,320 +3552,22 @@ class _VehicleDetailsPageState extends State<_VehicleDetailsPage> {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
-            _ProfileStyleCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    t.t('fleet_status_section_metadata'),
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: _FleetStatusPageState._kText,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  ..._metadataRows(context, widget.vehicle),
-                ],
-              ),
+          );
+          if (isWide) {
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(flex: 7, child: left),
+                Expanded(flex: 3, child: right),
+              ],
+            );
+          }
+          return SingleChildScrollView(
+            child: Column(
+              children: [left, right],
             ),
-            const SizedBox(height: 16),
-            _ProfileStyleCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    t.t('fleet_status_section_notes'),
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: _FleetStatusPageState._kText,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    widget.vehicle.notes.trim().isEmpty
-                        ? t.t('fleet_status_vehicle_details_not_set')
-                        : widget.vehicle.notes,
-                    style: const TextStyle(
-                      color: _FleetStatusPageState._kText,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _InfoRow(
-                    label: t.t('fleet_status_vehicle_details_created_at'),
-                    value: _formatDateTime(context, widget.vehicle.createdAt),
-                  ),
-                  const SizedBox(height: 10),
-                  _InfoRow(
-                    label: t.t('fleet_status_vehicle_details_updated_at'),
-                    value: _formatDateTime(context, widget.vehicle.updatedAt),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            _ProfileStyleCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          t.t('fleet_status_vehicle_documents_title'),
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: _FleetStatusPageState._kText,
-                          ),
-                        ),
-                      ),
-                      if (widget.canManageDocuments)
-                        CoButton(
-                          onPressed: () => _showDocumentDialog(),
-                          icon: Icons.add,
-                          label: t.t(
-                            'fleet_status_vehicle_documents_add_action',
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  StreamBuilder<List<FleetVehicleDocument>>(
-                    stream: _documentService.watchDocuments(
-                      dspUid: widget.dspUid,
-                      plateNumber: widget.vehicle.plateNumber,
-                    ),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting &&
-                          !snapshot.hasData) {
-                        return const CoStateSwitcher(
-                          child: LinearProgressIndicator(
-                            key: ValueKey('docs-loading'),
-                            minHeight: 2,
-                          ),
-                        );
-                      }
-                      if (snapshot.hasError) {
-                        return CoStateSwitcher(
-                          child: Text(
-                            key: const ValueKey('docs-error'),
-                            t.tf('fleet_status_vehicle_documents_load_failed', {
-                              'error': '${snapshot.error}',
-                            }),
-                          ),
-                        );
-                      }
-                      final docs =
-                          snapshot.data ?? const <FleetVehicleDocument>[];
-                      if (docs.isEmpty) {
-                        return CoStateSwitcher(
-                          child: Container(
-                            key: const ValueKey('docs-empty'),
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(24),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF9FAFB),
-                              borderRadius: BorderRadius.circular(18),
-                              border: Border.all(
-                                color: _FleetStatusPageState._kBorder,
-                              ),
-                            ),
-                            child: Text(
-                              t.t('fleet_status_vehicle_documents_empty'),
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: _FleetStatusPageState._kMuted,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        );
-                      }
-                      return CoStateSwitcher(
-                        child: Column(
-                          key: const ValueKey('docs-list'),
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: docs.map((doc) {
-                          final status = _documentStatusFor(
-                            context,
-                            _documentService.getDocumentStatus(
-                              expiryDate: doc.expiryDate,
-                              fileUrl: doc.fileUrl,
-                            ),
-                          );
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: Material(
-                              color: Colors.transparent,
-                              child: Container(
-                                padding: const EdgeInsets.all(14),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF7F8F8),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: const Color(0xFFE1E4EA),
-                                  ),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              // Text(
-                                              //   doc.documentName,
-                                              //   style: const TextStyle(
-                                              //     fontWeight: FontWeight.w800,
-                                              //     color: _FleetStatusPageState
-                                              //         ._kText,
-                                              //   ),
-                                              // ),
-                                              // const SizedBox(height: 6),
-                                              Wrap(
-                                                spacing: 8,
-                                                runSpacing: 8,
-                                                children: [
-                                                  _StatusBadge(
-                                                    label: _documentTypeLabel(
-                                                      doc.documentType,
-                                                    ),
-                                                    color: _FleetStatusPageState
-                                                        ._kBlue,
-                                                  ),
-                                                  _StatusBadge(
-                                                    label: status.label,
-                                                    color: status.color,
-                                                  ),
-                                                ],
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            IconButton(
-                                              tooltip: t.t('button_open'),
-                                              onPressed: () =>
-                                                  _openDocument(doc),
-                                              icon: const Icon(
-                                                Icons.open_in_new_outlined,
-                                              ),
-                                            ),
-                                            if (widget.canManageDocuments)
-                                              const SizedBox(width: 4),
-                                            if (widget.canManageDocuments) ...[
-                                              IconButton(
-                                                tooltip: t.t('button_edit'),
-                                                onPressed: () =>
-                                                    _showDocumentDialog(
-                                                      document: doc,
-                                                    ),
-                                                icon: const Icon(
-                                                  Icons.edit_outlined,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 4),
-                                              IconButton(
-                                                tooltip: t.t('button_delete'),
-                                                onPressed: () =>
-                                                    _deleteDocument(doc),
-                                                icon: const Icon(
-                                                  Icons.delete_outline,
-                                                ),
-                                              ),
-                                            ],
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 10),
-                                    _InfoRow(
-                                      label: t.t(
-                                        'fleet_status_vehicle_documents_document_number',
-                                      ),
-                                      value: doc.documentNumber.trim().isEmpty
-                                          ? t.t(
-                                              'fleet_status_vehicle_details_not_set',
-                                            )
-                                          : doc.documentNumber,
-                                    ),
-                                    // const SizedBox(height: 8),
-                                    // _InfoRow(
-                                    //   label: t.t(
-                                    //     'fleet_status_vehicle_documents_issue_date',
-                                    //   ),
-                                    //   value: _formatStoredDate(
-                                    //     context,
-                                    //     doc.issueDate,
-                                    //   ),
-                                    // ),
-                                    const SizedBox(height: 8),
-                                    _InfoRow(
-                                      label: t.t(
-                                        'fleet_status_vehicle_documents_expiry_date',
-                                      ),
-                                      value: _formatStoredDate(
-                                        context,
-                                        doc.expiryDate,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    _InfoRow(
-                                      label: t.t(
-                                        'fleet_status_vehicle_documents_file_name',
-                                      ),
-                                      value: doc.fileName.trim().isEmpty
-                                          ? t.t(
-                                              'fleet_status_vehicle_details_not_set',
-                                            )
-                                          : doc.fileName,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    _InfoRow(
-                                      label: t.t(
-                                        'fleet_status_vehicle_documents_file_type',
-                                      ),
-                                      value: doc.fileType.trim().isEmpty
-                                          ? t.t(
-                                              'fleet_status_vehicle_details_not_set',
-                                            )
-                                          : doc.fileType,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    _InfoRow(
-                                      label: t.t('fleet_status_field_notes'),
-                                      value: doc.notes.trim().isEmpty
-                                          ? t.t(
-                                              'fleet_status_vehicle_details_not_set',
-                                            )
-                                          : doc.notes,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -3964,24 +4191,38 @@ class _VehicleDocumentDialogState extends State<_VehicleDocumentDialog> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final existing = widget.document;
-    return Dialog(
-      elevation: 8,
-      backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: const BorderSide(color: Color(0xFFE5E7EB)),
-      ),
-      insetPadding: const EdgeInsets.all(20),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 12,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        ),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: 680,
+            maxHeight: MediaQuery.of(context).size.height * 0.92,
+          ),
+          child: SingleChildScrollView(
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE5E7EB),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                 Text(
                   t.t(
                     _isEditing
@@ -4105,6 +4346,7 @@ class _VehicleDocumentDialogState extends State<_VehicleDocumentDialog> {
                 ),
               ],
             ),
+          ),
           ),
         ),
       ),
@@ -4319,6 +4561,739 @@ class _MissingDocumentsBadge extends StatelessWidget {
           color: Color(0xFFDC2626),
           fontWeight: FontWeight.w600,
           fontSize: 11,
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Wartung / Verschleißteile (Reifen, Bremsen, Öl …) ────────────────
+//
+// Speichert pro Fahrzeug Wechsel als Vehicle-Event mit
+// eventType == 'MAINTENANCE' und metadata { component, label, kmStand }.
+// Nutzt damit die bestehende events-Subcollection + Rules (keine
+// Rules-Änderung nötig). Berechnet je Bauteil, wie viele km das
+// vorige Teil gehalten hat (Differenz der KM-Stände beim nächsten
+// Wechsel).
+
+const String _kMaintenanceEventType = 'MAINTENANCE';
+const List<String> _kMaintenanceComponents = <String>[
+  'TIRE',
+  'BRAKE',
+  'OIL',
+  'OTHER',
+];
+
+String _maintComponentLabel(String code, String lang) {
+  switch (code.trim().toUpperCase()) {
+    case 'TIRE':
+      return lang == 'de' ? 'Reifen' : 'Tires';
+    case 'BRAKE':
+      return lang == 'de' ? 'Bremsen' : 'Brakes';
+    case 'OIL':
+      return lang == 'de' ? 'Öl' : 'Oil';
+    default:
+      return lang == 'de' ? 'Sonstiges' : 'Other';
+  }
+}
+
+IconData _maintComponentIcon(String code) {
+  switch (code.trim().toUpperCase()) {
+    case 'TIRE':
+      return Icons.tire_repair;
+    case 'BRAKE':
+      return Icons.album_outlined;
+    case 'OIL':
+      return Icons.oil_barrel_outlined;
+    default:
+      return Icons.build_circle_outlined;
+  }
+}
+
+String _fmtKm(int km) {
+  final s = km.abs().toString();
+  final buf = StringBuffer();
+  for (var i = 0; i < s.length; i++) {
+    if (i > 0 && (s.length - i) % 3 == 0) buf.write('.');
+    buf.write(s[i]);
+  }
+  return '${km < 0 ? '-' : ''}${buf.toString()}';
+}
+
+int? _maintKmOf(FleetVehicleEvent e) {
+  final v = e.metadata['kmStand'];
+  if (v is int) return v;
+  if (v is num) return v.toInt();
+  return int.tryParse('${v ?? ''}'.trim());
+}
+
+/// One maintenance row with computed lifetime (how long this part held).
+class _MaintRow {
+  _MaintRow({
+    required this.event,
+    required this.component,
+    required this.label,
+    required this.km,
+    required this.kmHeld,
+    required this.isCurrent,
+  });
+
+  final FleetVehicleEvent event;
+  final String component;
+  final String label;
+  final int? km;
+  final int? kmHeld; // km the part lasted until the next change of same component
+  final bool isCurrent; // newest of its component → still mounted
+}
+
+List<_MaintRow> _computeMaintLifetimes(List<FleetVehicleEvent> records) {
+  String compOf(FleetVehicleEvent e) =>
+      (e.metadata['component'] ?? 'OTHER').toString().trim().toUpperCase();
+  String labelOf(FleetVehicleEvent e) =>
+      (e.metadata['label'] ?? '').toString().trim();
+
+  final byComp = <String, List<FleetVehicleEvent>>{};
+  for (final e in records) {
+    byComp.putIfAbsent(compOf(e), () => <FleetVehicleEvent>[]).add(e);
+  }
+
+  final rows = <_MaintRow>[];
+  for (final entry in byComp.entries) {
+    final withKm = entry.value.where((e) => _maintKmOf(e) != null).toList()
+      ..sort((a, b) => _maintKmOf(a)!.compareTo(_maintKmOf(b)!));
+    for (var i = 0; i < withKm.length; i++) {
+      final e = withKm[i];
+      final isCurrent = i == withKm.length - 1;
+      final held = isCurrent ? null : _maintKmOf(withKm[i + 1])! - _maintKmOf(e)!;
+      rows.add(_MaintRow(
+        event: e,
+        component: entry.key,
+        label: labelOf(e),
+        km: _maintKmOf(e),
+        kmHeld: held,
+        isCurrent: isCurrent,
+      ));
+    }
+    // Records without a KM value can't be computed — list them as-is.
+    for (final e in entry.value.where((e) => _maintKmOf(e) == null)) {
+      rows.add(_MaintRow(
+        event: e,
+        component: entry.key,
+        label: labelOf(e),
+        km: null,
+        kmHeld: null,
+        isCurrent: false,
+      ));
+    }
+  }
+  // Display newest first (highest KM first; unknown KM last).
+  rows.sort((a, b) => (b.km ?? -1).compareTo(a.km ?? -1));
+  return rows;
+}
+
+class _VehicleMaintenanceSection extends StatelessWidget {
+  const _VehicleMaintenanceSection({
+    required this.dspUid,
+    required this.plateNumber,
+    required this.eventService,
+    required this.canManage,
+  });
+
+  final String dspUid;
+  final String plateNumber;
+  final FleetVehicleEventService eventService;
+  final bool canManage;
+
+  String _ml(BuildContext context, String en, String de) =>
+      Localizations.localeOf(context).languageCode == 'de' ? de : en;
+
+  Future<void> _add(BuildContext context) async {
+    final lang = Localizations.localeOf(context).languageCode;
+    final messenger = ScaffoldMessenger.of(context);
+    final result = await showModalBottomSheet<_MaintDraftResult>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => _MaintenanceDialog(lang: lang),
+    );
+    if (result == null) return;
+    try {
+      await eventService.createEvent(
+        dspUid: dspUid,
+        plateNumber: plateNumber,
+        draft: FleetVehicleEventDraft(
+          eventType: _kMaintenanceEventType,
+          title: result.label.isNotEmpty
+              ? result.label
+              : _maintComponentLabel(result.component, lang),
+          eventDate: result.date,
+          metadata: <String, dynamic>{
+            'component': result.component,
+            'label': result.label,
+            'kmStand': result.kmStand,
+          },
+          fileName: '',
+          fileType: '',
+          notes: result.notes,
+        ),
+      );
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(_ml(context, 'Maintenance entry saved.',
+              'Wartungseintrag gespeichert.')),
+        ),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(
+          backgroundColor: _FleetStatusPageState._kRed,
+          content: Text(_ml(context, 'Could not save: $e',
+              'Speichern fehlgeschlagen: $e')),
+        ),
+      );
+    }
+  }
+
+  Future<void> _delete(BuildContext context, FleetVehicleEvent event) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(_ml(ctx, 'Delete entry', 'Eintrag löschen')),
+        content: Text(_ml(ctx, 'Permanently remove this maintenance entry?',
+            'Diesen Wartungseintrag dauerhaft entfernen?')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(_ml(ctx, 'Cancel', 'Abbrechen')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: _FleetStatusPageState._kRed,
+            ),
+            child: Text(_ml(ctx, 'Delete', 'Löschen')),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await eventService.softDeleteEvent(
+        dspUid: dspUid,
+        plateNumber: plateNumber,
+        eventId: event.eventId,
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(
+          backgroundColor: _FleetStatusPageState._kRed,
+          content: Text(_ml(context, 'Could not delete: $e',
+              'Löschen fehlgeschlagen: $e')),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lang = Localizations.localeOf(context).languageCode;
+    return _ProfileStyleCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _ml(context, 'Maintenance / wear parts',
+                      'Wartung / Verschleißteile'),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: _FleetStatusPageState._kText,
+                  ),
+                ),
+              ),
+              if (canManage)
+                CoButton(
+                  onPressed: () => _add(context),
+                  icon: Icons.add,
+                  label: _ml(context, 'Add', 'Hinzufügen'),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _ml(
+              context,
+              'Log tire / brake / oil changes by mileage — the system computes how long each part lasted.',
+              'Reifen-/Bremsen-/Öl-Wechsel nach Kilometerstand erfassen — das System berechnet, wie lange jedes Teil gehalten hat.',
+            ),
+            style: const TextStyle(
+              fontSize: 12.5,
+              color: _FleetStatusPageState._kMuted,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 14),
+          StreamBuilder<List<FleetVehicleEvent>>(
+            stream: eventService.watchEvents(
+              dspUid: dspUid,
+              plateNumber: plateNumber,
+              eventType: _kMaintenanceEventType,
+            ),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting &&
+                  !snapshot.hasData) {
+                return const CoStateSwitcher(
+                  child: LinearProgressIndicator(
+                    key: ValueKey('maint-loading'),
+                    minHeight: 2,
+                  ),
+                );
+              }
+              if (snapshot.hasError) {
+                return CoStateSwitcher(
+                  child: Text(
+                    key: const ValueKey('maint-error'),
+                    _ml(context, 'Could not load maintenance records.',
+                        'Wartungseinträge konnten nicht geladen werden.'),
+                  ),
+                );
+              }
+              final records = (snapshot.data ?? const <FleetVehicleEvent>[])
+                  .where((e) => !e.isDeleted)
+                  .toList();
+              if (records.isEmpty) {
+                return CoStateSwitcher(
+                  child: Container(
+                    key: const ValueKey('maint-empty'),
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF9FAFB),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: _FleetStatusPageState._kBorder,
+                      ),
+                    ),
+                    child: Text(
+                      _ml(context, 'No maintenance entries yet.',
+                          'Noch keine Wartungseinträge.'),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: _FleetStatusPageState._kMuted,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                );
+              }
+              final rows = _computeMaintLifetimes(records);
+              return CoStateSwitcher(
+                child: Column(
+                  key: const ValueKey('maint-list'),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: rows
+                      .map((r) => _MaintTile(
+                            row: r,
+                            lang: lang,
+                            canManage: canManage,
+                            onDelete: () => _delete(context, r.event),
+                            ml: _ml,
+                          ))
+                      .toList(),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MaintTile extends StatelessWidget {
+  const _MaintTile({
+    required this.row,
+    required this.lang,
+    required this.canManage,
+    required this.onDelete,
+    required this.ml,
+  });
+
+  final _MaintRow row;
+  final String lang;
+  final bool canManage;
+  final VoidCallback onDelete;
+  final String Function(BuildContext, String, String) ml;
+
+  @override
+  Widget build(BuildContext context) {
+    final compLabel = _maintComponentLabel(row.component, lang);
+    final title = row.label.isNotEmpty ? '$compLabel — ${row.label}' : compLabel;
+    final kmText = row.km != null
+        ? '${ml(context, 'Mileage', 'KM-Stand')}: ${_fmtKm(row.km!)} km'
+        : ml(context, 'Mileage: not set', 'KM-Stand: nicht gesetzt');
+    final date = row.event.eventDate.trim();
+
+    Widget? lifetimeBadge;
+    if (row.kmHeld != null) {
+      final name = row.label.isNotEmpty ? row.label : compLabel;
+      lifetimeBadge = _maintBadge(
+        color: const Color(0xFF067647),
+        bg: const Color(0xFFD1FAE5),
+        border: const Color(0xFF34D399),
+        icon: Icons.timelapse_rounded,
+        text: ml(context, '$name lasted ${_fmtKm(row.kmHeld!)} km',
+            '$name hat ${_fmtKm(row.kmHeld!)} km gehalten'),
+      );
+    } else if (row.isCurrent && row.km != null) {
+      lifetimeBadge = _maintBadge(
+        color: const Color(0xFF1D4ED8),
+        bg: const Color(0xFFDBEAFE),
+        border: const Color(0xFF93C5FD),
+        icon: Icons.check_circle_outline,
+        text: ml(context, 'Currently fitted (since ${_fmtKm(row.km!)} km)',
+            'Aktuell montiert (seit ${_fmtKm(row.km!)} km)'),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF7F8F8),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE1E4EA)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(_maintComponentIcon(row.component),
+                    size: 20, color: _FleetStatusPageState._kText),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: _FleetStatusPageState._kText,
+                    ),
+                  ),
+                ),
+                if (date.isNotEmpty)
+                  Text(
+                    date,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: _FleetStatusPageState._kMuted,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                if (canManage) ...[
+                  const SizedBox(width: 4),
+                  InkWell(
+                    onTap: onDelete,
+                    borderRadius: BorderRadius.circular(8),
+                    child: const Padding(
+                      padding: EdgeInsets.all(4),
+                      child: Icon(Icons.delete_outline_rounded,
+                          size: 18, color: _FleetStatusPageState._kMuted),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              kmText,
+              style: const TextStyle(
+                fontSize: 13,
+                color: _FleetStatusPageState._kText,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            if (row.event.notes.trim().isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                row.event.notes.trim(),
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  color: _FleetStatusPageState._kMuted,
+                  height: 1.35,
+                ),
+              ),
+            ],
+            if (lifetimeBadge != null) ...[
+              const SizedBox(height: 10),
+              lifetimeBadge,
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _maintBadge({
+    required Color color,
+    required Color bg,
+    required Color border,
+    required IconData icon,
+    required String text,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 13,
+                color: color,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MaintDraftResult {
+  _MaintDraftResult({
+    required this.component,
+    required this.label,
+    required this.kmStand,
+    required this.date,
+    required this.notes,
+  });
+
+  final String component;
+  final String label;
+  final int kmStand;
+  final String date; // YYYY-MM-DD
+  final String notes;
+}
+
+class _MaintenanceDialog extends StatefulWidget {
+  const _MaintenanceDialog({required this.lang});
+  final String lang;
+
+  @override
+  State<_MaintenanceDialog> createState() => _MaintenanceDialogState();
+}
+
+class _MaintenanceDialogState extends State<_MaintenanceDialog> {
+  String _component = 'TIRE';
+  final _labelCtrl = TextEditingController();
+  final _kmCtrl = TextEditingController();
+  final _notesCtrl = TextEditingController();
+  late DateTime _date = DateTime.now();
+  String? _error;
+
+  String get _lang => widget.lang;
+  String _ml(String en, String de) => _lang == 'de' ? de : en;
+
+  @override
+  void dispose() {
+    _labelCtrl.dispose();
+    _kmCtrl.dispose();
+    _notesCtrl.dispose();
+    super.dispose();
+  }
+
+  String _fmtDate(DateTime d) {
+    String two(int v) => v < 10 ? '0$v' : '$v';
+    return '${d.year}-${two(d.month)}-${two(d.day)}';
+  }
+
+  void _submit() {
+    final kmRaw = _kmCtrl.text.trim().replaceAll('.', '').replaceAll(' ', '');
+    final km = int.tryParse(kmRaw);
+    if (km == null || km < 0) {
+      setState(() => _error =
+          _ml('Enter a valid mileage (km).', 'Bitte gültigen KM-Stand eingeben.'));
+      return;
+    }
+    Navigator.of(context).pop(
+      _MaintDraftResult(
+        component: _component,
+        label: _labelCtrl.text.trim(),
+        kmStand: km,
+        date: _fmtDate(_date),
+        notes: _notesCtrl.text.trim(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 12,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE5E7EB),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _ml('Add maintenance entry', 'Wartungseintrag hinzufügen'),
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF111827),
+              ),
+            ),
+            const SizedBox(height: 14),
+            DropdownButtonFormField<String>(
+              value: _component,
+              decoration: InputDecoration(
+                labelText: _ml('Component', 'Bauteil'),
+                filled: true,
+                fillColor: const Color(0xFFF9FAFB),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              items: _kMaintenanceComponents
+                  .map((c) => DropdownMenuItem<String>(
+                        value: c,
+                        child: Text(_maintComponentLabel(c, _lang)),
+                      ))
+                  .toList(),
+              onChanged: (v) => setState(() => _component = v ?? 'TIRE'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _labelCtrl,
+              decoration: InputDecoration(
+                labelText: _ml('Label / designation (e.g. "TireXY")',
+                    'Bezeichnung (z. B. "ReifenXY")'),
+                filled: true,
+                fillColor: const Color(0xFFF9FAFB),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _kmCtrl,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: _ml('Mileage at change (km)', 'KM-Stand beim Wechsel'),
+                hintText: 'z. B. 45000',
+                filled: true,
+                fillColor: const Color(0xFFF9FAFB),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            InkWell(
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _date,
+                  firstDate: DateTime(2015),
+                  lastDate: DateTime(2100),
+                );
+                if (picked != null) setState(() => _date = picked);
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: InputDecorator(
+                decoration: InputDecoration(
+                  labelText: _ml('Change date', 'Wechseldatum'),
+                  filled: true,
+                  fillColor: const Color(0xFFF9FAFB),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(_fmtDate(_date)),
+                    const Icon(Icons.calendar_today_rounded, size: 18),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _notesCtrl,
+              maxLines: 3,
+              minLines: 2,
+              decoration: InputDecoration(
+                labelText: _ml('Notes (optional)', 'Notizen (optional)'),
+                filled: true,
+                fillColor: const Color(0xFFF9FAFB),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                _error!,
+                style: const TextStyle(
+                  color: Color(0xFFB91C1C),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(_ml('Cancel', 'Abbrechen')),
+                ),
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  onPressed: _submit,
+                  icon: const Icon(Icons.check_rounded, size: 18),
+                  label: Text(_ml('Save', 'Speichern')),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -4735,6 +5710,10 @@ String _statusLabel(BuildContext context, VehicleStatus status) {
       return t.t('fleet_status_status_grounded');
     case VehicleStatus.inService:
       return t.t('fleet_status_status_in_service');
+    case VehicleStatus.vorControllable:
+      return 'VOR · steuerbar';
+    case VehicleStatus.vorUncontrollable:
+      return 'VOR · nicht steuerbar';
     case VehicleStatus.defleeted:
       return t.t('fleet_status_status_defleeted');
     case VehicleStatus.active:
@@ -4748,6 +5727,10 @@ Color _statusColor(VehicleStatus status) {
       return _FleetStatusPageState._kRed;
     case VehicleStatus.inService:
       return _FleetStatusPageState._kBlue;
+    case VehicleStatus.vorControllable:
+      return const Color(0xFFB45309); // amber — DSP can fix
+    case VehicleStatus.vorUncontrollable:
+      return const Color(0xFF7C3AED); // purple — external blocker
     case VehicleStatus.defleeted:
       return _FleetStatusPageState._kMuted;
     case VehicleStatus.active:
@@ -4856,4 +5839,848 @@ String _formatDateTime(BuildContext context, DateTime? value) {
   final material = MaterialLocalizations.of(context);
   return '${material.formatShortDate(value)} '
       '${material.formatTimeOfDay(TimeOfDay.fromDateTime(value))}';
+}
+
+// =================================================================
+//   Fleet Hero — top-of-page summary of the whole fleet
+// =================================================================
+
+class _FleetHero extends StatelessWidget {
+  final List<FleetVehicle> vehicles;
+  final Map<String, _VehicleListComplianceSummary> compliance;
+  final bool isMobile;
+
+  const _FleetHero({
+    required this.vehicles,
+    required this.compliance,
+    this.isMobile = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+
+    int countByStatus(VehicleStatus s) =>
+        vehicles.where((v) => v.status == s).length;
+
+    final total = vehicles.length;
+    final active = countByStatus(VehicleStatus.active);
+    final grounded = countByStatus(VehicleStatus.grounded);
+    final inService = countByStatus(VehicleStatus.inService);
+    final vorCtrl = countByStatus(VehicleStatus.vorControllable);
+    final vorUnctrl = countByStatus(VehicleStatus.vorUncontrollable);
+    final defleeted = countByStatus(VehicleStatus.defleeted);
+
+    int tuvExpired = 0;
+    int tuvDueSoon = 0;
+    for (final v in vehicles) {
+      final c = compliance[normalizePlateNumber(v.plateNumber)];
+      if (c == null) continue;
+      switch (c.tuvStatus) {
+        case FleetVehicleDocumentStatus.expired:
+          tuvExpired++;
+          break;
+        case FleetVehicleDocumentStatus.expiringSoon:
+          tuvDueSoon++;
+          break;
+        default:
+          break;
+      }
+    }
+
+    if (isMobile) {
+      return Container(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF14532D), Color(0xFF1D7F5A)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: LayoutBuilder(builder: (ctx, c) {
+          // Two-column compact grid. "All" first, then statuses.
+          final entries = <(String, int)>[
+            ('All', total),
+            ('Aktiv', active),
+            ('Grounded', grounded),
+            ('In Service', inService),
+            ('VOR · steuerbar', vorCtrl),
+            ('VOR · nicht steuerbar', vorUnctrl),
+            ('Archiviert', defleeted),
+            if (tuvExpired > 0) ('TÜV abgelaufen', tuvExpired),
+            if (tuvDueSoon > 0) ('TÜV bald fällig', tuvDueSoon),
+          ];
+          const gap = 8.0;
+          final tileWidth = (c.maxWidth - gap) / 2;
+          return Wrap(
+            spacing: gap,
+            runSpacing: gap,
+            children: [
+              for (final e in entries)
+                SizedBox(
+                  width: tileWidth,
+                  child: _mobileTile(label: e.$1, value: e.$2),
+                ),
+            ],
+          );
+        }),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF14532D), Color(0xFF1D7F5A)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.local_shipping_outlined,
+                  color: Colors.white, size: 22),
+              const SizedBox(width: 8),
+              Text(
+                t.t('fleet_status_title'),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                ),
+              ),
+              const Spacer(),
+              _heroBigNumber(label: 'GESAMT', value: total),
+            ],
+          ),
+          const SizedBox(height: 16),
+          LayoutBuilder(builder: (ctx, c) {
+            final narrow = c.maxWidth < 720;
+            final tiles = <Widget>[
+              _heroTile('Aktiv', active,
+                  color: const Color(0xFF6EE7B7), icon: Icons.check_circle),
+              _heroTile('Grounded', grounded,
+                  color: const Color(0xFFFCA5A5), icon: Icons.report_problem),
+              _heroTile('In Service', inService,
+                  color: const Color(0xFF93C5FD), icon: Icons.build_circle),
+              _heroTile('VOR · steuerbar', vorCtrl,
+                  color: const Color(0xFFFCD34D),
+                  icon: Icons.error_outline_outlined),
+              _heroTile('VOR · nicht steuerbar', vorUnctrl,
+                  color: const Color(0xFFC4B5FD),
+                  icon: Icons.block_outlined),
+              _heroTile('Archiviert', defleeted,
+                  color: const Color(0xFFCBD5E1),
+                  icon: Icons.archive_outlined),
+              if (tuvExpired > 0)
+                _heroTile('TÜV abgelaufen', tuvExpired,
+                    color: const Color(0xFFFECACA), icon: Icons.warning_amber),
+              if (tuvDueSoon > 0)
+                _heroTile('TÜV bald fällig', tuvDueSoon,
+                    color: const Color(0xFFFED7AA),
+                    icon: Icons.event_busy_outlined),
+            ];
+            if (narrow) {
+              return Wrap(spacing: 8, runSpacing: 8, children: tiles);
+            }
+            return Row(
+              children: tiles
+                  .expand((w) => [Expanded(child: w), const SizedBox(width: 10)])
+                  .toList()
+                ..removeLast(),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  /// Mobile-only compact tile: no icon, label on top + big number
+  /// below. Slightly translucent white background to stay legible on
+  /// the dark-green hero gradient.
+  Widget _mobileTile({required String label, required int value}) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '$value',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _heroBigNumber({required String label, required int value}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.18),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFFD1FAE5),
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.0,
+            ),
+          ),
+          Text(
+            '$value',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _heroTile(String label, int value,
+      {required Color color, required IconData icon}) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withOpacity(0.18)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  '$value',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =================================================================
+//   _FahrzeugscheinCard
+//
+//   Sits on top of the vehicle detail page (left column). Shows two
+//   upload slots — front + back of the Fahrzeugschein — and below
+//   them an editable form for the fields that aren't in the Cortex
+//   export (tire size, kerb weight, max permissible weight, engine
+//   displacement, …). Data persists on the vehicle doc under the
+//   `fahrzeugschein` namespace; the scans themselves live in the
+//   normal vehicle documents subcollection with documentType
+//   `fahrzeugschein_front` / `fahrzeugschein_back`.
+// =================================================================
+
+class _FahrzeugscheinCard extends StatefulWidget {
+  final FleetVehicle vehicle;
+  final String dspUid;
+  final bool canManage;
+
+  const _FahrzeugscheinCard({
+    required this.vehicle,
+    required this.dspUid,
+    required this.canManage,
+  });
+
+  @override
+  State<_FahrzeugscheinCard> createState() => _FahrzeugscheinCardState();
+}
+
+class _FahrzeugscheinCardState extends State<_FahrzeugscheinCard> {
+  static const _docTypeFront = 'fahrzeugschein_front';
+  static const _docTypeBack = 'fahrzeugschein_back';
+
+  final FleetVehicleDocumentService _service = FleetVehicleDocumentService();
+  final FleetVehicleDocumentRepository _repo =
+      FleetVehicleDocumentRepository();
+
+  bool _busyFront = false;
+  bool _busyBack = false;
+  bool _savingFields = false;
+
+  final _tireSizeCtrl = TextEditingController();
+  final _rimSizeCtrl = TextEditingController();
+  final _kerbWeightCtrl = TextEditingController();
+  final _maxWeightCtrl = TextEditingController();
+  final _engineDisplacementCtrl = TextEditingController();
+  final _enginePowerCtrl = TextEditingController();
+  final _emissionClassCtrl = TextEditingController();
+  final _seatsCtrl = TextEditingController();
+  final _ownerNameCtrl = TextEditingController();
+  final _ownerAddressCtrl = TextEditingController();
+  final _firstRegCtrl = TextEditingController();
+
+  bool _hydrated = false;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _vehicleSub;
+  Map<String, dynamic> _autoExtracted = const {};
+  Timestamp? _lastAutoExtractedAt;
+
+  @override
+  void initState() {
+    super.initState();
+    _vehicleSub = FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.dspUid)
+        .collection('vehicles')
+        .doc(normalizePlateNumber(widget.vehicle.plateNumber))
+        .snapshots()
+        .listen(_onVehicleUpdate);
+  }
+
+  void _onVehicleUpdate(DocumentSnapshot<Map<String, dynamic>> snap) {
+    final fz = (snap.data()?['fahrzeugschein'] as Map?)
+            ?.cast<String, dynamic>() ??
+        const {};
+    // Only auto-fill controllers that the user has NOT typed into yet.
+    void fill(TextEditingController c, String key) {
+      final v = (fz[key] ?? '').toString();
+      if (c.text.trim().isEmpty && v.trim().isNotEmpty) {
+        c.text = v;
+      }
+    }
+
+    fill(_tireSizeCtrl, 'tireSize');
+    fill(_rimSizeCtrl, 'rimSize');
+    fill(_kerbWeightCtrl, 'kerbWeight');
+    fill(_maxWeightCtrl, 'maxWeight');
+    fill(_engineDisplacementCtrl, 'engineDisplacement');
+    fill(_enginePowerCtrl, 'enginePower');
+    fill(_emissionClassCtrl, 'emissionClass');
+    fill(_seatsCtrl, 'seats');
+    fill(_ownerNameCtrl, 'ownerName');
+    fill(_ownerAddressCtrl, 'ownerAddress');
+    fill(_firstRegCtrl, 'firstRegistration');
+
+    setState(() {
+      _hydrated = true;
+      _autoExtracted =
+          (fz['autoExtracted'] as Map?)?.cast<String, dynamic>() ?? const {};
+      _lastAutoExtractedAt = fz['lastAutoExtractedAt'] as Timestamp?;
+    });
+  }
+
+  @override
+  void dispose() {
+    _vehicleSub?.cancel();
+    for (final c in [
+      _tireSizeCtrl,
+      _rimSizeCtrl,
+      _kerbWeightCtrl,
+      _maxWeightCtrl,
+      _engineDisplacementCtrl,
+      _enginePowerCtrl,
+      _emissionClassCtrl,
+      _seatsCtrl,
+      _ownerNameCtrl,
+      _ownerAddressCtrl,
+      _firstRegCtrl,
+    ]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _pickAndUpload(String docType) async {
+    if (!widget.canManage) return;
+    final isFront = docType == _docTypeFront;
+    setState(() {
+      if (isFront) {
+        _busyFront = true;
+      } else {
+        _busyBack = true;
+      }
+    });
+    try {
+      final picked = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+        withData: true,
+      );
+      if (picked == null || picked.files.isEmpty) return;
+      final f = picked.files.first;
+      final bytes = f.bytes;
+      if (bytes == null) return;
+      // Replace any existing front/back doc for this vehicle.
+      final existing = await _repo
+          .documentsCollection(
+            dspUid: widget.dspUid,
+            plateNumber: widget.vehicle.plateNumber,
+          )
+          .where('documentType', isEqualTo: docType)
+          .get();
+      for (final d in existing.docs) {
+        await _service.softDeleteDocument(
+          dspUid: widget.dspUid,
+          plateNumber: widget.vehicle.plateNumber,
+          documentId: d.id,
+        );
+      }
+      final ext = (f.extension ?? '').toLowerCase();
+      await _service.createDocument(
+        dspUid: widget.dspUid,
+        plateNumber: widget.vehicle.plateNumber,
+        draft: FleetVehicleDocumentDraft(
+          documentType: docType,
+          documentNumber: '',
+          expiryDate: '',
+          fileName: f.name,
+          fileType: ext == 'pdf' ? 'application/pdf' : 'image/$ext',
+          notes: '',
+        ),
+        fileBytes: bytes,
+        originalFileName: f.name,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isFront
+              ? 'Fahrzeugschein Vorderseite hochgeladen.'
+              : 'Fahrzeugschein Rückseite hochgeladen.'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Upload fehlgeschlagen: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busyFront = false;
+          _busyBack = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _saveFields() async {
+    if (!widget.canManage) return;
+    setState(() => _savingFields = true);
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.dspUid)
+          .collection('vehicles')
+          .doc(normalizePlateNumber(widget.vehicle.plateNumber))
+          .set({
+        'fahrzeugschein': {
+          'tireSize': _tireSizeCtrl.text.trim(),
+          'rimSize': _rimSizeCtrl.text.trim(),
+          'kerbWeight': _kerbWeightCtrl.text.trim(),
+          'maxWeight': _maxWeightCtrl.text.trim(),
+          'engineDisplacement': _engineDisplacementCtrl.text.trim(),
+          'enginePower': _enginePowerCtrl.text.trim(),
+          'emissionClass': _emissionClassCtrl.text.trim(),
+          'seats': _seatsCtrl.text.trim(),
+          'ownerName': _ownerNameCtrl.text.trim(),
+          'ownerAddress': _ownerAddressCtrl.text.trim(),
+          'firstRegistration': _firstRegCtrl.text.trim(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Fahrzeugschein-Daten gespeichert.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Speichern fehlgeschlagen: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _savingFields = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _ProfileStyleCard(
+      child: StreamBuilder<List<FleetVehicleDocument>>(
+        stream: _repo.watchDocuments(
+          dspUid: widget.dspUid,
+          plateNumber: widget.vehicle.plateNumber,
+        ),
+        builder: (context, snap) {
+          final docs = snap.data ?? const <FleetVehicleDocument>[];
+          final front = docs.where(
+            (d) => d.documentType == _docTypeFront,
+          ).toList();
+          final back = docs.where(
+            (d) => d.documentType == _docTypeBack,
+          ).toList();
+          final hasAny = front.isNotEmpty || back.isNotEmpty;
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.assignment_ind_outlined,
+                      color: Color(0xFF1D7F5A)),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Fahrzeugschein',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF111827),
+                    ),
+                  ),
+                  const Spacer(),
+                  if (hasAny)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD1FAE5),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text('Hochgeladen',
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF065F46),
+                              fontWeight: FontWeight.w700)),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Vorderseite + Rückseite hochladen. Danach kannst du '
+                'die Daten erfassen, die Cortex nicht liefert '
+                '(Reifengröße, Leergewicht, Hubraum, …).',
+                style: TextStyle(color: Color(0xFF6B7280), fontSize: 13),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(child: _uploadTile(
+                    title: 'Vorderseite',
+                    docs: front,
+                    busy: _busyFront,
+                    onPick: () => _pickAndUpload(_docTypeFront),
+                  )),
+                  const SizedBox(width: 12),
+                  Expanded(child: _uploadTile(
+                    title: 'Rückseite',
+                    docs: back,
+                    busy: _busyBack,
+                    onPick: () => _pickAndUpload(_docTypeBack),
+                  )),
+                ],
+              ),
+              if (hasAny) ...[
+                const SizedBox(height: 18),
+                const Divider(),
+                const SizedBox(height: 8),
+                if (_autoExtracted.isNotEmpty) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFECFDF5),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFF6EE7B7)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.auto_awesome_outlined,
+                            color: Color(0xFF067647), size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '${_autoExtracted.length} Felder automatisch '
+                            'aus dem Fahrzeugschein erkannt. '
+                            'Bitte prüfen und bei Bedarf korrigieren.',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF065F46),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ] else if (hasAny &&
+                    _lastAutoExtractedAt == null &&
+                    _hydrated) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFFCD34D)),
+                    ),
+                    child: Row(
+                      children: [
+                        const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Text(
+                            'OCR läuft… (10-30 Sekunden) — '
+                            'die Felder unten füllen sich automatisch.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF92400E),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                const Text(
+                  'Erfassung',
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF111827),
+                      letterSpacing: 0.6),
+                ),
+                const SizedBox(height: 12),
+                if (!_hydrated)
+                  const Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else ...[
+                  Row(children: [
+                    Expanded(child: _tf('Reifengröße (z. B. 235/65 R16)',
+                        _tireSizeCtrl)),
+                    const SizedBox(width: 12),
+                    Expanded(child: _tf('Felgengröße', _rimSizeCtrl)),
+                  ]),
+                  const SizedBox(height: 10),
+                  Row(children: [
+                    Expanded(child: _tf('Leergewicht (kg)', _kerbWeightCtrl,
+                        kb: TextInputType.number)),
+                    const SizedBox(width: 12),
+                    Expanded(child: _tf(
+                        'Zulässige Gesamtmasse (kg)',
+                        _maxWeightCtrl,
+                        kb: TextInputType.number)),
+                  ]),
+                  const SizedBox(height: 10),
+                  Row(children: [
+                    Expanded(child: _tf('Hubraum (cm³)',
+                        _engineDisplacementCtrl,
+                        kb: TextInputType.number)),
+                    const SizedBox(width: 12),
+                    Expanded(child: _tf('Motorleistung (kW)',
+                        _enginePowerCtrl, kb: TextInputType.number)),
+                  ]),
+                  const SizedBox(height: 10),
+                  Row(children: [
+                    Expanded(
+                        child: _tf('Schadstoffklasse', _emissionClassCtrl)),
+                    const SizedBox(width: 12),
+                    Expanded(child: _tf('Sitzplätze', _seatsCtrl,
+                        kb: TextInputType.number)),
+                  ]),
+                  const SizedBox(height: 10),
+                  _tf('Erstzulassung (TT.MM.JJJJ)', _firstRegCtrl),
+                  const SizedBox(height: 10),
+                  _tf('Halter (Name)', _ownerNameCtrl),
+                  const SizedBox(height: 10),
+                  _tf('Halter-Anschrift', _ownerAddressCtrl, lines: 2),
+                  const SizedBox(height: 14),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: FilledButton.icon(
+                      onPressed: _savingFields || !widget.canManage
+                          ? null
+                          : _saveFields,
+                      icon: _savingFields
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation(
+                                      Colors.white)),
+                            )
+                          : const Icon(Icons.save_outlined, size: 18),
+                      label: Text(_savingFields
+                          ? 'Speichere…'
+                          : 'Erfassung speichern'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF1D7F5A),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _uploadTile({
+    required String title,
+    required List<FleetVehicleDocument> docs,
+    required bool busy,
+    required VoidCallback onPick,
+  }) {
+    final hasDoc = docs.isNotEmpty;
+    final doc = hasDoc ? docs.first : null;
+    return InkWell(
+      onTap: widget.canManage && !busy ? onPick : null,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        height: 120,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: hasDoc ? const Color(0xFFECFDF5) : const Color(0xFFF9FAFB),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: hasDoc
+                ? const Color(0xFF6EE7B7)
+                : const Color(0xFFE5E7EB),
+            width: hasDoc ? 1.5 : 1,
+            style: hasDoc ? BorderStyle.solid : BorderStyle.solid,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Icon(
+                hasDoc ? Icons.check_circle : Icons.upload_file_outlined,
+                color: hasDoc
+                    ? const Color(0xFF067647)
+                    : const Color(0xFF6B7280),
+                size: 22,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                title,
+                style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF111827)),
+              ),
+            ]),
+            const Spacer(),
+            if (busy)
+              const Center(
+                child: SizedBox(
+                    width: 22, height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2)),
+              )
+            else if (hasDoc)
+              Text(
+                doc?.fileName ?? '',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    fontSize: 12, color: Color(0xFF065F46)),
+              )
+            else
+              const Text(
+                'Klicken zum Hochladen (PDF, JPG, PNG)',
+                style: TextStyle(
+                    fontSize: 12, color: Color(0xFF6B7280)),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _tf(
+    String label,
+    TextEditingController c, {
+    TextInputType? kb,
+    int lines = 1,
+  }) {
+    return TextField(
+      controller: c,
+      enabled: widget.canManage,
+      maxLines: lines,
+      keyboardType: kb,
+      decoration: InputDecoration(
+        labelText: label,
+        isDense: true,
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFF1D7F5A)),
+        ),
+      ),
+    );
+  }
 }
