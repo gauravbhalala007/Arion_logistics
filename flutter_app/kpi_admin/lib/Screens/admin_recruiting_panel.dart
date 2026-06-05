@@ -674,10 +674,13 @@ class _RecruitingApplicationDetailPageState
     final app = widget.app;
     final fullName = app.displayName;
     setState(() => _onboardingBusy = true);
+    // Standard-Passwort des Admins vorbefüllen (wie im Drivers-Hub).
+    final defaultPwd = await readDefaultDriverPassword(widget.adminUid);
+    if (!mounted) return;
     final ok = await showAddDriverDialog(
       context: context,
       dspUid: widget.adminUid,
-      defaultPassword: '',
+      defaultPassword: defaultPwd,
       prefilledName: fullName,
       prefilledEmail: app.email,
       prefilledPhone: app.phoneWhatsApp,

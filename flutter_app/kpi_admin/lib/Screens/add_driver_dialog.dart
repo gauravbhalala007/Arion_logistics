@@ -83,6 +83,7 @@ class _AddDriverDialogState extends State<_AddDriverDialog> {
   late final TextEditingController _phoneCtrl;
   final _tidCtrl = TextEditingController();
   final _employeeNumberCtrl = TextEditingController();
+  final _emailBusinessCtrl = TextEditingController();
   late final TextEditingController _passwordCtrl;
   bool _passwordVisible = true;
   String _language = 'de';
@@ -130,6 +131,7 @@ class _AddDriverDialogState extends State<_AddDriverDialog> {
     _phoneCtrl.dispose();
     _tidCtrl.dispose();
     _employeeNumberCtrl.dispose();
+    _emailBusinessCtrl.dispose();
     _passwordCtrl.dispose();
     super.dispose();
   }
@@ -181,6 +183,7 @@ class _AddDriverDialogState extends State<_AddDriverDialog> {
       await ref.set({
         'driverName': name,
         'email': email,
+        'emailBusiness': _emailBusinessCtrl.text.trim(),
         'transporterId': effectiveTid,
         if (_phoneCtrl.text.trim().isNotEmpty)
           'phone': _phoneCtrl.text.trim(),
@@ -276,7 +279,6 @@ class _AddDriverDialogState extends State<_AddDriverDialog> {
   }) async {
     await ref.set(<String, dynamic>{
       'emailPrivate': app.email.trim(),
-      'emailBusiness': '',
       'birthDate':
           app.birthDate != null ? Timestamp.fromDate(app.birthDate!) : null,
       'birthPlace': app.birthPlace.trim(),
@@ -536,13 +538,24 @@ class _AddDriverDialogState extends State<_AddDriverDialog> {
             textInputAction: TextInputAction.next,
           ),
           const SizedBox(height: AppSpacing.md),
-          _Label('E-Mail *'),
+          _Label('E-Mail (Login) *'),
           TextField(
             controller: _emailCtrl,
             keyboardType: TextInputType.emailAddress,
             decoration: const InputDecoration(
               hintText: 'driver@example.com',
               prefixIcon: Icon(Icons.alternate_email_rounded),
+            ),
+            textInputAction: TextInputAction.next,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _Label('Geschäfts-E-Mail (optional)'),
+          TextField(
+            controller: _emailBusinessCtrl,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(
+              hintText: 'name@firma.de',
+              prefixIcon: Icon(Icons.business_center_outlined),
             ),
             textInputAction: TextInputAction.next,
           ),
