@@ -858,9 +858,11 @@ class _RecruitingApplicationDetailPageState
                     ),
                   ),
                 ]
-                // Onboard hand-off — visible once status reaches
-                // Eingestellt. Pre-fills the standard add-driver flow.
-                else if (_status == RecruitingStatus.hired) ...[
+                // Onboard hand-off — visible at the final pipeline stage:
+                // Visa → Eingestellt (hired), Local/EU → Ready.
+                // Pre-fills the standard add-driver flow.
+                else if (_status == RecruitingStatus.hired ||
+                    _status == RecruitingStatus.ready) ...[
                   const SizedBox(height: 14),
                   Container(
                     padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
@@ -886,7 +888,7 @@ class _RecruitingApplicationDetailPageState
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                'Hired — ready to onboard',
+                                'Ready to onboard',
                                 style: AppTypography.subheadline
                                     .copyWith(
                                   color: AppColors.codriverDeep,
