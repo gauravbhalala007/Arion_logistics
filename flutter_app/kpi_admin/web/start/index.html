@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CoDriver — Die Plattform für deine Delivery-Station</title>
+  <meta name="description" content="CoDriver macht die Amazon-Scorecard in 8 Sprachen verständlich, digitalisiert Onboarding, Driver Hub, Academy, Inventar und Schichtplanung. Eine Plattform für deine Delivery-Station." />
+  <link rel="icon" href="/favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #ffffff;
+      --bg-alt: #f5f5f7;
+      --bg-soft: #fafafc;
+      --text: #1d1d1f;
+      --muted: #6e6e73;
+      --faint: #86868b;
+      --line: rgba(0, 0, 0, 0.08);
+      --line-2: rgba(0, 0, 0, 0.12);
+      --green: #0a8f5b;
+      --green-deep: #077a4d;
+      --green-soft: #e8f6ef;
+      --green-text: #067a4b;
+      --ease: cubic-bezier(0.16, 1, 0.3, 1);
+      --maxw: 1120px;
+      --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+              "Helvetica Neue", "Hanken Grotesk", system-ui, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; scroll-behavior: smooth; }
+    body {
+      font-family: var(--font);
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.5;
+      letter-spacing: -0.01em;
+      overflow-x: hidden;
+    }
+    a { color: inherit; text-decoration: none; }
+    .container { width: 100%; max-width: var(--maxw); margin: 0 auto; padding: 0 28px; }
+
+    /* ---------- Nav ---------- */
+    header {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(255, 255, 255, 0.72);
+      backdrop-filter: saturate(180%) blur(20px);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      border-bottom: 1px solid transparent;
+      transition: border-color .3s ease, background .3s ease;
+    }
+    header.scrolled { border-color: var(--line); }
+    .nav { display: flex; align-items: center; justify-content: space-between; height: 56px; }
+    .brand { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 19px; letter-spacing: -0.03em; }
+    .brand .mark {
+      width: 26px; height: 26px; border-radius: 7px; flex: none;
+      background: linear-gradient(150deg, #14c074, var(--green-deep));
+      display: grid; place-items: center;
+    }
+    .brand .mark svg { width: 15px; height: 15px; }
+    .nav-links { display: flex; align-items: center; gap: 32px; }
+    .nav-links a:not(.btn) { font-size: 14.5px; color: var(--text); opacity: .82; transition: opacity .2s; }
+    .nav-links a:not(.btn):hover { opacity: 1; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      font-family: var(--font); font-weight: 600; font-size: 15px; letter-spacing: -0.01em;
+      padding: 11px 22px; border-radius: 980px; cursor: pointer; border: 1px solid transparent;
+      transition: transform .12s var(--ease), background .2s ease, box-shadow .25s ease, color .2s ease;
+      white-space: nowrap; will-change: transform;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: var(--green); color: #fff; box-shadow: 0 1px 2px rgba(10,143,91,0.25); }
+    .btn-primary:hover { background: var(--green-deep); box-shadow: 0 6px 20px rgba(10,143,91,0.28); }
+    .btn-sm { padding: 8px 18px; font-size: 14px; }
+    .btn-ghost { color: var(--text); border-color: var(--line-2); background: #fff; }
+    .btn-ghost:hover { border-color: var(--text); }
+    .btn-text { color: var(--green-text); font-weight: 600; padding: 0; background: none; }
+    .btn-text:hover { gap: 11px; }
+    .nav-toggle { display: none; width: 40px; height: 36px; border: 1px solid var(--line-2); border-radius: 9px; background: #fff; cursor: pointer; align-items: center; justify-content: center; }
+
+    /* ---------- Typography ---------- */
+    h1, h2, h3 { letter-spacing: -0.035em; font-weight: 700; line-height: 1.05; }
+    .eyebrow { font-size: 14px; font-weight: 600; color: var(--green-text); letter-spacing: 0; }
+    .display { font-size: clamp(40px, 6.4vw, 80px); }
+    .h2 { font-size: clamp(30px, 4.4vw, 52px); }
+    .lead { font-size: clamp(18px, 1.7vw, 23px); color: var(--muted); font-weight: 400; letter-spacing: -0.015em; line-height: 1.4; }
+
+    /* ---------- Hero ---------- */
+    .hero { text-align: center; padding: clamp(64px, 10vw, 120px) 0 0; }
+    .hero .eyebrow { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 980px; background: var(--green-soft); margin-bottom: 22px; }
+    .hero .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+    .hero h1 { margin-bottom: 22px; }
+    .hero .lead { max-width: 640px; margin: 0 auto; }
+    .hero-cta { display: flex; gap: 14px; justify-content: center; margin-top: 34px; flex-wrap: wrap; }
+    .hero-visual { margin-top: clamp(48px, 7vw, 88px); }
+
+    /* ---------- Image placeholder ---------- */
+    .ph {
+      position: relative; width: 100%; border-radius: 24px;
+      background:
+        radial-gradient(120% 120% at 50% 0%, #ffffff, var(--bg-alt) 70%);
+      border: 1px solid var(--line);
+      box-shadow: 0 30px 70px -40px rgba(0,0,0,0.25);
+      display: grid; place-items: center; overflow: hidden;
+    }
+    .ph::after {
+      content: "Bildvorschau"; position: absolute; bottom: 16px; right: 18px;
+      font-size: 12px; color: var(--faint); font-weight: 500; letter-spacing: 0;
+    }
+    .ph .glyph { width: 64px; height: 64px; color: #c7c7cc; }
+    .ph.wide { aspect-ratio: 16 / 9; }
+    .ph.tall { aspect-ratio: 4 / 3; }
+    .ph.square { aspect-ratio: 1 / 1; }
+    .ph.small { border-radius: 18px; }
+    .ph.small .glyph { width: 40px; height: 40px; }
+    .ph.small::after { font-size: 11px; bottom: 12px; right: 12px; }
+
+    /* ---------- Sections ---------- */
+    section { padding: clamp(72px, 11vw, 140px) 0; }
+    .feature-row { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(40px, 6vw, 88px); align-items: center; }
+    .feature-row.reverse .copy { order: 2; }
+    .feature-copy .eyebrow { display: block; margin-bottom: 16px; }
+    .feature-copy h2 { margin-bottom: 18px; }
+    .feature-copy p { font-size: clamp(17px, 1.4vw, 19px); color: var(--muted); max-width: 480px; line-height: 1.5; }
+    .feature-copy .more { margin-top: 26px; display: inline-flex; align-items: center; gap: 8px; transition: gap .2s var(--ease); }
+    .ul-check { list-style: none; margin-top: 22px; display: grid; gap: 13px; }
+    .ul-check li { display: flex; gap: 12px; align-items: flex-start; color: var(--text); font-size: 16.5px; }
+    .ul-check svg { width: 21px; height: 21px; color: var(--green); flex: none; margin-top: 1px; }
+
+    /* section tinted band */
+    .band { background: var(--bg-alt); }
+
+    /* language chips */
+    .langs { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 26px; max-width: 460px; }
+    .lang { font-size: 14px; font-weight: 500; color: var(--text); background: #fff; border: 1px solid var(--line-2); padding: 7px 14px; border-radius: 980px; }
+
+    /* ---------- Bento grid ---------- */
+    .grid-head { text-align: center; max-width: 660px; margin: 0 auto clamp(40px, 6vw, 72px); }
+    .grid-head h2 { margin-bottom: 16px; }
+    .grid-head p { font-size: 19px; color: var(--muted); }
+    .bento { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .card {
+      background: #fff; border: 1px solid var(--line); border-radius: 24px; padding: 30px;
+      transition: transform .35s var(--ease), box-shadow .35s var(--ease), border-color .3s ease;
+      display: flex; flex-direction: column;
+    }
+    .card:hover { transform: translateY(-6px); box-shadow: 0 24px 50px -30px rgba(0,0,0,0.22); border-color: var(--line-2); }
+    .card .ico { width: 50px; height: 50px; border-radius: 14px; background: var(--green-soft); display: grid; place-items: center; color: var(--green-text); margin-bottom: 20px; }
+    .card .ico svg { width: 25px; height: 25px; }
+    .card h3 { font-size: 22px; margin-bottom: 10px; letter-spacing: -0.03em; }
+    .card p { color: var(--muted); font-size: 15.5px; line-height: 1.5; margin-bottom: 22px; }
+    .card .ph { margin-top: auto; }
+
+    /* ---------- Stats ---------- */
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 28px; text-align: center; }
+    .stat .n { font-size: clamp(36px, 4.6vw, 56px); font-weight: 700; letter-spacing: -0.04em; }
+    .stat .n b { color: var(--green-text); font-weight: 700; }
+    .stat .l { color: var(--muted); font-size: 15.5px; margin-top: 6px; }
+
+    /* ---------- CTA ---------- */
+    .cta { text-align: center; }
+    .cta h2 { font-size: clamp(34px, 5vw, 60px); margin-bottom: 18px; }
+    .cta p { font-size: 20px; color: var(--muted); max-width: 540px; margin: 0 auto 34px; }
+
+    /* ---------- Footer ---------- */
+    footer { border-top: 1px solid var(--line); padding: 56px 0 44px; background: var(--bg-soft); }
+    .foot { display: flex; justify-content: space-between; gap: 40px; flex-wrap: wrap; }
+    .foot .brand { margin-bottom: 14px; }
+    .foot .desc { color: var(--muted); font-size: 14.5px; max-width: 300px; line-height: 1.5; }
+    .foot-cols { display: flex; gap: 64px; flex-wrap: wrap; }
+    .foot-col h4 { font-size: 13px; color: var(--faint); margin-bottom: 14px; font-weight: 600; letter-spacing: 0; }
+    .foot-col a { display: block; color: var(--muted); font-size: 14.5px; margin-bottom: 10px; transition: color .2s; }
+    .foot-col a:hover { color: var(--text); }
+    .foot-bottom { margin-top: 44px; padding-top: 22px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap; color: var(--faint); font-size: 13px; }
+
+    /* ---------- Reveal motion ---------- */
+    .reveal { opacity: 0; transform: translateY(22px); transition: opacity .65s var(--ease), transform .65s var(--ease); transition-delay: var(--d, 0ms); }
+    .reveal.in { opacity: 1; transform: none; }
+
+    /* ---------- Focus + responsive ---------- */
+    a:focus-visible, .btn:focus-visible, button:focus-visible { outline: 2px solid var(--green); outline-offset: 3px; border-radius: 6px; }
+
+    @media (max-width: 860px) {
+      .nav-links { display: none; }
+      .nav-toggle { display: flex; }
+      .nav-links.open { display: flex; position: absolute; top: 56px; left: 0; right: 0; flex-direction: column; align-items: stretch; gap: 6px; padding: 16px 28px 22px; background: rgba(255,255,255,0.96); backdrop-filter: blur(20px); border-bottom: 1px solid var(--line); }
+      .nav-links.open a:not(.btn) { padding: 10px 2px; }
+      .feature-row { grid-template-columns: 1fr; gap: 36px; }
+      .feature-row.reverse .copy { order: 0; }
+      .bento { grid-template-columns: 1fr; }
+      .stats { grid-template-columns: repeat(2, 1fr); gap: 36px 20px; }
+    }
+    @media (max-width: 460px) {
+      .container { padding: 0 20px; }
+      .hero-cta .btn { width: 100%; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      * { scroll-behavior: auto !important; }
+      .reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
+      .btn:active { transform: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <header id="hdr">
+    <div class="container nav">
+      <a class="brand" href="#top" aria-label="CoDriver Startseite">
+        <span class="mark"><svg viewBox="0 0 24 24" fill="none"><path d="M3 14l2-6a3 3 0 012.8-2H14a3 3 0 012.6 1.5L19 11l2 .6a1.5 1.5 0 011 1.4V16a1 1 0 01-1 1h-1" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7.5" cy="17" r="2" fill="#fff"/><circle cx="16.5" cy="17" r="2" fill="#fff"/></svg></span>
+        CoDriver
+      </a>
+      <nav class="nav-links" id="navLinks">
+        <a href="#scorecard">Scorecard</a>
+        <a href="#features">Funktionen</a>
+        <a href="#vorteile">Vorteile</a>
+        <a class="btn btn-primary btn-sm" href="https://dsp-codriver.de">Zur App</a>
+      </nav>
+      <button class="nav-toggle" id="navToggle" aria-label="Menü öffnen">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="#1d1d1f" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main id="top">
+
+    <!-- HERO -->
+    <section class="hero">
+      <div class="container">
+        <span class="eyebrow reveal"><span class="dot"></span> Für Amazon Delivery Service Partner</span>
+        <h1 class="display reveal" style="--d:60ms">Deine Station.<br>Verständlich gemacht.</h1>
+        <p class="lead reveal" style="--d:120ms">CoDriver vereint Scorecard, Onboarding, Driver Hub, Academy, Inventar und Schichtplanung — damit dein Team versteht, was zählt, und jeden Tag besser liefert.</p>
+        <div class="hero-cta reveal" style="--d:180ms">
+          <a class="btn btn-primary" href="https://dsp-codriver.de">Zur App</a>
+          <a class="btn btn-ghost" href="#scorecard">Funktionen entdecken</a>
+        </div>
+        <div class="hero-visual reveal" style="--d:240ms">
+          <div class="ph wide" role="img" aria-label="Platzhalter: CoDriver Dashboard">
+            <svg class="glyph" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="14" rx="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M3 9h18M7 14h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FLAGSHIP: SCORECARD -->
+    <section id="scorecard" class="band">
+      <div class="container feature-row">
+        <div class="feature-copy copy reveal">
+          <span class="eyebrow">Das Herzstück</span>
+          <h2 class="h2">Die Scorecard. Endlich verständlich. In 8&nbsp;Sprachen.</h2>
+          <p>Jedes Ergebnis und jede Kennzahl — klar erklärt, in der Sprache deiner Fahrer. Schluss mit Rätselraten: Dein Team versteht sofort, woran es liegt, und steigert die Performance deiner Delivery-Station.</p>
+          <div class="langs">
+            <span class="lang">Deutsch</span>
+            <span class="lang">English</span>
+            <span class="lang">Polski</span>
+            <span class="lang">Română</span>
+            <span class="lang">Shqip</span>
+            <span class="lang">Türkçe</span>
+            <span class="lang">العربية</span>
+            <span class="lang">Русский</span>
+          </div>
+        </div>
+        <div class="visual reveal" style="--d:80ms">
+          <div class="ph tall" role="img" aria-label="Platzhalter: Scorecard in mehreren Sprachen">
+            <svg class="glyph" viewBox="0 0 24 24" fill="none"><path d="M4 19V5m0 14h16M8 16v-6m4 6V7m4 9v-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- REGELN AB TAG 1 -->
+    <section>
+      <div class="container feature-row reverse">
+        <div class="feature-copy copy reveal">
+          <span class="eyebrow">Ab Tag 1</span>
+          <h2 class="h2">Regeln kennen. Vom ersten Tag an.</h2>
+          <p>Neue Mitarbeiter bekommen ein digitales Handbuch und eine FAQ — verständlich aufbereitet, immer griffbereit.</p>
+          <ul class="ul-check">
+            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Unternehmensregeln &amp; Abläufe digital erklärt</li>
+            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>FAQ zu Unternehmensgewinn &amp; Amazon-Lieferbedingungen</li>
+            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Schnelleres, sichereres Onboarding</li>
+          </ul>
+        </div>
+        <div class="visual reveal" style="--d:80ms">
+          <div class="ph tall" role="img" aria-label="Platzhalter: Digitales Handbuch und FAQ">
+            <svg class="glyph" viewBox="0 0 24 24" fill="none"><path d="M4 5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M13 3v5h5M8 13h8M8 16h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DRIVER HUB -->
+    <section class="band">
+      <div class="container feature-row">
+        <div class="feature-copy copy reveal">
+          <span class="eyebrow">Driver Hub</span>
+          <h2 class="h2">Von der Bewerbung bis zum letzten Dokument.</h2>
+          <p>Recruiting, Onboarding und Dokumentenmanagement an einem Ort. Alle Fristen und Unterlagen jedes Fahrers immer im Überblick — nichts läuft mehr ab, ohne dass du es weißt.</p>
+          <ul class="ul-check">
+            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Recruiting-Pipeline bis zum einsatzbereiten Fahrer</li>
+            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Dokumente &amp; Ablaufdaten zentral verwaltet</li>
+            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Fristen-Warnungen, bevor etwas abläuft</li>
+          </ul>
+        </div>
+        <div class="visual reveal" style="--d:80ms">
+          <div class="ph tall" role="img" aria-label="Platzhalter: Driver Hub mit Dokumenten und Fristen">
+            <svg class="glyph" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.5"/><path d="M4 20a8 8 0 0116 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- BENTO: weitere Funktionen -->
+    <section id="features">
+      <div class="container">
+        <div class="grid-head reveal">
+          <h2 class="h2">Alles, was eine Station braucht.</h2>
+          <p>Sechs Werkzeuge, eine Plattform — statt zehn Tools, die nicht miteinander reden.</p>
+        </div>
+        <div class="bento">
+          <div class="card reveal">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3l8 4v5c0 4.5-3.2 7.6-8 9-4.8-1.4-8-4.5-8-9V7l8-4z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <h3>DA Academy</h3>
+            <p>Sicherheitsschulungen und gesetzliche Sicherheitsunterweisungen — digital, nachweisbar und immer aktuell.</p>
+            <div class="ph small square" role="img" aria-label="Platzhalter: Academy"><svg class="glyph" viewBox="0 0 24 24" fill="none"><path d="M3 8l9-4 9 4-9 4-9-4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M7 10v5c0 1 2.2 2 5 2s5-1 5-2v-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          </div>
+          <div class="card reveal" style="--d:80ms">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none"><path d="M21 8l-9-5-9 5 9 5 9-5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M3 8v8l9 5 9-5V8M12 13v8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <h3>Inventory Tool</h3>
+            <p>Arbeitskleidung oder Fahrzeugteile — alles an einem Ort im Bestand, jederzeit nachvollziehbar.</p>
+            <div class="ph small square" role="img" aria-label="Platzhalter: Inventar"><svg class="glyph" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/></svg></div>
+          </div>
+          <div class="card reveal" style="--d:160ms">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M3 9h18M8 3v4M16 3v4M7 14l3 3 5-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <h3>Shiftplan &amp; Waveplan</h3>
+            <p>Einfacher Upload, schnelle Planung. Schichten und Wellen in Minuten statt Stunden organisiert.</p>
+            <div class="ph small square" role="img" aria-label="Platzhalter: Schichtplanung"><svg class="glyph" viewBox="0 0 24 24" fill="none"><path d="M12 3v9l5 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"/></svg></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STATS / VORTEILE -->
+    <section id="vorteile" class="band">
+      <div class="container">
+        <div class="stats">
+          <div class="stat reveal"><div class="n"><b>8</b></div><div class="l">Sprachen für die Scorecard</div></div>
+          <div class="stat reveal" style="--d:80ms"><div class="n">6&#8209;in&#8209;1</div><div class="l">Werkzeuge in einer Plattform</div></div>
+          <div class="stat reveal" style="--d:160ms"><div class="n">Tag&nbsp;<b>1</b></div><div class="l">Regeln &amp; Handbuch ab Start</div></div>
+          <div class="stat reveal" style="--d:240ms"><div class="n">EU</div><div class="l">Hosting &amp; DSGVO-konform</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta">
+      <div class="container reveal">
+        <h2>Bring deine Station<br>auf das nächste Level.</h2>
+        <p>Starte direkt in der App — oder melde dich für eine kurze Einführung.</p>
+        <div class="hero-cta">
+          <a class="btn btn-primary" href="https://dsp-codriver.de">Zur App</a>
+          <a class="btn btn-ghost" href="mailto:info@arion-logistics.de">Kontakt aufnehmen</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="container">
+      <div class="foot">
+        <div>
+          <a class="brand" href="#top">
+            <span class="mark"><svg viewBox="0 0 24 24" fill="none"><path d="M3 14l2-6a3 3 0 012.8-2H14a3 3 0 012.6 1.5L19 11l2 .6a1.5 1.5 0 011 1.4V16a1 1 0 01-1 1h-1" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7.5" cy="17" r="2" fill="#fff"/><circle cx="16.5" cy="17" r="2" fill="#fff"/></svg></span>
+            CoDriver
+          </a>
+          <p class="desc">Die Plattform für Amazon Delivery Service Partner. Scorecard, Onboarding, Driver Hub, Academy, Inventar &amp; Planung — vereint.</p>
+        </div>
+        <div class="foot-cols">
+          <div class="foot-col">
+            <h4>Produkt</h4>
+            <a href="#scorecard">Scorecard</a>
+            <a href="#features">Funktionen</a>
+            <a href="https://dsp-codriver.de">Zur App</a>
+          </div>
+          <div class="foot-col">
+            <h4>Kontakt</h4>
+            <a href="mailto:info@arion-logistics.de">info@arion-logistics.de</a>
+            <a href="https://dsp-codriver.de">dsp-codriver.de</a>
+          </div>
+          <div class="foot-col">
+            <h4>Anbieter</h4>
+            <a href="#" style="cursor:default">Kreativwerk Albert Dobra</a>
+          </div>
+        </div>
+      </div>
+      <div class="foot-bottom">
+        <span>© <span id="yr"></span> CoDriver · Kreativwerk Albert Dobra</span>
+        <span>Gehostet in der EU · DSGVO-konform</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Sticky nav border on scroll
+    var hdr = document.getElementById('hdr');
+    var onScroll = function () { hdr.classList.toggle('scrolled', window.scrollY > 8); };
+    onScroll(); window.addEventListener('scroll', onScroll, { passive: true });
+
+    // Mobile menu
+    var t = document.getElementById('navToggle'), n = document.getElementById('navLinks');
+    t.addEventListener('click', function () { n.classList.toggle('open'); });
+    n.querySelectorAll('a').forEach(function (a) { a.addEventListener('click', function () { n.classList.remove('open'); }); });
+
+    // Year
+    document.getElementById('yr').textContent = new Date().getFullYear();
+
+    // Scroll reveal (staggered, spring-eased via CSS) — emil-kowalski: motion with purpose, interruptible, reduced-motion safe
+    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) {
+      document.querySelectorAll('.reveal').forEach(function (el) { el.classList.add('in'); });
+    } else {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+      }, { threshold: 0.14, rootMargin: '0px 0px -40px 0px' });
+      document.querySelectorAll('.reveal').forEach(function (el) { io.observe(el); });
+      // Reveal hero immediately on load
+      window.addEventListener('load', function () {
+        document.querySelectorAll('.hero .reveal').forEach(function (el) { el.classList.add('in'); });
+      });
+    }
+  </script>
+</body>
+</html>
