@@ -79,11 +79,11 @@ class _AddDriverDialog extends StatefulWidget {
 
 class _AddDriverDialogState extends State<_AddDriverDialog> {
   late final TextEditingController _nameCtrl;
-  late final TextEditingController _emailCtrl;
+  late final TextEditingController _emailCtrl; // Geschäfts-/Login-Mail
+  late final TextEditingController _emailPrivateCtrl; // privat, kein Login
   late final TextEditingController _phoneCtrl;
   final _tidCtrl = TextEditingController();
   final _employeeNumberCtrl = TextEditingController();
-  final _emailBusinessCtrl = TextEditingController();
   late final TextEditingController _passwordCtrl;
   bool _passwordVisible = true;
   String _language = 'de';
@@ -117,7 +117,10 @@ class _AddDriverDialogState extends State<_AddDriverDialog> {
   void initState() {
     super.initState();
     _nameCtrl = TextEditingController(text: widget.prefilledName ?? '');
-    _emailCtrl =
+    // Login-/Geschäfts-Mail wird vom Admin eingetragen → leer starten.
+    _emailCtrl = TextEditingController(text: '');
+    // Private (Bewerber-)Mail vorbefüllen — wird NICHT als Login genutzt.
+    _emailPrivateCtrl =
         TextEditingController(text: widget.prefilledEmail ?? '');
     _phoneCtrl =
         TextEditingController(text: widget.prefilledPhone ?? '');
@@ -129,9 +132,9 @@ class _AddDriverDialogState extends State<_AddDriverDialog> {
     _nameCtrl.dispose();
     _emailCtrl.dispose();
     _phoneCtrl.dispose();
+    _emailPrivateCtrl.dispose();
     _tidCtrl.dispose();
     _employeeNumberCtrl.dispose();
-    _emailBusinessCtrl.dispose();
     _passwordCtrl.dispose();
     super.dispose();
   }
@@ -182,8 +185,10 @@ class _AddDriverDialogState extends State<_AddDriverDialog> {
 
       await ref.set({
         'driverName': name,
-        'email': email,
-        'emailBusiness': _emailBusinessCtrl.text.trim(),
+        'email': email, // Login = Geschäfts-E-Mail
+        'emailBusiness': email,
+        if (_emailPrivateCtrl.text.trim().isNotEmpty)
+          'emailPrivate': _emailPrivateCtrl.text.trim(),
         'transporterId': effectiveTid,
         if (_phoneCtrl.text.trim().isNotEmpty)
           'phone': _phoneCtrl.text.trim(),
@@ -278,7 +283,6 @@ class _AddDriverDialogState extends State<_AddDriverDialog> {
     required RecruitingApplication app,
   }) async {
     await ref.set(<String, dynamic>{
-      'emailPrivate': app.email.trim(),
       'birthDate':
           app.birthDate != null ? Timestamp.fromDate(app.birthDate!) : null,
       'birthPlace': app.birthPlace.trim(),
@@ -538,24 +542,26 @@ class _AddDriverDialogState extends State<_AddDriverDialog> {
             textInputAction: TextInputAction.next,
           ),
           const SizedBox(height: AppSpacing.md),
-          _Label('E-Mail (Login) *'),
+          _Label('Geschäfts-E-Mail (Login) *'),
           TextField(
             controller: _emailCtrl,
             keyboardType: TextInputType.emailAddress,
             decoration: const InputDecoration(
-              hintText: 'driver@example.com',
-              prefixIcon: Icon(Icons.alternate_email_rounded),
+              hintText: 'name@firma.de',
+              prefixIcon: Icon(Icons.business_center_outlined),
+              helperText: 'Wird als Login-E-Mail verwendet.',
             ),
             textInputAction: TextInputAction.next,
           ),
           const SizedBox(height: AppSpacing.md),
-          _Label('Geschäfts-E-Mail (optional)'),
+          _Label('Private E-Mail (optional)'),
           TextField(
-            controller: _emailBusinessCtrl,
+            controller: _emailPrivateCtrl,
             keyboardType: TextInputType.emailAddress,
             decoration: const InputDecoration(
-              hintText: 'name@firma.de',
-              prefixIcon: Icon(Icons.business_center_outlined),
+              hintText: 'driver@example.com',
+              prefixIcon: Icon(Icons.alternate_email_rounded),
+              helperText: 'Nur zur Ablage — kein Login.',
             ),
             textInputAction: TextInputAction.next,
           ),
