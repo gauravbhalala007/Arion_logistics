@@ -23,10 +23,12 @@ service cloud.firestore {
       return signedIn() && me().data.role == 'developer';
     }
 
-    // "staff" for feedback handling should be only developers.
-    // Admins/DSPs must not see each other's feedback.
+    // "staff" for feedback handling: developers + the operator superadmin
+    // (info@arion-logistics.de). Regular Admins/DSPs must NOT see each
+    // other's feedback — only these accounts get the global view.
     function isFeedbackStaff() {
-      return isDeveloper();
+      return isDeveloper()
+        || (signedIn() && request.auth.token.email == 'info@arion-logistics.de');
     }
 
     function isApproved(userId) {
@@ -1060,6 +1062,18 @@ service cloud.firestore {
             || (isDriverForUser(userId) && driverTransporterId() == driverId);
         }
       }
+    }
+
+    // ============================================================
+    //  RECRUITING SLUGS
+    //  recruiting_slugs/{slug} -> { adminUid: <DSP-Admin-UID> }
+    //  Public-read mapping used by /apply/<slug> to resolve the
+    //  company without exposing the long admin UID in shared URLs.
+    //  Writes happen ONLY via Admin SDK — never from the client.
+    // ============================================================
+    match /recruiting_slugs/{slug} {
+      allow read: if true;
+      allow write: if false;
     }
   }
 }

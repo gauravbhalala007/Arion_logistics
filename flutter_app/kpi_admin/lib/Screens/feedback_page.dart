@@ -35,6 +35,10 @@ class _FeedbackPageState extends State<FeedbackPage> {
   String? _feedbackStreamKey;
   Stream<QuerySnapshot<Map<String, dynamic>>>? _feedbackStream;
 
+  // Operator-Superadmin: sieht ALLE Feedbacks (über alle DSPs hinweg) und
+  // darf sie bearbeiten — zusätzlich zu Accounts mit role == 'developer'.
+  static const _kSuperadminEmail = 'info@arion-logistics.de';
+
   static const _kPageBg = Color(0xFFF3F6F7);
   static const _kCardBorder = Color(0xFFE1E4EA);
   static const _kTitle = Color(0xFF1F2937);
@@ -51,6 +55,22 @@ class _FeedbackPageState extends State<FeedbackPage> {
     return FirebaseAuth.instance.currentUser?.uid;
   }
   String? get _email => FirebaseAuth.instance.currentUser?.email;
+
+  @override
+  void initState() {
+    super.initState();
+    // Mark the badge as "seen" → the sidebar dot disappears for done-
+    // feedbacks the user has now viewed. We do this once per visit.
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .set({
+        'feedbackLastSeenAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true)).catchError((_) {});
+    }
+  }
 
   @override
   void dispose() {
@@ -359,6 +379,164 @@ class _FeedbackPageState extends State<FeedbackPage> {
     }
   }
 
+  /// Superadmin-only: marks a feedback as "done" with a completion
+  /// note describing what was changed. The note shows inline in the
+  /// card so the requester sees exactly what was implemented.
+  Future<void> _markDone({
+    required String feedbackId,
+    required String currentTitle,
+  }) async {
+    final uid = _uid;
+    if (uid == null) return;
+    final note = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        final ctrl = TextEditingController();
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 12,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE5E7EB),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Als erledigt markieren',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF111827),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                currentTitle,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF6B7280),
+                ),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: ctrl,
+                autofocus: true,
+                maxLines: 5,
+                minLines: 3,
+                decoration: InputDecoration(
+                  labelText: 'Was wurde umgesetzt? (Note für den Requester)',
+                  filled: true,
+                  fillColor: const Color(0xFFF9FAFB),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: const Text('Abbrechen'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    onPressed: () =>
+                        Navigator.of(ctx).pop(ctrl.text.trim()),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF067647),
+                    ),
+                    icon: const Icon(Icons.check_rounded, size: 18),
+                    label: const Text('Speichern & schließen'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    if (note == null) return;
+    try {
+      await FirebaseFirestore.instance
+          .collection('feedback')
+          .doc(feedbackId)
+          .set({
+            'status': 'done',
+            'doneAt': FieldValue.serverTimestamp(),
+            'doneByUid': uid,
+            'completionNotes': note,
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Color(0xFF067647),
+          content: Text('Feedback als erledigt markiert.'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update status: $e')),
+      );
+    }
+  }
+
+  /// Superadmin-only: marks a feedback as "processing" — that's the
+  /// signal to me (Claude) that this entry should be picked up and
+  /// implemented in the next iteration.
+  Future<void> _markProcessing({required String feedbackId}) async {
+    final uid = _uid;
+    if (uid == null) return;
+    try {
+      await FirebaseFirestore.instance
+          .collection('feedback')
+          .doc(feedbackId)
+          .set({
+            'status': 'processing',
+            'processingAt': FieldValue.serverTimestamp(),
+            'processingByUid': uid,
+            'resolvedAt': null,
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Color(0xFFB45309),
+          content: Text(
+            'Markiert als "In Bearbeitung" — wird in der nächsten '
+            'Iteration umgesetzt.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not update status: $e')));
+    }
+  }
+
   Future<void> _deleteFeedback({required String feedbackId}) async {
     if (_submitting) return;
 
@@ -454,7 +632,12 @@ class _FeedbackPageState extends State<FeedbackPage> {
         final me = snap.data?.data() ?? <String, dynamic>{};
         final role = (me['role'] ?? '').toString().trim().toLowerCase();
         final isDeveloper = role == 'developer';
-        final isStaff = isDeveloper;
+        final authEmail = (FirebaseAuth.instance.currentUser?.email ?? '')
+            .trim()
+            .toLowerCase();
+        final isSuperadmin = authEmail == _kSuperadminEmail;
+        // Developer ODER Operator-Superadmin sehen alle Feedbacks.
+        final isStaff = isDeveloper || isSuperadmin;
 
         final Query<Map<String, dynamic>> query = isStaff
             ? FirebaseFirestore.instance
@@ -768,10 +951,13 @@ class _FeedbackPageState extends State<FeedbackPage> {
                                     .toLowerCase();
 
                                 if (_devStatus != _DevStatusFilter.all) {
-                                  final want =
-                                      _devStatus == _DevStatusFilter.open
-                                      ? 'open'
-                                      : 'resolved';
+                                  final want = switch (_devStatus) {
+                                    _DevStatusFilter.open => 'open',
+                                    _DevStatusFilter.processing => 'processing',
+                                    _DevStatusFilter.done => 'done',
+                                    _DevStatusFilter.resolved => 'resolved',
+                                    _DevStatusFilter.all => '',
+                                  };
                                   if (status != want) return false;
                                 }
 
@@ -897,6 +1083,15 @@ class _FeedbackPageState extends State<FeedbackPage> {
                                         .trim()
                                         .toLowerCase();
                                     final isResolved = status == 'resolved';
+                                    final isProcessing = status == 'processing';
+                                    // Superadmin = mein eigener Account.
+                                    // Nur ich darf eine Feedback-Karte auf
+                                    // "in Bearbeitung" setzen — das ist
+                                    // mein Signal, das Feature einzubauen.
+                                    final email =
+                                        (_email ?? '').trim().toLowerCase();
+                                    final isSuperadmin =
+                                        email == _kSuperadminEmail;
 
                                     final title =
                                         (data['title'] ?? data['subject'] ?? '')
@@ -968,7 +1163,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
                                               _PriorityPill(priority: priority),
                                             ],
                                             const SizedBox(width: 8),
-                                            _StatusPill(resolved: isResolved),
+                                            _StatusPill(status: status),
                                             if (isStaff || canDelete) ...[
                                               const SizedBox(width: 8),
                                               PopupMenuButton<String>(
@@ -1000,6 +1195,19 @@ class _FeedbackPageState extends State<FeedbackPage> {
                                                       resolved: false,
                                                     );
                                                   }
+                                                  if (v == 'processing' &&
+                                                      isSuperadmin) {
+                                                    _markProcessing(
+                                                      feedbackId: d.id,
+                                                    );
+                                                  }
+                                                  if (v == 'done' &&
+                                                      isSuperadmin) {
+                                                    _markDone(
+                                                      feedbackId: d.id,
+                                                      currentTitle: title,
+                                                    );
+                                                  }
                                                   if (v == 'delete') {
                                                     _deleteFeedback(
                                                       feedbackId: d.id,
@@ -1007,6 +1215,48 @@ class _FeedbackPageState extends State<FeedbackPage> {
                                                   }
                                                 },
                                                 itemBuilder: (_) => [
+                                                  if (isSuperadmin &&
+                                                      status != 'done')
+                                                    PopupMenuItem<String>(
+                                                      value: 'done',
+                                                      child: Row(
+                                                        mainAxisSize:
+                                                            MainAxisSize.min,
+                                                        children: const [
+                                                          Icon(
+                                                              Icons.check_circle_outline,
+                                                              size: 18,
+                                                              color: Color(
+                                                                  0xFF067647)),
+                                                          SizedBox(width: 8),
+                                                          Text(
+                                                            'Als erledigt '
+                                                            'markieren (Done)',
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  if (isSuperadmin &&
+                                                      !isProcessing &&
+                                                      !isResolved)
+                                                    PopupMenuItem<String>(
+                                                      value: 'processing',
+                                                      child: Row(
+                                                        mainAxisSize:
+                                                            MainAxisSize.min,
+                                                        children: const [
+                                                          Icon(Icons.bolt_rounded,
+                                                              size: 18,
+                                                              color: Color(
+                                                                  0xFFB45309)),
+                                                          SizedBox(width: 8),
+                                                          Text(
+                                                            'In Bearbeitung '
+                                                            'nehmen',
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
                                                   if (isStaff && !isResolved)
                                                     PopupMenuItem<String>(
                                                       value: 'resolve',
@@ -1059,6 +1309,59 @@ class _FeedbackPageState extends State<FeedbackPage> {
                                                     height: 1.35,
                                                   ),
                                                 ),
+                                              if ((data['completionNotes'] ?? '')
+                                                  .toString()
+                                                  .trim()
+                                                  .isNotEmpty) ...[
+                                                const SizedBox(height: 10),
+                                                Container(
+                                                  padding: const EdgeInsets
+                                                      .all(10),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(
+                                                        0xFFD1FAE5),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            8),
+                                                    border: Border.all(
+                                                      color: const Color(
+                                                          0xFF34D399),
+                                                    ),
+                                                  ),
+                                                  child: Row(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      const Icon(
+                                                        Icons
+                                                            .check_circle_rounded,
+                                                        size: 16,
+                                                        color: Color(
+                                                            0xFF065F46),
+                                                      ),
+                                                      const SizedBox(
+                                                          width: 8),
+                                                      Expanded(
+                                                        child: Text(
+                                                          'Umgesetzt: '
+                                                          '${data['completionNotes']}',
+                                                          style:
+                                                              const TextStyle(
+                                                            fontSize: 13,
+                                                            color: Color(
+                                                                0xFF065F46),
+                                                            fontWeight:
+                                                                FontWeight
+                                                                    .w600,
+                                                            height: 1.35,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
                                               if (attachmentUrl.isNotEmpty) ...[
                                                 const SizedBox(height: 10),
                                                 Wrap(
@@ -1161,27 +1464,56 @@ class _metaChip extends StatelessWidget {
 }
 
 class _StatusPill extends StatelessWidget {
-  final bool resolved;
-  const _StatusPill({required this.resolved});
+  /// `open`, `processing`, `done`, or `resolved`.
+  final String status;
+  const _StatusPill({required this.status});
 
   @override
   Widget build(BuildContext context) {
+    Color bg;
+    Color border;
+    Color fg;
+    String label;
+    switch (status) {
+      case 'done':
+        bg = const Color(0xFFD1FAE5);
+        border = const Color(0xFF34D399);
+        fg = const Color(0xFF065F46);
+        label = 'DONE';
+        break;
+      case 'resolved':
+        bg = const Color(0xFFEEF2FF);
+        border = const Color(0xFFC7D2FE);
+        fg = const Color(0xFF3730A3);
+        label = 'RESOLVED';
+        break;
+      case 'processing':
+        bg = const Color(0xFFFEF3C7);
+        border = const Color(0xFFFCD34D);
+        fg = const Color(0xFF92400E);
+        label = 'IN BEARBEITUNG';
+        break;
+      case 'open':
+      default:
+        bg = const Color(0xFFECFDF5);
+        border = const Color(0xFFBBF7D0);
+        fg = const Color(0xFF166534);
+        label = 'OPEN';
+    }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: resolved ? const Color(0xFFEEF2FF) : const Color(0xFFECFDF5),
+        color: bg,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: resolved ? const Color(0xFFC7D2FE) : const Color(0xFFBBF7D0),
-        ),
+        border: Border.all(color: border),
       ),
       child: Text(
-        resolved ? 'RESOLVED' : 'OPEN',
+        label,
         style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w900,
           letterSpacing: 0.4,
-          color: resolved ? const Color(0xFF3730A3) : const Color(0xFF166534),
+          color: fg,
         ),
       ),
     );
@@ -1240,7 +1572,7 @@ class _PriorityPill extends StatelessWidget {
   }
 }
 
-enum _DevStatusFilter { open, resolved, all }
+enum _DevStatusFilter { open, processing, done, resolved, all }
 
 class _DevFiltersCard extends StatelessWidget {
   final TextEditingController searchCtrl;
@@ -1361,6 +1693,18 @@ class _DevFiltersCard extends StatelessWidget {
                       value: _DevStatusFilter.open,
                       group: status,
                       label: t('Open', 'Offen'),
+                      onSelected: onStatusChanged,
+                    ),
+                    chip<_DevStatusFilter>(
+                      value: _DevStatusFilter.processing,
+                      group: status,
+                      label: t('Processing', 'In Bearbeitung'),
+                      onSelected: onStatusChanged,
+                    ),
+                    chip<_DevStatusFilter>(
+                      value: _DevStatusFilter.done,
+                      group: status,
+                      label: t('Done', 'Erledigt (Done)'),
                       onSelected: onStatusChanged,
                     ),
                     chip<_DevStatusFilter>(
