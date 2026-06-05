@@ -13,6 +13,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -21,6 +22,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/recruiting_application.dart';
 import '../models/recruiting_form_config.dart';
 import '../services/recruiting_repository.dart';
+import '../services/recruiting_slug_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../widgets/co_button.dart';
@@ -40,11 +42,19 @@ class _AdminRecruitingPanelState extends State<AdminRecruitingPanel>
     with SingleTickerProviderStateMixin {
   late final TabController _tabs;
   final _repo = RecruitingRepository();
+  String? _brandSlug; // e.g. "arion" — looked up once on init.
 
   @override
   void initState() {
     super.initState();
     _tabs = TabController(length: 2, vsync: this);
+    _loadBrandSlug();
+  }
+
+  Future<void> _loadBrandSlug() async {
+    final slug = await RecruitingSlugService.slugFor(widget.adminUid);
+    if (!mounted) return;
+    setState(() => _brandSlug = slug);
   }
 
   @override
@@ -55,7 +65,14 @@ class _AdminRecruitingPanelState extends State<AdminRecruitingPanel>
 
   String _publicFormUrl(RecruitingChannel channel) {
     final base = Uri.base;
-    return '${base.origin}/#/recruiting?dsp=${widget.adminUid}'
+    // Prefer the short branded slug URL when available; otherwise fall
+    // back to the legacy ?dsp=<long-uid>&type=… form so existing
+    // customers without a slug keep working.
+    if (_brandSlug != null && _brandSlug!.isNotEmpty) {
+      final typeSegment = channel == RecruitingChannel.visa ? '/visa' : '';
+      return '${base.origin}/#/jobs/$_brandSlug$typeSegment';
+    }
+    return '${base.origin}/#/jobs?dsp=${widget.adminUid}'
         '&type=${channel.value}';
   }
 
@@ -388,6 +405,12 @@ class _ApplicationRow extends StatelessWidget {
     switch (s) {
       case RecruitingStatus.newApp:
         return const Color(0xFFB45309);
+      case RecruitingStatus.onboarded:
+        return const Color(0xFF1D4ED8);
+      case RecruitingStatus.scheduledTraining:
+        return const Color(0xFF7C3AED);
+      case RecruitingStatus.ready:
+        return AppColors.codriverGreen;
       case RecruitingStatus.contacted:
         return const Color(0xFF1D4ED8);
       case RecruitingStatus.scheduled:
@@ -473,9 +496,19 @@ class _ApplicationRow extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Wrap(
-                      spacing: 10,
+                      spacing: 8,
                       runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
+                        if (_ContractTypePill.forKey(
+                              (app.customAnswers['employmentInterest'] ?? '')
+                                  .toString(),
+                            ) !=
+                            null)
+                          _ContractTypePill.forKey(
+                            (app.customAnswers['employmentInterest'] ?? '')
+                                .toString(),
+                          )!,
                         _MetaChip(
                           icon: Icons.flag_outlined,
                           text: app.nationality.isEmpty
@@ -519,6 +552,58 @@ class _ApplicationRow extends StatelessWidget {
         .toList()
         .join();
     return letters.isEmpty ? '?' : letters;
+  }
+}
+
+class _ContractTypePill extends StatelessWidget {
+  const _ContractTypePill({required this.label, required this.color});
+  final String label;
+  final Color color;
+
+  static _ContractTypePill? forKey(String key) {
+    switch (key) {
+      case 'fulltime':
+        return const _ContractTypePill(
+          label: 'Vollzeit',
+          color: Color(0xFF1D7F5A),
+        );
+      case 'parttime':
+        return const _ContractTypePill(
+          label: 'Teilzeit',
+          color: Color(0xFF0369A1),
+        );
+      case 'minijob':
+        return const _ContractTypePill(
+          label: 'Minijob',
+          color: Color(0xFF6B7280),
+        );
+      case 'werkstudent':
+        return const _ContractTypePill(
+          label: 'Werkstudent',
+          color: Color(0xFF7C3AED),
+        );
+      default:
+        return null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: AppTypography.caption2.copyWith(
+          color: Colors.white,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.4,
+        ),
+      ),
+    );
   }
 }
 
@@ -583,6 +668,7 @@ class _RecruitingApplicationDetailPageState
   late RecruitingStatus _status = widget.app.status;
   bool _busy = false;
   bool _onboardingBusy = false;
+  late Map<String, dynamic>? _convertedToDriver = widget.app.convertedToDriver;
 
   Future<void> _onboardAsDriver() async {
     final app = widget.app;
@@ -595,10 +681,27 @@ class _RecruitingApplicationDetailPageState
       prefilledName: fullName,
       prefilledEmail: app.email,
       prefilledPhone: app.phoneWhatsApp,
+      sourceApplication: app,
     );
     if (!mounted) return;
     setState(() => _onboardingBusy = false);
     if (ok) {
+      // Markierung wurde vom Dialog geschrieben — frisch nachladen,
+      // damit Badge + Disable sofort greifen.
+      try {
+        final snap = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(widget.adminUid)
+            .collection('recruiting_applications')
+            .doc(app.id)
+            .get();
+        final conv = snap.data()?['convertedToDriver'];
+        if (mounted && conv is Map) {
+          setState(() =>
+              _convertedToDriver = Map<String, dynamic>.from(conv));
+        }
+      } catch (_) {}
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: AppColors.codriverDeep,
@@ -610,6 +713,14 @@ class _RecruitingApplicationDetailPageState
         ),
       );
     }
+  }
+
+  String _convertedDriverSubtitle() {
+    final tid = (_convertedToDriver?['tid'] ?? '').toString().trim();
+    if (tid.isEmpty) {
+      return 'Dieser Bewerber wurde bereits in einen Driver übernommen.';
+    }
+    return 'Driver-ID: $tid · Daten & Dokumente wurden übernommen.';
   }
 
   @override
@@ -700,10 +811,56 @@ class _RecruitingApplicationDetailPageState
                     }
                   },
                 ),
+                // Bereits übernommen → Badge statt Onboard-Box.
+                if (_convertedToDriver != null) ...[
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.green50,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: AppColors.codriverGreen
+                            .withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.verified_rounded,
+                          color: AppColors.codriverDeep,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Als Driver übernommen',
+                                style: AppTypography.subheadline.copyWith(
+                                  color: AppColors.codriverDeep,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              Text(
+                                _convertedDriverSubtitle(),
+                                style: AppTypography.caption2.copyWith(
+                                  color: AppColors.codriverDeep
+                                      .withValues(alpha: 0.75),
+                                  height: 1.35,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ]
                 // Onboard hand-off — visible once status reaches
-                // Eingestellt. Pre-fills the standard add-driver flow
-                // with the applicant's basics.
-                if (_status == RecruitingStatus.hired) ...[
+                // Eingestellt. Pre-fills the standard add-driver flow.
+                else if (_status == RecruitingStatus.hired) ...[
                   const SizedBox(height: 14),
                   Container(
                     padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
@@ -1103,6 +1260,46 @@ class _CustomAnswersGroup extends StatelessWidget {
   final String adminUid;
   final RecruitingChannel channel;
 
+  /// Built-in keys (those written by the recruiting form itself, not by
+  /// admin-configured custom questions) get human labels here so the
+  /// applicant detail view shows „Krankenkasse" instead of „healthInsurance".
+  static const Map<String, String> _builtInLabels = {
+    'employmentInterest': 'Beschäftigungs-Wunsch',
+    'parttimeDaysPerWeek': 'Teilzeit-Tage pro Woche',
+    'birthCountry': 'Geburtsland',
+    'taxId': 'Steueridentifikationsnummer',
+    'taxIdSubmitLater': 'Steuer-ID wird nachgereicht',
+    'socialSecurityNumber': 'Sozialversicherungsnummer',
+    'socialSecuritySubmitLater': 'Sozialversicherungs-Nr. wird nachgereicht',
+    'healthInsuranceStatus': 'Status Krankenkasse',
+    'healthInsurance': 'Krankenkasse',
+    'aokBayernRegisterRequested': 'AOK-Bayern-Anmeldung gewünscht',
+    'maritalStatus': 'Familienstand',
+    'childrenChoice': 'Kinder',
+    'childrenCount': 'Anzahl Kinder',
+    'notes': 'Anmerkungen',
+  };
+
+  /// Stable display order for built-in keys, so the admin always sees
+  /// payroll → family → notes in the same sequence regardless of map
+  /// iteration order.
+  static const List<String> _builtInOrder = [
+    'employmentInterest',
+    'parttimeDaysPerWeek',
+    'birthCountry',
+    'taxId',
+    'taxIdSubmitLater',
+    'socialSecurityNumber',
+    'socialSecuritySubmitLater',
+    'healthInsuranceStatus',
+    'healthInsurance',
+    'aokBayernRegisterRequested',
+    'maritalStatus',
+    'childrenChoice',
+    'childrenCount',
+    'notes',
+  ];
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<RecruitingFormConfig>(
@@ -1116,13 +1313,26 @@ class _CustomAnswersGroup extends StatelessWidget {
           for (final f in cfg.fields) f.id: f,
         };
         final rows = <_DetailRow>[];
-        for (final entry in answers.entries) {
-          final field = byId[entry.key];
-          final label =
-              field?.label ?? 'Custom field (${entry.key})';
-          final v = entry.value;
-          rows.add(_DetailRow(label, _formatAnswer(v)));
+
+        // 1) Built-in keys first, in a stable, predictable order.
+        for (final key in _builtInOrder) {
+          if (!answers.containsKey(key)) continue;
+          rows.add(_DetailRow(
+            _builtInLabels[key] ?? key,
+            _formatAnswer(key, answers[key]),
+          ));
         }
+
+        // 2) Admin-configured custom questions next, falling back to the
+        //    key name only if no label is configured (avoids the raw
+        //    „Custom field (xyz)" placeholder we used before).
+        for (final entry in answers.entries) {
+          if (_builtInLabels.containsKey(entry.key)) continue;
+          final field = byId[entry.key];
+          final label = field?.label ?? entry.key;
+          rows.add(_DetailRow(label, _formatAnswer(entry.key, entry.value)));
+        }
+
         if (rows.isEmpty) return const SizedBox.shrink();
         return _DetailGroup(
           title: 'Custom questions',
@@ -1132,11 +1342,50 @@ class _CustomAnswersGroup extends StatelessWidget {
     );
   }
 
-  String _formatAnswer(dynamic v) {
+  String _formatAnswer(String key, dynamic v) {
     if (v == null) return '—';
-    if (v is bool) return v ? 'Yes · Ja' : 'No · Nein';
-    if (v is String) return v.isEmpty ? '—' : v;
-    return v.toString();
+    if (v is bool) return v ? 'Ja' : 'Nein';
+    final s = v is String ? v : v.toString();
+    if (s.isEmpty) return '—';
+    switch (key) {
+      case 'employmentInterest':
+        return const {
+              'fulltime': 'Vollzeit',
+              'parttime': 'Teilzeit',
+              'minijob': 'Minijob',
+              'werkstudent': 'Werkstudent',
+            }[s] ??
+            s;
+      case 'healthInsuranceStatus':
+        return const {
+              'has': 'Vorhanden',
+              'none': 'Aktuell nicht versichert',
+            }[s] ??
+            s;
+      case 'parttimeDaysPerWeek':
+        return '$s Tage';
+      case 'maritalStatus':
+        return const {
+              'single': 'Ledig',
+              'divorced': 'Geschieden',
+              'married_or_separated': 'Verheiratet oder getrennt lebend',
+              'widowed': 'Verwitwet',
+              'married': 'Verheiratet', // legacy
+              'later': 'Wird nachgereicht',
+            }[s] ??
+            s;
+      case 'childrenChoice':
+        return const {
+              'none': 'Keine Kinder',
+              'count': 'Ja',
+              'later': 'Wird nachgereicht',
+            }[s] ??
+            s;
+      case 'taxId':
+      case 'socialSecurityNumber':
+        return s == 'later' ? 'Wird später nachgereicht' : s;
+    }
+    return s;
   }
 }
 
@@ -1147,11 +1396,15 @@ class _DocumentPreview extends StatelessWidget {
   String _labelFor(String label) {
     switch (label) {
       case 'passport':
-        return 'Pass / Personalausweis';
+        return 'Pass / Personalausweis · Vorderseite';
+      case 'id_back':
+        return 'Personalausweis · Rückseite';
+      case 'selfie':
+        return 'Selfie · Driver Badge';
       case 'license_front':
-        return 'Führerschein · Front';
+        return 'Führerschein · Vorderseite';
       case 'license_back':
-        return 'Führerschein · Back';
+        return 'Führerschein · Rückseite';
       default:
         return label;
     }
