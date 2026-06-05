@@ -19,6 +19,7 @@ import 'package:flutter/services.dart';
 
 import '../localization/app_localizations.dart';
 import '../models/driver_contract_type.dart';
+import '../models/recruiting_application.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_elevation.dart';
 import '../theme/app_spacing.dart';
@@ -37,6 +38,7 @@ Future<bool> showAddDriverDialog({
   String? prefilledName,
   String? prefilledEmail,
   String? prefilledPhone,
+  RecruitingApplication? sourceApplication,
 }) async {
   final result = await showDialog<bool>(
     context: context,
@@ -47,6 +49,7 @@ Future<bool> showAddDriverDialog({
       prefilledName: prefilledName,
       prefilledEmail: prefilledEmail,
       prefilledPhone: prefilledPhone,
+      sourceApplication: sourceApplication,
     ),
   );
   return result == true;
@@ -58,12 +61,14 @@ class _AddDriverDialog extends StatefulWidget {
   final String? prefilledName;
   final String? prefilledEmail;
   final String? prefilledPhone;
+  final RecruitingApplication? sourceApplication;
   const _AddDriverDialog({
     required this.dspUid,
     required this.defaultPassword,
     this.prefilledName,
     this.prefilledEmail,
     this.prefilledPhone,
+    this.sourceApplication,
   });
 
   @override
@@ -213,6 +218,12 @@ class _AddDriverDialogState extends State<_AddDriverDialog> {
             'fehl: $e';
       }
 
+      // Recruiting-Onboarding: alle Bewerber-Stammdaten übernehmen.
+      final srcApp = widget.sourceApplication;
+      if (srcApp != null) {
+        await _writeRecruitingFields(ref: ref, app: srcApp);
+      }
+
       if (!mounted) return;
       setState(() {
         _saving = false;
@@ -230,6 +241,39 @@ class _AddDriverDialogState extends State<_AddDriverDialog> {
         _error = '$e';
       });
     }
+  }
+
+  /// Übernimmt alle Bewerber-Stammdaten flach ins Driver-Dokument.
+  /// Wird nur im Recruiting-Onboarding-Flow aufgerufen.
+  Future<void> _writeRecruitingFields({
+    required DocumentReference<Map<String, dynamic>> ref,
+    required RecruitingApplication app,
+  }) async {
+    await ref.set(<String, dynamic>{
+      'emailPrivate': app.email.trim(),
+      'emailBusiness': '',
+      'birthDate':
+          app.birthDate != null ? Timestamp.fromDate(app.birthDate!) : null,
+      'birthPlace': app.birthPlace.trim(),
+      'nationality': app.nationality.trim(),
+      'street': app.street.trim(),
+      'postalCode': app.postalCode.trim(),
+      'city': app.city.trim(),
+      'livingHereSince': app.livingHereSince != null
+          ? Timestamp.fromDate(app.livingHereSince!)
+          : null,
+      'shirtSize': app.shirtSize.trim(),
+      'shoeSize': app.shoeSize.trim(),
+      'truckLicense': app.truckLicense.trim(),
+      'channel': app.channel.value,
+      'customAnswers': app.customAnswers,
+      'adminNote': app.adminNote.trim(),
+      'convertedFromApplication': <String, dynamic>{
+        'appId': app.id,
+        'adminUid': app.adminUid,
+        'at': FieldValue.serverTimestamp(),
+      },
+    }, SetOptions(merge: true));
   }
 
   @override
