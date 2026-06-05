@@ -9,11 +9,13 @@
 //   • After save: a success screen with the welcome message preview
 //     in the chosen language + a copy-to-clipboard button
 
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart' as fb_storage;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -96,6 +98,7 @@ class _AddDriverDialogState extends State<_AddDriverDialog> {
   String? _savedPassword;
   String? _savedLanguage;
   String? _savedLoginNotice;
+  String? _savedDocNotice;
 
   static const _supportedLanguages = <_Lang>[
     _Lang('de', 'Deutsch', '🇩🇪'),
@@ -218,10 +221,22 @@ class _AddDriverDialogState extends State<_AddDriverDialog> {
             'fehl: $e';
       }
 
-      // Recruiting-Onboarding: alle Bewerber-Stammdaten übernehmen.
+      // Recruiting-Onboarding: Stammdaten, Dokumente, Markierung.
       final srcApp = widget.sourceApplication;
+      String? docNotice;
       if (srcApp != null) {
         await _writeRecruitingFields(ref: ref, app: srcApp);
+        final failed = await _copyRecruitingDocuments(
+          ref: ref,
+          tid: effectiveTid,
+          app: srcApp,
+        );
+        await _markApplicationConverted(app: srcApp, tid: effectiveTid);
+        if (failed.isNotEmpty) {
+          docNotice =
+              'Einige Dokumente konnten nicht übernommen werden (${failed.join(', ')}). '
+              'Bitte im Drivers-Hub manuell nachladen.';
+        }
       }
 
       if (!mounted) return;
@@ -233,6 +248,7 @@ class _AddDriverDialogState extends State<_AddDriverDialog> {
         _savedPassword = password;
         _savedLanguage = _language;
         _savedLoginNotice = loginNotice;
+        _savedDocNotice = docNotice;
       });
     } catch (e) {
       if (!mounted) return;
@@ -271,6 +287,121 @@ class _AddDriverDialogState extends State<_AddDriverDialog> {
       'convertedFromApplication': <String, dynamic>{
         'appId': app.id,
         'adminUid': app.adminUid,
+        'at': FieldValue.serverTimestamp(),
+      },
+    }, SetOptions(merge: true));
+  }
+
+  /// Mappt ein Recruiting-Dokument-Label auf den Driver-`docType`.
+  /// `selfie` ist Sonderfall (Profilbild) und wird hier nicht gemappt.
+  static const Map<String, String> _kRecruitingDocTypeMap = <String, String>{
+    'passport': 'id_card_front',
+    'id_back': 'id_card_back',
+    'license_front': 'driver_license_front',
+    'license_back': 'driver_license_back',
+  };
+
+  /// Kopiert die Bewerber-Dokumente in die Driver-Storage-Pfade und legt
+  /// `documents`-Einträge an. Selfie → Profilbild. Liefert die Labels,
+  /// deren Kopie fehlgeschlagen ist (für einen Hinweis im Erfolgs-Screen).
+  Future<List<String>> _copyRecruitingDocuments({
+    required DocumentReference<Map<String, dynamic>> ref,
+    required String tid,
+    required RecruitingApplication app,
+  }) async {
+    final storage = fb_storage.FirebaseStorage.instance;
+    final docsCol = ref.collection('documents');
+    final failures = <String>[];
+
+    for (final d in app.documents) {
+      try {
+        final hasPath = d.storagePath.trim().isNotEmpty;
+        final hasUrl = d.downloadUrl.trim().isNotEmpty;
+        if (!hasPath && !hasUrl) {
+          continue; // legacy/base64-only oder leer → nichts zu kopieren
+        }
+        final srcRef = hasPath
+            ? storage.ref(d.storagePath)
+            : storage.refFromURL(d.downloadUrl);
+        // 25 MB Limit deckt die max. 15 MB Recruiting-Uploads ab.
+        final bytes = await srcRef.getData(25 * 1024 * 1024);
+        if (bytes == null) {
+          failures.add(d.label);
+          continue;
+        }
+        final contentType =
+            d.mimeType.trim().isEmpty ? null : d.mimeType.trim();
+        final stamp = DateTime.now().millisecondsSinceEpoch;
+
+        if (d.label == 'selfie') {
+          // Profilbild: nach driver_profile_photos + onboarding-Map.
+          final photoRef = storage
+              .ref()
+              .child('driver_profile_photos')
+              .child(tid)
+              .child('recruiting_$stamp.jpg');
+          await photoRef.putData(
+            bytes,
+            contentType == null
+                ? null
+                : fb_storage.SettableMetadata(contentType: contentType),
+          );
+          final url = await photoRef.getDownloadURL();
+          await ref.set(<String, dynamic>{
+            'onboarding': <String, dynamic>{
+              'profilePhotoBase64': base64Encode(bytes),
+              'profilePhotoUrl': url,
+            },
+          }, SetOptions(merge: true));
+          continue;
+        }
+
+        final docType = _kRecruitingDocTypeMap[d.label] ?? d.label;
+        final fileName =
+            d.filename.trim().isNotEmpty ? d.filename.trim() : docType;
+        final destRef = storage
+            .ref()
+            .child('driver_docs')
+            .child(tid)
+            .child('${stamp}_$fileName');
+        await destRef.putData(
+          bytes,
+          contentType == null
+              ? null
+              : fb_storage.SettableMetadata(contentType: contentType),
+        );
+        final url = await destRef.getDownloadURL();
+        await docsCol.doc(docType).set(<String, dynamic>{
+          'fileName': fileName,
+          'downloadUrl': url,
+          'storagePath': destRef.fullPath,
+          if (contentType != null) 'contentType': contentType,
+          'uploadedAt': FieldValue.serverTimestamp(),
+          'uploadedAtClient': Timestamp.now(),
+          'size': bytes.length,
+          'docType': docType,
+          'uploadedBy': 'recruiting',
+        }, SetOptions(merge: true));
+      } catch (_) {
+        failures.add(d.label);
+      }
+    }
+    return failures;
+  }
+
+  /// Markiert die Quell-Bewerbung als umgewandelt (bleibt im Recruiting).
+  Future<void> _markApplicationConverted({
+    required RecruitingApplication app,
+    required String tid,
+  }) async {
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(app.adminUid)
+        .collection('recruiting_applications')
+        .doc(app.id)
+        .set(<String, dynamic>{
+      'convertedToDriver': <String, dynamic>{
+        'tid': tid,
         'at': FieldValue.serverTimestamp(),
       },
     }, SetOptions(merge: true));
@@ -656,6 +787,37 @@ class _AddDriverDialogState extends State<_AddDriverDialog> {
                   Expanded(
                     child: Text(
                       _savedLoginNotice!,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        height: 1.4,
+                        color: Color(0xFF92400E),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (_savedDocNotice != null) ...[
+            const SizedBox(height: AppSpacing.md),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF8E1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFCD34D)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.info_outline,
+                      size: 18, color: Color(0xFF92400E)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _savedDocNotice!,
                       style: const TextStyle(
                         fontSize: 12.5,
                         height: 1.4,
