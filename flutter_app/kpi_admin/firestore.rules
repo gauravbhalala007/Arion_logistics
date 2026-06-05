@@ -24,11 +24,11 @@ service cloud.firestore {
     }
 
     // "staff" for feedback handling: developers + the operator superadmin
-    // (info@arion-logistics.de). Regular Admins/DSPs must NOT see each
+    // (admin@arion-logistics.de). Regular Admins/DSPs must NOT see each
     // other's feedback — only these accounts get the global view.
     function isFeedbackStaff() {
       return isDeveloper()
-        || (signedIn() && request.auth.token.email == 'info@arion-logistics.de');
+        || (signedIn() && request.auth.token.email == 'admin@arion-logistics.de');
     }
 
     function isApproved(userId) {

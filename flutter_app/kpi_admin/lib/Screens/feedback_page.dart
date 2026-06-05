@@ -37,7 +37,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
 
   // Operator-Superadmin: sieht ALLE Feedbacks (über alle DSPs hinweg) und
   // darf sie bearbeiten — zusätzlich zu Accounts mit role == 'developer'.
-  static const _kSuperadminEmail = 'info@arion-logistics.de';
+  static const _kSuperadminEmail = 'admin@arion-logistics.de';
 
   static const _kPageBg = Color(0xFFF3F6F7);
   static const _kCardBorder = Color(0xFFE1E4EA);
