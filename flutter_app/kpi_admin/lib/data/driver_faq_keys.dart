@@ -20,7 +20,6 @@ class DriverFaqKeys {
     DriverFaqNode(qKey: 'faq_q3', aKey: 'faq_a3'),
     DriverFaqNode(qKey: 'faq_q4', aKey: 'faq_a4'),
     DriverFaqNode(qKey: 'faq_q5', aKey: 'faq_a5'),
-    DriverFaqNode(qKey: 'faq_q6', aKey: 'faq_a6'),
 
     // 7 - Weekly Scorecard (has sub sections in the PDF)
     DriverFaqNode(

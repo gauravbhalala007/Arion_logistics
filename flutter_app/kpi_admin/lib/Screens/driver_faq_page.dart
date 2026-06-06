@@ -454,12 +454,8 @@ class _SearchBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: const Color(0xFFEFEFF4),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: const Color(0xFFE5E5EA),
-          width: 0.6,
-        ),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 14),
       child: Row(
