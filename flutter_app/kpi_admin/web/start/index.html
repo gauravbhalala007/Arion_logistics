@@ -54,12 +54,8 @@
     header.scrolled { border-color: var(--line); }
     .nav { display: flex; align-items: center; justify-content: space-between; height: 56px; }
     .brand { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 19px; letter-spacing: -0.03em; }
-    .brand .mark {
-      width: 26px; height: 26px; border-radius: 7px; flex: none;
-      background: linear-gradient(150deg, #14c074, var(--green-deep));
-      display: grid; place-items: center;
-    }
-    .brand .mark svg { width: 15px; height: 15px; }
+    .brand .mark { width: 28px; height: 28px; flex: none; }
+    .brand .mark img { width: 100%; height: 100%; object-fit: contain; display: block; }
     .nav-links { display: flex; align-items: center; gap: 32px; }
     .nav-links a:not(.btn) { font-size: 14.5px; color: var(--text); opacity: .82; transition: opacity .2s; }
     .nav-links a:not(.btn):hover { opacity: 1; }
@@ -132,9 +128,17 @@
     /* section tinted band */
     .band { background: var(--bg-alt); }
 
-    /* language chips */
-    .langs { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 26px; max-width: 460px; }
-    .lang { font-size: 14px; font-weight: 500; color: var(--text); background: #fff; border: 1px solid var(--line-2); padding: 7px 14px; border-radius: 980px; }
+    /* language chips with round flags */
+    .langs { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; max-width: 520px; }
+    .lang { display: inline-flex; align-items: center; gap: 9px; font-size: 14px; font-weight: 500; color: var(--text); background: #fff; border: 1px solid var(--line-2); padding: 6px 14px 6px 6px; border-radius: 980px; }
+    .flag { width: 22px; height: 22px; border-radius: 50%; overflow: hidden; flex: none; display: inline-block; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.10); }
+    .flag img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+    /* footer logos */
+    .foot-logo { display: inline-block; margin-bottom: 16px; }
+    .foot-logo img { height: 54px; width: auto; display: block; }
+    .kw-logo { height: 24px; width: auto; display: block; opacity: .65; transition: opacity .2s; }
+    .kw-logo:hover { opacity: 1; }
 
     /* ---------- Bento grid ---------- */
     .grid-head { text-align: center; max-width: 660px; margin: 0 auto clamp(40px, 6vw, 72px); }
@@ -209,7 +213,7 @@
   <header id="hdr">
     <div class="container nav">
       <a class="brand" href="#top" aria-label="CoDriver Startseite">
-        <span class="mark"><svg viewBox="0 0 24 24" fill="none"><path d="M3 14l2-6a3 3 0 012.8-2H14a3 3 0 012.6 1.5L19 11l2 .6a1.5 1.5 0 011 1.4V16a1 1 0 01-1 1h-1" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7.5" cy="17" r="2" fill="#fff"/><circle cx="16.5" cy="17" r="2" fill="#fff"/></svg></span>
+        <span class="mark"><img src="img/codriver-mark.png" alt="" /></span>
         CoDriver
       </a>
       <nav class="nav-links" id="navLinks">
@@ -252,14 +256,14 @@
           <h2 class="h2">Die Scorecard. Endlich verständlich. In 8&nbsp;Sprachen.</h2>
           <p>Jedes Ergebnis und jede Kennzahl — klar erklärt, in der Sprache deiner Fahrer. Schluss mit Rätselraten: Dein Team versteht sofort, woran es liegt, und steigert die eigene Performance.</p>
           <div class="langs">
-            <span class="lang">Deutsch</span>
-            <span class="lang">English</span>
-            <span class="lang">Polski</span>
-            <span class="lang">Română</span>
-            <span class="lang">Shqip</span>
-            <span class="lang">Türkçe</span>
-            <span class="lang">العربية</span>
-            <span class="lang">Русский</span>
+            <span class="lang"><span class="flag"><img src="flags/de.svg" alt="" /></span>Deutsch</span>
+            <span class="lang"><span class="flag"><img src="flags/gb.svg" alt="" /></span>English</span>
+            <span class="lang"><span class="flag"><img src="flags/al.svg" alt="" /></span>Shqip</span>
+            <span class="lang"><span class="flag"><img src="flags/hu.svg" alt="" /></span>Magyar</span>
+            <span class="lang"><span class="flag"><img src="flags/ro.svg" alt="" /></span>Română</span>
+            <span class="lang"><span class="flag"><img src="flags/hr.svg" alt="" /></span>Hrvatski</span>
+            <span class="lang"><span class="flag"><img src="flags/sy.svg" alt="" /></span>العربية</span>
+            <span class="lang"><span class="flag"><img src="flags/tr.svg" alt="" /></span>Türkçe</span>
           </div>
         </div>
         <div class="visual reveal" style="--d:80ms">
@@ -372,10 +376,7 @@
     <div class="container">
       <div class="foot">
         <div>
-          <a class="brand" href="#top">
-            <span class="mark"><svg viewBox="0 0 24 24" fill="none"><path d="M3 14l2-6a3 3 0 012.8-2H14a3 3 0 012.6 1.5L19 11l2 .6a1.5 1.5 0 011 1.4V16a1 1 0 01-1 1h-1" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7.5" cy="17" r="2" fill="#fff"/><circle cx="16.5" cy="17" r="2" fill="#fff"/></svg></span>
-            CoDriver
-          </a>
+          <a class="foot-logo" href="#top" aria-label="CoDriver"><img src="img/codriver-logo.png" alt="CoDriver" /></a>
           <p class="desc">Die Plattform für Amazon Delivery Service Partner. Scorecard, Onboarding, Driver Hub, Academy, Inventar &amp; Planung — damit dein Fahrerteam besser liefert.</p>
         </div>
         <div class="foot-cols">
@@ -392,7 +393,7 @@
           </div>
           <div class="foot-col">
             <h4>Anbieter</h4>
-            <a href="#" style="cursor:default">Kreativwerk Albert Dobra</a>
+            <a href="https://www.kw-agentur.de" target="_blank" rel="noopener" aria-label="Kreativwerk Albert Dobra"><img class="kw-logo" src="img/kreativwerk-logo.png" alt="Kreativwerk Albert Dobra" /></a>
           </div>
         </div>
       </div>
