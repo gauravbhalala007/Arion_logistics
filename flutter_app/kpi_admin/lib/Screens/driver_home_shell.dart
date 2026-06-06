@@ -126,7 +126,62 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _ensurePinOnLogin();
+      _ensureDriverLocaleLoaded();
     });
+  }
+
+  /// Drivers can have their language preference stored in two places:
+  ///   1. users/{driverUid}.languageCode  (auth_gate reads this)
+  ///   2. users/{dspUid}/drivers/{tid}.onboarding.language  (set during
+  ///      driver onboarding, never propagated to top-level)
+  ///
+  /// If (1) is missing, fall back to (2) and persist it back to (1)
+  /// so the next login uses the right locale immediately.
+  Future<void> _ensureDriverLocaleLoaded() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    try {
+      // 1) Check top-level user doc first.
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      final topLang = (userDoc.data()?['languageCode'] ??
+              userDoc.data()?['language'] ??
+              '')
+          .toString()
+          .trim();
+      if (topLang.isNotEmpty) {
+        if (localeController.locale?.languageCode != topLang) {
+          localeController.setLocale(Locale(topLang));
+        }
+        return;
+      }
+
+      // 2) Fall back to driver onboarding language.
+      final driverDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.dspUid)
+          .collection('drivers')
+          .doc(widget.driverTransporterId.toUpperCase())
+          .get();
+      final onboarding =
+          (driverDoc.data()?['onboarding'] as Map?)?.cast<String, dynamic>();
+      final onboardingLang =
+          (onboarding?['language'] ?? '').toString().trim();
+      if (onboardingLang.isEmpty) return;
+
+      if (localeController.locale?.languageCode != onboardingLang) {
+        localeController.setLocale(Locale(onboardingLang));
+      }
+      // Persist to top-level user doc so auth_gate picks it up next time.
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'languageCode': onboardingLang,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (_) {
+      // silent — don't block login on locale fetch
+    }
   }
 
   @override
@@ -407,6 +462,7 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
       case DriverView.home:
         return DriverHomePage(
           dspUid: widget.dspUid,
+          driverTransporterId: widget.driverTransporterId,
           pendingTasksCount: _pendingTasksCount,
           unconfirmedRulesCount: _unconfirmedRulesCount,
           onOpenScorecard: () {
@@ -924,7 +980,18 @@ class _HeaderBar extends StatelessWidget {
                       final asset = _flagAssetForLang(code);
 
                       return ListTile(
-                        leading: SvgPicture.asset(asset, width: 26, height: 20),
+                        leading: Container(
+                          width: 30,
+                          height: 30,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: const Color(0x1A000000),
+                            ),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: SvgPicture.asset(asset, fit: BoxFit.cover),
+                        ),
                         title: Text(
                           _languageName(code),
                           style: const TextStyle(
