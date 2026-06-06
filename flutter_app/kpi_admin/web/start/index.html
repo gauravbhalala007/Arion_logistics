@@ -83,15 +83,17 @@
     .lead { font-size: clamp(18px, 1.7vw, 23px); color: var(--muted); font-weight: 400; letter-spacing: -0.015em; line-height: 1.4; }
 
     /* ---------- Hero ---------- */
-    .hero { text-align: center; padding: clamp(64px, 10vw, 120px) 0 clamp(64px, 9vw, 128px); }
+    .hero { padding: clamp(56px, 8vw, 110px) 0; }
+    .hero-grid { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: clamp(32px, 5vw, 64px); align-items: center; }
+    .hero-copy { text-align: left; }
     .hero .eyebrow { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 980px; background: var(--green-soft); margin-bottom: 22px; }
     .hero .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
     .hero h1 { margin-bottom: 22px; color: #3a3a3c; }
-    .hero .lead { max-width: 640px; margin: 0 auto; }
-    .hero-cta { display: flex; gap: 14px; justify-content: center; margin-top: 34px; flex-wrap: wrap; }
-    .hero-cta .btn { width: 244px; }
-    .hero-visual { margin-top: clamp(48px, 7vw, 88px); }
-    .hero-shot { max-width: 720px; margin: 0 auto; border-radius: 28px; overflow: hidden; box-shadow: 0 50px 90px -55px rgba(0,0,0,0.35); }
+    .hero .lead { max-width: 520px; margin: 0; }
+    .hero-cta { display: flex; gap: 14px; justify-content: flex-start; margin-top: 34px; flex-wrap: wrap; }
+    .hero-cta .btn { width: 220px; }
+    .hero-visual { margin-top: 0; }
+    .hero-shot { max-width: 100%; margin: 0; border-radius: 28px; overflow: hidden; box-shadow: 0 50px 90px -55px rgba(0,0,0,0.35); }
     .hero-shot img { width: 100%; height: auto; display: block; }
 
     /* ---------- Image placeholder ---------- */
@@ -131,9 +133,9 @@
     .band { background: var(--bg-alt); }
 
     /* language chips with round flags */
-    .langs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 26px; max-width: 480px; }
-    .lang { display: flex; align-items: center; gap: 9px; font-size: 14px; font-weight: 500; color: var(--text); background: #fff; border: 1px solid var(--line-2); padding: 6px 14px 6px 6px; border-radius: 980px; }
-    .flag { width: 26px; height: 26px; min-width: 26px; min-height: 26px; border-radius: 50%; overflow: hidden; flex: none; display: inline-block; background-size: 135%; background-position: center; background-repeat: no-repeat; border: 1px solid rgba(0,0,0,0.16); box-shadow: 0 1px 2px rgba(0,0,0,0.12); }
+    .langs { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; max-width: 460px; }
+    .lang { display: flex; align-items: center; gap: 8px; width: 128px; font-size: 13.5px; font-weight: 500; color: var(--text); background: #fff; border: 1px solid var(--line-2); padding: 6px 12px 6px 6px; border-radius: 980px; }
+    .flag { width: 24px; height: 24px; min-width: 24px; min-height: 24px; border-radius: 50%; overflow: hidden; flex: none; display: inline-block; background-size: 116%; background-position: center; background-repeat: no-repeat; border: 1px solid rgba(0,0,0,0.16); box-shadow: 0 1px 2px rgba(0,0,0,0.12); }
 
     /* footer logos */
     .foot-logo { display: inline-block; margin-bottom: 16px; }
@@ -192,6 +194,7 @@
       .nav-toggle { display: flex; }
       .nav-links.open { display: flex; position: absolute; top: 56px; left: 0; right: 0; flex-direction: column; align-items: stretch; gap: 6px; padding: 16px 28px 22px; background: rgba(255,255,255,0.96); backdrop-filter: blur(20px); border-bottom: 1px solid var(--line); }
       .nav-links.open a:not(.btn) { padding: 10px 2px; }
+      .hero-grid { grid-template-columns: 1fr; gap: 40px; }
       .feature-row { grid-template-columns: 1fr; gap: 36px; }
       .feature-row.reverse .copy { order: 0; }
       .bento { grid-template-columns: 1fr; }
@@ -233,13 +236,15 @@
 
     <!-- HERO -->
     <section class="hero">
-      <div class="container">
-        <span class="eyebrow reveal"><span class="dot"></span> Für Amazon Delivery Service Partner</span>
-        <h1 class="display reveal" style="--d:60ms">Die All-in-One App<br>für DSP’s.</h1>
-        <p class="lead reveal" style="--d:120ms">CoDriver vereint Scorecard, Onboarding, Driver Hub, Academy, Inventar und Schichtplanung — damit dein Fahrerteam versteht, was zählt, und jeden Tag besser liefert.</p>
-        <div class="hero-cta reveal" style="--d:180ms">
-          <a class="btn btn-primary" href="https://dsp-codriver.de">Jetzt loslegen <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
-          <a class="btn btn-ghost" href="#scorecard">Funktionen entdecken <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <span class="eyebrow reveal"><span class="dot"></span> Für Amazon Delivery Service Partner</span>
+          <h1 class="display reveal" style="--d:60ms">Die All-in-One App<br>für DSP’s.</h1>
+          <p class="lead reveal" style="--d:120ms">CoDriver vereint Scorecard, Onboarding, Driver Hub, Academy, Inventar und Schichtplanung — damit dein Fahrerteam versteht, was zählt, und jeden Tag besser liefert.</p>
+          <div class="hero-cta reveal" style="--d:180ms">
+            <a class="btn btn-primary" href="https://dsp-codriver.de">Jetzt loslegen <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+            <a class="btn btn-ghost" href="#scorecard">Funktionen entdecken <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+          </div>
         </div>
         <div class="hero-visual reveal" style="--d:240ms">
           <div class="hero-shot">
@@ -366,7 +371,7 @@
         <p>Starte direkt in der App — oder melde dich für eine kurze Einführung.</p>
         <div class="hero-cta">
           <a class="btn btn-primary" href="https://dsp-codriver.de">Jetzt loslegen <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
-          <a class="btn btn-ghost" href="mailto:info@arion-logistics.de"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M4 7l8 6 8-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Kontakt aufnehmen</a>
+          <a class="btn btn-ghost" href="mailto:info@kw-agentur.de"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M4 7l8 6 8-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Kontakt aufnehmen</a>
         </div>
       </div>
     </section>
@@ -389,7 +394,7 @@
           </div>
           <div class="foot-col">
             <h4>Kontakt</h4>
-            <a href="mailto:info@arion-logistics.de">info@arion-logistics.de</a>
+            <a href="mailto:info@kw-agentur.de">info@kw-agentur.de</a>
             <a href="https://dsp-codriver.de">dsp-codriver.de</a>
           </div>
           <div class="foot-col">
