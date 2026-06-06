@@ -56,7 +56,7 @@ Nach jeder funktionalen Änderung an `flutter_app/kpi_admin/` automatisch deploy
 ```bash
 cd "flutter_app/kpi_admin"
 firebase use   # MUSS "codriver-eu" zurückgeben — sonst abbrechen!
-flutter build web --release
+flutter build web --release --pwa-strategy=none
 firebase deploy --only hosting
 ```
 
