@@ -10,6 +10,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../localization/app_localizations.dart';
+import '../widgets/metric_info_chip.dart';
 
 String _s(dynamic v) => (v == null) ? '' : v.toString();
 
@@ -1310,6 +1311,48 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
                                   )
                                 : <String, dynamic>{};
 
+                            // ── CDF (Customer Delivery Feedback) ──
+                            final cdfRaw = myData['cdf'];
+                            final cdfMap = cdfRaw is Map
+                                ? Map<String, dynamic>.from(cdfRaw as Map)
+                                : <String, dynamic>{};
+                            final l1 = cdfMap['l1Buckets'] is Map
+                                ? Map<String, dynamic>.from(
+                                    cdfMap['l1Buckets'] as Map,
+                                  )
+                                : <String, dynamic>{};
+                            final cdf = cdfMap.isNotEmpty
+                                ? _CdfStats(
+                                    totalFeedback:
+                                        _numOr0(cdfMap['totalFeedback'])
+                                            .toDouble(),
+                                    negativeFeedback:
+                                        _numOr0(cdfMap['negativeFeedback'])
+                                            .toDouble(),
+                                    neverReceived:
+                                        _numOr0(l1['neverReceived']).toDouble(),
+                                    driverMishandled:
+                                        _numOr0(l1['driverMishandled'])
+                                            .toDouble(),
+                                    notDeliveredToPreferredLocation: _numOr0(
+                                      l1['notDeliveredToPreferredLocation'],
+                                    ).toDouble(),
+                                    damagedPackage:
+                                        _numOr0(l1['damagedPackage'])
+                                            .toDouble(),
+                                    deliveryWasLate:
+                                        _numOr0(l1['deliveryWasLate'])
+                                            .toDouble(),
+                                    badDeliveryExperience:
+                                        _numOr0(l1['badDeliveryExperience'])
+                                            .toDouble(),
+                                    driverWasUnprofessional: _numOr0(
+                                      l1['driverWasUnprofessional'],
+                                    ).toDouble(),
+                                    other: _numOr0(l1['other']).toDouble(),
+                                  )
+                                : null;
+
                             final concessions = concessionsMap.isNotEmpty
                                 ? _ConcessionsStats(
                                     totalDelivered: _numOr0(
@@ -1384,6 +1427,7 @@ class _DashboardTabBodyState extends State<DashboardTabBody> {
                                   cdfValue: cdfValue,
                                   podQuality: podQuality,
                                   concessions: concessions,
+                                  cdf: cdf,
                                 ),
                               ],
                             );
@@ -2941,6 +2985,7 @@ class _MyScoreKpiList extends StatelessWidget {
 
   final _PodQualityStats? podQuality;
   final _ConcessionsStats? concessions;
+  final _CdfStats? cdf;
 
   const _MyScoreKpiList({
     required this.totalScore,
@@ -2964,6 +3009,7 @@ class _MyScoreKpiList extends StatelessWidget {
     required this.cdfValue,
     required this.podQuality,
     required this.concessions,
+    this.cdf,
   });
 
   Color _kpiColorFromScore(double s) {
@@ -3057,6 +3103,7 @@ class _MyScoreKpiList extends StatelessWidget {
           proTip: loc.t('kpi_tip_cdf'),
           podQuality: null,
           concessions: null,
+          cdf: cdf,
         ),
         const SizedBox(height: 24),
       ],
@@ -3075,6 +3122,7 @@ class _ExpandableKpiTile extends StatefulWidget {
   final String proTip;
   final _PodQualityStats? podQuality;
   final _ConcessionsStats? concessions;
+  final _CdfStats? cdf;
 
   const _ExpandableKpiTile({
     required this.code,
@@ -3086,6 +3134,7 @@ class _ExpandableKpiTile extends StatefulWidget {
     required this.proTip,
     required this.podQuality,
     required this.concessions,
+    this.cdf,
   });
 
   @override
@@ -3238,59 +3287,73 @@ class _ExpandableKpiTileState extends State<_ExpandableKpiTile> {
                     _ConcessionsInline(stats: widget.concessions!),
                     const SizedBox(height: 12),
                   ],
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.title,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF374151),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              widget.description,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                height: 1.4,
-                                color: Color(0xFF6B7280),
-                              ),
-                            ),
-                          ],
-                        ),
+                  if (widget.cdf != null) ...[
+                    _CdfInline(stats: widget.cdf!),
+                    const SizedBox(height: 12),
+                  ],
+                  // Erklärung über die volle Breite.
+                  Text(
+                    widget.title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF374151),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    widget.description,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      height: 1.45,
+                      color: Color(0xFF6B7280),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  // Pro-Tipp darunter (nicht daneben), volle Breite, abgesetzt.
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: _kPrimaryGreen.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _kPrimaryGreen.withValues(alpha: 0.22),
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
                           children: [
+                            const Icon(
+                              Icons.lightbulb_outline_rounded,
+                              size: 16,
+                              color: _kPrimaryGreen,
+                            ),
+                            const SizedBox(width: 6),
                             Text(
                               loc.t('kpi_pro_tip'),
                               style: const TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
                                 color: _kPrimaryGreen,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              widget.proTip,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                height: 1.4,
-                                color: Color(0xFF374151),
+                                letterSpacing: 0.3,
                               ),
                             ),
                           ],
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 6),
+                        Text(
+                          widget.proTip,
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            height: 1.45,
+                            color: Color(0xFF374151),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -3404,25 +3467,13 @@ class _PodQualityInline extends StatelessWidget {
                 label: loc.t('pod_quality_rejects'),
                 value: _fmtInt(stats.rejects),
               ),
-              _PodMiniStat(
-                label: loc.t('pod_quality_blurry'),
-                value: _fmtInt(stats.blurry),
-              ),
-              _PodMiniStat(
-                label: loc.t('pod_quality_too_dark'),
-                value: _fmtInt(stats.tooDark),
-              ),
-              _PodMiniStat(
-                label: loc.t('pod_quality_no_package'),
-                value: _fmtInt(stats.noPackage),
-              ),
-              _PodMiniStat(
-                label: loc.t('pod_quality_in_car'),
-                value: _fmtInt(stats.inCar),
-              ),
-              _PodMiniStat(
-                label: loc.t('pod_quality_too_close'),
-                value: _fmtInt(stats.tooClose),
+              ..._podRejectChips(
+                context,
+                blurry: stats.blurry,
+                tooDark: stats.tooDark,
+                noPackage: stats.noPackage,
+                inCar: stats.inCar,
+                tooClose: stats.tooClose,
               ),
             ],
           ),
@@ -3528,6 +3579,118 @@ class _PodMiniStat extends StatelessWidget {
 // Concessions (DSC) — driver-level personal scorecard card
 // ============================================================================
 
+class _CdfStats {
+  final double totalFeedback;
+  final double negativeFeedback;
+  final double neverReceived;
+  final double driverMishandled;
+  final double notDeliveredToPreferredLocation;
+  final double damagedPackage;
+  final double deliveryWasLate;
+  final double badDeliveryExperience;
+  final double driverWasUnprofessional;
+  final double other;
+
+  const _CdfStats({
+    required this.totalFeedback,
+    required this.negativeFeedback,
+    required this.neverReceived,
+    required this.driverMishandled,
+    required this.notDeliveredToPreferredLocation,
+    required this.damagedPackage,
+    required this.deliveryWasLate,
+    required this.badDeliveryExperience,
+    required this.driverWasUnprofessional,
+    required this.other,
+  });
+}
+
+class _CdfInline extends StatelessWidget {
+  final _CdfStats stats;
+
+  const _CdfInline({required this.stats});
+
+  String _fmtInt(double v) => v.toStringAsFixed(0).replaceAll('.', ',');
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context);
+    final chips = <Widget>[];
+    void add(String key, double v) {
+      if (v <= 0) return;
+      chips.add(MetricInfoChip(
+        label: loc.t(key),
+        value: _fmtInt(v),
+        count: v,
+        description: loc.t('${key}_desc'),
+        tip: loc.t('${key}_tip'),
+      ));
+    }
+
+    add('cdf_l1_never_received', stats.neverReceived);
+    add('cdf_l1_driver_mishandled', stats.driverMishandled);
+    add('cdf_l1_not_delivered_to_preferred', stats.notDeliveredToPreferredLocation);
+    add('cdf_l1_damaged_package', stats.damagedPackage);
+    add('cdf_l1_delivery_was_late', stats.deliveryWasLate);
+    add('cdf_l1_bad_delivery_experience', stats.badDeliveryExperience);
+    add('cdf_l1_driver_was_unprofessional', stats.driverWasUnprofessional);
+    add('cdf_l1_other', stats.other);
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  loc.t('cdf_title'),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.1,
+                    color: Color(0xFF4B5563),
+                  ),
+                ),
+              ),
+              _PodStatPill(
+                label: loc.t('cdf_negative_short'),
+                value: _fmtInt(stats.negativeFeedback),
+                tone: _PodTone.warn,
+              ),
+              const SizedBox(width: 8),
+              _PodStatPill(
+                label: loc.t('cdf_total_short'),
+                value: _fmtInt(stats.totalFeedback),
+                tone: _PodTone.good,
+              ),
+            ],
+          ),
+          if (chips.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(spacing: 10, runSpacing: 10, children: chips),
+          ] else ...[
+            const SizedBox(height: 8),
+            Text(
+              loc.t('cdf_no_categories'),
+              style: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF6B7280),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _ConcessionsStats {
   final double totalDelivered;
   final double totalDnr;
@@ -3614,53 +3777,36 @@ class _ConcessionsInline extends StatelessWidget {
             spacing: 10,
             runSpacing: 10,
             children: [
-              _PodMiniStat(
+              MetricInfoChip(
                 label: loc.t('concessions_delivered'),
                 value: _fmtInt(stats.totalDelivered),
+                count: stats.totalDelivered,
+                description: loc.t('concessions_delivered_desc'),
+                tip: loc.t('concessions_delivered_tip'),
+                warningColor: const Color(0xFFEFF6FF),
               ),
-              _PodMiniStat(
-                label: loc.tf('concessions_week_w', {'week': '1'}),
-                value: _fmtInt(stats.dnrW1),
-              ),
-              _PodMiniStat(
-                label: loc.tf('concessions_week_w', {'week': '2'}),
-                value: _fmtInt(stats.dnrW2),
-              ),
-              _PodMiniStat(
-                label: loc.tf('concessions_week_w', {'week': '3'}),
-                value: _fmtInt(stats.dnrW3),
-              ),
-              _PodMiniStat(
-                label: loc.tf('concessions_week_w', {'week': '4'}),
-                value: _fmtInt(stats.dnrW4),
-              ),
-              _PodMiniStat(
-                label: loc.t('concessions_focus_attended_dnr'),
-                value: _fmtInt(stats.attendedDnr),
-              ),
-              _PodMiniStat(
-                label: loc.t('concessions_focus_photo_on_delivery'),
-                value: _fmtInt(stats.photoOnDelivery),
-              ),
-              _PodMiniStat(
-                label: loc.t('concessions_focus_successful_contact'),
-                value: _fmtInt(stats.successfulContact),
-              ),
-              _PodMiniStat(
-                label: loc.t('concessions_focus_delivered_25m'),
-                value: _fmtInt(stats.delivered25m),
-              ),
-              _PodMiniStat(
-                label: loc.t('concessions_focus_false_scan'),
-                value: _fmtInt(stats.falseScan),
-              ),
-              _PodMiniStat(
-                label: loc.t('concessions_focus_mailbox'),
-                value: _fmtInt(stats.mailbox),
-              ),
-              _PodMiniStat(
-                label: loc.t('concessions_focus_delivered_otp'),
-                value: _fmtInt(stats.deliveredOtp),
+              for (final entry in <MapEntry<String, double>>[
+                MapEntry('1', stats.dnrW1),
+                MapEntry('2', stats.dnrW2),
+                MapEntry('3', stats.dnrW3),
+                MapEntry('4', stats.dnrW4),
+              ])
+                MetricInfoChip(
+                  label: loc.tf('concessions_week_w', {'week': entry.key}),
+                  value: _fmtInt(entry.value),
+                  count: entry.value,
+                  description: loc.t('concessions_week_w_desc'),
+                  tip: loc.t('concessions_week_w_tip'),
+                ),
+              ..._concessionFocusChips(
+                context,
+                attendedDnr: stats.attendedDnr,
+                photoOnDelivery: stats.photoOnDelivery,
+                successfulContact: stats.successfulContact,
+                delivered25m: stats.delivered25m,
+                falseScan: stats.falseScan,
+                mailbox: stats.mailbox,
+                deliveredOtp: stats.deliveredOtp,
               ),
             ],
           ),
@@ -3668,4 +3814,91 @@ class _ConcessionsInline extends StatelessWidget {
       ),
     );
   }
+}
+
+
+// ===========================================================================
+// Driver-Dashboard: Klartext-Chips fuer POD Reject + Concessions Focus.
+// Spiegeln das Pattern aus pod_quality_week.dart / concessions_week.dart.
+// ===========================================================================
+
+String _fmtIntSafe(double v) =>
+    v.toStringAsFixed(0).replaceAll('.', ',');
+
+List<Widget> _podRejectChips(
+  BuildContext context, {
+  required double blurry,
+  required double tooDark,
+  required double noPackage,
+  required double inCar,
+  required double tooClose,
+}) {
+  final t = AppLocalizations.of(context);
+
+  final entries = <_DrvRejectEntry>[
+    _DrvRejectEntry(blurry, "pod_quality_blurry"),
+    _DrvRejectEntry(tooDark, "pod_quality_too_dark"),
+    _DrvRejectEntry(noPackage, "pod_quality_no_package"),
+    _DrvRejectEntry(inCar, "pod_quality_in_car"),
+    _DrvRejectEntry(tooClose, "pod_quality_too_close"),
+  ];
+
+  entries.sort((a, b) {
+    final aWarn = a.count > 0;
+    final bWarn = b.count > 0;
+    if (aWarn != bWarn) return bWarn ? 1 : -1;
+    return b.count.compareTo(a.count);
+  });
+
+  return entries.map((e) => MetricInfoChip(
+    label: t.t(e.labelKey),
+    value: _fmtIntSafe(e.count),
+    count: e.count,
+    description: t.t("${e.labelKey}_desc"),
+    tip: t.t("${e.labelKey}_tip"),
+  )).toList();
+}
+
+List<Widget> _concessionFocusChips(
+  BuildContext context, {
+  required double attendedDnr,
+  required double photoOnDelivery,
+  required double successfulContact,
+  required double delivered25m,
+  required double falseScan,
+  required double mailbox,
+  required double deliveredOtp,
+}) {
+  final t = AppLocalizations.of(context);
+
+  final entries = <_DrvRejectEntry>[
+    _DrvRejectEntry(attendedDnr, "concessions_focus_attended_dnr"),
+    _DrvRejectEntry(photoOnDelivery, "concessions_focus_photo_on_delivery"),
+    _DrvRejectEntry(successfulContact, "concessions_focus_successful_contact"),
+    _DrvRejectEntry(delivered25m, "concessions_focus_delivered_25m"),
+    _DrvRejectEntry(falseScan, "concessions_focus_false_scan"),
+    _DrvRejectEntry(mailbox, "concessions_focus_mailbox"),
+    _DrvRejectEntry(deliveredOtp, "concessions_focus_delivered_otp"),
+  ];
+
+  entries.sort((a, b) {
+    final aWarn = a.count > 0;
+    final bWarn = b.count > 0;
+    if (aWarn != bWarn) return bWarn ? 1 : -1;
+    return b.count.compareTo(a.count);
+  });
+
+  return entries.map((e) => MetricInfoChip(
+    label: t.t(e.labelKey),
+    value: _fmtIntSafe(e.count),
+    count: e.count,
+    description: t.t("${e.labelKey}_desc"),
+    tip: t.t("${e.labelKey}_tip"),
+  )).toList();
+}
+
+class _DrvRejectEntry {
+  final double count;
+  final String labelKey;
+  const _DrvRejectEntry(this.count, this.labelKey);
 }
