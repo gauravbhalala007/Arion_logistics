@@ -981,16 +981,22 @@ class _HeaderBar extends StatelessWidget {
 
                       return ListTile(
                         leading: Container(
-                          width: 30,
-                          height: 30,
+                          width: 32,
+                          height: 32,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: const Color(0x1A000000),
+                              color: const Color(0x1F000000),
                             ),
                           ),
-                          clipBehavior: Clip.antiAlias,
-                          child: SvgPicture.asset(asset, fit: BoxFit.cover),
+                          child: ClipOval(
+                            child: SvgPicture.asset(
+                              asset,
+                              width: 32,
+                              height: 32,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
                         ),
                         title: Text(
                           _languageName(code),
