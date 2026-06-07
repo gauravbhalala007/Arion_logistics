@@ -93,7 +93,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
     final sourceLang = _sourceLangCode();
     final targets = AppLocalizations.supportedLocales
         .map((l) => l.languageCode.toLowerCase())
-        .where((code) => code != sourceLang)
+        .where((code) => code.isNotEmpty)
         .toList(growable: false);
     if (targets.isEmpty) return;
 
@@ -172,7 +172,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   }) async {
     final targets = AppLocalizations.supportedLocales
         .map((l) => l.languageCode.toLowerCase())
-        .where((c) => c != sourceLang)
+        .where((c) => c.isNotEmpty)
         .toList(growable: false);
     final mapped = <String, Map<String, String>>{};
     if (targets.isEmpty) return mapped;
@@ -1662,7 +1662,7 @@ class _HistoryTile extends StatelessWidget {
       // sahen die Ausgangssprache.)
       final targets = AppLocalizations.supportedLocales
           .map((l) => l.languageCode.toLowerCase())
-          .where((c) => c != sourceLang)
+          .where((c) => c.isNotEmpty)
           .toList(growable: false);
       final Map<String, dynamic> translations = <String, dynamic>{};
       try {

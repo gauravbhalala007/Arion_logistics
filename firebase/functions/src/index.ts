@@ -288,21 +288,16 @@ async function translateTextBestEffort(
   try {
     // POST so long texts go in the body (GET URL length limit broke
     // translation of long notification/rule bodies).
+    // sl=auto: detect the real source language. (Deriving it from the
+    // admin's UI locale was wrong — e.g. English UI but German text →
+    // Google translated "German as English" and left it unchanged.)
     const url =
       "https://translate.googleapis.com/translate_a/single" +
-      `?client=gtx&sl=${encodeURIComponent(sourceLang)}` +
+      "?client=gtx&sl=auto" +
       `&tl=${encodeURIComponent(targetLang)}&dt=t`;
     const responseText = await postText(url, `q=${encodeURIComponent(clean)}`);
     const parsed = JSON.parse(responseText) as unknown;
     const translated = parseTranslatedSegments(parsed).trim();
-    logger.info("translate-debug", {
-      sl: sourceLang,
-      tl: targetLang,
-      inLen: clean.length,
-      outLen: translated.length,
-      same: translated === clean,
-      head: responseText.slice(0, 120),
-    });
     return translated || clean;
   } catch (err) {
     logger.warn(
@@ -590,7 +585,10 @@ async function translateNotificationToAll(
   body: string,
   sourceLang: string,
 ): Promise<Record<string, NotificationTranslationRow>> {
-  const targets = SUPPORTED_DRIVER_LANGS.filter((l) => l !== sourceLang);
+  // Translate into every supported language. sl=auto detects the real
+  // source; the source→source pair just returns the original text, which
+  // is harmless (drivers in the source language see the original anyway).
+  const targets = SUPPORTED_DRIVER_LANGS;
   const out: Record<string, NotificationTranslationRow> = {};
   await Promise.all(
     targets.map(async (lang) => {
@@ -647,10 +645,13 @@ export const publishNotificationToAllDrivers = onCall(async (request) => {
     );
   }
 
-  // Bulletproof: if the client sent no translations, translate server-side
-  // into all driver languages so every notification/rule is multilingual.
-  if (Object.keys(translations).length === 0) {
-    translations = await translateNotificationToAll(title, body, sourceLang);
+  // Always translate server-side (authoritative) so every notification/rule
+  // is correctly multilingual, independent of the client's UI locale or
+  // cache. Falls back to client-sent translations only if this yields none.
+  const serverTranslations =
+    await translateNotificationToAll(title, body, sourceLang);
+  if (Object.keys(serverTranslations).length > 0) {
+    translations = serverTranslations;
   }
 
   // Load drivers under this DSP
