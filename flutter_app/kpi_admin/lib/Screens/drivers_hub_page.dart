@@ -4248,31 +4248,25 @@ class _DriversHubPageState extends State<DriversHubPage> {
                 }).toList();
               }
 
+              // Pending / Approved / Rejected filtern nach den echten
+              // Feldern (active, hasLogin) — passend zum Status-Punkt der
+              // Zeile (grün = aktiv, rot = inaktiv).
               if (_driverSort == _DriverSort.pending) {
+                // Noch kein Login angelegt → Einrichtung ausstehend.
                 filtered = filtered.where((d) {
-                  final data = d.data();
-                  final onboardingRaw = data['onboarding'];
-                  final hasOnboarding =
-                      onboardingRaw is Map && onboardingRaw.isNotEmpty;
-                  return !hasOnboarding;
+                  return (d.data()['hasLogin'] as bool?) != true;
                 }).toList();
               } else if (_driverSort == _DriverSort.approved) {
+                // Aktiv mit Login (grüner Punkt).
                 filtered = filtered.where((d) {
                   final data = d.data();
-                  final onboardingRaw = data['onboarding'];
-                  final hasOnboarding =
-                      onboardingRaw is Map && onboardingRaw.isNotEmpty;
                   final active = (data['active'] as bool?) ?? true;
-                  return hasOnboarding && active;
+                  return active && data['hasLogin'] == true;
                 }).toList();
               } else if (_driverSort == _DriverSort.rejected) {
+                // Deaktiviert/abgelehnt (roter Punkt).
                 filtered = filtered.where((d) {
-                  final data = d.data();
-                  final onboardingRaw = data['onboarding'];
-                  final hasOnboarding =
-                      onboardingRaw is Map && onboardingRaw.isNotEmpty;
-                  final active = (data['active'] as bool?) ?? true;
-                  return hasOnboarding && !active;
+                  return ((d.data()['active'] as bool?) ?? true) == false;
                 }).toList();
               }
 
