@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../widgets/admin_scope.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
 import '../localization/app_localizations.dart';
@@ -786,6 +787,46 @@ class _ComposerCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
+
+          // Reliable paste button — on mobile/web the native paste menu is
+          // unreliable in text fields, so we read the clipboard directly.
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () async {
+                final data = await Clipboard.getData(Clipboard.kTextPlain);
+                final text = data?.text;
+                if (text == null || text.isEmpty) return;
+                final sel = bodyCtrl.selection;
+                if (sel.isValid && sel.start >= 0 && sel.end >= sel.start) {
+                  final newText =
+                      bodyCtrl.text.replaceRange(sel.start, sel.end, text);
+                  bodyCtrl.value = TextEditingValue(
+                    text: newText,
+                    selection: TextSelection.collapsed(
+                      offset: sel.start + text.length,
+                    ),
+                  );
+                } else {
+                  bodyCtrl.text = bodyCtrl.text + text;
+                  bodyCtrl.selection = TextSelection.collapsed(
+                    offset: bodyCtrl.text.length,
+                  );
+                }
+                onContentChanged();
+              },
+              icon: const Icon(Icons.content_paste_rounded, size: 16),
+              label: const Text('Einfügen'),
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF1D7F5A),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                minimumSize: const Size(0, 0),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
 
           // Rule / Message big box
           buildBodyField(),
