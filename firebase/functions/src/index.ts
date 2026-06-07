@@ -563,6 +563,40 @@ export const createDriverLogin = onCall(async (request) => {
  * - users/{dspUid}/notifications/{notifId} (history)
  * - users/{dspUid}/drivers/{TID}/notifications/{notifId} (fan-out)
  */
+const SUPPORTED_DRIVER_LANGS = [
+  "de", "en", "sq", "hu", "ro", "hr", "ar", "tr", "ru",
+];
+
+/**
+ * Translates a notification's title/body into every supported driver
+ * language (except the source). Guarantees notifications/rules are always
+ * multilingual, regardless of what the client sent.
+ *
+ * @param {string} title
+ * @param {string} body
+ * @param {string} sourceLang
+ * @return {Promise<Record<string, NotificationTranslationRow>>}
+ */
+async function translateNotificationToAll(
+  title: string,
+  body: string,
+  sourceLang: string,
+): Promise<Record<string, NotificationTranslationRow>> {
+  const targets = SUPPORTED_DRIVER_LANGS.filter((l) => l !== sourceLang);
+  const out: Record<string, NotificationTranslationRow> = {};
+  await Promise.all(
+    targets.map(async (lang) => {
+      const tt = title ?
+        await translateTextBestEffort(title, sourceLang, lang) : "";
+      const tb = body ?
+        await translateTextBestEffort(body, sourceLang, lang) : "";
+      if (!tt && !tb) return;
+      out[lang] = {title: tt, body: tb};
+    }),
+  );
+  return out;
+}
+
 export const publishNotificationToAllDrivers = onCall(async (request) => {
   const callerUid = requireAuthUid(request.auth);
   const data = (request.data || {}) as PublishNotificationData;
@@ -572,7 +606,7 @@ export const publishNotificationToAllDrivers = onCall(async (request) => {
   const title = (data.title || "").trim();
   const body = (data.body || "").trim();
   const sourceLang = (data.sourceLang || "en").toString().trim().toLowerCase();
-  const translations = sanitizeNotificationTranslations(data.translations);
+  let translations = sanitizeNotificationTranslations(data.translations);
   const requiresConfirmation = true;
 
 
@@ -603,6 +637,12 @@ export const publishNotificationToAllDrivers = onCall(async (request) => {
       "invalid-argument",
       "sourceLang must be 2 letters.",
     );
+  }
+
+  // Bulletproof: if the client sent no translations, translate server-side
+  // into all driver languages so every notification/rule is multilingual.
+  if (Object.keys(translations).length === 0) {
+    translations = await translateNotificationToAll(title, body, sourceLang);
   }
 
   // Load drivers under this DSP
