@@ -883,21 +883,37 @@ class _ComposerCard extends StatelessWidget {
           buildBodyField(),
           const SizedBox(height: 14),
 
-          Row(
-            children: [
-              Expanded(
-                child: CoButton(
-                  onPressed: onTranslateAll,
-                  icon: Icons.translate,
-                  label: translating
-                      ? 'Translating...'
-                      : 'Translate all languages',
-                  variant: CoButtonVariant.secondaryOutlined,
-                  fullWidth: true,
-                  busy: translating,
+          // Übersetzung passiert automatisch beim Veröffentlichen.
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F8F4),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFD9E7DE)),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.translate,
+                  size: 18,
+                  color: Color(0xFF1D7F5A),
                 ),
-              ),
-            ],
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Wird beim Veröffentlichen automatisch in alle '
+                    'Fahrer-Sprachen übersetzt.',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1D7F5A),
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
           if (translatedCount > 0) ...[
             const SizedBox(height: 8),
