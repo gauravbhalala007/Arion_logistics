@@ -125,6 +125,15 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
 
   bool get _isLocal => widget.channel == RecruitingChannel.local;
 
+  // Visa-Formular: gewählte Sprache (null = noch nicht gewählt → Auswahl
+  // zuerst). 'sq' = Albanisch, 'de' = Deutsch. Danach wird nur diese
+  // Sprache angezeigt (statt beide gleichzeitig).
+  String? _visaLang;
+
+  /// Visa-Texthelfer: gibt je nach gewählter Sprache den albanischen oder
+  /// deutschen Text zurück (Default Albanisch).
+  String _vt(String sq, String de) => _visaLang == 'de' ? de : sq;
+
   @override
   void initState() {
     super.initState();
@@ -261,45 +270,45 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
         return _isLocal
             ? 'Please pick an employment type · '
                 'Bitte Beschäftigungs-Wunsch auswählen.'
-            : 'Ju lutemi zgjidhni llojin e punës · '
-                'Bitte Beschäftigungs-Wunsch auswählen.';
+            : _vt('Ju lutemi zgjidhni llojin e punës.',
+                'Bitte Beschäftigungs-Wunsch auswählen.');
       }
       if (_employmentInterest == 'parttime' && _parttimeDays.isEmpty) {
         return _isLocal
             ? 'Please pick 2, 3 or 4 days per week · '
                 'Bitte 2, 3 oder 4 Tage pro Woche auswählen.'
-            : 'Ju lutemi zgjidhni 2, 3 ose 4 ditë në javë · '
-                'Bitte 2, 3 oder 4 Tage pro Woche auswählen.';
+            : _vt('Ju lutemi zgjidhni 2, 3 ose 4 ditë në javë.',
+                'Bitte 2, 3 oder 4 Tage pro Woche auswählen.');
       }
       if (_firstName.text.trim().isEmpty) {
         return _isLocal
             ? 'First name / Vorname fehlt.'
-            : 'Emri / Vorname fehlt.';
+            : _vt('Emri mungon.', 'Vorname fehlt.');
       }
       if (_lastName.text.trim().isEmpty) {
         return _isLocal
             ? 'Last name / Nachname fehlt.'
-            : 'Mbiemri / Nachname fehlt.';
+            : _vt('Mbiemri mungon.', 'Nachname fehlt.');
       }
       if (_birthDate == null) {
         return _isLocal
             ? 'Date of birth / Geburtsdatum fehlt.'
-            : 'Data e lindjes / Geburtsdatum fehlt.';
+            : _vt('Data e lindjes mungon.', 'Geburtsdatum fehlt.');
       }
       if (_birthPlace.text.trim().isEmpty) {
         return _isLocal
             ? 'Place of birth / Geburtsort fehlt.'
-            : 'Vendlindja / Geburtsort fehlt.';
+            : _vt('Vendlindja mungon.', 'Geburtsort fehlt.');
       }
       if (_birthCountry.text.trim().isEmpty) {
         return _isLocal
             ? 'Country of birth / Geburtsland fehlt.'
-            : 'Shteti i lindjes / Geburtsland fehlt.';
+            : _vt('Shteti i lindjes mungon.', 'Geburtsland fehlt.');
       }
       if (_nationality.isEmpty) {
         return _isLocal
             ? 'Nationality / Nationalität fehlt.'
-            : 'Shtetësia / Nationalität fehlt.';
+            : _vt('Shtetësia mungon.', 'Nationalität fehlt.');
       }
       return null;
     }
@@ -307,19 +316,21 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
       if (_street.text.trim().isEmpty) {
         return _isLocal
             ? 'Address / Adresse fehlt.'
-            : 'Rruga / Adresse fehlt.';
+            : _vt('Rruga mungon.', 'Adresse fehlt.');
       }
       if (_postalCode.text.trim().isEmpty) {
         return _isLocal
             ? 'Postal code / PLZ fehlt.'
-            : 'Kodi postar / PLZ fehlt.';
+            : _vt('Kodi postar mungon.', 'PLZ fehlt.');
       }
       if (_city.text.trim().isEmpty) {
-        return _isLocal ? 'City / Stadt fehlt.' : 'Qyteti / Stadt fehlt.';
+        return _isLocal
+            ? 'City / Stadt fehlt.'
+            : _vt('Qyteti mungon.', 'Stadt fehlt.');
       }
       // livingSince is Visa-only — Local/EU dropped the field.
       if (!_isLocal && _livingSince == null) {
-        return 'Që nga kur? / Seit wann? fehlt.';
+        return _vt('Që nga kur? mungon.', 'Seit wann? fehlt.');
       }
       return null;
     }
@@ -327,12 +338,12 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
       if (_shirtSize.text.trim().isEmpty) {
         return _isLocal
             ? 'Shirt size / Größe fehlt.'
-            : 'Madhësia / Größe fehlt.';
+            : _vt('Madhësia mungon.', 'Größe fehlt.');
       }
       if (_shoeSize.text.trim().isEmpty) {
         return _isLocal
             ? 'Shoe size / Schuhgröße fehlt.'
-            : 'Numri i këpucëve / Schuhgröße fehlt.';
+            : _vt('Numri i këpucëve mungon.', 'Schuhgröße fehlt.');
       }
       if (_phone.text.trim().isEmpty) return 'Telefon fehlt.';
       if (_email.text.trim().isEmpty) return 'Email fehlt.';
@@ -341,10 +352,12 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
     }
     if (id == 'license') {
       if (_truckLicenseCategory.isEmpty) {
-        return 'Patenta e kamionit / Lkw-Führerschein-Antwort fehlt.';
+        return _vt('Përgjigja për patentën e kamionit mungon.',
+            'Lkw-Führerschein-Antwort fehlt.');
       }
       if (_truckLicenseCategory != 'none' && _hasCode95 == null) {
-        return 'Code 95 — bitte Ja oder Nein wählen.';
+        return _vt('Code 95 — ju lutemi zgjidhni Po ose Jo.',
+            'Code 95 — bitte Ja oder Nein wählen.');
       }
       return null;
     }
@@ -370,8 +383,8 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
           return _isLocal
               ? 'Please accept the data protection consent · '
                   'Bitte Datenschutz-Einwilligung akzeptieren.'
-              : 'Ju lutemi pranoni pëlqimin e privatësisë · '
-                  'Bitte Datenschutz-Einwilligung akzeptieren.';
+              : _vt('Ju lutemi pranoni pëlqimin e privatësisë.',
+                  'Bitte Datenschutz-Einwilligung akzeptieren.');
         }
         return null;
       }
@@ -715,6 +728,12 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
     }
     if (_submitted) return _ScaffoldShell(body: _buildSuccess());
 
+    // Visa-Formular: zuerst Sprache wählen (Albanisch oder Deutsch),
+    // danach nur diese Sprache anzeigen.
+    if (widget.channel == RecruitingChannel.visa && _visaLang == null) {
+      return _ScaffoldShell(body: _buildVisaLanguagePicker());
+    }
+
     return _ScaffoldShell(
       body: SafeArea(
         child: Center(
@@ -805,6 +824,122 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
     );
   }
 
+  Widget _buildVisaLanguagePicker() {
+    Widget option({
+      required String flag,
+      required String label,
+      required String sub,
+      required String code,
+    }) {
+      return InkWell(
+        onTap: () => setState(() => _visaLang = code),
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x0F000000),
+                blurRadius: 10,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Text(flag, style: const TextStyle(fontSize: 30)),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      label,
+                      style: AppTypography.title3.copyWith(
+                        color: const Color(0xFF111827),
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      sub,
+                      style: AppTypography.caption1.copyWith(
+                        color: const Color(0xFF6B7280),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_forward_rounded,
+                  color: AppColors.codriverDeep),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return SafeArea(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: AppColors.green50,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  alignment: Alignment.center,
+                  child: const Icon(Icons.translate_rounded,
+                      color: AppColors.codriverDeep, size: 28),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  'Zgjidh gjuhën · Sprache wählen',
+                  style: AppTypography.title2.copyWith(
+                    color: const Color(0xFF111827),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Zgjidh gjuhën për formularin · '
+                  'Wähle die Sprache für das Formular.',
+                  style: AppTypography.body.copyWith(
+                    color: const Color(0xFF6B7280),
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                option(
+                  flag: '🇦🇱',
+                  label: 'Shqip',
+                  sub: 'Vazhdo në shqip',
+                  code: 'sq',
+                ),
+                const SizedBox(height: 12),
+                option(
+                  flag: '🇩🇪',
+                  label: 'Deutsch',
+                  sub: 'Weiter auf Deutsch',
+                  code: 'de',
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildHeader() {
     return Row(
       children: [
@@ -837,7 +972,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
               ),
               Text(
                 widget.channel == RecruitingChannel.visa
-                    ? 'Aplikim me Vizë Pune · Working Visa Application'
+                    ? _vt('Aplikim me Vizë Pune', 'Arbeitsvisum-Antrag')
                     : 'Driver Application · Fahrer-Bewerbung',
                 style: AppTypography.title3.copyWith(
                   color: const Color(0xFF111827),
@@ -879,7 +1014,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
         _SectionLabel(
           text: _isLocal
               ? 'Additional questions · Weitere Fragen'
-              : 'Pyetjet shtesë · Weitere Fragen',
+              : _vt('Pyetjet shtesë', 'Weitere Fragen'),
         ),
         for (final f in _customFields)
           Padding(
@@ -906,17 +1041,19 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
         _SectionLabel(
           text: _isLocal
               ? 'Employment interest · Beschäftigungs-Wunsch'
-              : 'Lloji i punës · Beschäftigungs-Wunsch',
+              : _vt('Lloji i punës', 'Beschäftigungs-Wunsch'),
         ),
         _LabeledField(
           label: _isLocal
               ? 'What are you applying for?'
-              : 'Për çfarë po aplikoni? · Was bewirbst du dich?',
+              : _vt('Për çfarë po aplikoni?', 'Was bewirbst du dich?'),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _ChoiceTile(
-                label: 'Fulltime · Vollzeit',
+                label: _isLocal
+                    ? 'Fulltime · Vollzeit'
+                    : _vt('Kohë e plotë', 'Vollzeit'),
                 selected: _employmentInterest == 'fulltime',
                 onTap: () =>
                     setState(() => _employmentInterest = 'fulltime'),
@@ -924,7 +1061,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
               _ChoiceTile(
                 label: _isLocal
                     ? 'Part-time · Teilzeit'
-                    : 'Gjysmë-orari · Teilzeit',
+                    : _vt('Gjysmë-orari', 'Teilzeit'),
                 selected: _employmentInterest == 'parttime',
                 onTap: () =>
                     setState(() => _employmentInterest = 'parttime'),
@@ -935,7 +1072,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   child: Text(
                     _isLocal
                         ? 'How many days per week? · Wie viele Tage pro Woche?'
-                        : 'Sa ditë në javë? · Wie viele Tage pro Woche?',
+                        : _vt('Sa ditë në javë?', 'Wie viele Tage pro Woche?'),
                     style: AppTypography.caption1.copyWith(
                       color: const Color(0xFF6B7280),
                       fontWeight: FontWeight.w700,
@@ -947,7 +1084,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                     for (final d in const ['2', '3', '4']) ...[
                       Expanded(
                         child: _DaysChoiceTile(
-                          label: '$d days · $d Tage',
+                          label: _isLocal ? '$d days · $d Tage' : _vt('$d ditë', '$d Tage'),
                           selected: _parttimeDays == d,
                           onTap: () =>
                               setState(() => _parttimeDays = d),
@@ -968,7 +1105,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
               _ChoiceTile(
                 label: _isLocal
                     ? 'Working student · Werkstudent'
-                    : 'Student punëtor · Werkstudent',
+                    : _vt('Student punëtor', 'Werkstudent'),
                 selected: _employmentInterest == 'werkstudent',
                 onTap: () =>
                     setState(() => _employmentInterest = 'werkstudent'),
@@ -980,17 +1117,17 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
         _SectionLabel(
           text: _isLocal
               ? 'Personal info · Persönliche Daten'
-              : 'Të dhënat personale · Personal info',
+              : _vt('Të dhënat personale', 'Persönliche Daten'),
         ),
         _LabeledField(
-          label: _isLocal ? 'First name · Vorname' : 'Emri · Vorname',
+          label: _isLocal ? 'First name · Vorname' : _vt('Emri', 'Vorname'),
           child: TextField(
             controller: _firstName,
             decoration: _input(_isLocal ? 'e.g. Andreas' : 'z.B. Andi'),
           ),
         ),
         _LabeledField(
-          label: _isLocal ? 'Last name · Nachname' : 'Mbiemri · Nachname',
+          label: _isLocal ? 'Last name · Nachname' : _vt('Mbiemri', 'Nachname'),
           child: TextField(
             controller: _lastName,
             decoration: _input(_isLocal ? 'e.g. Müller' : 'z.B. Krasniqi'),
@@ -999,7 +1136,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
         _LabeledField(
           label: _isLocal
               ? 'Date of birth · Geburtsdatum'
-              : 'Data e lindjes · Geburtsdatum',
+              : _vt('Data e lindjes', 'Geburtsdatum'),
           child: _DatePickerField(
             value: _birthDate,
             firstDate: DateTime(1940),
@@ -1010,7 +1147,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
         _LabeledField(
           label: _isLocal
               ? 'Place of birth · Geburtsort'
-              : 'Vendlindja (Qyteti) · Geburtsort (Stadt)',
+              : _vt('Vendlindja (Qyteti)', 'Geburtsort (Stadt)'),
           child: TextField(
             controller: _birthPlace,
             decoration: _input('z.B. Prishtina'),
@@ -1019,7 +1156,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
         _LabeledField(
           label: _isLocal
               ? 'Country of birth · Geburtsland'
-              : 'Shteti i lindjes · Geburtsland',
+              : _vt('Shteti i lindjes', 'Geburtsland'),
           child: TextField(
             controller: _birthCountry,
             textCapitalization: TextCapitalization.words,
@@ -1029,7 +1166,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
         _LabeledField(
           label: _isLocal
               ? 'Nationality · Nationalität'
-              : 'Shtetësia · Nationalität',
+              : _vt('Shtetësia', 'Nationalität'),
           child: _isLocal
               ? TextField(
                   controller: _nationalityFreeText,
@@ -1054,11 +1191,12 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
   Widget _buildAddressStep() {
     return ListView(
       children: [
-        _SectionLabel(text: _isLocal ? 'Address · Adresse' : 'Adresa · Adresse'),
+        _SectionLabel(
+            text: _isLocal ? 'Address · Adresse' : _vt('Adresa', 'Adresse')),
         _LabeledField(
           label: _isLocal
               ? 'Street + number · Straße + Hausnummer'
-              : 'Rruga + Numri i shtëpisë · Straße + Hausnummer',
+              : _vt('Rruga + Numri i shtëpisë', 'Straße + Hausnummer'),
           child: TextField(
             controller: _street,
             decoration: _input('z.B. Musterstraße 12'),
@@ -1067,7 +1205,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
         _LabeledField(
           label: _isLocal
               ? 'Postal code · Postleitzahl'
-              : 'Kodi postar · Postleitzahl',
+              : _vt('Kodi postar', 'Postleitzahl'),
           child: TextField(
             controller: _postalCode,
             keyboardType: TextInputType.number,
@@ -1077,7 +1215,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
         _LabeledField(
           label: _isLocal
               ? 'City · Stadt'
-              : 'Qyteti / Vendbanimi · Stadt / Wohnort',
+              : _vt('Qyteti / Vendbanimi', 'Stadt / Wohnort'),
           child: TextField(
             controller: _city,
             decoration: _input('z.B. Köln'),
@@ -1085,7 +1223,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
         ),
         if (!_isLocal)
           _LabeledField(
-            label: 'Që nga kur jeton në këtë adresë? · Wohnhaft seit?',
+            label: _vt('Që nga kur jeton në këtë adresë?', 'Wohnhaft seit?'),
             child: _DatePickerField(
               value: _livingSince,
               firstDate: DateTime(1980),
@@ -1103,12 +1241,12 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
         _SectionLabel(
           text: _isLocal
               ? 'Sizes & contact · Größen & Kontakt'
-              : 'Madhësitë & Kontakti · Größen & Kontakt',
+              : _vt('Madhësitë & Kontakti', 'Größen & Kontakt'),
         ),
         _LabeledField(
           label: _isLocal
               ? 'T-shirt & jacket size · T-Shirt- & Jacken-Größe'
-              : 'Madhësia e bluzës dhe xhaketës · T-Shirt- & Jacken-Größe',
+              : _vt('Madhësia e bluzës dhe xhaketës', 'T-Shirt- & Jacken-Größe'),
           child: _SizePickerField(
             value: _shirtSize.text,
             options: _kShirtSizes,
@@ -1119,7 +1257,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
         _LabeledField(
           label: _isLocal
               ? 'Shoe size · Schuhgröße'
-              : 'Numri i këpucëve · Schuhgröße',
+              : _vt('Numri i këpucëve', 'Schuhgröße'),
           child: _SizePickerField(
             value: _shoeSize.text,
             options: _kShoeSizes,
@@ -1130,7 +1268,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
         _LabeledField(
           label: _isLocal
               ? 'Phone (WhatsApp) · Telefonnummer'
-              : 'Numri i telefonit (WhatsApp) · Telefonnummer',
+              : _vt('Numri i telefonit (WhatsApp)', 'Telefonnummer'),
           child: TextField(
             controller: _phone,
             keyboardType: TextInputType.phone,
@@ -1164,9 +1302,10 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
   Widget _buildLicenseStep() {
     return ListView(
       children: [
-        _SectionLabel(text: 'Patenta e kamionit · Lkw-Führerschein'),
+        _SectionLabel(text: _vt('Patenta e kamionit', 'Lkw-Führerschein')),
         Text(
-          'A ke edhe patentën e kamionit?\nHast du auch einen Lkw-Führerschein?',
+          _vt('A ke edhe patentën e kamionit?',
+              'Hast du auch einen Lkw-Führerschein?'),
           style: AppTypography.body.copyWith(
             color: const Color(0xFF374151),
             height: 1.45,
@@ -1175,8 +1314,8 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
         const SizedBox(height: 12),
         _RadioCard(
           selected: _truckLicenseCategory == 'none',
-          title: 'Jo, nuk kam',
-          subtitle: 'Nein, habe ich nicht',
+          title: _vt('Jo, nuk kam', 'Nein, habe ich nicht'),
+          subtitle: '',
           onTap: () => setState(() {
             _truckLicenseCategory = 'none';
             _hasCode95 = null;
@@ -1185,15 +1324,15 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
         const SizedBox(height: 8),
         _RadioCard(
           selected: _truckLicenseCategory == 'C',
-          title: 'Po, kategoria C',
-          subtitle: 'Ja, Klasse C',
+          title: _vt('Po, kategoria C', 'Ja, Klasse C'),
+          subtitle: '',
           onTap: () => setState(() => _truckLicenseCategory = 'C'),
         ),
         const SizedBox(height: 8),
         _RadioCard(
           selected: _truckLicenseCategory == 'CE',
-          title: 'Po, kategoria CE',
-          subtitle: 'Ja, Klasse CE',
+          title: _vt('Po, kategoria CE', 'Ja, Klasse CE'),
+          subtitle: '',
           onTap: () => setState(() => _truckLicenseCategory = 'CE'),
         ),
         // ── Conditional follow-up: Code 95 ─────────────────────
@@ -1207,9 +1346,9 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _SectionLabel(text: 'Kodi 95 · Code 95'),
+                      _SectionLabel(text: _vt('Kodi 95', 'Code 95')),
                       Text(
-                        'A e ke kodin 95?\nHast du Code 95?',
+                        _vt('A e ke kodin 95?', 'Hast du Code 95?'),
                         style: AppTypography.body.copyWith(
                           color: const Color(0xFF374151),
                           height: 1.45,
@@ -1221,8 +1360,8 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                           Expanded(
                             child: _RadioCard(
                               selected: _hasCode95 == true,
-                              title: 'Po · Ja',
-                              subtitle: 'Code 95 vorhanden',
+                              title: _vt('Po', 'Ja'),
+                              subtitle: _vt('Kodi 95 ekziston', 'Code 95 vorhanden'),
                               onTap: () =>
                                   setState(() => _hasCode95 = true),
                             ),
@@ -1231,8 +1370,9 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                           Expanded(
                             child: _RadioCard(
                               selected: _hasCode95 == false,
-                              title: 'Jo · Nein',
-                              subtitle: 'Code 95 nicht vorhanden',
+                              title: _vt('Jo', 'Nein'),
+                              subtitle:
+                                  _vt('Kodi 95 nuk ekziston', 'Code 95 nicht vorhanden'),
                               onTap: () =>
                                   setState(() => _hasCode95 = false),
                             ),
@@ -1447,14 +1587,16 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
     return ListView(
       children: [
         _SectionLabel(
-          text: _isLocal ? 'Documents · Dokumente' : 'Dokumentet · Dokumente',
+          text: _isLocal
+              ? 'Documents · Dokumente'
+              : _vt('Dokumentet', 'Dokumente'),
         ),
         Text(
           _isLocal
               ? 'Clear, complete, no shadows.\n'
                   'Bitte gut sichtbar, vollständig, nicht abgeschnitten.'
-              : 'Foto e qartë, e plotë dhe pa hije.\n'
-                  'Bitte gut sichtbar, vollständig, nicht abgeschnitten.',
+              : _vt('Foto e qartë, e plotë dhe pa hije.',
+                  'Bitte gut sichtbar, vollständig, nicht abgeschnitten.'),
           style: AppTypography.caption1.copyWith(
             color: const Color(0xFF6B7280),
             height: 1.45,
@@ -1467,7 +1609,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
               : 'Pass / Personalausweis (Vorderseite)',
           subtitle: _isLocal
               ? 'Front side of passport or ID card · Vorderseite'
-              : 'Faqja e parë · Vorderseite',
+              : _vt('Faqja e parë', 'Vorderseite'),
           icon: Icons.badge_outlined,
           file: _passport,
           onPick: () => _pickDocument('passport'),
@@ -1476,10 +1618,11 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
         _UploadCard(
           title: _isLocal
               ? 'ID card — back · Personalausweis (Rückseite)'
-              : 'Karta e identitetit (Pjesa e prapme) · Personalausweis (Rückseite)',
+              : _vt('Karta e identitetit (Pjesa e prapme)',
+                  'Personalausweis (Rückseite)'),
           subtitle: _isLocal
               ? 'Back side of your ID card · Rückseite des Personalausweises'
-              : 'Faqja e prapme e kartës · Rückseite',
+              : _vt('Faqja e prapme e kartës', 'Rückseite'),
           icon: Icons.badge_outlined,
           file: _idBack,
           onPick: () => _pickDocument('id_back'),
@@ -1488,12 +1631,12 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
         _UploadCard(
           title: _isLocal
               ? 'Selfie for Driver Badge · Selfie für Driver-Badge'
-              : 'Selfie për Driver-Badge · Selfie für Driver-Badge',
+              : _vt('Selfie për Driver-Badge', 'Selfie für Driver-Badge'),
           subtitle: _isLocal
               ? 'Plain white background, head straight, no sunglasses · '
                   'Weißer Hintergrund, Kopf gerade, keine Sonnenbrille'
-              : 'Sfond i bardhë, koka drejt, pa syze dielli · '
-                  'Weißer Hintergrund, Kopf gerade, keine Sonnenbrille',
+              : _vt('Sfond i bardhë, koka drejt, pa syze dielli',
+                  'Weißer Hintergrund, Kopf gerade, keine Sonnenbrille'),
           icon: Icons.face_retouching_natural_rounded,
           file: _selfie,
           onPick: () => _pickDocument('selfie'),
@@ -1520,11 +1663,12 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                           'Bitte den Führerschein gerade von oben in guter '
                           'Qualität fotografieren. Der gesamte Führerschein '
                           'muss zu sehen sein.'
-                      : 'Të dhënat e patentës: foto nga lart, e qartë dhe '
-                          'patenta në tërësi e dukshme.\n'
+                      : _vt(
+                          'Të dhënat e patentës: foto nga lart, e qartë dhe '
+                              'patenta në tërësi e dukshme.',
                           'Bitte den Führerschein gerade von oben in guter '
-                          'Qualität fotografieren. Der gesamte Führerschein '
-                          'muss zu sehen sein.',
+                              'Qualität fotografieren. Der gesamte Führerschein '
+                              'muss zu sehen sein.'),
                   style: AppTypography.caption1.copyWith(
                     color: const Color(0xFF7A3E08),
                     height: 1.45,
@@ -1539,10 +1683,10 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
         _UploadCard(
           title: _isLocal
               ? "Driver's licence (front) · Führerschein (Vorderseite)"
-              : 'Patenta · Führerschein (Vorderseite)',
+              : _vt('Patenta', 'Führerschein (Vorderseite)'),
           subtitle: _isLocal
               ? 'Front side · Vorderseite'
-              : 'Pjesa e parë · Front side',
+              : _vt('Pjesa e parë', 'Vorderseite'),
           icon: Icons.credit_card_rounded,
           file: _licenseFront,
           onPick: () => _pickDocument('license_front'),
@@ -1551,10 +1695,10 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
         _UploadCard(
           title: _isLocal
               ? "Driver's licence (back) · Führerschein (Rückseite)"
-              : 'Patenta · Führerschein (Rückseite)',
+              : _vt('Patenta', 'Führerschein (Rückseite)'),
           subtitle: _isLocal
               ? 'Back side · Rückseite'
-              : 'Pjesa e prapme · Back side',
+              : _vt('Pjesa e prapme', 'Rückseite'),
           icon: Icons.credit_card_outlined,
           file: _licenseBack,
           onPick: () => _pickDocument('license_back'),
@@ -1603,8 +1747,8 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   }
                 },
           label: isLast
-              ? (_isLocal ? 'Submit · Senden' : 'Submit · Dërgo')
-              : (_isLocal ? 'Next · Weiter' : 'Next · Vazhdo'),
+              ? (_isLocal ? 'Submit · Senden' : _vt('Dërgo', 'Senden'))
+              : (_isLocal ? 'Next · Weiter' : _vt('Vazhdo', 'Weiter')),
           icon:
               isLast ? Icons.send_rounded : Icons.arrow_forward_rounded,
           busy: _submitting,
@@ -1636,7 +1780,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
             ),
             const SizedBox(height: 16),
             Text(
-              _isLocal ? 'Thank you! · Danke!' : 'Faleminderit! · Danke!',
+              _isLocal ? 'Thank you! · Danke!' : _vt('Faleminderit!', 'Danke!'),
               style: AppTypography.title2.copyWith(
                 color: const Color(0xFF111827),
                 fontWeight: FontWeight.w800,
@@ -1650,9 +1794,10 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                       'We will get back to you shortly.\n'
                       'Ihre Bewerbung wurde übermittelt. Wir melden uns in '
                       'Kürze.'
-                  : 'Aplikimi yt u dërgua. Do të kontaktojmë së shpejti.\n'
+                  : _vt(
+                      'Aplikimi yt u dërgua. Do të kontaktojmë së shpejti.',
                       'Ihre Bewerbung wurde übermittelt. Wir melden uns in '
-                      'Kürze.',
+                          'Kürze.'),
               textAlign: TextAlign.center,
               style: AppTypography.body.copyWith(
                 color: const Color(0xFF6B7280),
