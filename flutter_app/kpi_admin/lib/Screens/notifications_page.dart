@@ -163,6 +163,45 @@ class _NotificationsPageState extends State<NotificationsPage> {
     }
   }
 
+  /// Übersetzt Titel/Text in alle unterstützten Fahrer-Sprachen (außer der
+  /// Ausgangssprache). Liefert eine Map lang -> {title, body}.
+  Future<Map<String, Map<String, String>>> _computeTranslations({
+    required String title,
+    required String body,
+    required String sourceLang,
+  }) async {
+    final targets = AppLocalizations.supportedLocales
+        .map((l) => l.languageCode.toLowerCase())
+        .where((c) => c != sourceLang)
+        .toList(growable: false);
+    final mapped = <String, Map<String, String>>{};
+    if (targets.isEmpty) return mapped;
+    try {
+      final resp = await FirebaseFunctions.instance
+          .httpsCallable('translateFaqText')
+          .call({
+        'sourceLang': sourceLang,
+        'targetLangs': targets,
+        'question': title,
+        'answer': body,
+      });
+      final raw = (resp.data as Map?)?['translations'];
+      if (raw is Map) {
+        for (final code in targets) {
+          final row = raw[code];
+          if (row is! Map) continue;
+          final tt = (row['question'] ?? '').toString().trim();
+          final tb = (row['answer'] ?? '').toString().trim();
+          if (tt.isEmpty && tb.isEmpty) continue;
+          mapped[code] = {'title': tt, 'body': tb};
+        }
+      }
+    } catch (_) {
+      // Übersetzung fehlgeschlagen → ohne Übersetzungen veröffentlichen.
+    }
+    return mapped;
+  }
+
   // ------------------------------------------------------------
   // Publish (UI-first implementation)
   // ------------------------------------------------------------
@@ -189,6 +228,18 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
     setState(() => _publishing = true);
     try {
+      final sourceLang = _sourceLangCode();
+      // Immer automatisch in alle Sprachen übersetzen — der Admin muss den
+      // Übersetzen-Button nicht zwingend nutzen.
+      var translations = _translationsByLang;
+      if (translations.isEmpty) {
+        translations = await _computeTranslations(
+          title: title,
+          body: body,
+          sourceLang: sourceLang,
+        );
+      }
+
       final callable = FirebaseFunctions.instance.httpsCallable(
         'publishNotificationToAllDrivers',
       );
@@ -198,8 +249,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
         'type': _selectedType.value,
         'title': title,
         'body': body,
-        'sourceLang': _sourceLangCode(),
-        'translations': _translationsByLang,
+        'sourceLang': sourceLang,
+        'translations': translations,
         'requiresConfirmation': _selectedType.value == 'rule',
       });
 
