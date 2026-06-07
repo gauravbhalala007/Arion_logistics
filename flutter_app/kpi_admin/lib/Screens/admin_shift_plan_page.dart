@@ -1874,8 +1874,11 @@ class _Header extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: _AdminShiftPlanPageState._kBorder),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Row(
+            children: [
           Container(
             width: 40,
             height: 40,
@@ -1915,6 +1918,14 @@ class _Header extends StatelessWidget {
               ],
             ),
           ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
           if (publishedAt != null) ...[
             const SizedBox(width: 12),
             Container(
@@ -2078,6 +2089,8 @@ class _Header extends StatelessWidget {
               busy: publishing,
             ),
           ],
+        ],
+      ),
         ],
       ),
     );
