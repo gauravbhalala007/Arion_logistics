@@ -5615,34 +5615,17 @@ class _ContractTypeStatsRow extends StatelessWidget {
         ),
     ];
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // Desktop: Kacheln nur so breit wie ihr Inhalt (Titel/Zahl),
-        // links bündig statt über die volle Breite gestreckt.
-        if (!compact && constraints.maxWidth >= 720) {
-          return Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final t in tiles) IntrinsicWidth(child: t),
-            ],
-          );
-        }
-        // Mobile: every tile gets the SAME fixed width so the strip
-        // looks uniform. Horizontally scrollable when it doesn't fit.
-        const tileWidth = 110.0;
-        return SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              for (var i = 0; i < tiles.length; i++) ...[
-                SizedBox(width: tileWidth, child: tiles[i]),
-                if (i < tiles.length - 1) const SizedBox(width: 8),
-              ],
-            ],
-          ),
-        );
-      },
+    // Desktop: über die volle Breite gleichmäßig verteilt.
+    // Mobile: alle Kacheln in EINER Reihe, so kompakt wie nötig — kein
+    // horizontales Scrollen, damit alle Counter sichtbar sind.
+    final gap = compact ? 6.0 : 8.0;
+    return Row(
+      children: [
+        for (var i = 0; i < tiles.length; i++) ...[
+          Expanded(child: tiles[i]),
+          if (i < tiles.length - 1) SizedBox(width: gap),
+        ],
+      ],
     );
   }
 }
