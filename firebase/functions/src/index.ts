@@ -295,6 +295,14 @@ async function translateTextBestEffort(
     const responseText = await postText(url, `q=${encodeURIComponent(clean)}`);
     const parsed = JSON.parse(responseText) as unknown;
     const translated = parseTranslatedSegments(parsed).trim();
+    logger.info("translate-debug", {
+      sl: sourceLang,
+      tl: targetLang,
+      inLen: clean.length,
+      outLen: translated.length,
+      same: translated === clean,
+      head: responseText.slice(0, 120),
+    });
     return translated || clean;
   } catch (err) {
     logger.warn(
