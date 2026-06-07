@@ -278,6 +278,20 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage>
           return s.docs
               .where((doc) {
                 final data = doc.data();
+                // Fahrer ohne Auslieferungen aus der Wertung
+                // herausnehmen — sie hatten in dieser Woche keine
+                // Pakete und sollen weder gezaehlt noch in der
+                // Driver-Hub-Zusammenfassung erscheinen.
+                final kpis = (data['kpis'] as Map?) ?? const {};
+                final delivered = _numOr0(
+                  kpis['Delivered'] ??
+                      kpis['DELIVERED'] ??
+                      kpis['delivered'] ??
+                      data['Delivered'] ??
+                      data['delivered'],
+                );
+                if (delivered <= 0) return false;
+
                 final reportId = _s(data['reportId']);
                 if (reportId.isNotEmpty && reportIds.contains(reportId)) {
                   return true;
@@ -1638,7 +1652,31 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage>
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              tabBar,
+                              if (!_isNarrow(context))
+                                Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.center,
+                                  children: [
+                                    Expanded(child: tabBar),
+                                    const SizedBox(width: 12),
+                                    Padding(
+                                      padding: EdgeInsets.only(
+                                        bottom: _pad(14, w),
+                                      ),
+                                      child: _UploadNewButton(
+                                        onPickPdf: _uploadWeeklyPdf,
+                                        onPickCsv: _uploadDriverCsv,
+                                        pdfLabel: t.t(
+                                          'scorecard_overview_upload_pdf',
+                                        ),
+                                        csvLabel:
+                                            t.t('dash_upload_driver_csv'),
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              else
+                                tabBar,
                               Expanded(child: content),
                             ],
                           );
@@ -1659,27 +1697,29 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage>
       children: [
         Container(color: _UI.bg, child: body),
 
-        // ── Schwebender Upload-Plus-Button (Speed-Dial) ─────────────
-        Positioned(
-          right: 20,
-          bottom: 24,
-          child: _UploadSpeedDial(
-            open: _fabOpen,
-            onToggle: () => setState(() => _fabOpen = !_fabOpen),
-            busyPdf: _busyUpload,
-            busyCsv: _busyCsv,
-            onPickPdf: () {
-              setState(() => _fabOpen = false);
-              _uploadWeeklyPdf();
-            },
-            onPickCsv: () {
-              setState(() => _fabOpen = false);
-              _uploadDriverCsv();
-            },
-            pdfLabel: t.t('scorecard_overview_upload_pdf'),
-            csvLabel: t.t('dash_upload_driver_csv'),
+        // Speed-Dial nur auf Mobile/schmal — Desktop nutzt den
+        // grünen "New"-Button oben rechts.
+        if (_isNarrow(context))
+          Positioned(
+            right: 20,
+            bottom: 24,
+            child: _UploadSpeedDial(
+              open: _fabOpen,
+              onToggle: () => setState(() => _fabOpen = !_fabOpen),
+              busyPdf: _busyUpload,
+              busyCsv: _busyCsv,
+              onPickPdf: () {
+                setState(() => _fabOpen = false);
+                _uploadWeeklyPdf();
+              },
+              onPickCsv: () {
+                setState(() => _fabOpen = false);
+                _uploadDriverCsv();
+              },
+              pdfLabel: t.t('scorecard_overview_upload_pdf'),
+              csvLabel: t.t('dash_upload_driver_csv'),
+            ),
           ),
-        ),
 
         if (_busyUpload) ...[
           Positioned.fill(
@@ -2678,6 +2718,93 @@ class _SummaryRow extends StatelessWidget {
 /// Schwebender Plus-Button rechts unten. Tap → klappt zwei Upload-
 /// Optionen aus: Scorecard-PDF und Drivers-CSV. Beide jeweils mit
 /// Label-Pille, deutlich getrennt, Apple-iOS-Pattern.
+/// Desktop: grüner "New"-Button (oben rechts) mit Popup-Menü für die
+/// Uploads (Scorecard-PDF + Driver-CSV).
+class _UploadNewButton extends StatelessWidget {
+  const _UploadNewButton({
+    required this.onPickPdf,
+    required this.onPickCsv,
+    required this.pdfLabel,
+    required this.csvLabel,
+  });
+
+  final VoidCallback onPickPdf;
+  final VoidCallback onPickCsv;
+  final String pdfLabel;
+  final String csvLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<int>(
+      tooltip: '',
+      offset: const Offset(0, 48),
+      color: Colors.white,
+      elevation: 8,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: Color(0xFFE5E7EB)),
+      ),
+      onSelected: (v) {
+        if (v == 0) onPickPdf();
+        if (v == 1) onPickCsv();
+      },
+      itemBuilder: (_) => [
+        PopupMenuItem<int>(
+          value: 0,
+          child: Row(
+            children: [
+              const Icon(Icons.picture_as_pdf_outlined,
+                  size: 18, color: AppColors.codriverDeep),
+              const SizedBox(width: 10),
+              Text(pdfLabel),
+            ],
+          ),
+        ),
+        PopupMenuItem<int>(
+          value: 1,
+          child: Row(
+            children: [
+              const Icon(Icons.table_chart_outlined,
+                  size: 18, color: AppColors.codriverDeep),
+              const SizedBox(width: 10),
+              Text(csvLabel),
+            ],
+          ),
+        ),
+      ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.codriverGreen,
+          borderRadius: BorderRadius.circular(999),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.codriverGreen.withValues(alpha: 0.30),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.add_rounded, color: Colors.white, size: 18),
+            SizedBox(width: 6),
+            Text(
+              'New',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _UploadSpeedDial extends StatelessWidget {
   final bool open;
   final VoidCallback onToggle;
