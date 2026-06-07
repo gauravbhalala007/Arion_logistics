@@ -97,7 +97,7 @@ class _DriversHubPageState extends State<DriversHubPage> {
   Timer? _defaultPwdSaveDebounce;
 
   String _search = '';
-  _DriverSort _driverSort = _DriverSort.newest;
+  _DriverSort _driverSort = _DriverSort.nameAsc;
   // null = no filter; if filtering on "Unset", use the special sentinel.
   DriverContractType? _contractFilter;
   bool _filterUnsetContract = false;
@@ -4276,35 +4276,6 @@ class _DriversHubPageState extends State<DriversHubPage> {
                 }).toList();
               }
 
-              // Expiry-first pre-sort: drivers with a document expiring
-              // within 30 days (or already expired) bubble to the top,
-              // sorted by closest expiry. The user's chosen sort
-              // continues to apply as a tie-breaker for everyone else.
-              int expiryRank(QueryDocumentSnapshot<Map<String, dynamic>> d) {
-                final raw = d.data()['onboarding'];
-                if (raw is! Map) return 999;
-                int best = 999;
-                for (final key in const [
-                  'licenseExpiry',
-                  'idDocExpiry',
-                  'residencePermitExpiry',
-                ]) {
-                  final s = (raw[key] ?? '').toString().trim();
-                  final m = RegExp(r'^(\d{4})-(\d{2})-(\d{2})$').firstMatch(s);
-                  if (m == null) continue;
-                  final dt = DateTime.utc(
-                    int.parse(m.group(1)!),
-                    int.parse(m.group(2)!),
-                    int.parse(m.group(3)!),
-                  );
-                  final now = DateTime.now().toUtc();
-                  final today = DateTime.utc(now.year, now.month, now.day);
-                  final days = dt.difference(today).inDays;
-                  if (days < best) best = days;
-                }
-                return best;
-              }
-
               filtered.sort((a, b) {
                 final ad = a.data();
                 final bd = b.data();
@@ -4318,24 +4289,8 @@ class _DriversHubPageState extends State<DriversHubPage> {
                     .toString()
                     .toUpperCase();
 
-                // 1) Expiring drivers (≤30 days) always at the top.
-                final ar = expiryRank(a);
-                final br = expiryRank(b);
-                final aPrio = ar <= 30;
-                final bPrio = br <= 30;
-                if (aPrio != bPrio) return aPrio ? -1 : 1;
-                if (aPrio && bPrio) {
-                  final c = ar.compareTo(br);
-                  if (c != 0) return c;
-                }
-
-                // 2) Active beats rejected — rejected (active=false)
-                // sinks to the bottom regardless of the chosen sort,
-                // so the visible workforce stays at the top.
-                final aActive = (ad['active'] as bool?) ?? true;
-                final bActive = (bd['active'] as bool?) ?? true;
-                if (aActive != bActive) return aActive ? -1 : 1;
-
+                // Die vom Nutzer gewählte Sortierung ist maßgeblich
+                // (keine erzwungene Vorsortierung mehr).
                 DateTime? asDate(dynamic v) {
                   if (v is Timestamp) return v.toDate();
                   if (v is DateTime) return v;
