@@ -65,6 +65,10 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
   // current UI language for this driver (stored in Firestore)
   String _lang = 'de';
 
+  // DSGVO: jeder neue Fahrer muss aktiv zustimmen (nicht vorausgewählt).
+  bool _dsgvoAccepted = false;
+  static const _kPrivacyUrl = 'https://codriver-landing.web.app/datenschutz';
+
   // wizard step (0 = welcome, then 1..6 as in mockup)
   int _step = 0;
   static const int _lastStep = 6;
@@ -231,6 +235,18 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (!_dsgvoAccepted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Bitte Datenschutz-Einwilligung akzeptieren · '
+            'Please accept the data protection consent.',
+          ),
+        ),
+      );
+      return;
+    }
+
     setState(() => _saving = true);
     try {
       await widget.driverRef.set({
@@ -262,6 +278,9 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
           if (_profilePhotoBase64 != null)
             'profilePhotoBase64': _profilePhotoBase64,
           if (_profilePhotoUrl != null) 'profilePhotoUrl': _profilePhotoUrl,
+          // DSGVO-Nachweis (Art. 7 — Einwilligung dokumentieren)
+          'dsgvoConsent': _dsgvoAccepted,
+          'dsgvoConsentAt': DateTime.now().toIso8601String(),
         },
         'onboardingSubmittedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -1422,12 +1441,152 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
                 controller: _ibanCtrl,
                 label: _t('label_iban'),
               ),
+              _buildDsgvoConsentBox(),
             ],
           ),
         ),
         const SizedBox(height: 18),
         _DriverDocsPreview(driverRef: widget.driverRef),
       ],
+    );
+  }
+
+  // ----------------- DSGVO CONSENT -------------------
+
+  /// DSGVO-Einwilligung am Ende des Onboardings — jeder neue Fahrer muss
+  /// aktiv zustimmen (Checkbox nicht vorausgewählt). Texte vor Live-Gang
+  /// vom Datenschutz-Anwalt prüfen lassen.
+  Widget _buildDsgvoConsentBox() {
+    const green = Color(0xFF1D7F5A);
+    return Container(
+      margin: const EdgeInsets.only(top: 20),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7FAF8),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFD9E7DE)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.privacy_tip_outlined, size: 18, color: green),
+              SizedBox(width: 8),
+              Text(
+                'Datenschutz · Data protection',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14,
+                  color: Color(0xFF1F2937),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Verantwortlich für die Verarbeitung deiner Daten ist dein '
+            'Arbeitgeber (DSP). Deine Angaben und Dokumente werden zur '
+            'Durchführung deines Beschäftigungsverhältnisses verarbeitet und '
+            'sicher auf Servern in der EU gespeichert (Art. 6 Abs. 1 lit. b '
+            'DSGVO, § 26 BDSG; Foto für den Driver-Badge auf Grundlage deiner '
+            'Einwilligung, Art. 6 Abs. 1 lit. a DSGVO). Eine Weitergabe an '
+            'unbefugte Dritte erfolgt nicht; die technische Verarbeitung '
+            'erfolgt durch unseren Auftragsverarbeiter CoDriver (Kreativwerk '
+            'Albert Dobra). Du hast die Rechte auf Auskunft, Berichtigung, '
+            'Löschung, Einschränkung, Datenübertragbarkeit und Widerruf sowie '
+            'ein Beschwerderecht bei einer Aufsichtsbehörde.',
+            style: TextStyle(
+              fontSize: 11.5,
+              height: 1.4,
+              color: Color(0xFF4B5563),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Your details and documents are processed to carry out your '
+            'employment and stored securely on servers in the EU; they are not '
+            'shared with unauthorised third parties. You can access, rectify, '
+            'erase, restrict and port your data, withdraw consent at any time, '
+            'and lodge a complaint with a supervisory authority.',
+            style: TextStyle(
+              fontSize: 11.5,
+              height: 1.4,
+              color: Color(0xFF6B7280),
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: () => launchUrl(
+              Uri.parse(_kPrivacyUrl),
+              mode: LaunchMode.externalApplication,
+            ),
+            child: const Text(
+              'Datenschutzerklärung öffnen · Open privacy policy',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: green,
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ),
+          InkWell(
+            onTap: () => setState(() => _dsgvoAccepted = !_dsgvoAccepted),
+            borderRadius: BorderRadius.circular(10),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: Checkbox(
+                      value: _dsgvoAccepted,
+                      onChanged: (v) =>
+                          setState(() => _dsgvoAccepted = v ?? false),
+                      activeColor: green,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Ich habe die Datenschutzhinweise gelesen und '
+                          'willige in die Verarbeitung und sichere Speicherung '
+                          'meiner Daten und Dokumente ein.',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            height: 1.35,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF1F2937),
+                          ),
+                        ),
+                        SizedBox(height: 3),
+                        Text(
+                          'I have read the privacy notice and consent to the '
+                          'processing and secure storage of my data and '
+                          'documents.',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            height: 1.35,
+                            color: Color(0xFF6B7280),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
