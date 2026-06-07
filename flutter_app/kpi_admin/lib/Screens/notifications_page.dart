@@ -1606,11 +1606,44 @@ class _HistoryTile extends StatelessWidget {
           .where((d) => isDriverWorking(d.data()))
           .toList(growable: false);
 
+      // Bearbeitete Regeln müssen übersetzt bleiben: neu in alle Fahrer-
+      // Sprachen übersetzen. (Vorher wurden translations geleert → Fahrer
+      // sahen die Ausgangssprache.)
+      final targets = AppLocalizations.supportedLocales
+          .map((l) => l.languageCode.toLowerCase())
+          .where((c) => c != sourceLang)
+          .toList(growable: false);
+      final Map<String, dynamic> translations = <String, dynamic>{};
+      try {
+        final resp = await FirebaseFunctions.instance
+            .httpsCallable('translateFaqText')
+            .call({
+          'sourceLang': sourceLang,
+          'targetLangs': targets,
+          'question': newTitle,
+          'answer': newBody,
+        });
+        final raw = (resp.data as Map?)?['translations'];
+        if (raw is Map) {
+          for (final code in targets) {
+            final row = raw[code];
+            if (row is! Map) continue;
+            final tt = (row['question'] ?? '').toString().trim();
+            final tb = (row['answer'] ?? '').toString().trim();
+            if (tt.isEmpty && tb.isEmpty) continue;
+            translations[code] = {'title': tt, 'body': tb};
+          }
+        }
+      } catch (_) {
+        // Übersetzung fehlgeschlagen → Regel wird ohne Übersetzungen
+        // gespeichert (Fahrer sehen Ausgangssprache), kein Absturz.
+      }
+
       await adminNotifRef.set({
         'title': newTitle,
         'body': newBody,
         'sourceLang': sourceLang,
-        'translations': <String, dynamic>{},
+        'translations': translations,
         'targetCount': drivers.length,
         'confirmedCount': 0,
         'requiresConfirmation': true,
@@ -1636,7 +1669,7 @@ class _HistoryTile extends StatelessWidget {
             'title': newTitle,
             'body': newBody,
             'sourceLang': sourceLang,
-            'translations': <String, dynamic>{},
+            'translations': translations,
             'status': 'unread',
             'readAt': null,
             'confirmedAt': null,
