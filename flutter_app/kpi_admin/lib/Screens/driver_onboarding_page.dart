@@ -67,7 +67,7 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
 
   // DSGVO: jeder neue Fahrer muss aktiv zustimmen (nicht vorausgewählt).
   bool _dsgvoAccepted = false;
-  static const _kPrivacyUrl = 'https://codriver-landing.web.app/datenschutz';
+  static const _kPrivacyUrl = 'https://codriver-app.com/datenschutz';
 
   // wizard step (0 = welcome, then 1..6 as in mockup)
   int _step = 0;
