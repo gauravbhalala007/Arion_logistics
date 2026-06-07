@@ -195,6 +195,11 @@
       .nav-links.open { display: flex; position: absolute; top: 56px; left: 0; right: 0; flex-direction: column; align-items: stretch; gap: 6px; padding: 16px 28px 22px; background: rgba(255,255,255,0.96); backdrop-filter: blur(20px); border-bottom: 1px solid var(--line); }
       .nav-links.open a:not(.btn) { padding: 10px 2px; }
       .hero-grid { grid-template-columns: 1fr; gap: 40px; }
+      /* Mobile: Hero komplett mittig, H1 ~50% größer */
+      .hero-copy { text-align: center; }
+      .hero .lead { margin: 0 auto; }
+      .hero-cta { justify-content: center; }
+      .display { font-size: clamp(28px, 8vw, 34px); }
       .feature-row { grid-template-columns: 1fr; gap: 36px; }
       .feature-row.reverse .copy { order: 0; }
       .bento { grid-template-columns: 1fr; }
