@@ -200,32 +200,50 @@ function isDriverWorking(driverData: Record<string, unknown>): boolean {
 }
 
 /**
- * Very small helper for GET calls without adding dependencies.
+ * POST helper (application/x-www-form-urlencoded). Used for translation so
+ * long texts go in the request body instead of the URL (GET URLs have a
+ * length limit that broke translation of long notification/rule bodies).
+ *
  * @param {string} url
+ * @param {string} body
  * @return {Promise<string>}
  */
-function getText(url: string): Promise<string> {
+function postText(url: string, body: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    const req = https.get(url, (res) => {
-      let body = "";
-      res.setEncoding("utf8");
-      res.on("data", (chunk) => {
-        body += chunk;
-      });
-      res.on("end", () => {
-        const code = res.statusCode ?? 500;
-        if (code >= 400) {
-          reject(new Error(`HTTP ${code}`));
-          return;
-        }
-        resolve(body);
-      });
-    });
+    const u = new URL(url);
+    const req = https.request(
+      {
+        method: "POST",
+        hostname: u.hostname,
+        path: u.pathname + u.search,
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+          "Content-Length": Buffer.byteLength(body),
+        },
+      },
+      (res) => {
+        let resp = "";
+        res.setEncoding("utf8");
+        res.on("data", (chunk) => {
+          resp += chunk;
+        });
+        res.on("end", () => {
+          const code = res.statusCode ?? 500;
+          if (code >= 400) {
+            reject(new Error(`HTTP ${code}`));
+            return;
+          }
+          resolve(resp);
+        });
+      },
+    );
 
     req.on("error", reject);
     req.setTimeout(8000, () => {
       req.destroy(new Error("Request timeout"));
     });
+    req.write(body);
+    req.end();
   });
 }
 
@@ -268,12 +286,13 @@ async function translateTextBestEffort(
   if (!clean) return "";
 
   try {
-    const query = encodeURIComponent(clean);
+    // POST so long texts go in the body (GET URL length limit broke
+    // translation of long notification/rule bodies).
     const url =
       "https://translate.googleapis.com/translate_a/single" +
       `?client=gtx&sl=${encodeURIComponent(sourceLang)}` +
-      `&tl=${encodeURIComponent(targetLang)}&dt=t&q=${query}`;
-    const responseText = await getText(url);
+      `&tl=${encodeURIComponent(targetLang)}&dt=t`;
+    const responseText = await postText(url, `q=${encodeURIComponent(clean)}`);
     const parsed = JSON.parse(responseText) as unknown;
     const translated = parseTranslatedSegments(parsed).trim();
     return translated || clean;
@@ -1937,6 +1956,17 @@ export {
   scheduledFirestoreBackup,
   purgeOldBackups,
 } from "./backup";
+
+// Aufenthaltserlaubnis — PDF-Overlay-Generator. Liest den Firestore-Form
+// und stempelt Text + Signatur auf das Original-Template (PDF bleibt
+// strukturell unveraendert). Region europe-west3.
+export {generateResidencePermitPdf} from "./residence_permit";
+
+// Fahrzeugschein-OCR via Google Document AI (EU region). Triggert auf
+// neue Vehicle-Documents mit documentType `fahrzeugschein_*`, extrahiert
+// die Standard-Felder und schreibt sie in das Vehicle-Doc unter
+// `fahrzeugschein.*` (nur leere Felder werden gefuellt).
+export {extractFahrzeugscheinOnUpload} from "./fahrzeugschein";
 
 // ════════════════════════════════════════════════════════════════════════════
 //  Vehicle soft-delete purge (Mac-Claude branch)
