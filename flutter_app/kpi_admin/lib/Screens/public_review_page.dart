@@ -361,8 +361,8 @@ class _PublicReviewPageState extends State<PublicReviewPage> {
           ),
           const SizedBox(height: 12),
           const Text(
-            'Deine Rückmeldung wurde gespeichert. Wir prüfen sie und '
-            'schalten sie ggf. frei.',
+            'Vielen Dank für dein ehrliches Feedback! Es hilft uns, '
+            'CoDriver jeden Tag besser zu machen.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 15, color: _muted, height: 1.5),
           ),
