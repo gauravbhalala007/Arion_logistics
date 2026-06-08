@@ -1295,15 +1295,6 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage>
                               ],
                             ),
                           ),
-                          CoButton(
-                            onPressed: _busyCsv ? null : _uploadDriverCsv,
-                            icon: Icons.upload_file,
-                            label: _busyCsv
-                                ? t.t('uploading')
-                                : t.t('dash_upload_driver_csv'),
-                            busy: _busyCsv,
-                            variant: CoButtonVariant.secondaryTinted,
-                          ),
                         ],
                       ),
                     if (!narrow) SizedBox(height: _pad(16, w)),
