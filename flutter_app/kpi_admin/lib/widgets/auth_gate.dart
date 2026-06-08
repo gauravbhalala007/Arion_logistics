@@ -24,6 +24,11 @@ String _normalizeSupportedLanguageCode(String raw) {
   return supported.contains(code) ? code : '';
 }
 
+/// Tracks per-uid whether we already forced an ID-token refresh during
+/// this app session. Without this the StreamBuilder would re-fire on
+/// every Firestore snapshot tick and we'd refresh the token endlessly.
+String _lastTokenRefreshUid = '';
+
 /// Decides whether we show:
 ///  - Login page (no user)
 ///  - DSP/admin dashboard (role != 'driver')
@@ -43,7 +48,19 @@ class AuthGate extends StatelessWidget {
         final user = authSnap.data;
         if (user == null) {
           _lastProfileLocaleSyncKey = '';
+          _lastTokenRefreshUid = '';
           return const LoginPage();
+        }
+
+        // Refresh the ID token once per app-session per uid, so any
+        // custom claims (e.g. `role: 'admin'`) set since the original
+        // sign-in propagate to Firestore + Storage rule checks without
+        // requiring the user to manually log out and back in.
+        if (_lastTokenRefreshUid != user.uid) {
+          _lastTokenRefreshUid = user.uid;
+          // Fire-and-forget; auth_gate keeps rendering meanwhile.
+          // ignore: discarded_futures
+          user.getIdToken(true);
         }
 
         // 🔹 First check the top-level users/{uid} doc (your function writes here)
@@ -125,6 +142,14 @@ class AuthGate extends StatelessWidget {
               final approved = (data['approved'] == true);
               if (!approved) {
                 return _AwaitApproval(email: user.email ?? '');
+              }
+              // 30-Tage-Test: nach Ablauf zugang sperren.
+              final plan = (data['plan'] ?? '').toString();
+              final trialEndsRaw = data['trialEndsAt'];
+              if (plan == 'trial' && trialEndsRaw is Timestamp) {
+                if (DateTime.now().isAfter(trialEndsRaw.toDate())) {
+                  return _TrialExpired(email: user.email ?? '');
+                }
               }
               return AdminShellPage(initialNav: AppNav.home);
             }
@@ -242,6 +267,67 @@ class _CenterProgress extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(body: Center(child: CircularProgressIndicator()));
+  }
+}
+
+class _TrialExpired extends StatelessWidget {
+  final String email;
+  const _TrialExpired({required this.email});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.timer_off_outlined, size: 48,
+                    color: Color(0xFF1D7F5A)),
+                const SizedBox(height: 16),
+                const Text(
+                  'Dein 30-Tage-Test ist abgelaufen',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Danke, dass du CoDriver getestet hast! Um weiter zu '
+                  'arbeiten, kontaktiere uns für die Freischaltung deines '
+                  'Kontos.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(height: 1.45, color: Color(0xFF4B5563)),
+                ),
+                const SizedBox(height: 12),
+                const SelectableText(
+                  'info@kw-agentur.de',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF1D7F5A),
+                  ),
+                ),
+                if (email.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    email,
+                    style: const TextStyle(color: Color(0xFF9CA3AF)),
+                  ),
+                ],
+                const SizedBox(height: 24),
+                OutlinedButton.icon(
+                  onPressed: () => FirebaseAuth.instance.signOut(),
+                  icon: const Icon(Icons.logout_rounded, size: 18),
+                  label: const Text('Abmelden'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

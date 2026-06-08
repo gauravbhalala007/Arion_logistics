@@ -156,8 +156,9 @@ class _SignupPageState extends State<SignupPage> {
         companyName: company,
       );
       if (!mounted) return;
-      _showInfo('Verification email sent. Please check your inbox.');
-      Navigator.of(context).pushReplacementNamed('/verify-email');
+      // Nutzer ist nach der Registrierung bereits angemeldet → direkt in die
+      // App (30-Tage-Test läuft ab jetzt).
+      Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
     } on FirebaseAuthException catch (e) {
       _showError(_mapSignupError(e));
     } catch (_) {
