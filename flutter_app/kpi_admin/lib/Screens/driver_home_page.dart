@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../localization/app_localizations.dart';
 import '../widgets/motion_helpers.dart';
+import 'driver_vehicle_inspection_page.dart';
 
 /// Driver-Whitelist als Fallback, falls der Admin das Add-On Flag noch
 /// nicht explizit aktiviert hat. Alle anderen Driver sehen co:timer nur,
@@ -22,6 +23,7 @@ const double _kTopCardHeight = 142;
 
 class DriverHomePage extends StatelessWidget {
   final String dspUid;
+  final String driverTransporterId;
   final int pendingTasksCount;
   final int unconfirmedRulesCount;
   final VoidCallback onOpenScorecard;
@@ -38,6 +40,7 @@ class DriverHomePage extends StatelessWidget {
   const DriverHomePage({
     super.key,
     required this.dspUid,
+    this.driverTransporterId = '',
     required this.pendingTasksCount,
     required this.unconfirmedRulesCount,
     required this.onOpenScorecard,
@@ -56,6 +59,7 @@ class DriverHomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return _DriverHomePageBody(
       dspUid: dspUid,
+      driverTransporterId: driverTransporterId,
       pendingTasks: pendingTasksCount,
       unconfirmedRules: unconfirmedRulesCount,
       onOpenScorecard: onOpenScorecard,
@@ -74,6 +78,7 @@ class DriverHomePage extends StatelessWidget {
 
 class _DriverHomePageBody extends StatefulWidget {
   final String dspUid;
+  final String driverTransporterId;
   final int pendingTasks;
   final int unconfirmedRules;
   final VoidCallback onOpenScorecard;
@@ -89,6 +94,7 @@ class _DriverHomePageBody extends StatefulWidget {
 
   const _DriverHomePageBody({
     required this.dspUid,
+    required this.driverTransporterId,
     required this.pendingTasks,
     required this.unconfirmedRules,
     required this.onOpenScorecard,
@@ -199,8 +205,7 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
         icon: Icons.school_outlined,
         iconColor: const Color(0xFF3E82F7),
         iconBackground: const Color(0xFFE9F1FE),
-        badgeText: t.t('coming_soon'),
-        onTap: null,
+        onTap: widget.onOpenAcademy,
       ),
       _HomeCardData(
         title: t.t('driver_home_rules_title'),
@@ -261,6 +266,21 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
         borderColor: const Color(0xFFFF8A1F),
         badgeText: t.t('coming_soon'),
         onTap: null,
+      ),
+      // Pre-shift vehicle check — opens a bottom sheet with two quick
+      // yes/no questions. When "No" we instruct the driver to send a
+      // walk-around video to the dispatcher via WhatsApp.
+      _HomeCardData(
+        title: 'Fahrzeug-Check',
+        subtitle: 'Kurz vor Schichtstart bestätigen',
+        icon: Icons.directions_car_rounded,
+        iconColor: const Color(0xFF1D7F5A),
+        iconBackground: const Color(0xFFE6F8F2),
+        onTap: () => openDriverVehicleInspectionSheet(
+          context,
+          dspUid: widget.dspUid,
+          driverDocId: widget.driverTransporterId.toUpperCase(),
+        ),
       ),
       // Page: DriverWaveplanView
       // Wiring: driver_home_shell.dart -> DriverView.waveplan
