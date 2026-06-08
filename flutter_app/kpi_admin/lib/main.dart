@@ -13,6 +13,8 @@ import 'Screens/driver_dashboard_page.dart';
 import 'Screens/admin_shell_page.dart';
 import 'Screens/admin_inventory_detail_page.dart';
 import 'Screens/recruiting_form_page.dart';
+import 'Screens/public_review_page.dart';
+import 'services/recruiting_slug_service.dart';
 import 'models/recruiting_application.dart';
 import 'widgets/app_side_menu.dart'; // for AppNav
 
@@ -98,21 +100,46 @@ class App extends StatelessWidget {
               );
             }
             // Public recruiting form.
-            //   /recruiting?dsp=<adminUid>&type=local|visa
-            // No auth wrapper — anyone with the link can fill it.
+            //   /jobs/<slug>             → local channel (current path)
+            //   /jobs/<slug>/visa        → visa channel
+            //   /apply/<slug>[…]         → legacy alias (still works)
+            //   /apply?dsp=<uid>&type=…  → legacy long-UID fallback
+            // No auth wrapper — anyone with the link can fill it. Each
+            // rename of the public path forces any stale browser cache
+            // to fetch a fresh JS bundle from index.html → the working
+            // version that hits the right Storage bucket.
             final name = settings.name ?? '';
-            if (name.startsWith('/recruiting')) {
+            // Public, link-only review page (Sterne + Text). No auth.
+            //   /bewertung  ·  /review
+            final namePath = Uri.parse(name).path;
+            if (namePath == '/bewertung' || namePath == '/review') {
+              return MaterialPageRoute<void>(
+                settings: settings,
+                builder: (_) => _wrapSelectable(const PublicReviewPage()),
+              );
+            }
+            final isJobs = name.startsWith('/jobs');
+            final isApply = name.startsWith('/apply');
+            if (isJobs || isApply) {
               final uri = Uri.parse(name);
-              final adminUid = uri.queryParameters['dsp'] ?? '';
-              final typeRaw = uri.queryParameters['type'] ?? 'local';
-              final channel = typeRaw.toLowerCase() == 'visa'
+              final segs = uri.pathSegments;
+              // pathSegments for "/jobs/arion/visa" → ['jobs','arion','visa']
+              final slug = segs.length >= 2 ? segs[1] : '';
+              final pathType = segs.length >= 3 ? segs[2] : '';
+              final queryType = uri.queryParameters['type'] ?? '';
+              final typeRaw =
+                  (pathType.isNotEmpty ? pathType : queryType).toLowerCase();
+              final channel = typeRaw == 'visa'
                   ? RecruitingChannel.visa
                   : RecruitingChannel.local;
+              final legacyUid = uri.queryParameters['dsp'] ?? '';
+
               return MaterialPageRoute<void>(
                 settings: settings,
                 builder: (_) => _wrapSelectable(
-                  RecruitingFormPage(
-                    adminUid: adminUid,
+                  _RecruitingFormLoader(
+                    slug: slug,
+                    legacyAdminUid: legacyUid,
                     channel: channel,
                   ),
                 ),
@@ -140,8 +167,14 @@ class App extends StatelessWidget {
             '/concessions': (_) => _wrapSelectable(
               const AdminShellPage(initialNav: AppNav.concessions),
             ),
+            '/cdf': (_) => _wrapSelectable(
+              const AdminShellPage(initialNav: AppNav.cdf),
+            ),
             '/drivers': (_) => _wrapSelectable(
               const AdminShellPage(initialNav: AppNav.drivers),
+            ),
+            '/recruiting': (_) => _wrapSelectable(
+              const AdminShellPage(initialNav: AppNav.recruiting),
             ),
             '/waveplan': (_) => _wrapSelectable(
               const AdminShellPage(initialNav: AppNav.waveplan),
@@ -209,6 +242,94 @@ class _PlaceholderPage extends StatelessWidget {
           style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
         ),
       ),
+    );
+  }
+}
+
+/// Resolves a recruiting slug (e.g. "arion") to the long admin UID
+/// before handing off to [RecruitingFormPage]. Falls back to the
+/// legacy `?dsp=<uid>` query if no slug is given.
+class _RecruitingFormLoader extends StatefulWidget {
+  final String slug;
+  final String legacyAdminUid;
+  final RecruitingChannel channel;
+
+  const _RecruitingFormLoader({
+    required this.slug,
+    required this.legacyAdminUid,
+    required this.channel,
+  });
+
+  @override
+  State<_RecruitingFormLoader> createState() => _RecruitingFormLoaderState();
+}
+
+class _RecruitingFormLoaderState extends State<_RecruitingFormLoader> {
+  String? _resolvedUid;
+  bool _loading = true;
+  bool _notFound = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolve();
+  }
+
+  Future<void> _resolve() async {
+    // 1) Legacy long-UID URL — use directly, no Firestore round-trip.
+    if (widget.slug.isEmpty && widget.legacyAdminUid.isNotEmpty) {
+      setState(() {
+        _resolvedUid = widget.legacyAdminUid;
+        _loading = false;
+      });
+      return;
+    }
+    // 2) Slug path — look up in recruiting_slugs collection.
+    if (widget.slug.isNotEmpty) {
+      final uid = await RecruitingSlugService.resolveAdminUid(widget.slug);
+      if (!mounted) return;
+      setState(() {
+        _resolvedUid = uid;
+        _notFound = uid == null;
+        _loading = false;
+      });
+      return;
+    }
+    setState(() {
+      _notFound = true;
+      _loading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_notFound || _resolvedUid == null) {
+      return Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Text(
+              'Invalid application link.\n\n'
+              'Please ask your contact at the company for the correct URL.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 16,
+                color: Color(0xFF6B7280),
+                height: 1.5,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    return RecruitingFormPage(
+      adminUid: _resolvedUid!,
+      channel: widget.channel,
     );
   }
 }

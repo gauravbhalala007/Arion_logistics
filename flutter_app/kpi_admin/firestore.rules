@@ -1075,5 +1075,35 @@ service cloud.firestore {
       allow read: if true;
       allow write: if false;
     }
+
+    // ============================================================
+    //  PUBLIC REVIEWS — link-only rating page (Sterne + Text).
+    //  Anyone with the link may submit one review (no auth). Reads
+    //  are public ONLY for approved reviews (Landingpage-Testimonials).
+    //  Moderation (approved=true) happens via Admin SDK / Console.
+    // ============================================================
+    match /public_reviews/{reviewId} {
+      allow read: if resource.data.approved == true;
+
+      allow create: if request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 80
+        && request.resource.data.stationCode is string
+        && request.resource.data.stationCode.size() <= 40
+        && request.resource.data.stationCity is string
+        && request.resource.data.stationCity.size() <= 80
+        && request.resource.data.companyName is string
+        && request.resource.data.companyName.size() > 0
+        && request.resource.data.companyName.size() <= 120
+        && request.resource.data.reviewText is string
+        && request.resource.data.reviewText.size() > 0
+        && request.resource.data.reviewText.size() <= 2000
+        && request.resource.data.rating is int
+        && request.resource.data.rating >= 1
+        && request.resource.data.rating <= 5
+        && request.resource.data.approved == false;
+
+      allow update, delete: if false;
+    }
   }
 }
