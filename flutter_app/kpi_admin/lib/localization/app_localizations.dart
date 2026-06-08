@@ -615,11 +615,35 @@ class AppLocalizations {
       'pod_quality_rejects': 'Rejects',
       'pod_quality_opp': 'Opportunities',
       'pod_quality_bypass': 'Bypass',
-      'pod_quality_blurry': 'Blurry',
-      'pod_quality_too_dark': 'Too Dark',
-      'pod_quality_no_package': 'No Package',
-      'pod_quality_in_car': 'In Car',
-      'pod_quality_too_close': 'Too Close',
+      'pod_quality_blurry': 'Photo blurry',
+      'pod_quality_blurry_desc':
+          'The delivery photo is out of focus — the package is hard to recognize.',
+      'pod_quality_blurry_tip':
+          'Hold the phone steady, wait a moment for autofocus, then snap. Do not move while taking the photo.',
+
+      'pod_quality_too_dark': 'Photo too dark',
+      'pod_quality_too_dark_desc':
+          'The photo is too dark to clearly see the package — usually taken in evening, stairwell or shadow.',
+      'pod_quality_too_dark_tip':
+          'Turn on phone flash or place the package somewhere brighter. The customer needs to recognize their package.',
+
+      'pod_quality_no_package': 'No package visible',
+      'pod_quality_no_package_desc':
+          'The system cannot detect a package in the photo — either it is missing or hidden.',
+      'pod_quality_no_package_tip':
+          'Place the package clearly in the center of the frame. The label should be readable.',
+
+      'pod_quality_in_car': 'Package still in car',
+      'pod_quality_in_car_desc':
+          'Photo shows the package inside the delivery vehicle — not at the customer location.',
+      'pod_quality_in_car_tip':
+          'Always take the photo AT the door / safe-place, never inside the van.',
+
+      'pod_quality_too_close': 'Photo too close',
+      'pod_quality_too_close_desc':
+          'Photo is taken so close that the customer cannot see the surroundings — they cannot identify the location.',
+      'pod_quality_too_close_tip':
+          'Step back so the door, address sign or context is visible in the frame.',
       'pod_quality_shell_week_title': 'POD QUALITY - WEEK',
       'pod_quality_week_label': 'Week {week}',
       'pod_quality_dashboard_title': 'POD QUALITY DASHBOARD',
@@ -1335,11 +1359,35 @@ class AppLocalizations {
       'pod_quality_rejects': 'Ablehnungen',
       'pod_quality_opp': 'Chancen',
       'pod_quality_bypass': 'Übersprungen',
-      'pod_quality_blurry': 'Unscharf',
-      'pod_quality_too_dark': 'Zu dunkel',
-      'pod_quality_no_package': 'Kein Paket',
-      'pod_quality_in_car': 'Im Auto',
-      'pod_quality_too_close': 'Zu nah',
+      'pod_quality_blurry': 'Foto unscharf',
+      'pod_quality_blurry_desc':
+          'Das Lieferfoto ist unscharf — das Paket ist kaum zu erkennen.',
+      'pod_quality_blurry_tip':
+          'Handy ruhig halten, kurz warten bis der Autofokus scharfstellt, dann auslösen. Beim Knipsen nicht bewegen.',
+
+      'pod_quality_too_dark': 'Foto zu dunkel',
+      'pod_quality_too_dark_desc':
+          'Das Foto ist zu dunkel um das Paket eindeutig zu erkennen — meist abends, im Treppenhaus oder Schatten gemacht.',
+      'pod_quality_too_dark_tip':
+          'Handy-Blitz an oder das Paket an eine hellere Stelle legen. Der Kunde muss sein Paket erkennen können.',
+
+      'pod_quality_no_package': 'Kein Paket sichtbar',
+      'pod_quality_no_package_desc':
+          'Das System erkennt kein Paket im Foto — entweder fehlt es oder es ist verdeckt.',
+      'pod_quality_no_package_tip':
+          'Paket klar in die Mitte vom Bild legen. Das Versandetikett sollte lesbar sein.',
+
+      'pod_quality_in_car': 'Paket noch im Auto',
+      'pod_quality_in_car_desc':
+          'Foto zeigt das Paket im Lieferwagen — nicht am Lieferort.',
+      'pod_quality_in_car_tip':
+          'Foto immer AN der Tür / am Ablageort machen, niemals im Auto.',
+
+      'pod_quality_too_close': 'Foto zu nah',
+      'pod_quality_too_close_desc':
+          'Foto wurde so nah aufgenommen dass die Umgebung nicht sichtbar ist — Kunde kann den Ort nicht erkennen.',
+      'pod_quality_too_close_tip':
+          'Etwas Abstand nehmen, damit Tür, Hausnummer oder Umgebung im Bild zu sehen sind.',
       'pod_quality_shell_week_title': 'POD-QUALITAET - WOCHE',
       'pod_quality_week_label': 'Woche {week}',
       'pod_quality_dashboard_title': 'POD-QUALITAET DASHBOARD',
@@ -6465,6 +6513,12 @@ class AppLocalizations {
       'driver_notification_confirmed': 'confirmed',
       'driver_notification_detail_title': 'Detail',
       'driver_notification_reading_confirmation': 'Reading confirmation',
+      'driver_notification_signature_title': 'Signature',
+      'driver_notification_signature_hint': 'Please sign to confirm.',
+      'driver_notification_signature_clear': 'Clear',
+      'driver_notification_signature_confirm': 'Confirm',
+      'driver_notification_signature_required': 'Please sign first.',
+      'driver_notification_signature_cancel': 'Cancel',
       'driver_notification_confirm_success': 'Confirmed',
       'driver_notification_confirm_failed': 'Confirm failed: {error}',
       'driver_notification_mark_read_failed': 'Failed to mark as read: {error}',
@@ -6474,6 +6528,12 @@ class AppLocalizations {
       'driver_notification_confirmed': 'bestaetigt',
       'driver_notification_detail_title': 'Detail',
       'driver_notification_reading_confirmation': 'Lesebestaetigung',
+      'driver_notification_signature_title': 'Unterschrift',
+      'driver_notification_signature_hint': 'Bitte unterschreibe zur Bestaetigung.',
+      'driver_notification_signature_clear': 'Loeschen',
+      'driver_notification_signature_confirm': 'Bestaetigen',
+      'driver_notification_signature_required': 'Bitte zuerst unterschreiben.',
+      'driver_notification_signature_cancel': 'Abbrechen',
       'driver_notification_confirm_success': 'Bestaetigt',
       'driver_notification_confirm_failed':
           'Bestaetigung fehlgeschlagen: {error}',
@@ -6485,6 +6545,12 @@ class AppLocalizations {
       'driver_notification_confirmed': 'konfirmuar',
       'driver_notification_detail_title': 'Detaje',
       'driver_notification_reading_confirmation': 'Konfirmimi i leximit',
+      'driver_notification_signature_title': 'Nenshkrimi',
+      'driver_notification_signature_hint': 'Te lutem nenshkruaj per te konfirmuar.',
+      'driver_notification_signature_clear': 'Pastro',
+      'driver_notification_signature_confirm': 'Konfirmo',
+      'driver_notification_signature_required': 'Te lutem nenshkruaj fillimisht.',
+      'driver_notification_signature_cancel': 'Anulo',
       'driver_notification_confirm_success': 'U konfirmua',
       'driver_notification_confirm_failed': 'Konfirmimi deshtoi: {error}',
       'driver_notification_mark_read_failed':
@@ -6495,6 +6561,12 @@ class AppLocalizations {
       'driver_notification_confirmed': 'megerositve',
       'driver_notification_detail_title': 'Reszletek',
       'driver_notification_reading_confirmation': 'Olvasas megerositese',
+      'driver_notification_signature_title': 'Alairas',
+      'driver_notification_signature_hint': 'Kerjuk, irja ala a megerositeshez.',
+      'driver_notification_signature_clear': 'Torles',
+      'driver_notification_signature_confirm': 'Megerosit',
+      'driver_notification_signature_required': 'Kerjuk, eloszor irja ala.',
+      'driver_notification_signature_cancel': 'Megse',
       'driver_notification_confirm_success': 'Megerositve',
       'driver_notification_confirm_failed': 'A megerosites sikertelen: {error}',
       'driver_notification_mark_read_failed':
@@ -6505,6 +6577,12 @@ class AppLocalizations {
       'driver_notification_confirmed': 'confirmat',
       'driver_notification_detail_title': 'Detalii',
       'driver_notification_reading_confirmation': 'Confirmare citire',
+      'driver_notification_signature_title': 'Semnatura',
+      'driver_notification_signature_hint': 'Te rugam sa semnezi pentru confirmare.',
+      'driver_notification_signature_clear': 'Sterge',
+      'driver_notification_signature_confirm': 'Confirma',
+      'driver_notification_signature_required': 'Te rugam sa semnezi mai intai.',
+      'driver_notification_signature_cancel': 'Anuleaza',
       'driver_notification_confirm_success': 'Confirmat',
       'driver_notification_confirm_failed': 'Confirmarea a esuat: {error}',
       'driver_notification_mark_read_failed':
@@ -6515,6 +6593,12 @@ class AppLocalizations {
       'driver_notification_confirmed': 'potvrdeno',
       'driver_notification_detail_title': 'Detalji',
       'driver_notification_reading_confirmation': 'Potvrda citanja',
+      'driver_notification_signature_title': 'Potpis',
+      'driver_notification_signature_hint': 'Molimo potpisite za potvrdu.',
+      'driver_notification_signature_clear': 'Ocisti',
+      'driver_notification_signature_confirm': 'Potvrdi',
+      'driver_notification_signature_required': 'Molimo prvo se potpisite.',
+      'driver_notification_signature_cancel': 'Odustani',
       'driver_notification_confirm_success': 'Potvrdeno',
       'driver_notification_confirm_failed': 'Potvrda nije uspjela: {error}',
       'driver_notification_mark_read_failed':
@@ -6525,6 +6609,12 @@ class AppLocalizations {
       'driver_notification_confirmed': 'تم التأكيد',
       'driver_notification_detail_title': 'التفاصيل',
       'driver_notification_reading_confirmation': 'تأكيد القراءة',
+      'driver_notification_signature_title': 'التوقيع',
+      'driver_notification_signature_hint': 'يرجى التوقيع للتأكيد.',
+      'driver_notification_signature_clear': 'مسح',
+      'driver_notification_signature_confirm': 'تأكيد',
+      'driver_notification_signature_required': 'يرجى التوقيع أولاً.',
+      'driver_notification_signature_cancel': 'إلغاء',
       'driver_notification_confirm_success': 'تم التأكيد',
       'driver_notification_confirm_failed': 'فشل التأكيد: {error}',
       'driver_notification_mark_read_failed':
@@ -6535,6 +6625,12 @@ class AppLocalizations {
       'driver_notification_confirmed': 'onaylandi',
       'driver_notification_detail_title': 'Detay',
       'driver_notification_reading_confirmation': 'Okuma onayi',
+      'driver_notification_signature_title': 'Imza',
+      'driver_notification_signature_hint': 'Lutfen onaylamak icin imzalayin.',
+      'driver_notification_signature_clear': 'Temizle',
+      'driver_notification_signature_confirm': 'Onayla',
+      'driver_notification_signature_required': 'Lutfen once imzalayin.',
+      'driver_notification_signature_cancel': 'Iptal',
       'driver_notification_confirm_success': 'Onaylandi',
       'driver_notification_confirm_failed': 'Onay basarisiz: {error}',
       'driver_notification_mark_read_failed':
@@ -6545,6 +6641,12 @@ class AppLocalizations {
       'driver_notification_confirmed': 'подтверждено',
       'driver_notification_detail_title': 'Детали',
       'driver_notification_reading_confirmation': 'Подтверждение прочтения',
+      'driver_notification_signature_title': 'Подпись',
+      'driver_notification_signature_hint': 'Пожалуйста, подпишите для подтверждения.',
+      'driver_notification_signature_clear': 'Очистить',
+      'driver_notification_signature_confirm': 'Подтвердить',
+      'driver_notification_signature_required': 'Сначала поставьте подпись.',
+      'driver_notification_signature_cancel': 'Отмена',
       'driver_notification_confirm_success': 'Подтверждено',
       'driver_notification_confirm_failed': 'Не удалось подтвердить: {error}',
       'driver_notification_mark_read_failed':
@@ -12499,6 +12601,15 @@ class AppLocalizations {
     'concessions_shell_week_title': 'CONCESSIONS - WEEK',
     'concessions_dashboard_title': 'CONCESSIONS DASHBOARD',
     'concessions_upload_xlsx': 'Upload XLSX',
+    'concessions_delete_week_tooltip': 'Delete this Concessions week',
+    'concessions_delete_week_confirm': 'Delete',
+    'concessions_delete_week_title': 'Delete Concessions data?',
+    'concessions_delete_week_body':
+        'This removes the Concessions data of {week}. Scorecard and POD Quality data for this week stay untouched. Continue?',
+    'concessions_delete_week_success':
+        'Concessions data for {week} deleted.',
+    'concessions_delete_week_failed':
+        'Could not delete: {error}',
     'concessions_no_reports_uploaded':
         'No Concessions reports yet. Upload a Concessions XLSX to get started.',
     'concessions_upload_success_one':
@@ -12514,15 +12625,142 @@ class AppLocalizations {
     'concessions_dnr_count': 'DNRs',
     'concessions_dnr_dpmo': 'DPMO',
     'concessions_dnr_dpmo_4w': 'DPMO 4W',
-    'concessions_focus_breakdown': 'Focus areas (last 4 weeks)',
-    'concessions_focus_attended_dnr': 'Attended DNR',
-    'concessions_focus_photo_on_delivery': 'POD',
-    'concessions_focus_successful_contact': 'Successful Contact',
-    'concessions_focus_delivered_25m': '>25 m',
-    'concessions_focus_false_scan': 'False Scan',
-    'concessions_focus_mailbox': 'Mailbox',
-    'concessions_focus_delivered_otp': 'OTP',
+    'concessions_focus_breakdown':
+        'Mistakes drivers made (last 4 weeks)',
+    'concessions_avg_loss_week': 'Ø loss / week',
+    'concessions_avg_dnr_week': 'Ø DNR / week',
+    'concessions_avg_dpmo': 'Ø DPMO',
+    'concessions_weeks_label': 'WEEKS',
+    'concessions_weeks_sort_loss': 'Loss (worst first)',
+    'concessions_weeks_sort_dnrs': 'DNR count (most first)',
+    'concessions_weeks_sort_date': 'Date (newest first)',
+    'concessions_dashboard_overview_title': 'Drivers overview',
+    'concessions_dashboard_open': 'Driver overview',
+    'concessions_dashboard_empty':
+        'No driver data yet. Upload a Concessions XLSX to get started.',
+    'concessions_search_hint': 'Search by name or Transporter ID',
+    'concessions_search_empty': 'No driver matches "{query}".',
+    'concessions_sort_tooltip': 'Sort drivers',
+    'concessions_sort_loss': 'Loss (worst first)',
+    'concessions_sort_dnrs': 'DNR count (most first)',
+    'concessions_sort_dpmo': 'DPMO (worst first)',
+    'concessions_sort_name': 'Name A–Z',
+    'concessions_total_loss': 'Total loss',
+    'concessions_total_dnrs': 'Total DNRs',
+    'concessions_affected_drivers': 'Affected drivers',
+    'concessions_loss': 'Loss',
+    'concessions_loss_desc':
+        'Estimated cost from DNRs over the last 4 weeks. Each DNR is counted as 5.50 € — Amazon refunds plus operational overhead.',
+    'concessions_loss_tip':
+        'Use this to prioritize coaching: drivers with the highest € loss deserve attention first, regardless of total volume.',
+    'concessions_loss_value': '{eur} €',
+    'concessions_week_w_label': 'Week {week}',
+    'concessions_week_w_desc':
+        'DNR (Did-Not-Receive) count per week. The 4 columns represent the last 4 calendar weeks: W1 is 4 weeks ago, W4 is the most recent finished week.',
+    'concessions_week_w_tip':
+        'Use this to spot trends — if the number rises week over week, talk with the driver early.',
+    'concessions_delivered_desc':
+        'Total parcels delivered in the last 4 weeks.',
+    'concessions_delivered_tip':
+        'Higher volume usually means more opportunities for mistakes — keep this in mind when comparing drivers.',
+    'concessions_dnr_count_desc':
+        'Total DNR (Did-Not-Receive) cases in the last 4 weeks — customer says they did not receive the package.',
+    'concessions_dnr_count_tip':
+        'Each DNR can become a refund or chargeback. Aim for zero.',
+    'concessions_dnr_dpmo_4w_desc':
+        'Defects Per Million Opportunities over 4 weeks. Lower is better. Amazon target is below ~1.500.',
+    'concessions_dnr_dpmo_4w_tip':
+        'Best metric for fairness — it controls for delivery volume, so high-volume drivers are not unfairly penalized.',
+    'concessions_focus_attended_dnr': 'Customer at home',
+    'concessions_focus_attended_dnr_desc':
+        'The customer was home but says they did not receive the package. Most serious: indicates no personal handover happened.',
+    'concessions_focus_attended_dnr_tip':
+        'Always ring the doorbell, knock and wait 30+ seconds. Hand the package over personally whenever possible.',
+
+    'concessions_focus_photo_on_delivery': 'Missing photo',
+    'concessions_focus_photo_on_delivery_desc':
+        'A delivery photo (POD) is missing or unusable — the customer has no proof the package arrived.',
+    'concessions_focus_photo_on_delivery_tip':
+        'Take a clearly visible photo of the package at the delivery location BEFORE confirming. Make sure the package is sharp and well lit.',
+
+    'concessions_focus_successful_contact': 'No customer contact',
+    'concessions_focus_successful_contact_desc':
+        'The driver should have contacted the customer (ring/knock/call) — there is no proof contact happened.',
+    'concessions_focus_successful_contact_tip':
+        'Always ring or knock and wait. If nobody answers, follow the safe-place rules.',
+
+    'concessions_focus_delivered_25m': 'Far from address',
+    'concessions_focus_delivered_25m_desc':
+        'The package was dropped more than 25 m from the official delivery address. Customer cannot find it.',
+    'concessions_focus_delivered_25m_tip':
+        'Use the address pin in the Flex app. If the building is far back, walk the package up — do not drop it at the curb.',
+
+    'concessions_focus_false_scan': 'Scanned but not delivered',
+    'concessions_focus_false_scan_desc':
+        'Driver scanned “delivered” but the package was returned to the station or never reached the customer.',
+    'concessions_focus_false_scan_tip':
+        'Only scan as delivered AT the customer location. Never pre-scan in the van.',
+
+    'concessions_focus_mailbox': 'Mailbox delivery',
+    'concessions_focus_mailbox_desc':
+        'Package was placed in the mailbox even though it was too big or not allowed there.',
+    'concessions_focus_mailbox_tip':
+        'Mailbox is only allowed for small letter-size packages. Larger ones need personal handover or a safe-place photo.',
+
+    'concessions_focus_delivered_otp': 'OTP missing',
+    'concessions_focus_delivered_otp_desc':
+        'A one-time password (OTP) was required for this delivery but was not entered — package likely went back.',
+    'concessions_focus_delivered_otp_tip':
+        'When the Flex app asks for an OTP, request the code from the customer in person before scanning as delivered.',
+
     'concessions_week_w': 'W{week}',
+
+    // ===== Customer Delivery Feedback (CDF) — driver-side =====
+    'cdf_title': 'CUSTOMER FEEDBACK',
+    'cdf_negative_short': 'Negative',
+    'cdf_total_short': 'Total',
+    'cdf_no_categories':
+        'No categorized feedback this week — only generic "Was not so great" entries.',
+    'cdf_l1_never_received': 'Not received',
+    'cdf_l1_never_received_desc':
+        'The customer reports they did not receive the package, even though it was marked as delivered.',
+    'cdf_l1_never_received_tip':
+        'Always take a clear delivery photo and hand parcels over personally when the customer is home.',
+    'cdf_l1_driver_mishandled': 'Mishandled package',
+    'cdf_l1_driver_mishandled_desc':
+        'The customer complained about how the parcel was handled (thrown, dropped, damaged on arrival).',
+    'cdf_l1_driver_mishandled_tip':
+        'Handle every parcel like it is fragile — place it gently, never throw.',
+    'cdf_l1_not_delivered_to_preferred': 'Wrong drop-off location',
+    'cdf_l1_not_delivered_to_preferred_desc':
+        'The package was left somewhere other than the location the customer requested in the delivery instructions.',
+    'cdf_l1_not_delivered_to_preferred_tip':
+        'Always read the special delivery instructions in the Flex app before scanning as delivered.',
+    'cdf_l1_damaged_package': 'Damaged package',
+    'cdf_l1_damaged_package_desc':
+        'The customer reports the parcel arrived damaged.',
+    'cdf_l1_damaged_package_tip':
+        'Inspect the parcel before delivery — if it is already damaged at pickup, scan as damaged in the Flex app.',
+    'cdf_l1_delivery_was_late': 'Late delivery',
+    'cdf_l1_delivery_was_late_tip':
+        'Try to keep within the promised time window — call the customer if you are running late.',
+    'cdf_l1_delivery_was_late_desc':
+        'The customer complained that the parcel arrived later than expected.',
+    'cdf_l1_bad_delivery_experience': 'Bad experience',
+    'cdf_l1_bad_delivery_experience_desc':
+        'The customer reported a generic bad delivery experience without a specific category.',
+    'cdf_l1_bad_delivery_experience_tip':
+        'Be friendly and professional at the door — first impressions count.',
+    'cdf_l1_driver_was_unprofessional': 'Driver unprofessional',
+    'cdf_l1_driver_was_unprofessional_desc':
+        'The customer felt the driver acted unprofessionally (rude, impatient, refusing instructions).',
+    'cdf_l1_driver_was_unprofessional_tip':
+        'Stay polite and patient — even one rude interaction can become a formal complaint.',
+    'cdf_l1_other': 'Other',
+    'cdf_l1_other_desc':
+        'Negative feedback that did not fit any of the standard categories.',
+    'cdf_l1_other_tip':
+        'Open the detail view to see the customer comment and decide whether the issue was avoidable.',
   };
 
   // Shared English defaults for the Waveplan admin page. The literal
@@ -13615,6 +13853,15 @@ class AppLocalizations {
       'concessions_shell_week_title': 'CONCESSIONS - WOCHE',
       'concessions_dashboard_title': 'CONCESSIONS DASHBOARD',
       'concessions_upload_xlsx': 'XLSX hochladen',
+      'concessions_delete_week_tooltip': 'Diese Concessions-KW löschen',
+      'concessions_delete_week_confirm': 'Löschen',
+      'concessions_delete_week_title': 'Concessions-Daten löschen?',
+      'concessions_delete_week_body':
+          'Damit werden die Concessions-Daten von {week} entfernt. Scorecard und POD-Quality-Daten dieser Woche bleiben unverändert. Fortfahren?',
+      'concessions_delete_week_success':
+          'Concessions-Daten für {week} gelöscht.',
+      'concessions_delete_week_failed':
+          'Löschen fehlgeschlagen: {error}',
       'concessions_no_reports_uploaded':
           'Noch keine Concessions-Berichte. Lade eine Concessions-XLSX hoch, um zu starten.',
       'concessions_upload_success_one':
@@ -13632,15 +13879,144 @@ class AppLocalizations {
       'concessions_dnr_count': 'DNRs',
       'concessions_dnr_dpmo': 'DPMO',
       'concessions_dnr_dpmo_4w': 'DPMO 4W',
-      'concessions_focus_breakdown': 'Fokus-Bereiche (letzte 4 Wochen)',
-      'concessions_focus_attended_dnr': 'Attended DNR',
-      'concessions_focus_photo_on_delivery': 'POD',
-      'concessions_focus_successful_contact': 'Erfolgreicher Kontakt',
-      'concessions_focus_delivered_25m': '>25 m',
-      'concessions_focus_false_scan': 'False Scan',
-      'concessions_focus_mailbox': 'Briefkasten',
-      'concessions_focus_delivered_otp': 'OTP',
+      'concessions_focus_breakdown':
+          'Fehlerarten der Fahrer (letzte 4 Wochen)',
+
+      'concessions_avg_loss_week': 'Ø Verlust / Woche',
+      'concessions_avg_dnr_week': 'Ø DNR / Woche',
+      'concessions_avg_dpmo': 'Ø DPMO',
+      'concessions_weeks_label': 'WOCHEN',
+      'concessions_weeks_sort_loss': 'Verlust (schlechteste zuerst)',
+      'concessions_weeks_sort_dnrs': 'DNR-Anzahl (meiste zuerst)',
+      'concessions_weeks_sort_date': 'Datum (neueste zuerst)',
+      'concessions_dashboard_overview_title': 'Fahrer-Übersicht',
+      'concessions_dashboard_open': 'Fahrer-Übersicht',
+      'concessions_dashboard_empty':
+          'Noch keine Fahrer-Daten. Lade eine Concessions-XLSX hoch, um zu starten.',
+      'concessions_search_hint': 'Suche nach Name oder Transporter-ID',
+      'concessions_search_empty':
+          'Kein Fahrer passt zu „{query}".',
+      'concessions_sort_tooltip': 'Sortieren',
+      'concessions_sort_loss': 'Verlust (schlechteste zuerst)',
+      'concessions_sort_dnrs': 'DNR-Anzahl (meiste zuerst)',
+      'concessions_sort_dpmo': 'DPMO (schlechteste zuerst)',
+      'concessions_sort_name': 'Name A–Z',
+      'concessions_total_loss': 'Gesamt-Verlust',
+      'concessions_total_dnrs': 'Gesamt-DNRs',
+      'concessions_affected_drivers': 'Betroffene Fahrer',
+      'concessions_loss': 'Verlust',
+      'concessions_loss_desc':
+          'Geschätzte Kosten durch DNRs der letzten 4 Wochen. Jede DNR = 5,50 € (Amazon-Erstattung + operativer Mehraufwand).',
+      'concessions_loss_tip':
+          'Nutze das für Coaching-Priorisierung: Fahrer mit dem höchsten €-Verlust zuerst, unabhängig vom Gesamtvolumen.',
+      'concessions_loss_value': '{eur} €',
+      'concessions_week_w_label': 'KW {week}',
+      'concessions_week_w_desc':
+          'DNR-Anzahl (Did-Not-Receive) pro Kalenderwoche. Die 4 Spalten sind die letzten 4 Kalenderwochen: W1 = vor 4 Wochen, W4 = letzte abgeschlossene Woche.',
+      'concessions_week_w_tip':
+          'Trends erkennen — steigt die Zahl von Woche zu Woche, früh mit dem Fahrer reden.',
+      'concessions_delivered_desc':
+          'Gesamtanzahl zugestellter Pakete der letzten 4 Wochen.',
+      'concessions_delivered_tip':
+          'Mehr Volumen heißt mehr Gelegenheiten für Fehler — beim Fahrer-Vergleich berücksichtigen.',
+      'concessions_dnr_count_desc':
+          'Gesamt-DNR-Fälle der letzten 4 Wochen — Kunde sagt er hätte das Paket nicht bekommen.',
+      'concessions_dnr_count_tip':
+          'Jede DNR kann eine Erstattung oder Rückbuchung werden. Ziel ist null.',
+      'concessions_dnr_dpmo_4w_desc':
+          'Fehler pro Million Gelegenheiten über 4 Wochen. Niedriger ist besser. Amazon-Ziel: unter ~1.500.',
+      'concessions_dnr_dpmo_4w_tip':
+          'Fairster Wert — berücksichtigt das Liefervolumen, vielfahrende Fahrer werden nicht benachteiligt.',
+      'concessions_focus_attended_dnr': 'Kunde war zu Hause',
+      'concessions_focus_attended_dnr_desc':
+          'Der Kunde war zu Hause, sagt aber er hätte das Paket nicht bekommen. Schwerster Fall — es gab keine persönliche Übergabe.',
+      'concessions_focus_attended_dnr_tip':
+          'Immer klingeln, klopfen und mindestens 30 Sekunden warten. Wann immer möglich persönlich übergeben.',
+
+      'concessions_focus_photo_on_delivery': 'Foto fehlt',
+      'concessions_focus_photo_on_delivery_desc':
+          'Das Lieferfoto (POD) fehlt oder ist nicht brauchbar — der Kunde hat keinen Nachweis dass das Paket ankam.',
+      'concessions_focus_photo_on_delivery_tip':
+          'Vor dem Bestätigen ein scharfes, gut sichtbares Foto vom Paket am Ablageort machen. Auf Helligkeit + Fokus achten.',
+
+      'concessions_focus_successful_contact': 'Kein Kunden-Kontakt',
+      'concessions_focus_successful_contact_desc':
+          'Der Fahrer hätte Kontakt aufnehmen sollen (klingeln / klopfen / anrufen) — es gibt keinen Nachweis dass das passiert ist.',
+      'concessions_focus_successful_contact_tip':
+          'Immer klingeln oder klopfen und warten. Wenn niemand da ist, an die Safe-Place-Regeln halten.',
+
+      'concessions_focus_delivered_25m': 'Zu weit von der Adresse',
+      'concessions_focus_delivered_25m_desc':
+          'Das Paket wurde mehr als 25 m vom offiziellen Lieferort entfernt abgelegt. Kunde findet es nicht.',
+      'concessions_focus_delivered_25m_tip':
+          'Pin in der Flex-App nutzen. Liegt das Haus weit hinten, das Paket nach hinten tragen — nicht am Straßenrand ablegen.',
+
+      'concessions_focus_false_scan': 'Falsch als zugestellt gescannt',
+      'concessions_focus_false_scan_desc':
+          'Fahrer hat „zugestellt“ gescannt, das Paket kam aber zurück oder erreichte den Kunden nie.',
+      'concessions_focus_false_scan_tip':
+          'Erst AM Lieferort als zugestellt scannen. Niemals vorab im Lieferwagen scannen.',
+
+      'concessions_focus_mailbox': 'Im Briefkasten abgelegt',
+      'concessions_focus_mailbox_desc':
+          'Paket wurde in den Briefkasten gesteckt, obwohl es zu groß war oder dort nicht erlaubt ist.',
+      'concessions_focus_mailbox_tip':
+          'Nur briefgroße Pakete dürfen in den Briefkasten. Größere persönlich übergeben oder als Safe-Place mit Foto ablegen.',
+
+      'concessions_focus_delivered_otp': 'OTP-Code fehlt',
+      'concessions_focus_delivered_otp_desc':
+          'Für diese Lieferung war ein OTP-Code nötig, wurde aber nicht eingegeben — Paket ging wahrscheinlich zurück.',
+      'concessions_focus_delivered_otp_tip':
+          'Wenn die Flex-App nach einem OTP fragt, vor dem Scannen den Code persönlich vom Kunden erfragen.',
+
       'concessions_week_w': 'KW {week}',
+
+      // ===== CDF — Fahrer-Ansicht =====
+      'cdf_title': 'KUNDENFEEDBACK',
+      'cdf_negative_short': 'Negativ',
+      'cdf_total_short': 'Gesamt',
+      'cdf_no_categories':
+          'Diese Woche keine kategorisierten Rückmeldungen — nur allgemeine "Nicht so gut"-Bewertungen.',
+      'cdf_l1_never_received': 'Nicht erhalten',
+      'cdf_l1_never_received_desc':
+          'Der Kunde meldet, dass das Paket nicht angekommen ist, obwohl es als geliefert markiert wurde.',
+      'cdf_l1_never_received_tip':
+          'Immer ein klares Beweisfoto machen und das Paket persönlich übergeben, wenn der Kunde zuhause ist.',
+      'cdf_l1_driver_mishandled': 'Falsch behandelt',
+      'cdf_l1_driver_mishandled_desc':
+          'Der Kunde hat sich beschwert, wie das Paket behandelt wurde (geworfen, fallen gelassen, beschädigt).',
+      'cdf_l1_driver_mishandled_tip':
+          'Jedes Paket vorsichtig behandeln, niemals werfen.',
+      'cdf_l1_not_delivered_to_preferred': 'Falsche Ablage',
+      'cdf_l1_not_delivered_to_preferred_desc':
+          'Das Paket wurde nicht an dem Ort abgelegt, den der Kunde in den Lieferhinweisen gewünscht hat.',
+      'cdf_l1_not_delivered_to_preferred_tip':
+          'Vor dem Liefern immer die Lieferhinweise in der Flex-App lesen.',
+      'cdf_l1_damaged_package': 'Beschädigt',
+      'cdf_l1_damaged_package_desc':
+          'Der Kunde meldet, dass das Paket beschädigt angekommen ist.',
+      'cdf_l1_damaged_package_tip':
+          'Pakete vor der Lieferung prüfen — falls bereits beschädigt, in der Flex-App entsprechend scannen.',
+      'cdf_l1_delivery_was_late': 'Zu spät',
+      'cdf_l1_delivery_was_late_desc':
+          'Der Kunde hat sich beschwert, dass das Paket später als erwartet kam.',
+      'cdf_l1_delivery_was_late_tip':
+          'Versuche das versprochene Zeitfenster einzuhalten — bei Verspätung den Kunden anrufen.',
+      'cdf_l1_bad_delivery_experience': 'Schlechte Erfahrung',
+      'cdf_l1_bad_delivery_experience_desc':
+          'Der Kunde hat allgemein eine schlechte Liefererfahrung gemeldet, ohne konkrete Kategorie.',
+      'cdf_l1_bad_delivery_experience_tip':
+          'Freundlich und professionell an der Tür auftreten — der erste Eindruck zählt.',
+      'cdf_l1_driver_was_unprofessional': 'Unprofessionell',
+      'cdf_l1_driver_was_unprofessional_desc':
+          'Der Kunde fand das Verhalten unprofessionell (unhöflich, ungeduldig, Hinweise ignoriert).',
+      'cdf_l1_driver_was_unprofessional_tip':
+          'Höflich und geduldig bleiben — schon eine unhöfliche Interaktion kann zu einer Beschwerde werden.',
+      'cdf_l1_other': 'Sonstige',
+      'cdf_l1_other_desc':
+          'Negatives Feedback, das in keine der Standard-Kategorien passt.',
+      'cdf_l1_other_tip':
+          'In der Detailansicht den Kommentar des Kunden ansehen und entscheiden, ob das Problem vermeidbar war.',
     },
     'sq': {
       ..._miscSharedValues,

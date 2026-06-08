@@ -1,7 +1,11 @@
 // lib/screens/driver_notification_detail_view.dart
 
+import 'dart:typed_data';
+
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
+import 'package:signature/signature.dart';
 
 import '../localization/app_localizations.dart';
 import '../widgets/notification_pin_dialogs.dart';
@@ -286,15 +290,200 @@ class _DriverNotificationDetailViewState
                         ),
                       );
 
-                      if (ok == true) {
-                        await _confirm();
-                      }
+                      if (ok != true) return;
+                      if (!mounted) return;
+
+                      // After the PIN, capture the driver's signature.
+                      final sigBytes = await showDialog<Uint8List>(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (_) => const _SignatureCaptureDialog(),
+                      );
+                      if (sigBytes == null) return; // cancelled
+
+                      await _uploadSignature(sigBytes);
+                      await _confirm();
                     },
                     busy: _busyConfirm,
                   ),
           ),
         ),
+        const SizedBox(height: 28),
       ],
+    );
+  }
+
+  /// Persists the read-confirmation signature (best effort) under the
+  /// driver's own documents path. Driver self-writes are already allowed
+  /// by Storage rules for `driver_docs/{tid}`.
+  Future<void> _uploadSignature(Uint8List bytes) async {
+    try {
+      final tid = widget.driverTransporterId.toUpperCase();
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('driver_docs')
+          .child(tid)
+          .child(
+            'notification_signature_${widget.notification.id}_'
+            '${DateTime.now().millisecondsSinceEpoch}.png',
+          );
+      await ref.putData(
+        bytes,
+        SettableMetadata(contentType: 'image/png'),
+      );
+    } catch (_) {
+      // Best effort — never block the confirmation on a storage hiccup.
+    }
+  }
+}
+
+/// Signature pad shown right after the PIN check. Returns the drawn
+/// signature as PNG bytes, or null if the driver cancels.
+class _SignatureCaptureDialog extends StatefulWidget {
+  const _SignatureCaptureDialog();
+
+  @override
+  State<_SignatureCaptureDialog> createState() =>
+      _SignatureCaptureDialogState();
+}
+
+class _SignatureCaptureDialogState extends State<_SignatureCaptureDialog> {
+  late final SignatureController _ctrl;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = SignatureController(
+      penStrokeWidth: 2.5,
+      penColor: const Color(0xFF22252F),
+      exportBackgroundColor: Colors.white,
+    );
+    _ctrl.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _confirm() async {
+    final l10n = AppLocalizations.of(context);
+    if (_ctrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.t('driver_notification_signature_required')),
+        ),
+      );
+      return;
+    }
+    setState(() => _busy = true);
+    final bytes = await _ctrl.toPngBytes();
+    if (!mounted) return;
+    Navigator.of(context).pop(bytes);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              l10n.t('driver_notification_signature_title'),
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF22252F),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              l10n.t('driver_notification_signature_hint'),
+              style: const TextStyle(
+                fontSize: 13.5,
+                height: 1.4,
+                color: Color(0xFF6B7280),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              height: 200,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Signature(
+                  controller: _ctrl,
+                  backgroundColor: Colors.white,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: _ctrl.isEmpty ? null : () => _ctrl.clear(),
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: Text(l10n.t('driver_notification_signature_clear')),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed:
+                        _busy ? null : () => Navigator.of(context).pop(),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 46),
+                      shape: const StadiumBorder(),
+                      side: const BorderSide(color: Color(0xFFE5E7EB)),
+                      foregroundColor: const Color(0xFF111827),
+                    ),
+                    child: Text(
+                        l10n.t('driver_notification_signature_cancel')),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: (_busy || _ctrl.isEmpty) ? null : _confirm,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF00B287),
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(0, 46),
+                      shape: const StadiumBorder(),
+                    ),
+                    child: _busy
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : Text(
+                            l10n.t('driver_notification_signature_confirm')),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
