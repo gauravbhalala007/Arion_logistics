@@ -756,34 +756,6 @@ class _HeaderBar extends StatelessWidget {
     }
   }
 
-  String _headerGreeting(AppLocalizations loc) {
-    final hour = DateTime.now().hour;
-    if (hour >= 5 && hour < 12) return loc.t('header_good_morning');
-    if (hour >= 12 && hour < 18) return loc.t('header_good_afternoon');
-    return loc.t('header_good_evening');
-  }
-
-  Widget _greetingLabel(AppLocalizations loc) {
-    return StreamBuilder<DateTime>(
-      stream: Stream<DateTime>.periodic(
-        const Duration(minutes: 1),
-        (_) => DateTime.now(),
-      ),
-      initialData: DateTime.now(),
-      builder: (context, _) {
-        return Text(
-          _headerGreeting(loc),
-          style: const TextStyle(
-            fontSize: 12,
-            letterSpacing: 2.0,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF9FA4AF),
-          ),
-        );
-      },
-    );
-  }
-
   // round white icon container (for flag + bell)
   Widget _circleIcon({required Widget child, VoidCallback? onTap}) {
     final content = Container(
@@ -1165,8 +1137,6 @@ class _HeaderBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final loc = AppLocalizations.of(context);
-
     final currentLocale =
         localeController.locale ?? Localizations.localeOf(context);
     final langCode = currentLocale.languageCode;
@@ -1175,21 +1145,15 @@ class _HeaderBar extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _greetingLabel(loc),
-              const SizedBox(height: 2),
-              Text(
-                driverName.toUpperCase(),
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.8,
-                  color: Color(0xFF22252F),
-                ),
-              ),
-            ],
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Image.asset(
+              'assets/codriver_logo_lang.png',
+              height: 30,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
+              cacheHeight: 120,
+            ),
           ),
         ),
         Row(
