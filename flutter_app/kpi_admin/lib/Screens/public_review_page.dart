@@ -128,16 +128,16 @@ class _PublicReviewPageState extends State<PublicReviewPage> {
       children: [
         Center(
           child: Image.asset(
-            'assets/codriver_logo.png',
-            height: 40,
+            'assets/codriver_logo_lang.png',
+            height: 44,
             fit: BoxFit.contain,
             filterQuality: FilterQuality.high,
-            cacheHeight: 160,
+            cacheHeight: 176,
           ),
         ),
         const SizedBox(height: 28),
         const Text(
-          'Bewerte deinen DSP',
+          'Bewerte CoDriver',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 26,
@@ -148,8 +148,8 @@ class _PublicReviewPageState extends State<PublicReviewPage> {
         ),
         const SizedBox(height: 10),
         const Text(
-          'Teile deine Erfahrung. Deine Bewertung hilft anderen Fahrern '
-          'und Partnern.',
+          'Wie gefällt dir CoDriver? Teile deine Erfahrung mit der App — '
+          'dein Feedback hilft uns, sie besser zu machen.',
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 15, color: _muted, height: 1.45),
         ),
@@ -186,7 +186,7 @@ class _PublicReviewPageState extends State<PublicReviewPage> {
                 _field(
                   controller: _company,
                   label: 'Firmenname',
-                  hint: 'Name des DSP / Unternehmens',
+                  hint: 'Dein DSP / Unternehmen',
                   textInputAction: TextInputAction.next,
                   maxLength: 120,
                 ),
