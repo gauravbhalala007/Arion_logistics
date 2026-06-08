@@ -373,34 +373,29 @@ class _TrialCountdownBanner extends StatelessWidget {
               bottom: BorderSide(color: accent.withValues(alpha: 0.18)),
             ),
           ),
-          child: Row(
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 2,
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Icon(Icons.timer_outlined, size: 18, color: accent),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Wrap(
-                  spacing: 6,
-                  runSpacing: 2,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Text(
-                      'Testversion',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        color: accent,
-                        letterSpacing: 0.2,
-                      ),
-                    ),
-                    Text(
-                      '· Noch $daysLeft $dayWord',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: accent.withValues(alpha: 0.92),
-                      ),
-                    ),
-                  ],
+              const SizedBox(width: 4),
+              Text(
+                'Testversion',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: accent,
+                  letterSpacing: 0.2,
+                ),
+              ),
+              Text(
+                '· Noch $daysLeft $dayWord',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: accent.withValues(alpha: 0.92),
                 ),
               ),
             ],
