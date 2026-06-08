@@ -440,7 +440,7 @@
             <div class="price-plan">CoDriver Pro</div>
             <div class="bill-toggle" id="billToggle">
               <button type="button" data-bill="monthly" class="active">Monatlich</button>
-              <button type="button" data-bill="yearly">Jährlich</button>
+              <button type="button" data-bill="yearly">Jährlich · −20 %</button>
             </div>
             <div class="price-amount">
               <span class="price-old" id="priceOld">299 €</span>
@@ -579,10 +579,10 @@
         if (!b) return;
         t.querySelectorAll('button').forEach(function (x) { x.classList.toggle('active', x === b); });
         if (b.dataset.bill === 'yearly') {
-          old.textContent = '2.990 €';
-          now.textContent = '1.990 €';
-          unit.textContent = 'pro Station · Jahr';
-          sub.textContent = '= 166 €/Monat · 2 Monate gratis';
+          old.textContent = '299 €';
+          now.textContent = '159 €';
+          unit.textContent = 'pro Station · Monat';
+          sub.textContent = '= 1.908 €/Jahr · 20 % gespart';
         } else {
           old.textContent = '299 €';
           now.textContent = '199 €';
