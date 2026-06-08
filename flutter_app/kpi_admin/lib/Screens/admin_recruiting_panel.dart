@@ -726,6 +726,65 @@ class _RecruitingApplicationDetailPageState
     return 'Driver-ID: $tid · Daten & Dokumente wurden übernommen.';
   }
 
+  String _fmtDate(DateTime? d) =>
+      d == null ? '—' : DateFormat('dd.MM.yyyy').format(d);
+
+  /// Baut den gesamten Bewerber-Datensatz als formatierten Text und kopiert
+  /// ihn in die Zwischenablage.
+  Future<void> _copyAll() async {
+    final app = widget.app;
+    final b = StringBuffer();
+    void line(String k, String v) =>
+        b.writeln('$k: ${v.trim().isEmpty ? '—' : v.trim()}');
+
+    b.writeln(app.displayName);
+    b.writeln('────────────────────');
+    line('Kanal',
+        app.channel == RecruitingChannel.visa ? 'Non-EU / Visa' : 'EU / Local');
+    line('Status', app.status.label);
+    line('Eingegangen', _fmtDate(app.submittedAt));
+    b.writeln();
+    line('Vorname', app.firstName);
+    line('Nachname', app.lastName);
+    line('Geburtsdatum', _fmtDate(app.birthDate));
+    line('Geburtsort', app.birthPlace);
+    line('Nationalität', app.nationality);
+    b.writeln();
+    line('Straße', app.street);
+    line('PLZ', app.postalCode);
+    line('Stadt', app.city);
+    if (app.channel == RecruitingChannel.visa) {
+      line('Wohnhaft seit', _fmtDate(app.livingHereSince));
+    }
+    b.writeln();
+    line('E-Mail', app.email);
+    line('Telefon / WhatsApp', app.phoneWhatsApp);
+    line('T-Shirt-Größe', app.shirtSize);
+    line('Schuhgröße', app.shoeSize);
+    line('Lkw-Führerschein', app.truckLicense);
+    if (app.customAnswers.isNotEmpty) {
+      b.writeln();
+      b.writeln('Weitere Angaben:');
+      app.customAnswers.forEach((k, v) => line('  $k', '$v'));
+    }
+    if (app.documents.isNotEmpty) {
+      b.writeln();
+      b.writeln('Dokumente:');
+      for (final d in app.documents) {
+        b.writeln('  ${d.label}: ${d.downloadUrl}');
+      }
+    }
+
+    await Clipboard.setData(ClipboardData(text: b.toString()));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Alle Daten in die Zwischenablage kopiert.'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final app = widget.app;
@@ -747,6 +806,12 @@ class _RecruitingApplicationDetailPageState
           ),
         ),
         actions: [
+          IconButton(
+            tooltip: 'Alle Daten kopieren',
+            onPressed: _copyAll,
+            icon: const Icon(Icons.copy_all_rounded),
+            color: AppColors.codriverDeep,
+          ),
           IconButton(
             onPressed: _busy
                 ? null
@@ -1244,6 +1309,28 @@ class _DetailRow extends StatelessWidget {
               ),
             ),
           ),
+          if (value.trim().isNotEmpty)
+            InkWell(
+              onTap: () async {
+                await Clipboard.setData(ClipboardData(text: value.trim()));
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('„${label.trim()}" kopiert.'),
+                    duration: const Duration(seconds: 1),
+                  ),
+                );
+              },
+              borderRadius: BorderRadius.circular(6),
+              child: const Padding(
+                padding: EdgeInsets.all(4),
+                child: Icon(
+                  Icons.copy_rounded,
+                  size: 15,
+                  color: Color(0xFF9CA3AF),
+                ),
+              ),
+            ),
         ],
       ),
     );
