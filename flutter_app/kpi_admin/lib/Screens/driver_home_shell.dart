@@ -1145,15 +1145,27 @@ class _HeaderBar extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Image.asset(
-              'assets/codriver_logo_lang.png',
-              height: 30,
-              fit: BoxFit.contain,
-              filterQuality: FilterQuality.high,
-              cacheHeight: 120,
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset(
+                'assets/codriver_mark.png',
+                height: 34,
+                fit: BoxFit.contain,
+                filterQuality: FilterQuality.high,
+                cacheHeight: 136,
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                'CoDriver',
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                  color: Color(0xFF22252F),
+                ),
+              ),
+            ],
           ),
         ),
         Row(
