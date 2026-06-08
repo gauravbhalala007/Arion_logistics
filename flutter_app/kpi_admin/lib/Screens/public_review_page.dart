@@ -221,7 +221,8 @@ class _PublicReviewPageState extends State<PublicReviewPage> {
                 _field(
                   controller: _review,
                   label: 'Bewertung',
-                  hint: 'Was lief gut? Was könnte besser sein?',
+                  hint: 'Was gefällt dir an CoDriver am besten? '
+                      'Erzähl uns, was dich begeistert!',
                   maxLines: 5,
                   maxLength: 2000,
                 ),
