@@ -2,6 +2,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
@@ -15,7 +16,9 @@ import 'admin_home_page.dart';
 import 'scorecard_overview.dart';
 import 'pod_quality_overview.dart';
 import 'concessions_overview.dart';
+import 'cdf_overview.dart';
 import 'drivers_hub_page.dart';
+import 'admin_recruiting_page.dart';
 import 'admin_waveplan_page.dart';
 import 'admin_calendar_page.dart';
 import 'task_sheet_page.dart';
@@ -157,6 +160,8 @@ class _AdminShellPageState extends State<AdminShellPage> {
                       'assets/Codriver_logo_dark.png',
                       height: 30,
                       fit: BoxFit.contain,
+                      filterQuality: FilterQuality.high,
+                      cacheHeight: 120,
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -173,6 +178,8 @@ class _AdminShellPageState extends State<AdminShellPage> {
                   'assets/Codriver_logo_dark.png',
                   height: 38,
                   fit: BoxFit.contain,
+                  filterQuality: FilterQuality.high,
+                  cacheHeight: 152,
                 ),
           sideMenu: AppSideMenu(
             width: 300,
@@ -191,14 +198,20 @@ class _AdminShellPageState extends State<AdminShellPage> {
               }
             },
           ),
-          body: IndexedStack(
+          body: Column(
+            children: [
+              _TrialCountdownBanner(profile: data),
+              Expanded(
+                child: IndexedStack(
             index: _indexFor(_active),
             children: [
               _lazy(AppNav.home, () => const AdminHomePage()),
               _lazy(AppNav.dashboard, () => const ScorecardOverviewPage()),
               _lazy(AppNav.podQuality, () => const PodQualityOverviewPage()),
               _lazy(AppNav.concessions, () => const ConcessionsOverviewPage()),
+              _lazy(AppNav.cdf, () => const CdfOverviewPage()),
               _lazy(AppNav.drivers, () => const DriversHubPage()),
+              _lazy(AppNav.recruiting, () => const AdminRecruitingPage()),
               _lazy(AppNav.waveplan, () => const AdminWaveplanPage()),
               _lazy(AppNav.calendar, () => const AdminCalendarPage()),
               _lazy(AppNav.fleetStatus, () => const FleetStatusPage()),
@@ -221,6 +234,9 @@ class _AdminShellPageState extends State<AdminShellPage> {
               _lazy(AppNav.inventory, () => const AdminInventoryPage()),
               _lazy(AppNav.cart, () => const AdminCartPage()),
               _lazy(AppNav.shiftPlan, () => const AdminShiftPlanPage()),
+            ],
+                ),
+              ),
             ],
           ),
         );
@@ -252,48 +268,145 @@ class _AdminShellPageState extends State<AdminShellPage> {
         return 2;
       case AppNav.concessions:
         return 3;
-      case AppNav.drivers:
+      case AppNav.cdf:
         return 4;
-      case AppNav.waveplan:
+      case AppNav.drivers:
         return 5;
-      case AppNav.calendar:
+      case AppNav.recruiting:
         return 6;
-      case AppNav.fleetStatus:
+      case AppNav.waveplan:
         return 7;
-      case AppNav.tasks:
+      case AppNav.calendar:
         return 8;
-      case AppNav.shiftAbsence:
+      case AppNav.fleetStatus:
         return 9;
-      case AppNav.incidentReports:
+      case AppNav.tasks:
         return 10;
-      case AppNav.academy:
+      case AppNav.shiftAbsence:
         return 11;
-      case AppNav.dispatcherPill:
+      case AppNav.incidentReports:
         return 12;
-      case AppNav.notifications:
+      case AppNav.academy:
         return 13;
-      case AppNav.feedback:
+      case AppNav.dispatcherPill:
         return 14;
-      case AppNav.faqs:
+      case AppNav.notifications:
         return 15;
-      case AppNav.adminApprovals:
+      case AppNav.feedback:
         return 16;
-      case AppNav.dispatchers:
+      case AppNav.faqs:
         return 17;
-      case AppNav.profile:
+      case AppNav.adminApprovals:
         return 18;
-      case AppNav.styleguide:
+      case AppNav.dispatchers:
         return 19;
-      case AppNav.cotimer:
+      case AppNav.profile:
         return 20;
-      case AppNav.inventory:
+      case AppNav.styleguide:
         return 21;
-      case AppNav.cart:
+      case AppNav.cotimer:
         return 22;
-      case AppNav.shiftPlan:
+      case AppNav.inventory:
         return 23;
+      case AppNav.cart:
+        return 24;
+      case AppNav.shiftPlan:
+        return 25;
       default:
         return 0;
     }
+  }
+}
+
+/// Slim banner shown at the top of every admin page while the account
+/// is on the 30-day trial. Counts down the remaining days and shifts
+/// from green → amber → red as expiry approaches. Hidden entirely for
+/// non-trial (paid / dispatcher) accounts.
+class _TrialCountdownBanner extends StatelessWidget {
+  final Map<String, dynamic> profile;
+  const _TrialCountdownBanner({required this.profile});
+
+  @override
+  Widget build(BuildContext context) {
+    final plan = (profile['plan'] ?? '').toString();
+    final endsRaw = profile['trialEndsAt'];
+    if (plan != 'trial' || endsRaw is! Timestamp) {
+      return const SizedBox.shrink();
+    }
+
+    final endsAt = endsRaw.toDate();
+    final now = DateTime.now();
+    final remaining = endsAt.difference(now);
+
+    // Already expired → auth_gate handles the hard block; render nothing.
+    if (remaining.isNegative) return const SizedBox.shrink();
+
+    // Round partial days up so the last 24 h still read as "1 Tag".
+    final daysLeft = (remaining.inMinutes / (60 * 24)).ceil().clamp(1, 999);
+
+    // Colour escalation by urgency.
+    final Color accent;
+    final Color bg;
+    if (daysLeft <= 3) {
+      accent = const Color(0xFFB42318); // red-700
+      bg = const Color(0xFFFEF3F2); // red-50
+    } else if (daysLeft <= 7) {
+      accent = const Color(0xFFB54708); // amber-700
+      bg = const Color(0xFFFFFAEB); // amber-50
+    } else {
+      accent = const Color(0xFF067A55); // green-700 (readable on light bg)
+      bg = const Color(0xFFECFDF3); // green-50
+    }
+
+    final dayWord = daysLeft == 1 ? 'Tag' : 'Tage';
+
+    return Material(
+      color: bg,
+      child: SafeArea(
+        bottom: false,
+        child: Container(
+          width: double.infinity,
+          padding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: accent.withValues(alpha: 0.18)),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.timer_outlined, size: 18, color: accent),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 2,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      'Testversion',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: accent,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                    Text(
+                      '· Noch $daysLeft $dayWord',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: accent.withValues(alpha: 0.92),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
