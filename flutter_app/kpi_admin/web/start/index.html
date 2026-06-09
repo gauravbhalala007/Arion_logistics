@@ -146,8 +146,8 @@
     .hero-cta { display: flex; gap: 14px; justify-content: flex-start; margin-top: 34px; flex-wrap: wrap; }
     .hero-cta .btn { width: 220px; }
     .hero-visual { margin-top: 0; }
-    .hero-shot { max-width: 100%; margin: 0; border-radius: 28px; overflow: hidden; box-shadow: 0 50px 90px -55px rgba(0,0,0,0.35); }
-    .hero-shot img { width: 100%; height: auto; display: block; }
+    .hero-shot { max-width: 100%; margin: 0; }
+    .hero-shot img { width: 100%; height: auto; display: block; filter: drop-shadow(0 30px 50px rgba(0,0,0,0.16)); }
 
     /* ---------- Image placeholder ---------- */
     .ph {
@@ -310,7 +310,7 @@
         </div>
         <div class="hero-visual reveal" style="--d:240ms">
           <div class="hero-shot">
-            <img src="img/hero.png" width="1920" height="1920" alt="CoDriver App – Scorecard und Driver-Ansicht auf dem Smartphone" />
+            <img src="img/hero.png" width="853" height="692" alt="CoDriver App – Dashboard, Scorecard und Driver-Ansicht auf dem Smartphone" />
           </div>
         </div>
       </div>
@@ -336,7 +336,7 @@
         </div>
         <div class="visual reveal" style="--d:80ms">
           <div class="feature-shot">
-            <img src="img/scorecard-langs.png" width="1448" height="1181" loading="lazy" alt="CoDriver Scorecard in mehreren Sprachen – Deutsch, Albanisch und Arabisch" />
+            <img src="img/scorecard-langs.png" width="1381" height="1086" loading="lazy" alt="CoDriver Scorecard in mehreren Sprachen – Deutsch, Albanisch und Arabisch" />
           </div>
         </div>
       </div>
@@ -356,8 +356,8 @@
           </ul>
         </div>
         <div class="visual reveal" style="--d:80ms">
-          <div class="ph tall" role="img" aria-label="Platzhalter: Digitales Handbuch und FAQ">
-            <svg class="glyph" viewBox="0 0 24 24" fill="none"><path d="M4 5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M13 3v5h5M8 13h8M8 16h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <div class="feature-shot">
+            <img src="img/firmenregeln.png" width="998" height="1299" loading="lazy" alt="CoDriver Firmenregeln mit Lesebestätigung und PIN-Eingabe" />
           </div>
         </div>
       </div>
@@ -377,8 +377,8 @@
           </ul>
         </div>
         <div class="visual reveal" style="--d:80ms">
-          <div class="ph tall" role="img" aria-label="Platzhalter: Recruiting- und Onboarding-Formular">
-            <svg class="glyph" viewBox="0 0 24 24" fill="none"><rect x="4" y="3" width="16" height="18" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <div class="feature-shot">
+            <img src="img/recruiting.png" width="736" height="1368" loading="lazy" alt="CoDriver Recruiting- und Onboarding-Pipeline mit Bewerbern" />
           </div>
         </div>
       </div>
@@ -409,6 +409,27 @@
             <h3>Shiftplan &amp; Waveplan</h3>
             <p>Einfacher Upload, schnelle Planung. Schichten und Wellen in Minuten statt Stunden organisiert.</p>
             <div class="ph small square" role="img" aria-label="Platzhalter: Schichtplanung"><svg class="glyph" viewBox="0 0 24 24" fill="none"><path d="M12 3v9l5 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"/></svg></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- INVENTORY -->
+    <section id="inventory" class="band">
+      <div class="container feature-row reverse">
+        <div class="feature-copy copy reveal">
+          <span class="eyebrow">Inventory</span>
+          <h2 class="h2">Bestand im Griff — vom Sicherheitsschuh bis zum Ersatzteil.</h2>
+          <p>Arbeitskleidung und Fahrzeugteile zentral verwalten: anlegen, ausgeben, nachbestellen — jederzeit nachvollziehbar.</p>
+          <ul class="ul-check">
+            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Katalog mit Kategorien, Größen &amp; Lieferanten</li>
+            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Bestände &amp; Niedrigbestand-Warnungen auf einen Blick</li>
+            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Neue Artikel in Sekunden angelegt</li>
+          </ul>
+        </div>
+        <div class="visual reveal" style="--d:80ms">
+          <div class="feature-shot">
+            <img src="img/inventory.png" width="750" height="971" loading="lazy" alt="CoDriver Inventory Tool – Bestand und neuer Artikel" />
           </div>
         </div>
       </div>
