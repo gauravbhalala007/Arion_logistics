@@ -30,8 +30,44 @@
 
   <title>DSP CODRIVER — Operations-Plattform für DSPs</title>
   <link rel="manifest" href="manifest.json">
+  <style>
+    #app-loading {
+      position: fixed; inset: 0; z-index: 9999;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 22px; background: #F3F6F7;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      transition: opacity .35s ease;
+    }
+    #app-loading img { width: 64px; height: 64px; object-fit: contain; }
+    #app-loading .sp {
+      width: 34px; height: 34px; border: 3px solid #dbe3e3; border-top-color: #00B287;
+      border-radius: 50%; animation: codriver-spin .8s linear infinite;
+    }
+    #app-loading .tx { color: #6B7280; font-size: 14px; font-weight: 600; letter-spacing: .01em; }
+    @keyframes codriver-spin { to { transform: rotate(360deg); } }
+  </style>
 </head>
 <body>
+  <div id="app-loading">
+    <img src="codriver-mark.png" alt="CoDriver" />
+    <div class="sp"></div>
+    <div class="tx">CoDriver wird geladen …</div>
+  </div>
+  <script>
+    // Branded loading screen entfernen, sobald Flutter den ersten Frame
+    // rendert (sonst sähe der Nutzer waehrend des Downloads nur Weiss).
+    (function () {
+      function hide() {
+        var el = document.getElementById('app-loading');
+        if (!el) return;
+        el.style.opacity = '0';
+        setTimeout(function () { if (el && el.parentNode) el.parentNode.removeChild(el); }, 400);
+      }
+      window.addEventListener('flutter-first-frame', hide);
+      // Fallback, falls das Event nicht feuert.
+      setTimeout(hide, 25000);
+    })();
+  </script>
   <script>
     // Kein Service Worker (Build mit --pwa-strategy=none). Bestehende SWs
     // und Caches früherer Versionen sofort entfernen, damit neue Deploys
