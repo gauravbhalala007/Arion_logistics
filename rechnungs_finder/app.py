@@ -25,7 +25,13 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from imap_client import MailboxConfig, fetch_pdf_attachments
-from matcher import Match, match_transactions, target_filename
+from matcher import (
+    Match,
+    folder_for,
+    match_transactions,
+    relative_target_path,
+    target_filename,
+)
 from statement_parser import Transaction, parse_statement
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -106,7 +112,6 @@ def output_directory(config: dict) -> Path:
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
     config = load_config()
-    debits = [t for t in state.transactions if t.is_debit]
     return templates.TemplateResponse(
         request,
         "index.html",
@@ -115,10 +120,13 @@ def index(request: Request):
             "mailboxes": [m.name for m in mailboxes_from_config(config)] if config else [],
             "output_dir": str(output_directory(config)),
             "state": state,
-            "debits": debits,
+            "transactions": state.transactions,
+            "ausgaben": [t for t in state.transactions if t.is_debit],
+            "einnahmen": [t for t in state.transactions if not t.is_debit],
             "confident": [m for m in state.matches if m.confident],
             "uncertain": [m for m in state.matches if not m.confident],
             "target_filename": target_filename,
+            "folder_for": folder_for,
         },
     )
 
@@ -133,11 +141,8 @@ async def upload_statement(file: UploadFile = File(...)):
     except Exception as exc:
         state.errors.append(f"Kontoauszug konnte nicht gelesen werden: {exc}")
         return RedirectResponse("/", status_code=303)
-    debits = [t for t in state.transactions if t.is_debit]
-    if not debits:
-        state.errors.append(
-            "Es wurden keine Abbuchungen (negative Beträge) im Auszug gefunden."
-        )
+    if not state.transactions:
+        state.errors.append("Es wurden keine Buchungen im Auszug gefunden.")
     return RedirectResponse("/", status_code=303)
 
 
@@ -145,12 +150,12 @@ def _run_search() -> None:
     config = load_config()
     mailboxes = mailboxes_from_config(config)
     days_before, days_after, min_score = search_settings(config)
-    debits = [t for t in state.transactions if t.is_debit]
+    transactions = state.transactions
 
     try:
-        earliest = min(t.booking_date for t in debits) - timedelta(days=days_before)
+        earliest = min(t.booking_date for t in transactions) - timedelta(days=days_before)
         latest = min(
-            max(t.booking_date for t in debits) + timedelta(days=days_after + 1),
+            max(t.booking_date for t in transactions) + timedelta(days=days_after + 1),
             date.today() + timedelta(days=1),
         )
         attachments = []
@@ -166,10 +171,10 @@ def _run_search() -> None:
                 state.errors.append(f"Postfach „{mailbox.name}“: {exc}")
 
         state.log_progress(
-            f"Lese {len(attachments)} PDFs und ordne {len(debits)} Abbuchungen zu …"
+            f"Lese {len(attachments)} PDFs und ordne {len(transactions)} Buchungen zu …"
         )
         matches, unmatched = match_transactions(
-            debits, attachments, days_before, days_after, min_score
+            transactions, attachments, days_before, days_after, min_score
         )
         with state.lock:
             state.matches = matches
@@ -196,8 +201,8 @@ def start_search():
             "config.yaml kopieren und ausfüllen."
         )
         return RedirectResponse("/", status_code=303)
-    if not [t for t in state.transactions if t.is_debit]:
-        state.errors.append("Bitte zuerst einen Kontoauszug mit Abbuchungen hochladen.")
+    if not state.transactions:
+        state.errors.append("Bitte zuerst einen Kontoauszug hochladen.")
         return RedirectResponse("/", status_code=303)
     if state.search_running:
         return RedirectResponse("/", status_code=303)
@@ -229,25 +234,29 @@ def save_results():
     out_dir.mkdir(parents=True, exist_ok=True)
 
     rows = []
-    used_names: set[str] = set()
+    used_paths: set[str] = set()
     for match in state.matches:
-        name = target_filename(match)
-        stem, suffix = name.rsplit(".", 1)
+        # Ablage: <ausgabeordner>/<JJJJ-MM>/<Ausgaben|Einnahmen>/<datei>.pdf
+        rel_path = relative_target_path(match)
+        stem, suffix = rel_path.rsplit(".", 1)
         counter = 2
-        while name in used_names:
-            name = f"{stem}_{counter}.{suffix}"
+        while rel_path in used_paths:
+            rel_path = f"{stem}_{counter}.{suffix}"
             counter += 1
-        used_names.add(name)
-        (out_dir / name).write_bytes(match.attachment.data)
+        used_paths.add(rel_path)
+        target = out_dir / rel_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(match.attachment.data)
         tx = match.transaction
         rows.append({
             "Buchungsdatum": tx.booking_date.isoformat(),
+            "Art": "Ausgabe" if tx.is_debit else "Einnahme",
             "Betrag": f"{tx.amount:.2f}".replace(".", ","),
             "Empfänger": tx.counterparty,
             "Verwendungszweck": tx.purpose,
             "Status": "sicher" if match.confident else "unsicher – bitte prüfen",
             "Punkte": match.score,
-            "Datei": name,
+            "Datei": rel_path,
             "Postfach": match.attachment.mailbox_name,
             "Mail-Absender": match.attachment.sender_address,
             "Mail-Betreff": match.attachment.subject,
@@ -256,6 +265,7 @@ def save_results():
     for tx in state.unmatched:
         rows.append({
             "Buchungsdatum": tx.booking_date.isoformat(),
+            "Art": "Ausgabe" if tx.is_debit else "Einnahme",
             "Betrag": f"{tx.amount:.2f}".replace(".", ","),
             "Empfänger": tx.counterparty,
             "Verwendungszweck": tx.purpose,
@@ -267,6 +277,7 @@ def save_results():
             "Mail-Betreff": "",
             "Mail-Datum": "",
         })
+    rows.sort(key=lambda r: (r["Buchungsdatum"], r["Art"]))
 
     csv_path = out_dir / "zuordnung.csv"
     with csv_path.open("w", newline="", encoding="utf-8-sig") as fh:

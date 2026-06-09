@@ -18,9 +18,25 @@ Zuordnungstabelle, welche Abbuchung zu welcher Datei gehört und wo noch Belege 
    - Maildatum liegt nah am Buchungsdatum (bis +10)
 
    Ab 60 Punkten gilt ein Treffer als „sicher“, darunter als „bitte prüfen“.
-3. **Speichern** — alle PDFs landen flach im Ausgabeordner mit sprechendem Namen
-   (`2026-05-12_Amazon_-49,99EUR.pdf`) plus `zuordnung.csv` (Excel-kompatibel, Semikolon,
-   UTF-8-BOM) mit allen Treffern **und** den Abbuchungen ohne Beleg.
+3. **Speichern** — die PDFs werden **pro Monat in Ordner sortiert, getrennt nach
+   Ausgaben und Einnahmen**, mit sprechendem Dateinamen:
+
+   ```
+   belege/
+   ├── 2026-05/
+   │   ├── Ausgaben/
+   │   │   └── 2026-05-12_Amazon_-49,99EUR.pdf
+   │   └── Einnahmen/
+   │       └── 2026-05-20_Kunde_GmbH_1500,00EUR.pdf
+   ├── 2026-06/
+   │   └── …
+   └── zuordnung.csv
+   ```
+
+   Die `zuordnung.csv` (Excel-kompatibel, Semikolon, UTF-8-BOM) listet alle Treffer
+   mit Pfad **und** die Buchungen ohne Beleg, sortiert nach Datum.
+   Es werden Belege für beide Richtungen gesucht: Abbuchungen (Eingangsrechnungen)
+   und Gutschriften (z. B. deine Ausgangsrechnungen an Kunden).
 
 ## Einrichtung
 

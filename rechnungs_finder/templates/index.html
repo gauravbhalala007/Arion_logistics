@@ -97,12 +97,9 @@
     {% if state.statement_name %}
       <p class="muted" style="margin-bottom:0">
         Eingelesen: <strong>{{ state.statement_name }}</strong> —
-        {{ state.transactions|length }} Buchungen, davon
-        <strong>{{ debits|length }} Abbuchungen</strong>
-        {% if debits %}
-          ({{ debits[-1].booking_date.strftime('%d.%m.%Y') }} bis
-          {{ debits[0].booking_date.strftime('%d.%m.%Y') }})
-        {% endif %}
+        {{ state.transactions|length }} Buchungen:
+        <strong>{{ ausgaben|length }} Ausgaben</strong> und
+        <strong>{{ einnahmen|length }} Einnahmen</strong>
       </p>
     {% else %}
       <p class="muted" style="margin-bottom:0">CSV-Export der Bank empfohlen. PDF-Ausz&uuml;ge werden nach bestem Bem&uuml;hen gelesen.</p>
@@ -117,7 +114,7 @@
       </p>
     {% endif %}
     <form action="/search" method="post">
-      <button type="submit" {% if state.search_running or not debits %}disabled{% endif %}>
+      <button type="submit" {% if state.search_running or not transactions %}disabled{% endif %}>
         {% if state.search_running %}Suche l&auml;uft &hellip;{% else %}Suche starten{% endif %}
       </button>
     </form>
@@ -142,7 +139,7 @@
     <table>
       <tr>
         <th>Buchung</th><th>Empf&auml;nger / Zweck</th><th class="num">Betrag</th>
-        <th>Beleg (PDF)</th><th>Begr&uuml;ndung</th><th>Status</th>
+        <th>Beleg (PDF)</th><th>Ablage</th><th>Begr&uuml;ndung</th><th>Status</th>
       </tr>
       {% for m in state.matches %}
       <tr>
@@ -156,6 +153,7 @@
           <a href="/pdf/{{ loop.index0 }}" target="_blank">{{ m.attachment.filename }}</a><br>
           <span class="muted">{{ m.attachment.mailbox_name }} · {{ m.attachment.sender_address }}</span>
         </td>
+        <td><code>{{ folder_for(m.transaction) }}/</code></td>
         <td class="muted">{{ m.reasons|join(', ') }}</td>
         <td>
           {% if m.confident %}<span class="pill ok">sicher ({{ m.score }})</span>
@@ -167,7 +165,7 @@
     {% endif %}
 
     {% if state.unmatched %}
-      <h3 style="margin:20px 0 8px; font-size:15px">Abbuchungen ohne Beleg</h3>
+      <h3 style="margin:20px 0 8px; font-size:15px">Buchungen ohne Beleg</h3>
       <table>
         <tr><th>Buchung</th><th>Empf&auml;nger / Zweck</th><th class="num">Betrag</th><th></th></tr>
         {% for tx in state.unmatched %}

@@ -111,14 +111,15 @@ def score_pair(tx: Transaction, att: PdfAttachment, days_before: int, days_after
 
 
 def match_transactions(
-    debits: list[Transaction],
+    transactions: list[Transaction],
     attachments: list[PdfAttachment],
     days_before: int,
     days_after: int,
     min_score: int,
 ) -> tuple[list[Match], list[Transaction]]:
-    """Beste Zuordnung je Abbuchung. Ein PDF darf mehrere Abbuchungen
-    abdecken (z. B. Sammelrechnung), bevorzugt wird aber 1:1."""
+    """Beste Zuordnung je Buchung (Abbuchungen UND Gutschriften).
+    Ein PDF darf mehrere Buchungen abdecken (z. B. Sammelrechnung),
+    bevorzugt wird aber 1:1."""
     for att in attachments:
         if not att.text:
             att.text = extract_pdf_text(att.data)
@@ -127,7 +128,7 @@ def match_transactions(
     unmatched: list[Transaction] = []
     used_attachments: set[int] = set()
 
-    for tx in debits:
+    for tx in transactions:
         candidates: list[tuple[int, list[str], int, PdfAttachment]] = []
         for idx, att in enumerate(attachments):
             score, reasons = score_pair(tx, att, days_before, days_after)
@@ -163,3 +164,15 @@ def target_filename(match: Match) -> str:
     vendor = safe_filename(tx.counterparty or match.attachment.sender_name or "unbekannt", 40)
     amount = f"{tx.amount:.2f}".replace(".", ",")
     return f"{tx.booking_date.isoformat()}_{vendor}_{amount}EUR.pdf"
+
+
+def folder_for(tx: Transaction) -> str:
+    """Ablage-Unterordner: ein Ordner pro Monat, getrennt nach Richtung,
+    z. B. '2026-05/Ausgaben' oder '2026-05/Einnahmen'."""
+    month = tx.booking_date.strftime("%Y-%m")
+    kind = "Ausgaben" if tx.amount < 0 else "Einnahmen"
+    return f"{month}/{kind}"
+
+
+def relative_target_path(match: Match) -> str:
+    return f"{folder_for(match.transaction)}/{target_filename(match)}"
