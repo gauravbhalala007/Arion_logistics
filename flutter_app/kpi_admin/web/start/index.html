@@ -263,6 +263,9 @@
       .feature-row.reverse .copy { order: 0; }
       .bento { grid-template-columns: 1fr; }
       .stats { grid-template-columns: repeat(2, 1fr); gap: 36px 20px; }
+      /* Mobile: Sprachpills als 3er-Grid */
+      .langs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-width: 100%; }
+      .lang { width: auto; justify-content: center; gap: 6px; padding: 7px 8px; font-size: 12px; }
     }
     @media (max-width: 460px) {
       .container { padding: 0 20px; }
