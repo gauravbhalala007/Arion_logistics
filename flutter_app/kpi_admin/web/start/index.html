@@ -86,6 +86,17 @@
     }
     .wa-card h2 { font-size: clamp(26px, 3.6vw, 40px); margin-bottom: 14px; }
     .wa-card p { font-size: clamp(16px, 1.5vw, 19px); color: var(--muted); max-width: 480px; margin: 0 auto 28px; line-height: 1.5; }
+    /* ---------- Feedback (prominent) ---------- */
+    .fb-card {
+      max-width: 860px; margin: 0 auto; text-align: center; color: #fff;
+      background: radial-gradient(85% 130% at 50% 0%, #0ba368 0%, #066b43 72%);
+      border-radius: 32px; padding: clamp(44px, 6vw, 76px) clamp(24px, 5vw, 56px);
+      box-shadow: 0 44px 90px -45px rgba(10,143,91,0.55);
+    }
+    .fb-icon { width: 66px; height: 66px; border-radius: 20px; margin: 0 auto 22px; display: grid; place-items: center; background: rgba(255,255,255,0.16); color: #fff; }
+    .fb-icon svg { width: 32px; height: 32px; }
+    .fb-card h2 { font-size: clamp(28px, 3.8vw, 46px); margin-bottom: 16px; color: #fff; }
+    .fb-card p { font-size: clamp(16px, 1.6vw, 20px); color: rgba(255,255,255,0.92); max-width: 580px; margin: 0 auto; line-height: 1.55; }
     /* ---------- Testimonials ---------- */
     .tgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
     .tcard { background: #fff; border: 1px solid var(--line); border-radius: 22px; padding: 26px; display: flex; flex-direction: column; }
@@ -121,7 +132,7 @@
     .price-note { font-size: 13px; color: var(--faint); margin: 8px auto 26px; line-height: 1.45; max-width: 320px; }
     .price-features { list-style: none; text-align: left; display: grid; gap: 13px; margin: 0 0 28px; padding: 0; }
     .price-features li { display: flex; gap: 11px; align-items: flex-start; font-size: 15px; color: var(--text); }
-    .price-features svg { width: 20px; height: 20px; color: var(--green); flex-shrink: 0; margin-top: 1px; }
+    .price-features svg { width: 24px; height: 24px; color: var(--green); flex-shrink: 0; margin-top: 0; }
     .price-card .btn { width: 100%; }
     .price-fine { font-size: 12.5px; color: var(--faint); margin-top: 14px; line-height: 1.45; }
     .btn-text { color: var(--green-text); font-weight: 600; padding: 0; background: none; }
@@ -189,7 +200,7 @@
     .feature-copy .more { margin-top: 26px; display: inline-flex; align-items: center; gap: 8px; transition: gap .2s var(--ease); }
     .ul-check { list-style: none; margin-top: 22px; display: grid; gap: 13px; }
     .ul-check li { display: flex; gap: 12px; align-items: flex-start; color: var(--text); font-size: 16.5px; }
-    .ul-check svg { width: 21px; height: 21px; color: var(--green); flex: none; margin-top: 1px; }
+    .ul-check svg { width: 26px; height: 26px; color: var(--green); flex: none; margin-top: 0; }
 
     /* section tinted band */
     .band { background: var(--bg-alt); }
@@ -473,7 +484,7 @@
           <div class="card reveal" style="--d:120ms">
             <div class="ico"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M3 9h18M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
             <h3>Kalender &amp; Termine</h3>
-            <p>Mietfahrzeuge, Abholungen und alle Termine an einem Ort — übersichtlich im Monatskalender mit Detail-Liste.</p>
+            <p>Mietfahrzeuge, Abholungen und alle Termine an einem Ort — übersichtlich im Monatskalender mit KW-Darstellung und Detail-Liste.</p>
             <div class="card-shot"><img src="img/kalender.png" width="625" height="1161" loading="lazy" alt="CoDriver Kalender mit Terminen" /></div>
           </div>
           <div class="card reveal" style="--d:160ms">
@@ -633,6 +644,19 @@
           <p>Echte Bewertungen aus der Community.</p>
         </div>
         <div class="tgrid" id="tgrid"></div>
+      </div>
+    </section>
+
+    <!-- FEEDBACK -->
+    <section id="feedback">
+      <div class="container">
+        <div class="fb-card reveal">
+          <div class="fb-icon">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 12a8 8 0 01-11.6 7.1L4 20l1-4.4A8 8 0 1121 12z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 7.5l1.2 2.5 2.8.3-2 1.9.5 2.8-2.5-1.4-2.5 1.4.5-2.8-2-1.9 2.8-.3L12 7.5z" fill="currentColor"/></svg>
+          </div>
+          <h2>Deine Ideen formen CoDriver.</h2>
+          <p>In der App selbst findet ihr eine Feedback-Section, in der ihr Verbesserungen, Ideen und Wünsche eintragen könnt. Unser Team setzt das schnell um.</p>
+        </div>
       </div>
     </section>
 
