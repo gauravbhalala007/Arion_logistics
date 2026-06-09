@@ -136,7 +136,14 @@
     .lead { font-size: clamp(18px, 1.7vw, 23px); color: var(--muted); font-weight: 400; letter-spacing: -0.015em; line-height: 1.4; }
 
     /* ---------- Hero ---------- */
-    .hero { padding: clamp(56px, 8vw, 110px) 0; }
+    .hero { padding: clamp(56px, 8vw, 110px) 0; position: relative; }
+    .hero::before {
+      content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+      background:
+        radial-gradient(52% 46% at 74% 16%, rgba(10,143,91,0.13), transparent 70%),
+        radial-gradient(44% 40% at 12% 4%, rgba(10,143,91,0.07), transparent 70%);
+    }
+    .hero .container { position: relative; z-index: 1; }
     .hero-grid { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: clamp(32px, 5vw, 64px); align-items: center; }
     .hero-copy { text-align: left; }
     .hero .eyebrow { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 980px; background: var(--green-soft); margin-bottom: 22px; }
@@ -186,6 +193,28 @@
 
     /* section tinted band */
     .band { background: var(--bg-alt); }
+    /* ---------- Section themes (contrast / wow) ---------- */
+    .dark {
+      background:
+        radial-gradient(70% 60% at 82% 0%, rgba(16,185,129,0.16), transparent 62%),
+        radial-gradient(55% 50% at 8% 100%, rgba(16,185,129,0.10), transparent 60%),
+        #0B1220;
+      color: #fff;
+    }
+    .dark h2, .dark h3, .dark .h2 { color: #fff; }
+    .dark p { color: #9aa3b2; }
+    .dark .eyebrow, .dark .feature-copy .eyebrow { color: #34d399; }
+    .dark .lang { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.16); color: #e8edf3; }
+    .dark .lang.active { background: var(--green); border-color: var(--green); color: #fff; }
+    .section-green {
+      background: linear-gradient(135deg, #0a8f5b 0%, #066b43 100%);
+      color: #fff;
+    }
+    .section-green .grid-head h2, .section-green h2 { color: #fff; }
+    .section-green .grid-head p, .section-green p { color: rgba(255,255,255,0.85); }
+    .section-green .eyebrow { color: rgba(255,255,255,0.92); }
+    .section-green .stat .n, .section-green .stat .n b { color: #fff; }
+    .section-green .stat .l { color: rgba(255,255,255,0.85); }
 
     /* language chips with round flags */
     .langs { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; max-width: 460px; }
@@ -241,6 +270,10 @@
     .cta { text-align: center; }
     .cta h2 { font-size: clamp(34px, 5vw, 60px); margin-bottom: 18px; }
     .cta p { font-size: 20px; color: var(--muted); max-width: 540px; margin: 0 auto 34px; }
+    .cta.dark h2 { color: #fff; }
+    .cta.dark p { color: #aab2c0; }
+    .cta.dark .btn-ghost { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.28); color: #fff; }
+    .cta.dark .btn-ghost:hover { border-color: #fff; background: rgba(255,255,255,0.14); }
 
     /* ---------- Footer ---------- */
     footer { border-top: 1px solid var(--line); padding: 56px 0 44px; background: var(--bg-soft); }
@@ -336,7 +369,7 @@
     </section>
 
     <!-- FLAGSHIP: SCORECARD -->
-    <section id="scorecard" class="band">
+    <section id="scorecard" class="dark">
       <div class="container feature-row">
         <div class="feature-copy copy reveal">
           <span class="eyebrow">Das Herzstück</span>
@@ -405,7 +438,7 @@
     </section>
 
     <!-- BENTO: weitere Funktionen -->
-    <section id="features">
+    <section id="features" class="band">
       <div class="container">
         <div class="grid-head reveal">
           <h2 class="h2">Alles, was dein Team braucht.</h2>
@@ -441,7 +474,7 @@
     </section>
 
     <!-- INVENTORY -->
-    <section id="inventory" class="band">
+    <section id="inventory">
       <div class="container feature-row reverse">
         <div class="feature-copy copy reveal">
           <span class="eyebrow">Inventory</span>
@@ -505,7 +538,7 @@
     </section>
 
     <!-- STATS / VORTEILE -->
-    <section id="vorteile" class="band">
+    <section id="vorteile" class="section-green">
       <div class="container">
         <div class="stats">
           <div class="stat reveal"><div class="n"><b>9</b></div><div class="l">Sprachen für die Scorecard</div></div>
@@ -582,7 +615,7 @@
     </section>
 
     <!-- CTA -->
-    <section class="cta">
+    <section class="cta dark">
       <div class="container reveal">
         <h2>Bring dein Team<br>auf das nächste Level.</h2>
         <p>Starte direkt in der App — oder melde dich für eine kurze Einführung.</p>
