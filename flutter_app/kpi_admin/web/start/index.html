@@ -223,6 +223,10 @@
     .lang.active { border-color: var(--green); background: var(--green-soft); color: var(--green-text); font-weight: 600; }
     .scorecard-screen { width: 100%; max-width: 300px; margin: 0 auto; border-radius: 30px; overflow: hidden; background: #fff; border: 1px solid var(--line); box-shadow: 0 40px 80px -45px rgba(0,0,0,0.4); }
     .scorecard-screen img { width: 100%; height: auto; display: block; transition: opacity .25s ease; }
+    .sc-grid { display: grid; column-gap: clamp(32px, 5vw, 64px); row-gap: 0; grid-template-columns: 1.05fr 0.95fr; align-items: start; grid-template-areas: "copy visual" "langs visual"; }
+    .sc-copy { grid-area: copy; }
+    .sc-langs { grid-area: langs; }
+    .sc-visual { grid-area: visual; align-self: center; }
     .flag { width: 24px; height: 24px; min-width: 24px; min-height: 24px; border-radius: 50%; overflow: hidden; flex: none; display: inline-block; background-size: 116%; background-position: center; background-repeat: no-repeat; border: 1px solid rgba(0,0,0,0.16); box-shadow: 0 1px 2px rgba(0,0,0,0.12); }
 
     /* footer logos */
@@ -311,6 +315,12 @@
       /* Mobile: Sprachpills als 3er-Grid */
       .langs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-width: 100%; }
       .lang { width: auto; justify-content: center; gap: 6px; padding: 7px 8px; font-size: 12px; }
+      /* Mobile Herzstück: Text oben, dann Flaggen (1er-Grid) links + Bild rechts */
+      .sc-grid { grid-template-columns: auto 1fr; column-gap: 14px; row-gap: 18px; align-items: start; grid-template-areas: "copy copy" "langs visual"; }
+      .sc-langs.langs { grid-template-columns: 1fr; gap: 8px; margin-top: 0; max-width: none; align-self: start; }
+      .sc-langs .lang { width: 100%; justify-content: flex-start; padding: 7px 10px; }
+      .sc-visual { align-self: start; }
+      .sc-visual .scorecard-screen { max-width: 100%; margin: 0; }
     }
     @media (max-width: 460px) {
       .container { padding: 0 20px; }
@@ -370,24 +380,24 @@
 
     <!-- FLAGSHIP: SCORECARD -->
     <section id="scorecard" class="dark">
-      <div class="container feature-row">
-        <div class="feature-copy copy reveal">
+      <div class="container sc-grid">
+        <div class="sc-copy reveal">
           <span class="eyebrow">Das Herzstück</span>
           <h2 class="h2">Die Scorecard. Endlich verständlich. In 9&nbsp;Sprachen.</h2>
           <p>Jedes Ergebnis und jede Kennzahl — klar erklärt, in der Sprache deiner Fahrer. Tippe eine Sprache an und sieh, wie die Scorecard aussieht.</p>
-          <div class="langs" id="scLangs">
-            <button type="button" class="lang active" data-lang="de"><span class="flag" style="background-image:url('flags/de.svg')" role="img" aria-label="Deutschland"></span>Deutsch</button>
-            <button type="button" class="lang" data-lang="en"><span class="flag" style="background-image:url('flags/gb.svg')" role="img" aria-label="Vereinigtes Königreich"></span>English</button>
-            <button type="button" class="lang" data-lang="sq"><span class="flag" style="background-image:url('flags/al.svg')" role="img" aria-label="Albanien"></span>Shqip</button>
-            <button type="button" class="lang" data-lang="hu"><span class="flag" style="background-image:url('flags/hu.svg')" role="img" aria-label="Ungarn"></span>Magyar</button>
-            <button type="button" class="lang" data-lang="ro"><span class="flag" style="background-image:url('flags/ro.svg')" role="img" aria-label="Rumänien"></span>Română</button>
-            <button type="button" class="lang" data-lang="hr"><span class="flag" style="background-image:url('flags/hr.svg')" role="img" aria-label="Kroatien"></span>Hrvatski</button>
-            <button type="button" class="lang" data-lang="ar"><span class="flag" style="background-image:url('flags/sy.svg')" role="img" aria-label="Syrien"></span>العربية</button>
-            <button type="button" class="lang" data-lang="tr"><span class="flag" style="background-image:url('flags/tr.svg')" role="img" aria-label="Türkei"></span>Türkçe</button>
-            <button type="button" class="lang" data-lang="ru"><span class="flag" style="background-image:url('flags/ru.svg')" role="img" aria-label="Russland"></span>Русский</button>
-          </div>
         </div>
-        <div class="visual reveal" style="--d:80ms">
+        <div class="langs sc-langs reveal" id="scLangs">
+          <button type="button" class="lang active" data-lang="de"><span class="flag" style="background-image:url('flags/de.svg')" role="img" aria-label="Deutschland"></span>Deutsch</button>
+          <button type="button" class="lang" data-lang="en"><span class="flag" style="background-image:url('flags/gb.svg')" role="img" aria-label="Vereinigtes Königreich"></span>English</button>
+          <button type="button" class="lang" data-lang="sq"><span class="flag" style="background-image:url('flags/al.svg')" role="img" aria-label="Albanien"></span>Shqip</button>
+          <button type="button" class="lang" data-lang="hu"><span class="flag" style="background-image:url('flags/hu.svg')" role="img" aria-label="Ungarn"></span>Magyar</button>
+          <button type="button" class="lang" data-lang="ro"><span class="flag" style="background-image:url('flags/ro.svg')" role="img" aria-label="Rumänien"></span>Română</button>
+          <button type="button" class="lang" data-lang="hr"><span class="flag" style="background-image:url('flags/hr.svg')" role="img" aria-label="Kroatien"></span>Hrvatski</button>
+          <button type="button" class="lang" data-lang="ar"><span class="flag" style="background-image:url('flags/sy.svg')" role="img" aria-label="Syrien"></span>العربية</button>
+          <button type="button" class="lang" data-lang="tr"><span class="flag" style="background-image:url('flags/tr.svg')" role="img" aria-label="Türkei"></span>Türkçe</button>
+          <button type="button" class="lang" data-lang="ru"><span class="flag" style="background-image:url('flags/ru.svg')" role="img" aria-label="Russland"></span>Русский</button>
+        </div>
+        <div class="sc-visual reveal" style="--d:80ms">
           <div class="scorecard-screen">
             <img id="scorecardShot" src="img/scorecard/de.png" width="680" height="1477" loading="lazy" alt="CoDriver Scorecard auf Deutsch" />
           </div>
