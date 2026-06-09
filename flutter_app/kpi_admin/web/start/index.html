@@ -165,8 +165,8 @@
     .ph .glyph { width: 64px; height: 64px; color: #c7c7cc; }
     .ph.wide { aspect-ratio: 16 / 9; }
     .ph.tall { aspect-ratio: 4 / 3; }
-    .feature-shot { width: 100%; display: block; }
-    .feature-shot img { width: 100%; height: auto; display: block; filter: drop-shadow(0 26px 44px rgba(0,0,0,0.16)); }
+    .feature-shot { width: 100%; display: block; background: #fff; border: 1px solid var(--line); border-radius: 28px; padding: clamp(22px, 3vw, 40px); box-shadow: 0 30px 70px -45px rgba(0,0,0,0.25); }
+    .feature-shot img { width: 100%; height: auto; display: block; filter: drop-shadow(0 16px 28px rgba(0,0,0,0.10)); }
     .ph.square { aspect-ratio: 1 / 1; }
     .ph.small { border-radius: 18px; }
     .ph.small .glyph { width: 40px; height: 40px; }
@@ -220,6 +220,16 @@
     .card h3 { font-size: 22px; margin-bottom: 10px; letter-spacing: -0.03em; }
     .card p { color: var(--muted); font-size: 15.5px; line-height: 1.5; margin-bottom: 22px; }
     .card .ph { margin-top: auto; }
+    /* ---------- Coming soon / Roadmap ---------- */
+    .soon { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .soon-card { background: #fff; border: 1px dashed var(--line-2); border-radius: 24px; padding: 28px; display: flex; flex-direction: column; transition: border-color .3s ease, transform .35s var(--ease); }
+    .soon-card:hover { transform: translateY(-4px); border-color: var(--green); }
+    .soon-card .ico { width: 48px; height: 48px; border-radius: 14px; background: var(--bg-alt); display: grid; place-items: center; color: var(--muted); margin-bottom: 18px; }
+    .soon-card .ico svg { width: 24px; height: 24px; }
+    .soon-badge { align-self: flex-start; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--green-text); background: var(--green-soft); padding: 5px 11px; border-radius: 980px; margin-bottom: 16px; }
+    .soon-card h3 { font-size: 19px; margin-bottom: 9px; letter-spacing: -0.025em; }
+    .soon-card p { color: var(--muted); font-size: 15px; line-height: 1.5; }
+    @media (max-width: 860px) { .soon { grid-template-columns: 1fr; } }
 
     /* ---------- Stats ---------- */
     .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 28px; text-align: center; }
@@ -360,9 +370,9 @@
           <h2 class="h2">Regeln kennen. Vom ersten Tag an.</h2>
           <p>Neue Mitarbeiter bekommen ein digitales Handbuch und eine FAQ — verständlich aufbereitet, immer griffbereit.</p>
           <ul class="ul-check">
-            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Unternehmensregeln &amp; Abläufe digital erklärt</li>
-            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>FAQ zu Unternehmensgewinn &amp; Amazon-Lieferbedingungen</li>
-            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Schnelleres, sichereres Onboarding</li>
+            <li><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22 5.18 10.59 16.6l-4.24-4.24 1.41-1.41 2.83 2.83 10-10L22 5.18Zm-2.21 5.04c.13.57.21 1.17.21 1.78 0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8c1.58 0 3.04.46 4.28 1.25l1.44-1.44C16.1 2.67 14.13 2 12 2 6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10c0-1.19-.22-2.33-.6-3.39l-1.61 1.61z"/></svg>Unternehmensregeln &amp; Abläufe digital erklärt</li>
+            <li><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22 5.18 10.59 16.6l-4.24-4.24 1.41-1.41 2.83 2.83 10-10L22 5.18Zm-2.21 5.04c.13.57.21 1.17.21 1.78 0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8c1.58 0 3.04.46 4.28 1.25l1.44-1.44C16.1 2.67 14.13 2 12 2 6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10c0-1.19-.22-2.33-.6-3.39l-1.61 1.61z"/></svg>FAQ zu Unternehmensgewinn &amp; Amazon-Lieferbedingungen</li>
+            <li><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22 5.18 10.59 16.6l-4.24-4.24 1.41-1.41 2.83 2.83 10-10L22 5.18Zm-2.21 5.04c.13.57.21 1.17.21 1.78 0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8c1.58 0 3.04.46 4.28 1.25l1.44-1.44C16.1 2.67 14.13 2 12 2 6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10c0-1.19-.22-2.33-.6-3.39l-1.61 1.61z"/></svg>Schnelleres, sichereres Onboarding</li>
           </ul>
         </div>
         <div class="visual reveal" style="--d:80ms">
@@ -381,9 +391,9 @@
           <h2 class="h2">Von der Bewerbung bis zum einsatzbereiten Fahrer.</h2>
           <p>Intuitive Formulare per Link, die alle Daten fürs Onboarding direkt mitliefern — auch für internationale Fahrer.</p>
           <ul class="ul-check">
-            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Geführte Formulare — alle Onboarding-Daten &amp; Dokumente in einem Schritt</li>
-            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Auch für internationale Fahrer: Arbeitserlaubnis-Daten, z. B. Westbalkanregelung</li>
-            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Dokumente &amp; Fristen zentral — Warnung, bevor etwas abläuft</li>
+            <li><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22 5.18 10.59 16.6l-4.24-4.24 1.41-1.41 2.83 2.83 10-10L22 5.18Zm-2.21 5.04c.13.57.21 1.17.21 1.78 0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8c1.58 0 3.04.46 4.28 1.25l1.44-1.44C16.1 2.67 14.13 2 12 2 6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10c0-1.19-.22-2.33-.6-3.39l-1.61 1.61z"/></svg>Geführte Formulare — alle Onboarding-Daten &amp; Dokumente in einem Schritt</li>
+            <li><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22 5.18 10.59 16.6l-4.24-4.24 1.41-1.41 2.83 2.83 10-10L22 5.18Zm-2.21 5.04c.13.57.21 1.17.21 1.78 0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8c1.58 0 3.04.46 4.28 1.25l1.44-1.44C16.1 2.67 14.13 2 12 2 6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10c0-1.19-.22-2.33-.6-3.39l-1.61 1.61z"/></svg>Auch für internationale Fahrer: Arbeitserlaubnis-Daten, z. B. Westbalkanregelung</li>
+            <li><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22 5.18 10.59 16.6l-4.24-4.24 1.41-1.41 2.83 2.83 10-10L22 5.18Zm-2.21 5.04c.13.57.21 1.17.21 1.78 0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8c1.58 0 3.04.46 4.28 1.25l1.44-1.44C16.1 2.67 14.13 2 12 2 6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10c0-1.19-.22-2.33-.6-3.39l-1.61 1.61z"/></svg>Dokumente &amp; Fristen zentral — Warnung, bevor etwas abläuft</li>
           </ul>
         </div>
         <div class="visual reveal" style="--d:80ms">
@@ -438,14 +448,57 @@
           <h2 class="h2">Bestand im Griff — vom Sicherheitsschuh bis zum Ersatzteil.</h2>
           <p>Arbeitskleidung und Fahrzeugteile zentral verwalten: anlegen, ausgeben, nachbestellen — jederzeit nachvollziehbar.</p>
           <ul class="ul-check">
-            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Katalog mit Kategorien, Größen &amp; Lieferanten</li>
-            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Bestände &amp; Niedrigbestand-Warnungen auf einen Blick</li>
-            <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Neue Artikel in Sekunden angelegt</li>
+            <li><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22 5.18 10.59 16.6l-4.24-4.24 1.41-1.41 2.83 2.83 10-10L22 5.18Zm-2.21 5.04c.13.57.21 1.17.21 1.78 0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8c1.58 0 3.04.46 4.28 1.25l1.44-1.44C16.1 2.67 14.13 2 12 2 6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10c0-1.19-.22-2.33-.6-3.39l-1.61 1.61z"/></svg>Katalog mit Kategorien, Größen &amp; Lieferanten</li>
+            <li><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22 5.18 10.59 16.6l-4.24-4.24 1.41-1.41 2.83 2.83 10-10L22 5.18Zm-2.21 5.04c.13.57.21 1.17.21 1.78 0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8c1.58 0 3.04.46 4.28 1.25l1.44-1.44C16.1 2.67 14.13 2 12 2 6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10c0-1.19-.22-2.33-.6-3.39l-1.61 1.61z"/></svg>Bestände &amp; Niedrigbestand-Warnungen auf einen Blick</li>
+            <li><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22 5.18 10.59 16.6l-4.24-4.24 1.41-1.41 2.83 2.83 10-10L22 5.18Zm-2.21 5.04c.13.57.21 1.17.21 1.78 0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8c1.58 0 3.04.46 4.28 1.25l1.44-1.44C16.1 2.67 14.13 2 12 2 6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10c0-1.19-.22-2.33-.6-3.39l-1.61 1.61z"/></svg>Neue Artikel in Sekunden angelegt</li>
           </ul>
         </div>
         <div class="visual reveal" style="--d:80ms">
           <div class="feature-shot">
             <img src="img/inventory.png" width="750" height="971" loading="lazy" alt="CoDriver Inventory Tool – Bestand und neuer Artikel" />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- COMING SOON / ROADMAP -->
+    <section id="roadmap">
+      <div class="container">
+        <div class="grid-head reveal">
+          <span class="eyebrow">In Planung</span>
+          <h2 class="h2">Schon bald in CoDriver.</h2>
+          <p>Woran wir gerade arbeiten — gebaut für DSPs, nicht von der Stange.</p>
+        </div>
+        <div class="soon">
+          <div class="soon-card reveal">
+            <span class="soon-badge">Coming soon</span>
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <h3>co:Timer – Zeiterfassung</h3>
+            <p>Auf DSPs zugeschnitten und Audit-Ready — keine generische Lösung. Direkt mit dem Schichtplan gekoppelt.</p>
+          </div>
+          <div class="soon-card reveal" style="--d:80ms">
+            <span class="soon-badge">Coming soon</span>
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none"><path d="M4 5h16v10H8l-4 4V5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+            <h3>Team-Chat in der App</h3>
+            <p>Statt WhatsApp: DSGVO-konforme Kommunikation im Team — mit automatischem Übersetzer für jede Sprache.</p>
+          </div>
+          <div class="soon-card reveal" style="--d:160ms">
+            <span class="soon-badge">Coming soon</span>
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <h3>Ride-Along-Checkliste</h3>
+            <p>Alles fürs praktische Training — strukturiert für Mentor und Mentee, Schritt für Schritt abhakbar.</p>
+          </div>
+          <div class="soon-card reveal" style="--d:80ms">
+            <span class="soon-badge">Coming soon</span>
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none"><path d="M3 13l2-5a2 2 0 012-1.4h10A2 2 0 0124 8l2 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 13h18v5a1 1 0 01-1 1h-1a2 2 0 01-4 0H9a2 2 0 01-4 0H4a1 1 0 01-1-1v-5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+            <h3>Fleet Hub mit Service-History</h3>
+            <p>Fahrzeuge, Wartungen und der komplette Service-Verlauf — lückenlos dokumentiert an einem Ort.</p>
+          </div>
+          <div class="soon-card reveal" style="--d:160ms">
+            <span class="soon-badge">Coming soon</span>
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="6" width="16" height="12" rx="3" stroke="currentColor" stroke-width="1.6"/><path d="M12 3v3M9 11h.01M15 11h.01M9 15h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></div>
+            <h3>CoDriver AI-Assistant</h3>
+            <p>Fahrer klären Fragen zu Firmenregeln und Lieferanweisungen direkt per Chatbot — sofort und in jeder Sprache.</p>
           </div>
         </div>
       </div>
@@ -487,12 +540,12 @@
             <div class="price-sub" id="priceSub">&nbsp;</div>
             <div class="price-note">Launch-Preis nur bis <strong>30.06.2026</strong> sichern – danach regulär 299 €. Einmal gesichert, bleibt der Preis, solange dein Abo läuft.</div>
             <ul class="price-features">
-              <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Scorecard-Auswertung in 9 Sprachen</li>
-              <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Driver Hub &amp; DA Academy</li>
-              <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Recruiting &amp; digitales Onboarding</li>
-              <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Inventar, Schicht- &amp; Wellenplanung</li>
-              <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Unbegrenzt Fahrer &amp; Dispatcher</li>
-              <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>EU-Hosting · DSGVO-konform</li>
+              <li><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22 5.18 10.59 16.6l-4.24-4.24 1.41-1.41 2.83 2.83 10-10L22 5.18Zm-2.21 5.04c.13.57.21 1.17.21 1.78 0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8c1.58 0 3.04.46 4.28 1.25l1.44-1.44C16.1 2.67 14.13 2 12 2 6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10c0-1.19-.22-2.33-.6-3.39l-1.61 1.61z"/></svg>Scorecard-Auswertung in 9 Sprachen</li>
+              <li><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22 5.18 10.59 16.6l-4.24-4.24 1.41-1.41 2.83 2.83 10-10L22 5.18Zm-2.21 5.04c.13.57.21 1.17.21 1.78 0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8c1.58 0 3.04.46 4.28 1.25l1.44-1.44C16.1 2.67 14.13 2 12 2 6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10c0-1.19-.22-2.33-.6-3.39l-1.61 1.61z"/></svg>Driver Hub &amp; DA Academy</li>
+              <li><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22 5.18 10.59 16.6l-4.24-4.24 1.41-1.41 2.83 2.83 10-10L22 5.18Zm-2.21 5.04c.13.57.21 1.17.21 1.78 0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8c1.58 0 3.04.46 4.28 1.25l1.44-1.44C16.1 2.67 14.13 2 12 2 6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10c0-1.19-.22-2.33-.6-3.39l-1.61 1.61z"/></svg>Recruiting &amp; digitales Onboarding</li>
+              <li><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22 5.18 10.59 16.6l-4.24-4.24 1.41-1.41 2.83 2.83 10-10L22 5.18Zm-2.21 5.04c.13.57.21 1.17.21 1.78 0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8c1.58 0 3.04.46 4.28 1.25l1.44-1.44C16.1 2.67 14.13 2 12 2 6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10c0-1.19-.22-2.33-.6-3.39l-1.61 1.61z"/></svg>Inventar, Schicht- &amp; Wellenplanung</li>
+              <li><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22 5.18 10.59 16.6l-4.24-4.24 1.41-1.41 2.83 2.83 10-10L22 5.18Zm-2.21 5.04c.13.57.21 1.17.21 1.78 0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8c1.58 0 3.04.46 4.28 1.25l1.44-1.44C16.1 2.67 14.13 2 12 2 6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10c0-1.19-.22-2.33-.6-3.39l-1.61 1.61z"/></svg>Unbegrenzt Fahrer &amp; Dispatcher</li>
+              <li><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22 5.18 10.59 16.6l-4.24-4.24 1.41-1.41 2.83 2.83 10-10L22 5.18Zm-2.21 5.04c.13.57.21 1.17.21 1.78 0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8c1.58 0 3.04.46 4.28 1.25l1.44-1.44C16.1 2.67 14.13 2 12 2 6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10c0-1.19-.22-2.33-.6-3.39l-1.61 1.61z"/></svg>EU-Hosting · DSGVO-konform</li>
             </ul>
             <a class="btn btn-primary" href="https://dsp-codriver.de/#/signup">30 Tage kostenlos testen</a>
             <div class="price-fine">Keine Kreditkarte für den Test nötig. Stationen werden automatisch aus deinen Scorecard-Uploads erkannt.</div>
