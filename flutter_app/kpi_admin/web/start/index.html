@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CoDriver — Die Plattform für dein DSP-Team</title>
-  <meta name="description" content="CoDriver macht die Amazon-Scorecard in 8 Sprachen verständlich, digitalisiert Onboarding, Driver Hub, Academy, Inventar und Schichtplanung — und macht dein Fahrerteam jeden Tag besser." />
+  <meta name="description" content="CoDriver macht die Amazon-Scorecard in 9 Sprachen verständlich, digitalisiert Onboarding, Driver Hub, Academy, Inventar und Schichtplanung — und macht dein Fahrerteam jeden Tag besser." />
   <link rel="icon" href="/favicon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -189,7 +189,11 @@
 
     /* language chips with round flags */
     .langs { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; max-width: 460px; }
-    .lang { display: flex; align-items: center; gap: 8px; width: 128px; font-size: 13.5px; font-weight: 500; color: var(--text); background: #fff; border: 1px solid var(--line-2); padding: 6px 12px 6px 6px; border-radius: 980px; }
+    .lang { display: flex; align-items: center; gap: 8px; width: 128px; font-family: var(--font); font-size: 13.5px; font-weight: 500; color: var(--text); background: #fff; border: 1px solid var(--line-2); padding: 6px 12px 6px 6px; border-radius: 980px; text-align: left; cursor: pointer; transition: border-color .2s ease, background .2s ease, color .2s ease, transform .12s ease; }
+    button.lang:active { transform: scale(0.97); }
+    .lang.active { border-color: var(--green); background: var(--green-soft); color: var(--green-text); font-weight: 600; }
+    .scorecard-screen { width: 100%; max-width: 300px; margin: 0 auto; border-radius: 30px; overflow: hidden; background: #fff; border: 1px solid var(--line); box-shadow: 0 40px 80px -45px rgba(0,0,0,0.4); }
+    .scorecard-screen img { width: 100%; height: auto; display: block; transition: opacity .25s ease; }
     .flag { width: 24px; height: 24px; min-width: 24px; min-height: 24px; border-radius: 50%; overflow: hidden; flex: none; display: inline-block; background-size: 116%; background-position: center; background-repeat: no-repeat; border: 1px solid rgba(0,0,0,0.16); box-shadow: 0 1px 2px rgba(0,0,0,0.12); }
 
     /* footer logos */
@@ -321,22 +325,23 @@
       <div class="container feature-row">
         <div class="feature-copy copy reveal">
           <span class="eyebrow">Das Herzstück</span>
-          <h2 class="h2">Die Scorecard. Endlich verständlich. In 8&nbsp;Sprachen.</h2>
-          <p>Jedes Ergebnis und jede Kennzahl — klar erklärt, in der Sprache deiner Fahrer. Schluss mit Rätselraten: Dein Team versteht sofort, woran es liegt, und steigert die eigene Performance.</p>
-          <div class="langs">
-            <span class="lang"><span class="flag" style="background-image:url('flags/de.svg')" role="img" aria-label="Deutschland"></span>Deutsch</span>
-            <span class="lang"><span class="flag" style="background-image:url('flags/gb.svg')" role="img" aria-label="Vereinigtes Königreich"></span>English</span>
-            <span class="lang"><span class="flag" style="background-image:url('flags/al.svg')" role="img" aria-label="Albanien"></span>Shqip</span>
-            <span class="lang"><span class="flag" style="background-image:url('flags/hu.svg')" role="img" aria-label="Ungarn"></span>Magyar</span>
-            <span class="lang"><span class="flag" style="background-image:url('flags/ro.svg')" role="img" aria-label="Rumänien"></span>Română</span>
-            <span class="lang"><span class="flag" style="background-image:url('flags/hr.svg')" role="img" aria-label="Kroatien"></span>Hrvatski</span>
-            <span class="lang"><span class="flag" style="background-image:url('flags/sy.svg')" role="img" aria-label="Syrien"></span>العربية</span>
-            <span class="lang"><span class="flag" style="background-image:url('flags/tr.svg')" role="img" aria-label="Türkei"></span>Türkçe</span>
+          <h2 class="h2">Die Scorecard. Endlich verständlich. In 9&nbsp;Sprachen.</h2>
+          <p>Jedes Ergebnis und jede Kennzahl — klar erklärt, in der Sprache deiner Fahrer. Tippe eine Sprache an und sieh, wie die Scorecard aussieht.</p>
+          <div class="langs" id="scLangs">
+            <button type="button" class="lang active" data-lang="de"><span class="flag" style="background-image:url('flags/de.svg')" role="img" aria-label="Deutschland"></span>Deutsch</button>
+            <button type="button" class="lang" data-lang="en"><span class="flag" style="background-image:url('flags/gb.svg')" role="img" aria-label="Vereinigtes Königreich"></span>English</button>
+            <button type="button" class="lang" data-lang="sq"><span class="flag" style="background-image:url('flags/al.svg')" role="img" aria-label="Albanien"></span>Shqip</button>
+            <button type="button" class="lang" data-lang="hu"><span class="flag" style="background-image:url('flags/hu.svg')" role="img" aria-label="Ungarn"></span>Magyar</button>
+            <button type="button" class="lang" data-lang="ro"><span class="flag" style="background-image:url('flags/ro.svg')" role="img" aria-label="Rumänien"></span>Română</button>
+            <button type="button" class="lang" data-lang="hr"><span class="flag" style="background-image:url('flags/hr.svg')" role="img" aria-label="Kroatien"></span>Hrvatski</button>
+            <button type="button" class="lang" data-lang="ar"><span class="flag" style="background-image:url('flags/sy.svg')" role="img" aria-label="Syrien"></span>العربية</button>
+            <button type="button" class="lang" data-lang="tr"><span class="flag" style="background-image:url('flags/tr.svg')" role="img" aria-label="Türkei"></span>Türkçe</button>
+            <button type="button" class="lang" data-lang="ru"><span class="flag" style="background-image:url('flags/ru.svg')" role="img" aria-label="Russland"></span>Русский</button>
           </div>
         </div>
         <div class="visual reveal" style="--d:80ms">
-          <div class="feature-shot">
-            <img src="img/scorecard-langs.png" width="1381" height="1086" loading="lazy" alt="CoDriver Scorecard in mehreren Sprachen – Deutsch, Albanisch und Arabisch" />
+          <div class="scorecard-screen">
+            <img id="scorecardShot" src="img/scorecard/de.png" width="680" height="1477" loading="lazy" alt="CoDriver Scorecard auf Deutsch" />
           </div>
         </div>
       </div>
@@ -439,7 +444,7 @@
     <section id="vorteile" class="band">
       <div class="container">
         <div class="stats">
-          <div class="stat reveal"><div class="n"><b>8</b></div><div class="l">Sprachen für die Scorecard</div></div>
+          <div class="stat reveal"><div class="n"><b>9</b></div><div class="l">Sprachen für die Scorecard</div></div>
           <div class="stat reveal" style="--d:80ms"><div class="n">6&#8209;in&#8209;1</div><div class="l">Werkzeuge in einer Plattform</div></div>
           <div class="stat reveal" style="--d:160ms"><div class="n">Tag&nbsp;<b>1</b></div><div class="l">Regeln &amp; Handbuch ab Start</div></div>
           <div class="stat reveal" style="--d:240ms"><div class="n">EU</div><div class="l">Hosting &amp; DSGVO-konform</div></div>
@@ -471,7 +476,7 @@
             <div class="price-sub" id="priceSub">&nbsp;</div>
             <div class="price-note">Launch-Preis nur bis <strong>30.06.2026</strong> sichern – danach regulär 299 €. Einmal gesichert, bleibt der Preis, solange dein Abo läuft.</div>
             <ul class="price-features">
-              <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Scorecard-Auswertung in 8 Sprachen</li>
+              <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Scorecard-Auswertung in 9 Sprachen</li>
               <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Driver Hub &amp; DA Academy</li>
               <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Recruiting &amp; digitales Onboarding</li>
               <li><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Inventar, Schicht- &amp; Wellenplanung</li>
@@ -586,6 +591,31 @@
         document.querySelectorAll('.hero .reveal').forEach(function (el) { el.classList.add('in'); });
       });
     }
+
+    // ---- Scorecard: Sprachpills wechseln das Bild ----
+    (function () {
+      var box = document.getElementById('scLangs');
+      var shot = document.getElementById('scorecardShot');
+      if (!box || !shot) return;
+      var names = { de: 'Deutsch', en: 'English', sq: 'Shqip', hu: 'Magyar',
+        ro: 'Română', hr: 'Hrvatski', ar: 'Arabisch', tr: 'Türkçe', ru: 'Русский' };
+      box.querySelectorAll('.lang[data-lang]').forEach(function (p) {
+        p.addEventListener('click', function () {
+          var lang = p.dataset.lang;
+          box.querySelectorAll('.lang').forEach(function (x) {
+            x.classList.toggle('active', x === p);
+          });
+          shot.style.opacity = '0';
+          var pre = new Image();
+          pre.onload = function () {
+            shot.src = pre.src;
+            shot.alt = 'CoDriver Scorecard – ' + (names[lang] || lang);
+            shot.style.opacity = '1';
+          };
+          pre.src = 'img/scorecard/' + lang + '.png';
+        });
+      });
+    })();
 
     // ---- Pricing: Monats-/Jahres-Toggle ----
     (function () {
