@@ -1,0 +1,31 @@
+# Konfiguration für den Rechnungs-Finder
+# Diese Datei nach "config.yaml" kopieren und ausfüllen.
+# config.yaml ist in .gitignore und landet NICHT im Repository.
+
+# Postfächer, die durchsucht werden (IONOS-Standard: imap.ionos.de, Port 993, SSL)
+mailboxes:
+  - name: "Büro"
+    host: imap.ionos.de
+    port: 993
+    user: rechnung@meine-firma.de
+    password: "HIER-PASSWORT"
+    # Optional: welche IMAP-Ordner durchsucht werden (Standard: nur INBOX)
+    folders:
+      - INBOX
+
+  - name: "Privat"
+    host: imap.ionos.de
+    port: 993
+    user: ich@meine-domain.de
+    password: "HIER-PASSWORT"
+
+# Suchfenster um das Buchungsdatum der Abbuchung herum:
+# Rechnungen kommen meist VOR der Abbuchung an.
+search:
+  days_before: 45   # so viele Tage vor der Abbuchung suchen
+  days_after: 10    # so viele Tage nach der Abbuchung suchen
+  min_score: 60     # ab dieser Punktzahl gilt ein Treffer als sicher
+
+# Wohin die gefundenen PDFs gespeichert werden
+output:
+  directory: ./belege

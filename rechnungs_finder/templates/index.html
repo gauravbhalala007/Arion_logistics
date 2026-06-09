@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rechnungs-Finder</title>
+{% if state.search_running %}<meta http-equiv="refresh" content="3">{% endif %}
+<style>
+  :root {
+    --bg: #f6f5f2;
+    --card: #ffffff;
+    --ink: #1f2430;
+    --muted: #6b7280;
+    --line: #e6e3dc;
+    --accent: #0f6b54;
+    --accent-soft: #e3f0ec;
+    --warn: #9a6700;
+    --warn-soft: #fff3d6;
+    --bad: #b3261e;
+    --bad-soft: #fbe9e7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.55 "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 20px 64px; }
+  header h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -0.02em; }
+  header p { color: var(--muted); margin: 0 0 28px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 20px 24px; margin-bottom: 20px;
+  }
+  .card h2 { font-size: 16px; margin: 0 0 12px; display: flex; align-items: center; gap: 10px; }
+  .step {
+    display: inline-flex; width: 24px; height: 24px; border-radius: 50%;
+    background: var(--ink); color: #fff; font-size: 13px;
+    align-items: center; justify-content: center; flex: none;
+  }
+  .muted { color: var(--muted); }
+  .error {
+    background: var(--bad-soft); border: 1px solid #f0c4c0; color: var(--bad);
+    border-radius: 10px; padding: 12px 16px; margin-bottom: 16px;
+  }
+  .pill {
+    display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 13px;
+  }
+  .pill.ok { background: var(--accent-soft); color: var(--accent); }
+  .pill.warn { background: var(--warn-soft); color: var(--warn); }
+  .pill.bad { background: var(--bad-soft); color: var(--bad); }
+  button, .btn {
+    background: var(--accent); color: #fff; border: 0; border-radius: 8px;
+    padding: 9px 18px; font-size: 15px; cursor: pointer; font-family: inherit;
+  }
+  button:hover { filter: brightness(1.08); }
+  button.secondary { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+  input[type=file] { font-family: inherit; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 13px; }
+  td.num, th.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .progress {
+    background: #14181f; color: #cdd6e0; border-radius: 10px; padding: 12px 16px;
+    font: 13px/1.6 ui-monospace, monospace; max-height: 220px; overflow-y: auto;
+  }
+  a { color: var(--accent); }
+  .summary { display: flex; gap: 24px; flex-wrap: wrap; margin: 4px 0 16px; }
+  .summary div strong { font-size: 22px; display: block; letter-spacing: -0.02em; }
+  .summary div span { color: var(--muted); font-size: 13px; }
+  code { background: var(--bg); border-radius: 5px; padding: 1px 6px; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Rechnungs-Finder</h1>
+    <p>Kontoauszug hochladen &rarr; Postf&auml;cher durchsuchen &rarr; Belege speichern</p>
+  </header>
+
+  {% for error in state.errors %}
+    <div class="error">{{ error }}</div>
+  {% endfor %}
+
+  {% if not config_exists %}
+    <div class="error">
+      Noch keine <code>config.yaml</code> vorhanden. Bitte <code>config.example.yaml</code>
+      kopieren, Postf&auml;cher eintragen und die Seite neu laden.
+    </div>
+  {% endif %}
+
+  <div class="card">
+    <h2><span class="step">1</span> Kontoauszug hochladen</h2>
+    <form action="/upload" method="post" enctype="multipart/form-data">
+      <input type="file" name="file" accept=".csv,.pdf" required>
+      <button type="submit">Einlesen</button>
+    </form>
+    {% if state.statement_name %}
+      <p class="muted" style="margin-bottom:0">
+        Eingelesen: <strong>{{ state.statement_name }}</strong> —
+        {{ state.transactions|length }} Buchungen, davon
+        <strong>{{ debits|length }} Abbuchungen</strong>
+        {% if debits %}
+          ({{ debits[-1].booking_date.strftime('%d.%m.%Y') }} bis
+          {{ debits[0].booking_date.strftime('%d.%m.%Y') }})
+        {% endif %}
+      </p>
+    {% else %}
+      <p class="muted" style="margin-bottom:0">CSV-Export der Bank empfohlen. PDF-Ausz&uuml;ge werden nach bestem Bem&uuml;hen gelesen.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2><span class="step">2</span> Postf&auml;cher durchsuchen</h2>
+    {% if mailboxes %}
+      <p class="muted">Konfigurierte Postf&auml;cher:
+        {% for name in mailboxes %}<span class="pill ok">{{ name }}</span> {% endfor %}
+      </p>
+    {% endif %}
+    <form action="/search" method="post">
+      <button type="submit" {% if state.search_running or not debits %}disabled{% endif %}>
+        {% if state.search_running %}Suche l&auml;uft &hellip;{% else %}Suche starten{% endif %}
+      </button>
+    </form>
+    {% if state.progress %}
+      <div class="progress" style="margin-top:14px">
+        {% for line in state.progress %}{{ line }}<br>{% endfor %}
+        {% if state.search_running %}&hellip; (Seite aktualisiert sich automatisch){% endif %}
+      </div>
+    {% endif %}
+  </div>
+
+  {% if state.search_done %}
+  <div class="card">
+    <h2><span class="step">3</span> Ergebnis pr&uuml;fen &amp; speichern</h2>
+    <div class="summary">
+      <div><strong>{{ confident|length }}</strong><span>sichere Treffer</span></div>
+      <div><strong>{{ uncertain|length }}</strong><span>unsichere Treffer</span></div>
+      <div><strong>{{ state.unmatched|length }}</strong><span>ohne Beleg</span></div>
+    </div>
+
+    {% if state.matches %}
+    <table>
+      <tr>
+        <th>Buchung</th><th>Empf&auml;nger / Zweck</th><th class="num">Betrag</th>
+        <th>Beleg (PDF)</th><th>Begr&uuml;ndung</th><th>Status</th>
+      </tr>
+      {% for m in state.matches %}
+      <tr>
+        <td class="num">{{ m.transaction.booking_date.strftime('%d.%m.%Y') }}</td>
+        <td>
+          <strong>{{ m.transaction.counterparty or '—' }}</strong><br>
+          <span class="muted">{{ m.transaction.purpose[:90] }}</span>
+        </td>
+        <td class="num">{{ '%.2f'|format(m.transaction.amount)|replace('.', ',') }}&nbsp;€</td>
+        <td>
+          <a href="/pdf/{{ loop.index0 }}" target="_blank">{{ m.attachment.filename }}</a><br>
+          <span class="muted">{{ m.attachment.mailbox_name }} · {{ m.attachment.sender_address }}</span>
+        </td>
+        <td class="muted">{{ m.reasons|join(', ') }}</td>
+        <td>
+          {% if m.confident %}<span class="pill ok">sicher ({{ m.score }})</span>
+          {% else %}<span class="pill warn">pr&uuml;fen ({{ m.score }})</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+
+    {% if state.unmatched %}
+      <h3 style="margin:20px 0 8px; font-size:15px">Abbuchungen ohne Beleg</h3>
+      <table>
+        <tr><th>Buchung</th><th>Empf&auml;nger / Zweck</th><th class="num">Betrag</th><th></th></tr>
+        {% for tx in state.unmatched %}
+        <tr>
+          <td class="num">{{ tx.booking_date.strftime('%d.%m.%Y') }}</td>
+          <td><strong>{{ tx.counterparty or '—' }}</strong><br>
+              <span class="muted">{{ tx.purpose[:90] }}</span></td>
+          <td class="num">{{ '%.2f'|format(tx.amount)|replace('.', ',') }}&nbsp;€</td>
+          <td><span class="pill bad">kein Beleg</span></td>
+        </tr>
+        {% endfor %}
+      </table>
+    {% endif %}
+
+    <form action="/save" method="post" style="margin-top:18px">
+      <button type="submit" {% if not state.matches %}disabled{% endif %}>
+        Alle PDFs + zuordnung.csv speichern
+      </button>
+      <span class="muted" style="margin-left:10px">Zielordner: <code>{{ output_dir }}</code></span>
+    </form>
+    {% if state.saved_to %}
+      <p style="margin-bottom:0"><span class="pill ok">Gespeichert in {{ state.saved_to }}</span></p>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+</body>
+</html>
