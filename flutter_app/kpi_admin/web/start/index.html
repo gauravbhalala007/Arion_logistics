@@ -206,7 +206,9 @@
     .grid-head { text-align: center; max-width: 660px; margin: 0 auto clamp(40px, 6vw, 72px); }
     .grid-head h2 { margin-bottom: 16px; }
     .grid-head p { font-size: 19px; color: var(--muted); }
-    .bento { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .bento { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+    .card-shot { margin-top: auto; padding-top: 20px; display: flex; justify-content: center; }
+    .card-shot img { width: 100%; max-width: 250px; height: auto; display: block; filter: drop-shadow(0 20px 34px rgba(0,0,0,0.15)); }
     .card {
       background: #fff; border: 1px solid var(--line); border-radius: 24px; padding: 30px;
       transition: transform .35s var(--ease), box-shadow .35s var(--ease), border-color .3s ease;
@@ -403,20 +405,26 @@
           <div class="card reveal">
             <div class="ico"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3l8 4v5c0 4.5-3.2 7.6-8 9-4.8-1.4-8-4.5-8-9V7l8-4z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
             <h3>DA Academy</h3>
-            <p>Sicherheitsschulungen und gesetzliche Sicherheitsunterweisungen — digital, nachweisbar und immer aktuell.</p>
-            <div class="ph small square" role="img" aria-label="Platzhalter: Academy"><svg class="glyph" viewBox="0 0 24 24" fill="none"><path d="M3 8l9-4 9 4-9 4-9-4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M7 10v5c0 1 2.2 2 5 2s5-1 5-2v-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <p>Sicherheitsschulungen und gesetzliche Unterweisungen — digital, nachweisbar und immer aktuell, in der Sprache deiner Fahrer.</p>
+            <div class="card-shot"><img src="img/academy.png" width="742" height="963" loading="lazy" alt="CoDriver DA Academy mit Schulungen und Green Book" /></div>
           </div>
           <div class="card reveal" style="--d:80ms">
-            <div class="ico"><svg viewBox="0 0 24 24" fill="none"><path d="M21 8l-9-5-9 5 9 5 9-5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M3 8v8l9 5 9-5V8M12 13v8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-            <h3>Inventory Tool</h3>
-            <p>Arbeitskleidung oder Fahrzeugteile — alles an einem Ort im Bestand, jederzeit nachvollziehbar.</p>
-            <div class="ph small square" role="img" aria-label="Platzhalter: Inventar"><svg class="glyph" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/></svg></div>
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M3 9h18M8 3v4M16 3v4M7 14l3 3 5-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <h3>Shift- &amp; Waveplan</h3>
+            <p>Einfacher Upload, schnelle Planung. Schichten und Wellen in Minuten statt Stunden — der Fahrer sieht seinen Plan direkt in der App.</p>
+            <div class="card-shot"><img src="img/waveplan.png" width="625" height="1161" loading="lazy" alt="CoDriver Waveplan in der Fahrer-App" /></div>
+          </div>
+          <div class="card reveal" style="--d:120ms">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M3 9h18M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <h3>Kalender &amp; Termine</h3>
+            <p>Mietfahrzeuge, Abholungen und alle Termine an einem Ort — übersichtlich im Monatskalender mit Detail-Liste.</p>
+            <div class="card-shot"><img src="img/kalender.png" width="625" height="1161" loading="lazy" alt="CoDriver Kalender mit Terminen" /></div>
           </div>
           <div class="card reveal" style="--d:160ms">
-            <div class="ico"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M3 9h18M8 3v4M16 3v4M7 14l3 3 5-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-            <h3>Shiftplan &amp; Waveplan</h3>
-            <p>Einfacher Upload, schnelle Planung. Schichten und Wellen in Minuten statt Stunden organisiert.</p>
-            <div class="ph small square" role="img" aria-label="Platzhalter: Schichtplanung"><svg class="glyph" viewBox="0 0 24 24" fill="none"><path d="M12 3v9l5 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"/></svg></div>
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3 8-8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 12v6a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <h3>Task Sheet</h3>
+            <p>Aufgaben an einzelne Fahrer oder das ganze Team — mit Bestätigung, freiem Feedback oder Auswahlantwort.</p>
+            <div class="card-shot"><img src="img/tasksheet.png" width="625" height="1161" loading="lazy" alt="CoDriver Task Sheet zum Erstellen von Aufgaben" /></div>
           </div>
         </div>
       </div>
