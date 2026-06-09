@@ -223,9 +223,12 @@
     .lang.active { border-color: var(--green); background: var(--green-soft); color: var(--green-text); font-weight: 600; }
     .scorecard-screen { width: 100%; max-width: 300px; margin: 0 auto; border-radius: 30px; overflow: hidden; background: #fff; border: 1px solid var(--line); box-shadow: 0 40px 80px -45px rgba(0,0,0,0.4); }
     .scorecard-screen img { width: 100%; height: auto; display: block; transition: opacity .25s ease; }
-    .sc-grid { display: grid; column-gap: clamp(32px, 5vw, 64px); row-gap: 0; grid-template-columns: 1.05fr 0.95fr; align-items: start; grid-template-areas: "copy visual" "langs visual"; }
+    .sc-grid { display: grid; column-gap: clamp(44px, 6vw, 96px); row-gap: 0; grid-template-columns: 1.05fr 0.95fr; align-items: start; grid-template-areas: "copy visual" "langs visual"; }
     .sc-copy { grid-area: copy; }
-    .sc-langs { grid-area: langs; }
+    .sc-copy .eyebrow { display: block; margin-bottom: 18px; }
+    .sc-copy h2 { margin-bottom: 24px; line-height: 1.12; }
+    .sc-copy p { line-height: 1.6; }
+    .sc-langs { grid-area: langs; margin-top: 36px; }
     .sc-visual { grid-area: visual; align-self: center; }
     .flag { width: 24px; height: 24px; min-width: 24px; min-height: 24px; border-radius: 50%; overflow: hidden; flex: none; display: inline-block; background-size: 116%; background-position: center; background-repeat: no-repeat; border: 1px solid rgba(0,0,0,0.16); box-shadow: 0 1px 2px rgba(0,0,0,0.12); }
 
@@ -383,7 +386,7 @@
       <div class="container sc-grid">
         <div class="sc-copy reveal">
           <span class="eyebrow">Das Herzstück</span>
-          <h2 class="h2">Die Scorecard. Endlich verständlich. In 9&nbsp;Sprachen.</h2>
+          <h2 class="h2">Die Scorecard.<br>Endlich verständlich.<br>In 9&nbsp;Sprachen.</h2>
           <p>Jedes Ergebnis und jede Kennzahl — klar erklärt, in der Sprache deiner Fahrer. Tippe eine Sprache an und sieh, wie die Scorecard aussieht.</p>
         </div>
         <div class="langs sc-langs reveal" id="scLangs">
