@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 
 import '../localization/app_localizations.dart';
 import 'driver_green_book_page.dart';
-import 'driver_academy_module_page.dart';
-import 'driver_faq_training_page.dart';
 
 class DriverAcademyPage extends StatelessWidget {
   final String dspUid;
@@ -112,17 +110,9 @@ class DriverAcademyPage extends StatelessWidget {
                       icon: Icons.fact_check_rounded,
                       iconColor: const Color(0xFFFF8A1F),
                       iconBg: const Color(0xFFFFF0E4),
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => DriverFaqTrainingPage(
-                              dspUid: dspUid,
-                              driverTransporterId: driverTransporterId,
-                              onBack: () => Navigator.of(context).pop(),
-                            ),
-                          ),
-                        );
-                      },
+                      disabled: true,
+                      badge: t.t('coming_soon'),
+                      onTap: null,
                     ),
                   ),
                   ...visibleCategories.map((category) {
@@ -136,18 +126,9 @@ class DriverAcademyPage extends StatelessWidget {
                       icon: _iconForCategory(category.id),
                       iconColor: const Color(0xFF3E82F7),
                       iconBg: const Color(0xFFE9F1FE),
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => DriverAcademyModulePage(
-                              dspUid: dspUid,
-                              driverTransporterId: driverTransporterId,
-                              categoryId: category.id,
-                              fallbackTitle: title,
-                            ),
-                          ),
-                        );
-                      },
+                      disabled: true,
+                      badge: t.t('coming_soon'),
+                      onTap: null,
                     ),
                   );
                   }),
@@ -263,7 +244,9 @@ class _AcademyTile extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
   final Color iconBg;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final bool disabled;
+  final String? badge;
 
   const _AcademyTile({
     required this.title,
@@ -272,28 +255,32 @@ class _AcademyTile extends StatelessWidget {
     required this.iconColor,
     required this.iconBg,
     required this.onTap,
+    this.disabled = false,
+    this.badge,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Material(
+    final tile = Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
+        onTap: disabled ? null : onTap,
         child: Container(
           height: 76,
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: const Color(0xFFDDE3E7), width: 1.4),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.06),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
-              ),
-            ],
+            boxShadow: disabled
+                ? null
+                : [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
           ),
           padding: const EdgeInsets.symmetric(horizontal: 14),
           child: Row(
@@ -338,16 +325,50 @@ class _AcademyTile extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: Color(0xFF7A8699),
-                size: 24,
-              ),
+              if (disabled)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F3F5),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.lock_outline_rounded,
+                        size: 13,
+                        color: Color(0xFF7A8699),
+                      ),
+                      if ((badge ?? '').trim().isNotEmpty) ...[
+                        const SizedBox(width: 5),
+                        Text(
+                          badge!,
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF7A8699),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                )
+              else
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: Color(0xFF7A8699),
+                  size: 24,
+                ),
             ],
           ),
         ),
       ),
     );
+    return disabled ? Opacity(opacity: 0.62, child: tile) : tile;
   }
 }
 
