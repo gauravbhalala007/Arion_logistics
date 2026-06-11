@@ -6,7 +6,6 @@ import 'package:video_player/video_player.dart';
 
 import '../localization/app_localizations.dart';
 import '../widgets/web_video_embed.dart';
-import 'driver_green_book_test_page.dart';
 
 const Color _kGreenBookText = Color(0xFF1F2937);
 const Color _kGreenBookMuted = Color(0xFF7A869F);
@@ -167,18 +166,6 @@ class _DriverGreenBookPageState extends State<DriverGreenBookPage> {
     );
   }
 
-  void _openTest() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => DriverGreenBookTestPage(
-          dspUid: widget.dspUid,
-          driverTransporterId: widget.driverTransporterId,
-          onBack: () => Navigator.of(context).pop(),
-        ),
-      ),
-    );
-  }
-
   _LanguageMeta _languageMeta(String code) {
     switch (code) {
       case 'de':
@@ -253,8 +240,9 @@ class _DriverGreenBookPageState extends State<DriverGreenBookPage> {
               const SizedBox(height: 14),
               _GreenBookTestCta(
                 label: t.t('driver_green_book_start_test'),
-                note: t.t('driver_green_book_test_required'),
-                onTap: _openTest,
+                note: t.t('coming_soon'),
+                onTap: null,
+                disabled: true,
               ),
               const SizedBox(height: 16),
               _SectionCard(
@@ -377,50 +365,66 @@ class _GreenBookVideoCard extends StatelessWidget {
 class _GreenBookTestCta extends StatelessWidget {
   final String label;
   final String note;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final bool disabled;
 
   const _GreenBookTestCta({
     required this.label,
     required this.note,
     required this.onTap,
+    this.disabled = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final Color borderColor =
+        disabled ? const Color(0xFFD6DBE2) : _kGreenBookPrimary;
+    const Color fg = Color(0xFF70809D);
     return Column(
       children: [
         Material(
           color: Colors.transparent,
           child: InkWell(
             borderRadius: BorderRadius.circular(999),
-            onTap: onTap,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: _kGreenBookPrimary, width: 2.2),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    label,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF70809D),
-                      decoration: TextDecoration.none,
+            onTap: disabled ? null : onTap,
+            child: Opacity(
+              opacity: disabled ? 0.7 : 1.0,
+              child: Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
+                decoration: BoxDecoration(
+                  color: disabled ? const Color(0xFFF7F8FA) : Colors.white,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: borderColor, width: 2.2),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (disabled) ...[
+                      const Icon(Icons.lock_outline_rounded,
+                          size: 18, color: fg),
+                      const SizedBox(width: 8),
+                    ],
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: fg,
+                        decoration: TextDecoration.none,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    color: Color(0xFF70809D),
-                    size: 24,
-                  ),
-                ],
+                    if (!disabled) ...[
+                      const SizedBox(width: 10),
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        color: fg,
+                        size: 24,
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -428,8 +432,8 @@ class _GreenBookTestCta extends StatelessWidget {
         const SizedBox(height: 10),
         Text(
           note,
-          style: const TextStyle(
-            color: Color(0xFFFF3B30),
+          style: TextStyle(
+            color: disabled ? const Color(0xFF7A8699) : const Color(0xFFFF3B30),
             fontSize: 14,
             fontWeight: FontWeight.w600,
             decoration: TextDecoration.none,
