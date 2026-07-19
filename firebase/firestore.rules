@@ -55,6 +55,28 @@ service cloud.firestore {
       return isDriverOf(userId) || isDriverOfByToken(userId);
     }
 
+    // Dispatcher sub-accounts — created by a DSP admin via the
+    // createDispatcherAccount Cloud Function. Each dispatcher belongs
+    // to exactly one admin (parentAdminUid).
+    function isDispatcher() {
+      return signedIn() && me().data.role == 'dispatcher';
+    }
+
+    function isDispatcherOf(userId) {
+      return isDispatcher() && me().data.parentAdminUid == userId;
+    }
+
+    // True when the caller is the admin themselves OR one of their
+    // dispatchers. Used by every users/{adminUid}/... rule that
+    // previously only admitted the admin.
+    function isAdminOrDispatcherOf(userId) {
+      return isSelf(userId) || isDispatcherOf(userId);
+    }
+
+    function isVehicleManagerOrDispatcherOf(userId) {
+      return isVehicleManager(userId) || isDispatcherOf(userId);
+    }
+
     function companyScope() {
       return request.auth.uid;
     }
@@ -463,21 +485,44 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-    
+
     	// ---------- admin notifications ----------
       match /notifications/{notificationId} {
         // Admin (DSP owner) can create + read notification history
         allow read, write: if isSelf(userId) && isApproved(userId);
       }
-      
+
+      // ---------- dispatcher sub-accounts (managed by parent admin) ----------
+      // Stored under the admin's user doc. Only the admin themselves can
+      // create / list / update / delete; dispatchers can read their OWN
+      // sub-account doc to learn their permission set.
+      match /sub_accounts/{subUid} {
+        allow read, write: if isSelf(userId);
+        allow read: if isDispatcherOf(userId) && request.auth.uid == subUid;
+      }
+
+      // Dispatcher blanket access to their parent admin's entire user
+      // namespace — UI gating decides which *modules* the dispatcher
+      // can see (Phase 2 settings page); Firestore rules only enforce
+      // cross-admin isolation. Phase 3 may tighten this per permission.
+      //
+      // ALSO covers any admin subcollection that doesn't have its own
+      // explicit `match` block (e.g. `seso_confirmations`). Existing
+      // narrower rules below are union'd — this never tightens them.
+      match /{document=**} {
+        allow read, write: if isSelf(userId) || isDispatcherOf(userId);
+      }
+
       // Created by the user at signup (DSP/admin + also driver profiles)
       allow create: if isSelf(userId);
 
-      // Everyone can read their OWN user doc; admin can read all
-      allow read: if isSelf(userId) || isAdmin();
+      // Everyone can read their OWN user doc; admin can read all;
+      // a dispatcher can read their parent admin's user doc so the
+      // app can render the admin's name etc.
+      allow read: if isSelf(userId) || isAdmin() || isDispatcherOf(userId);
 
       // Only admins may update/delete user docs (for now)
-      allow update: if isAdmin() || isSelf(userId); 
+      allow update: if isAdmin() || isSelf(userId);
       allow delete: if isAdmin();
 
       match /vehicles/{plateNumber} {
@@ -585,6 +630,22 @@ service cloud.firestore {
           // drivers of this DSP can read for display
           allow read: if isDriverForUser(userId) && isApproved(userId);
         }
+      }
+
+      // ---------- published waveplans ----------
+      // users/{userId}/published_waveplans/{date}
+      // Admin (DSP) writes the daily Waveplan when they hit Publish.
+      // Drivers of this DSP read it to see their assignment + carpool tab.
+      match /published_waveplans/{date} {
+        allow read, write: if isSelf(userId) && isApproved(userId);
+        allow read: if isDriverForUser(userId) && isApproved(userId);
+      }
+
+      // ---------- calendar events ----------
+      // users/{userId}/calendar_events/{eventId}
+      // Admin-only — calendar lives entirely in the admin area.
+      match /calendar_events/{eventId} {
+        allow read, write: if isSelf(userId) && isApproved(userId);
       }
 
       // ---------- scores for a report ----------
@@ -778,6 +839,21 @@ service cloud.firestore {
             && driverTransporterId() == driverId
             && request.resource.data.driverTransporterId == driverId
             && request.resource.data.testId == testId;
+        }
+
+        // ---------- driver FAQ training ----------
+        // users/{userId}/drivers/{driverId}/faq_training/{date}
+        // Daily completion record written when the driver finishes
+        // the FAQ Training quiz.
+        match /faq_training/{date} {
+          // DSP/admin can read+manage their drivers' progress
+          allow read, create, update, delete:
+            if isSelf(userId) && isApproved(userId);
+
+          // Driver can read + write their own training records
+          allow read, create, update: if isDriverForUser(userId)
+            && isApproved(userId)
+            && driverTransporterId() == driverId;
         }
 
         // ---------- driver shifts ----------

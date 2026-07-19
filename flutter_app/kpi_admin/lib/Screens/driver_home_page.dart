@@ -18,6 +18,7 @@ class DriverHomePage extends StatelessWidget {
   final VoidCallback onOpenShiftPlan;
   final VoidCallback onOpenAbsence;
   final VoidCallback onOpenIncidentReport;
+  final VoidCallback onOpenWaveplan;
   final VoidCallback onOpenComingSoon;
 
   const DriverHomePage({
@@ -32,6 +33,7 @@ class DriverHomePage extends StatelessWidget {
     required this.onOpenShiftPlan,
     required this.onOpenAbsence,
     required this.onOpenIncidentReport,
+    required this.onOpenWaveplan,
     required this.onOpenComingSoon,
   });
 
@@ -48,6 +50,7 @@ class DriverHomePage extends StatelessWidget {
       onOpenShiftPlan: onOpenShiftPlan,
       onOpenAbsence: onOpenAbsence,
       onOpenIncidentReport: onOpenIncidentReport,
+      onOpenWaveplan: onOpenWaveplan,
       onOpenComingSoon: onOpenComingSoon,
     );
   }
@@ -64,6 +67,7 @@ class _DriverHomePageBody extends StatefulWidget {
   final VoidCallback onOpenShiftPlan;
   final VoidCallback onOpenAbsence;
   final VoidCallback onOpenIncidentReport;
+  final VoidCallback onOpenWaveplan;
   final VoidCallback onOpenComingSoon;
 
   const _DriverHomePageBody({
@@ -77,6 +81,7 @@ class _DriverHomePageBody extends StatefulWidget {
     required this.onOpenShiftPlan,
     required this.onOpenAbsence,
     required this.onOpenIncidentReport,
+    required this.onOpenWaveplan,
     required this.onOpenComingSoon,
   });
 
@@ -195,6 +200,16 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
         borderColor: const Color(0xFFFF8A1F),
         badgeText: t.t('coming_soon'),
         onTap: null,
+      ),
+      // Page: DriverWaveplanView
+      // Wiring: driver_home_shell.dart -> DriverView.waveplan
+      _HomeCardData(
+        title: 'Waveplan',
+        subtitle: 'Deine Route, Spur & Schicht',
+        icon: Icons.waves_rounded,
+        iconColor: const Color(0xFF00B287),
+        iconBackground: const Color(0xFFE6F8F2),
+        onTap: widget.onOpenWaveplan,
       ),
     ];
 

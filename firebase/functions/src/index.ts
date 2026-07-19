@@ -63,6 +63,25 @@ type DeleteDriverData = {
   transporterId?: string;
 };
 
+type CreateDispatcherAccountData = {
+  email?: string;
+  password?: string;
+  displayName?: string;
+};
+
+type UpdateDispatcherAccountData = {
+  dispatcherUid?: string;
+  email?: string;
+  password?: string;
+  displayName?: string;
+  active?: boolean;
+  permissions?: Record<string, unknown>;
+};
+
+type DeleteDispatcherAccountData = {
+  dispatcherUid?: string;
+};
+
 type DeleteFeedbackData = {
   feedbackId?: string;
 };
@@ -902,8 +921,8 @@ export const syncDriverDocExpiryNotifications = onSchedule(
 
           const title =
             severity === "expired" ?
-              `${f.label} expired` :
-              `${f.label} expiring soon`;
+              `${f.label} expired on ${raw}` :
+              `${f.label} expires on ${raw}`;
 
           const body =
             severity === "expired" ?
@@ -1681,3 +1700,301 @@ export const purgeSoftDeletedVehicles = onSchedule(
     }
   },
 );
+
+// ════════════════════════════════════════════════════════════════════════════
+//  Dispatcher sub-accounts (Phase 1)
+// ════════════════════════════════════════════════════════════════════════════
+//
+// A DSP admin can create dispatcher sub-accounts. Each dispatcher has its
+// own Firebase Auth identity but reads/writes data scoped to the parent
+// admin (via parentAdminUid). The admin grants per-module permissions in
+// users/{adminUid}/sub_accounts/{dispatcherUid}.permissions.
+
+const DISPATCHER_PERMISSION_KEYS = [
+  "waveplan",
+  "drivers_hub",
+  "calendar",
+  "fleet_status",
+  "tasks",
+  "shift_absence",
+  "incident_reports",
+  "academy",
+  "dispatcher_pill",
+  "feedback",
+  "faqs",
+  "approvals",
+] as const;
+
+const DISPATCHER_DEFAULT_PERMISSIONS: Record<string, boolean> = {
+  waveplan: true,
+  drivers_hub: false,
+  calendar: true,
+  fleet_status: false,
+  tasks: true,
+  shift_absence: false,
+  incident_reports: false,
+  academy: false,
+  dispatcher_pill: false,
+  feedback: false,
+  faqs: true,
+  approvals: false,
+};
+
+/**
+ * Verify caller is an admin by reading their users/{uid} doc.
+ * @param {string} uid caller uid
+ * @return {Promise<void>} resolves if admin, throws otherwise
+ */
+async function requireAdminRole(uid: string): Promise<void> {
+  const snap = await db.collection("users").doc(uid).get();
+  const role = (snap.data()?.role ?? "").toString();
+  if (role !== "admin") {
+    throw new HttpsError(
+      "permission-denied",
+      "Only DSP admins can manage dispatcher sub-accounts.",
+    );
+  }
+}
+
+/**
+ * Sanitize a permissions map: only keep boolean values for known keys,
+ * coerce undefined/non-bool to false, fill missing keys with defaults.
+ * @param {unknown} raw incoming map from the client
+ * @return {Record<string, boolean>} sanitized
+ */
+function sanitizePermissions(raw: unknown): Record<string, boolean> {
+  const out: Record<string, boolean> = {...DISPATCHER_DEFAULT_PERMISSIONS};
+  if (raw && typeof raw === "object") {
+    const incoming = raw as Record<string, unknown>;
+    for (const key of DISPATCHER_PERMISSION_KEYS) {
+      if (key in incoming) {
+        out[key] = incoming[key] === true;
+      }
+    }
+  }
+  return out;
+}
+
+export const createDispatcherAccount = onCall(async (request) => {
+  const callerUid = requireAuthUid(request.auth);
+  await requireAdminRole(callerUid);
+
+  const data = (request.data || {}) as CreateDispatcherAccountData;
+  const email = (data.email || "").trim().toLowerCase();
+  const password = (data.password || "").toString();
+  const displayName = (data.displayName || "").toString().trim();
+
+  if (!email || !password || password.length < 6) {
+    throw new HttpsError(
+      "invalid-argument",
+      "email and password (min 6 chars) are required.",
+    );
+  }
+
+  let userRecord: UserRecord;
+  try {
+    userRecord = await auth.createUser({
+      email,
+      password,
+      displayName: displayName || undefined,
+      emailVerified: true,
+    });
+  } catch (err) {
+    const e = (typeof err === "object" && err !== null ? err : {}) as AuthLikeError;
+    if (e.code === "auth/email-already-exists") {
+      throw new HttpsError(
+        "already-exists",
+        "Eine Person mit dieser E-Mail existiert bereits.",
+      );
+    }
+    logger.error("createDispatcherAccount: auth.createUser failed", err);
+    throw new HttpsError(
+      "internal",
+      `Konnte Dispatcher-Account nicht anlegen: ${e.message || String(err)}`,
+    );
+  }
+
+  await auth.setCustomUserClaims(userRecord.uid, {
+    role: "dispatcher",
+    parentAdminUid: callerUid,
+  });
+
+  const now = FieldValue.serverTimestamp();
+
+  await db.collection("users").doc(userRecord.uid).set(
+    {
+      role: "dispatcher",
+      parentAdminUid: callerUid,
+      email,
+      displayName: displayName || null,
+      active: true,
+      createdAt: now,
+      updatedAt: now,
+    },
+    {merge: true},
+  );
+
+  await db
+    .collection("users")
+    .doc(callerUid)
+    .collection("sub_accounts")
+    .doc(userRecord.uid)
+    .set({
+      email,
+      displayName: displayName || null,
+      active: true,
+      permissions: DISPATCHER_DEFAULT_PERMISSIONS,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+  logger.info(
+    `createDispatcherAccount: ${userRecord.uid} for admin ${callerUid}`,
+  );
+  return {uid: userRecord.uid};
+});
+
+export const updateDispatcherAccount = onCall(async (request) => {
+  const callerUid = requireAuthUid(request.auth);
+  await requireAdminRole(callerUid);
+
+  const data = (request.data || {}) as UpdateDispatcherAccountData;
+  const dispatcherUid = (data.dispatcherUid || "").trim();
+  if (!dispatcherUid) {
+    throw new HttpsError("invalid-argument", "dispatcherUid is required.");
+  }
+
+  // Confirm this dispatcher actually belongs to the calling admin.
+  const subRef = db
+    .collection("users")
+    .doc(callerUid)
+    .collection("sub_accounts")
+    .doc(dispatcherUid);
+  const subSnap = await subRef.get();
+  if (!subSnap.exists) {
+    throw new HttpsError(
+      "not-found",
+      "Dispatcher gehört nicht zu diesem Admin-Account.",
+    );
+  }
+
+  const newEmailRaw = (data.email || "").toString().trim().toLowerCase();
+  const newPassword = (data.password || "").toString();
+  const newDisplayName = (data.displayName || "").toString().trim();
+  const newActive = data.active;
+  const newPermissionsRaw = data.permissions;
+
+  // Update Firebase Auth user (if email/password/displayName supplied).
+  const authPatch: Record<string, unknown> = {};
+  if (newEmailRaw) authPatch.email = newEmailRaw;
+  if (newPassword) {
+    if (newPassword.length < 6) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Passwort muss mindestens 6 Zeichen haben.",
+      );
+    }
+    authPatch.password = newPassword;
+  }
+  if (newDisplayName) authPatch.displayName = newDisplayName;
+  if (Object.keys(authPatch).length > 0) {
+    try {
+      await auth.updateUser(dispatcherUid, authPatch);
+    } catch (err) {
+      const e = (typeof err === "object" && err !== null ? err : {}) as AuthLikeError;
+      throw new HttpsError(
+        "internal",
+        `Update fehlgeschlagen: ${e.message || String(err)}`,
+      );
+    }
+  }
+
+  // Update top-level user doc.
+  const userPatch: Record<string, unknown> = {
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  if (newEmailRaw) userPatch.email = newEmailRaw;
+  if (newDisplayName) userPatch.displayName = newDisplayName;
+  if (typeof newActive === "boolean") userPatch.active = newActive;
+  await db.collection("users").doc(dispatcherUid).set(userPatch, {merge: true});
+
+  // Update sub-account doc.
+  const subPatch: Record<string, unknown> = {
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  if (newEmailRaw) subPatch.email = newEmailRaw;
+  if (newDisplayName) subPatch.displayName = newDisplayName;
+  if (typeof newActive === "boolean") subPatch.active = newActive;
+  if (newPermissionsRaw !== undefined) {
+    subPatch.permissions = sanitizePermissions(newPermissionsRaw);
+  }
+  await subRef.set(subPatch, {merge: true});
+
+  if (typeof newActive === "boolean") {
+    // Disabling the auth user also locks them out immediately.
+    try {
+      await auth.updateUser(dispatcherUid, {disabled: !newActive});
+    } catch (err) {
+      logger.warn(
+        `updateDispatcherAccount: failed to set disabled flag uid=${dispatcherUid}`,
+        err,
+      );
+    }
+  }
+
+  logger.info(
+    `updateDispatcherAccount: ${dispatcherUid} by admin ${callerUid}`,
+  );
+  return {ok: true};
+});
+
+export const deleteDispatcherAccount = onCall(async (request) => {
+  const callerUid = requireAuthUid(request.auth);
+  await requireAdminRole(callerUid);
+
+  const data = (request.data || {}) as DeleteDispatcherAccountData;
+  const dispatcherUid = (data.dispatcherUid || "").trim();
+  if (!dispatcherUid) {
+    throw new HttpsError("invalid-argument", "dispatcherUid is required.");
+  }
+
+  const subRef = db
+    .collection("users")
+    .doc(callerUid)
+    .collection("sub_accounts")
+    .doc(dispatcherUid);
+  const subSnap = await subRef.get();
+  if (!subSnap.exists) {
+    throw new HttpsError(
+      "not-found",
+      "Dispatcher gehört nicht zu diesem Admin-Account.",
+    );
+  }
+
+  let authDeleted = false;
+  try {
+    await auth.deleteUser(dispatcherUid);
+    authDeleted = true;
+  } catch (err) {
+    logger.warn(
+      `deleteDispatcherAccount: auth delete failed uid=${dispatcherUid}`,
+      err,
+    );
+  }
+
+  try {
+    await db.collection("users").doc(dispatcherUid).delete();
+  } catch (err) {
+    logger.warn(
+      `deleteDispatcherAccount: user doc delete failed uid=${dispatcherUid}`,
+      err,
+    );
+  }
+
+  await subRef.delete();
+
+  logger.info(
+    `deleteDispatcherAccount: ${dispatcherUid} by admin ${callerUid} (authDeleted=${authDeleted})`,
+  );
+  return {ok: true, authDeleted};
+});

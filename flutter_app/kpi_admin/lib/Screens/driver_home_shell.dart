@@ -17,6 +17,7 @@ import 'package:firebase_storage/firebase_storage.dart' as fb;
 
 import '../localization/app_localizations.dart';
 import '../models/driver_notification.dart';
+import '../theme/app_button_style.dart';
 import 'driver_academy_page.dart';
 import 'driver_absence_page.dart';
 import 'driver_onboarding_page.dart';
@@ -26,6 +27,7 @@ import 'driver_notification_detail_view.dart';
 import 'driver_notifications_view.dart';
 import 'driver_rules_view.dart';
 import 'driver_tasks_view.dart';
+import 'driver_waveplan_view.dart';
 
 import '../widgets/notification_pin_dialogs.dart';
 import 'driver_profile_page.dart';
@@ -66,6 +68,7 @@ enum DriverView {
   rules,
   notificationDetail,
   profile,
+  waveplan,
 }
 
 class DriverHomeShell extends StatefulWidget {
@@ -443,6 +446,12 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
               _view = DriverView.incidentReport;
             });
           },
+          onOpenWaveplan: () {
+            setState(() {
+              _tabIndex = 0;
+              _view = DriverView.waveplan;
+            });
+          },
           onOpenComingSoon: () {
             setState(() {
               _tabIndex = 0;
@@ -497,6 +506,12 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
               _view = DriverView.home;
             });
           },
+        );
+
+      case DriverView.waveplan:
+        return DriverWaveplanView(
+          dspUid: widget.dspUid,
+          driverTransporterId: widget.driverTransporterId,
         );
 
       case DriverView.comingSoon:
@@ -1013,52 +1028,33 @@ class _HeaderBar extends StatelessWidget {
                     const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
-                      child: FilledButton.tonal(
-                        style: FilledButton.styleFrom(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
+                      child: FilledButton(
+                        style: AppButtonStyle.of(AppButtonVariant.subtle),
                         onPressed: () {
                           Navigator.of(ctx).pop();
                           onOpenProfile();
                         },
-                        child: Text(
-                          loc.t('nav_profile'),
-                          style: const TextStyle(fontSize: 14),
-                        ),
+                        child: Text(loc.t('nav_profile')),
                       ),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 12),
                     SizedBox(
                       width: double.infinity,
-                      child: OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
+                      child: FilledButton(
+                        style: AppButtonStyle.of(AppButtonVariant.subtle),
                         onPressed: () async {
                           Navigator.of(ctx).pop();
                           await onChangePhoto();
                         },
-                        child: Text(
-                          loc.t('profile_change_photo'),
-                          style: const TextStyle(fontSize: 14),
-                        ),
+                        child: Text(loc.t('profile_change_photo')),
                       ),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 12),
                     SizedBox(
                       width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.redAccent,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: FilledButton(
+                        style: AppButtonStyle.of(
+                          AppButtonVariant.destructive,
                         ),
                         onPressed: () async {
                           Navigator.of(ctx).pop();
@@ -1068,13 +1064,7 @@ class _HeaderBar extends StatelessWidget {
                             context,
                           ).pushNamedAndRemoveUntil('/login', (r) => false);
                         },
-                        child: Text(
-                          loc.t('profile_logout'),
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+                        child: Text(loc.t('profile_logout')),
                       ),
                     ),
                   ],
@@ -1226,7 +1216,7 @@ class _DriverBottomNav extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(999),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.08),

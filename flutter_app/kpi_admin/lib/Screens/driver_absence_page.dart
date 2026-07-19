@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../localization/app_localizations.dart';
+import '../theme/app_button_style.dart';
 
 class DriverAbsencePage extends StatefulWidget {
   final String dspUid;
@@ -296,13 +297,8 @@ class _DriverAbsencePageState extends State<DriverAbsencePage> {
                             onPressed: () => pickForSheet(from: true),
                             icon: const Icon(Icons.event_available_outlined),
                             label: Text('${labels.fromLabel}: ${_date(_from)}'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFF475569),
-                              side: const BorderSide(color: Color(0xFFD9E1E7)),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
+                            style: AppButtonStyle.of(
+                              AppButtonVariant.subtle,
                             ),
                           ),
                         ),
@@ -312,13 +308,8 @@ class _DriverAbsencePageState extends State<DriverAbsencePage> {
                             onPressed: () => pickForSheet(from: false),
                             icon: const Icon(Icons.event_outlined),
                             label: Text('${labels.toLabel}: ${_date(_to)}'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFF475569),
-                              side: const BorderSide(color: Color(0xFFD9E1E7)),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
+                            style: AppButtonStyle.of(
+                              AppButtonVariant.subtle,
                             ),
                           ),
                         ),
