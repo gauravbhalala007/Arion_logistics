@@ -1,9 +1,12 @@
 // lib/screens/admin_shell_page.dart
+import 'dart:convert';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../localization/app_localizations.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../widgets/admin_scope.dart';
@@ -17,14 +20,21 @@ import 'scorecard_overview.dart';
 import 'pod_quality_overview.dart';
 import 'concessions_overview.dart';
 import 'cdf_overview.dart';
+import 'dwc_overview.dart';
+import 'contact_compliance_overview.dart';
 import 'drivers_hub_page.dart';
 import 'admin_recruiting_page.dart';
 import 'admin_waveplan_page.dart';
 import 'admin_calendar_page.dart';
 import 'task_sheet_page.dart';
 import 'admin_zeiten_abwesenheiten_page.dart';
+import 'admin_da_requests_page.dart';
+import 'admin_driver_reviews_page.dart';
+import 'admin_safety_training_page.dart';
 import 'admin_incident_reports_page.dart';
 import 'notifications_page.dart';
+import 'admin_app_updates_page.dart';
+import '../widgets/app_update_popup.dart';
 import 'admin_approvals_page.dart';
 import 'admin_faq_page.dart';
 import 'admin_academy_page.dart';
@@ -39,6 +49,9 @@ import 'admin_cotimer_page.dart';
 import 'admin_inventory_page.dart';
 import 'admin_cart_page.dart';
 import 'admin_shift_plan_page.dart';
+import 'admin_payment_check_page.dart';
+import 'admin_monthly_plan_page.dart';
+import '../widgets/admin_top_bar.dart';
 
 class AdminShellPage extends StatefulWidget {
   final AppNav initialNav;
@@ -53,6 +66,8 @@ class _AdminShellPageState extends State<AdminShellPage> {
   late AppNav _active = widget.initialNav;
   bool _redirectingToLogin = false;
   bool _redirectingToRoot = false;
+  bool _updatePopupScheduled = false;
+  bool _menuCollapsed = false;
 
   String? _profileUid;
   Stream<DocumentSnapshot<Map<String, dynamic>>>? _profileStream;
@@ -72,6 +87,12 @@ class _AdminShellPageState extends State<AdminShellPage> {
   }
 
   bool _isNarrow(BuildContext c) => MediaQuery.of(c).size.width < 1100;
+
+  /// Navy des Admin-Headers — auch die Farbe der mobilen Bottom-Bar.
+  static const Color _kHeaderNavy = Color(0xFF0B1220);
+
+  static String _tr(BuildContext c, String de, String en) =>
+      Localizations.localeOf(c).languageCode == 'de' ? de : en;
 
   Stream<DocumentSnapshot<Map<String, dynamic>>> _profileDocStreamFor(
     String uid,
@@ -145,10 +166,51 @@ class _AdminShellPageState extends State<AdminShellPage> {
                 .toString())
             : '';
 
+        // Once per session: surface the newest unseen product update as a
+        // post-login popup for admin-app users.
+        if (!_updatePopupScheduled) {
+          _updatePopupScheduled = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            AppUpdatePopup.maybeShow(
+              context,
+              uid: authUser.uid,
+              side: 'admin',
+            );
+          });
+        }
+
         return AppShell(
-          menuWidth: 300,
-          centerTitle: true,
-          appBarBackgroundColor: const Color(0xFF0B1220),
+          menuWidth: _menuCollapsed && !narrow ? 72 : 300,
+          // Mobil: Logo linksbündig, kein Hamburger mehr (das Seitenmenü
+          // hängt jetzt an der ersten Kachel der schwebenden Bottom-Bar).
+          centerTitle: !narrow,
+          hideDrawerButton: narrow,
+          actions: narrow
+              ? [
+                  _HeaderLanguageAction(uid: authUser.uid),
+                  const SizedBox(width: 12),
+                  _HeaderIconAction(
+                    icon: Icons.attach_file,
+                    tooltip: _tr(context, 'Notizen', 'Notes'),
+                    onTap: () =>
+                        showAdminQuickNotes(context, uid: authUser.uid),
+                  ),
+                  const SizedBox(width: 12),
+                  _HeaderProfileAvatar(
+                    profile: data,
+                    onTap: () {
+                      if (_active == AppNav.profile) return;
+                      setState(() {
+                        _active = AppNav.profile;
+                        _materialized.add(AppNav.profile);
+                      });
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                ]
+              : null,
+          appBarBackgroundColor: _kHeaderNavy,
           appBarForegroundColor: Colors.white,
           appBarToolbarHeight: 72,
           title: isDispatcherShell
@@ -182,7 +244,12 @@ class _AdminShellPageState extends State<AdminShellPage> {
                   cacheHeight: 152,
                 ),
           sideMenu: AppSideMenu(
-            width: 300,
+            width: _menuCollapsed && !narrow ? 72 : 300,
+            collapsed: _menuCollapsed && !narrow,
+            onToggleCollapsed: narrow
+                ? null
+                : () =>
+                    setState(() => _menuCollapsed = !_menuCollapsed),
             active: _active,
             onSelect: (nav) {
               if (nav == _active) return;
@@ -198,8 +265,31 @@ class _AdminShellPageState extends State<AdminShellPage> {
               }
             },
           ),
-          body: Column(
+          body: _withMobileBottomNav(
+            narrow: narrow,
+            child: Column(
             children: [
+              // Desktop-only top menu bar: company + station on the left,
+              // quick notes / language / profile on the right.
+              if (!narrow && !isDispatcherShell)
+                AdminTopBar(
+                  uid: authUser.uid,
+                  profile: data,
+                  onOpenProfile: () {
+                    if (_active == AppNav.profile) return;
+                    setState(() {
+                      _active = AppNav.profile;
+                      _materialized.add(AppNav.profile);
+                    });
+                  },
+                  onOpenUpdates: () {
+                    if (_active == AppNav.appUpdates) return;
+                    setState(() {
+                      _active = AppNav.appUpdates;
+                      _materialized.add(AppNav.appUpdates);
+                    });
+                  },
+                ),
               _TrialCountdownBanner(profile: data),
               Expanded(
                 child: IndexedStack(
@@ -224,6 +314,7 @@ class _AdminShellPageState extends State<AdminShellPage> {
               _lazy(AppNav.dispatcherPill,
                   () => const AdminDispatcherCenterPage()),
               _lazy(AppNav.notifications, () => const NotificationsPage()),
+              _lazy(AppNav.appUpdates, () => const AdminAppUpdatesPage()),
               _lazy(AppNav.feedback, () => const FeedbackPage()),
               _lazy(AppNav.faqs, () => const AdminFaqPage()),
               _lazy(AppNav.adminApprovals, () => const AdminApprovalsPage()),
@@ -234,13 +325,85 @@ class _AdminShellPageState extends State<AdminShellPage> {
               _lazy(AppNav.inventory, () => const AdminInventoryPage()),
               _lazy(AppNav.cart, () => const AdminCartPage()),
               _lazy(AppNav.shiftPlan, () => const AdminShiftPlanPage()),
+              _lazy(AppNav.paymentCheck,
+                  () => const AdminPaymentCheckPage()),
+              _lazy(AppNav.monthlyPlan,
+                  () => const AdminMonthlyPlanPage()),
+              _lazy(AppNav.dwc, () => const DwcOverviewPage()),
+              _lazy(AppNav.daRequests, () => const AdminDaRequestsPage()),
+              _lazy(AppNav.safetyTraining,
+                  () => const AdminSafetyTrainingPage()),
+              _lazy(AppNav.driverReviews,
+                  () => const AdminDriverReviewsPage()),
+              _lazy(AppNav.contactCompliance,
+                  () => const ContactComplianceOverviewPage()),
             ],
                 ),
               ),
             ],
           ),
+          ),
         );
       },
+    );
+  }
+
+  /// Legt mobil die schwebende Bottom-Navigation über den Inhalt und
+  /// reserviert darunter Platz, damit nichts verdeckt wird. Desktop gibt
+  /// den Inhalt unverändert zurück.
+  Widget _withMobileBottomNav({
+    required bool narrow,
+    required Widget child,
+  }) {
+    if (!narrow) return child;
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+    // Reservierte Fläche = Bar-Höhe + Abstand nach unten + Luft darüber.
+    // Weil der Seiteninhalt dadurch oberhalb der Bar endet, sitzen auch die
+    // schwebenden Plus-/FAB-Buttons der Seiten (Fleet, …) automatisch über
+    // der Bar — sie orientieren sich am unteren Rand ihres eigenen Bereichs.
+    const reserved = _AdminMobileBottomNav.barHeight +
+        _AdminMobileBottomNav.bottomMargin +
+        16;
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Padding(
+            padding: EdgeInsets.only(bottom: reserved + bottomInset),
+            child: child,
+          ),
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          // Builder: der Kontext muss unterhalb des Scaffolds von AppShell
+          // liegen, damit `Scaffold.of(...)` den Drawer öffnen kann.
+          child: Builder(
+            builder: (ctx) => SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  14,
+                  0,
+                  14,
+                  _AdminMobileBottomNav.bottomMargin,
+                ),
+                child: _AdminMobileBottomNav(
+                  active: _active,
+                  onSelect: (nav) {
+                    if (nav == _active) return;
+                    setState(() {
+                      _active = nav;
+                      _materialized.add(nav);
+                    });
+                  },
+                  onOpenMenu: () => Scaffold.of(ctx).openDrawer(),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -292,26 +455,42 @@ class _AdminShellPageState extends State<AdminShellPage> {
         return 14;
       case AppNav.notifications:
         return 15;
-      case AppNav.feedback:
+      case AppNav.appUpdates:
         return 16;
-      case AppNav.faqs:
+      case AppNav.feedback:
         return 17;
-      case AppNav.adminApprovals:
+      case AppNav.faqs:
         return 18;
-      case AppNav.dispatchers:
+      case AppNav.adminApprovals:
         return 19;
-      case AppNav.profile:
+      case AppNav.dispatchers:
         return 20;
-      case AppNav.styleguide:
+      case AppNav.profile:
         return 21;
-      case AppNav.cotimer:
+      case AppNav.styleguide:
         return 22;
-      case AppNav.inventory:
+      case AppNav.cotimer:
         return 23;
-      case AppNav.cart:
+      case AppNav.inventory:
         return 24;
-      case AppNav.shiftPlan:
+      case AppNav.cart:
         return 25;
+      case AppNav.shiftPlan:
+        return 26;
+      case AppNav.paymentCheck:
+        return 27;
+      case AppNav.monthlyPlan:
+        return 28;
+      case AppNav.dwc:
+        return 29;
+      case AppNav.daRequests:
+        return 30;
+      case AppNav.safetyTraining:
+        return 31;
+      case AppNav.driverReviews:
+        return 32;
+      case AppNav.contactCompliance:
+        return 33;
       default:
         return 0;
     }
@@ -396,6 +575,484 @@ class _TrialCountdownBanner extends StatelessWidget {
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: accent.withValues(alpha: 0.92),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Mobiler Header rechts: Sprache · Notizen · Profil
+// ---------------------------------------------------------------------------
+
+/// Runder Header-Button (44×44 Trefferfläche) auf dem Navy des Headers.
+class _HeaderIconAction extends StatelessWidget {
+  const _HeaderIconAction({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      waitDuration: const Duration(milliseconds: 500),
+      child: Material(
+        color: Colors.white.withValues(alpha: 0.10),
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: SizedBox(
+            width: 44,
+            height: 44,
+            child: Icon(icon, size: 21, color: Colors.white),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Sprach-Umschalter mit Landesflagge — gleiche Auswahl wie in der
+/// Fahrer-App, gleiche Logik wie in der Desktop-Topbar
+/// (`localeController` + `languageCode` auf `users/{uid}`).
+class _HeaderLanguageAction extends StatelessWidget {
+  const _HeaderLanguageAction({required this.uid});
+
+  final String uid;
+
+  static String flagAsset(String code) {
+    switch (code) {
+      case 'en':
+        return 'assets/flags/gb.svg';
+      case 'de':
+        return 'assets/flags/de.svg';
+      case 'sq':
+        return 'assets/flags/al.svg';
+      case 'hu':
+        return 'assets/flags/hu.svg';
+      case 'ro':
+        return 'assets/flags/ro.svg';
+      case 'hr':
+        return 'assets/flags/hr.svg';
+      case 'ar':
+        return 'assets/flags/sy.svg';
+      case 'tr':
+        return 'assets/flags/tr.svg';
+      case 'ru':
+        return 'assets/flags/ru.svg';
+      case 'bg':
+        return 'assets/flags/bg.svg';
+      case 'es':
+        return 'assets/flags/es.svg';
+      default:
+        return 'assets/flags/gb.svg';
+    }
+  }
+
+  Future<void> _select(BuildContext context) async {
+    final current =
+        (localeController.locale ?? Localizations.localeOf(context))
+            .languageCode;
+    final de = Localizations.localeOf(context).languageCode == 'de';
+
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(ctx).size.height * 0.8,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 10),
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE5E9EE),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    de ? 'Sprache' : 'Language',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1A212B),
+                    ),
+                  ),
+                ),
+              ),
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    for (final locale in AppLocalizations.supportedLocales)
+                      ListTile(
+                        minVerticalPadding: 12,
+                        leading: SizedBox(
+                          width: 30,
+                          height: 30,
+                          child: ClipOval(
+                            child: SvgPicture.asset(
+                              flagAsset(locale.languageCode),
+                              width: 30,
+                              height: 30,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                        title: Text(
+                          languageLabel(locale.languageCode),
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: locale.languageCode == current
+                                ? FontWeight.w800
+                                : FontWeight.w600,
+                          ),
+                        ),
+                        trailing: locale.languageCode == current
+                            ? const Icon(Icons.check_rounded,
+                                color: AppColors.codriverGreen)
+                            : null,
+                        onTap: () =>
+                            Navigator.of(ctx).pop(locale.languageCode),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (picked == null || picked == current) return;
+    localeController.setLocale(Locale(picked));
+    await FirebaseFirestore.instance.collection('users').doc(uid).set({
+      'languageCode': picked,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final code = (localeController.locale ?? Localizations.localeOf(context))
+        .languageCode;
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    return Tooltip(
+      message: de ? 'Sprache' : 'Language',
+      waitDuration: const Duration(milliseconds: 500),
+      child: Material(
+        // Die Flagge selbst ist die Fläche — kein zusätzlicher Farbring.
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => _select(context),
+          child: SizedBox(
+            width: 48,
+            height: 48,
+            child: Center(
+              child: Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.35),
+                  ),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: SvgPicture.asset(
+                  flagAsset(code),
+                  width: 42,
+                  height: 42,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Profil-Avatar im Header: Firmen-/Profilfoto aus `users/{uid}`
+/// (`profilePhotoBase64`, sonst `profilePhotoStorageUrl`), Fallback sind
+/// die Initialen des Firmennamens auf grünem Verlauf.
+class _HeaderProfileAvatar extends StatelessWidget {
+  const _HeaderProfileAvatar({required this.profile, required this.onTap});
+
+  final Map<String, dynamic> profile;
+  final VoidCallback onTap;
+
+  static String _initials(String name) {
+    final parts =
+        name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
+    return (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final name = (profile['companyName'] ??
+            profile['dspName'] ??
+            profile['name'] ??
+            '')
+        .toString();
+
+    ImageProvider? image;
+    final b64 = (profile['profilePhotoBase64'] ?? '').toString().trim();
+    if (b64.isNotEmpty) {
+      try {
+        image = MemoryImage(base64Decode(b64));
+      } catch (_) {}
+    }
+    if (image == null) {
+      final url = (profile['profilePhotoStorageUrl'] ?? '').toString().trim();
+      if (url.isNotEmpty) image = NetworkImage(url);
+    }
+
+    return Tooltip(
+      message: de ? 'Profil' : 'Profile',
+      waitDuration: const Duration(milliseconds: 500),
+      child: Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: SizedBox(
+            width: 44,
+            height: 44,
+            child: Center(
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: image == null
+                      ? const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFF0D8A60), Color(0xFF14A878)],
+                        )
+                      : null,
+                  image: image == null
+                      ? null
+                      : DecorationImage(image: image, fit: BoxFit.cover),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.35),
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: image == null
+                    ? Text(
+                        _initials(name),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      )
+                    : null,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Schwebende Bottom-Navigation (nur mobil)
+// ---------------------------------------------------------------------------
+
+/// Dunkle Variante der Fahrer-App-Bottom-Bar: schwebende Pill im Navy des
+/// Headers. Erste Kachel öffnet das Seitenmenü, danach die fünf
+/// Haupt-Bereiche. Aktiv = grün, inaktiv = gedämpftes Hellgrau.
+class _AdminMobileBottomNav extends StatelessWidget {
+  const _AdminMobileBottomNav({
+    required this.active,
+    required this.onSelect,
+    required this.onOpenMenu,
+  });
+
+  final AppNav active;
+  final ValueChanged<AppNav> onSelect;
+  final VoidCallback onOpenMenu;
+
+  static const Color _bar = Color(0xFF0B1220);
+  static const Color _activeColor = Color(0xFF14A878);
+  static const Color _idleColor = Color(0xFF9BA6B7);
+
+  /// Gesamthöhe der Pille (Item-Höhe + vertikales Innenpadding) — die Shell
+  /// reserviert damit exakt so viel Platz, wie die Bar wirklich braucht.
+  static const double itemHeight = 54;
+  static const double verticalPadding = 8;
+  static const double barHeight = itemHeight + verticalPadding * 2;
+
+  /// Abstand der Bar zum unteren Rand (zusätzlich zur SafeArea).
+  static const double bottomMargin = 22;
+
+  @override
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+
+    final items = <({AppNav nav, IconData icon, String label})>[
+      (nav: AppNav.home, icon: Icons.home_outlined, label: 'Home'),
+      (
+        nav: AppNav.drivers,
+        icon: Icons.badge_outlined,
+        label: de ? 'Fahrer' : 'Drivers',
+      ),
+      (
+        nav: AppNav.dashboard,
+        icon: Icons.dashboard,
+        label: 'Scorecard',
+      ),
+      (
+        nav: AppNav.fleetStatus,
+        icon: Icons.local_shipping_outlined,
+        label: 'Fleet',
+      ),
+      (
+        nav: AppNav.recruiting,
+        icon: Icons.work_outline_rounded,
+        label: 'Recruiting',
+      ),
+    ];
+
+    return Container(
+      height: barHeight,
+      decoration: BoxDecoration(
+        color: _bar,
+        // Echte Pille — vollständig abgerundet.
+        borderRadius: BorderRadius.circular(999),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.28),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 8,
+        vertical: verticalPadding,
+      ),
+      child: Row(
+        children: [
+          // Runde Menü-Kachel — etwas heller als die Bar und ein paar Pixel
+          // höher gesetzt als die übrigen Punkte.
+          Transform.translate(
+            offset: const Offset(0, -5),
+            child: Tooltip(
+              message: de ? 'Menü' : 'Menu',
+              waitDuration: const Duration(milliseconds: 500),
+              child: Material(
+                color: Colors.white.withValues(alpha: 0.14),
+                shape: const CircleBorder(),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: onOpenMenu,
+                  child: const SizedBox(
+                    width: 52,
+                    height: 52,
+                    child: Icon(Icons.menu, size: 25, color: Colors.white),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          for (final item in items)
+            Expanded(
+              child: _NavItem(
+                icon: item.icon,
+                label: item.label,
+                selected: active == item.nav,
+                onTap: () => onSelect(item.nav),
+                activeColor: _activeColor,
+                idleColor: _idleColor,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NavItem extends StatelessWidget {
+  const _NavItem({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    required this.activeColor,
+    required this.idleColor,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final Color activeColor;
+  final Color idleColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? activeColor : idleColor;
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(14),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: SizedBox(
+          height: _AdminMobileBottomNav.itemHeight,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 28, color: color),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 9.5,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                  color: color,
+                  letterSpacing: 0.1,
                 ),
               ),
             ],

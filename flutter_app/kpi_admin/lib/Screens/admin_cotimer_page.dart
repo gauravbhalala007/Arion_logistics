@@ -207,6 +207,7 @@ class _AdminCotimerPageState extends State<AdminCotimerPage>
         // DSP-UID mit dieser hier vergleichen.
         Builder(
           builder: (ctx) {
+            final de = Localizations.localeOf(ctx).languageCode == 'de';
             final uid = AdminScope.adminUidOf(ctx) ??
                 FirebaseAuth.instance.currentUser?.uid;
             return Row(
@@ -239,8 +240,9 @@ class _AdminCotimerPageState extends State<AdminCotimerPage>
                             if (sCtx.mounted) {
                               ScaffoldMessenger.of(sCtx).showSnackBar(
                                 SnackBar(
-                                  content: Text(
-                                      'Account kopiert: $copy'),
+                                  content: Text(de
+                                      ? 'Account kopiert: $copy'
+                                      : 'Account copied: $copy'),
                                 ),
                               );
                             }
@@ -311,9 +313,12 @@ class _AdminCotimerPageState extends State<AdminCotimerPage>
   }
 
   Widget _buildTabBar() {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     return PillTabBar(
       controller: _tab,
-      tabs: const ['Live', 'Zeitkonto', 'Korrekturen', 'Compliance'],
+      tabs: de
+          ? const ['Live', 'Zeitkonto', 'Korrekturen', 'Compliance']
+          : const ['Live', 'Time account', 'Corrections', 'Compliance'],
     );
   }
 }
@@ -337,13 +342,16 @@ class _LiveBoardTabState extends State<_LiveBoardTab> {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final uid = AdminScope.adminUidOf(context) ??
         FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) {
-      return const _EmptyTabState(
+      return _EmptyTabState(
         icon: Icons.lock_outline,
-        title: 'Nicht eingeloggt',
-        subtitle: 'Bitte erneut anmelden, um das Live-Board zu sehen.',
+        title: de ? 'Nicht eingeloggt' : 'Not signed in',
+        subtitle: de
+            ? 'Bitte erneut anmelden, um das Live-Board zu sehen.'
+            : 'Please sign in again to see the Live Board.',
       );
     }
 
@@ -387,22 +395,32 @@ class _LiveBoardTabState extends State<_LiveBoardTab> {
             if (shiftsSnap.hasError) {
               return _EmptyTabState(
                 icon: Icons.error_outline_rounded,
-                title: 'Fehler beim Laden',
-                subtitle: '${shiftsSnap.error}\n\n'
-                    'Hinweis: Der Firestore-CollectionGroup-Index für '
-                    '`shifts` wird beim Erst-Aufruf angelegt — das kann '
-                    'ein paar Minuten dauern. Bitte gleich erneut '
-                    'versuchen.',
+                title: de ? 'Fehler beim Laden' : 'Loading failed',
+                subtitle: de
+                    ? '${shiftsSnap.error}\n\n'
+                        'Hinweis: Der Firestore-CollectionGroup-Index für '
+                        '`shifts` wird beim Erst-Aufruf angelegt — das kann '
+                        'ein paar Minuten dauern. Bitte gleich erneut '
+                        'versuchen.'
+                    : '${shiftsSnap.error}\n\n'
+                        'Note: The Firestore collection-group index for '
+                        '`shifts` is created on first use — that can take '
+                        'a few minutes. Please try again shortly.',
               );
             }
             final shifts = shiftsSnap.data?.docs ?? const [];
             if (shifts.isEmpty) {
-              return const _EmptyTabState(
+              return _EmptyTabState(
                 icon: Icons.coffee_outlined,
-                title: 'Niemand ist eingestempelt',
-                subtitle:
-                    'Sobald ein Fahrer per co:timer einstempelt, erscheint '
-                    'er hier mit Live-Schichtdauer und Compliance-Status.',
+                title: de
+                    ? 'Niemand ist eingestempelt'
+                    : 'Nobody is clocked in',
+                subtitle: de
+                    ? 'Sobald ein Fahrer per co:timer einstempelt, erscheint '
+                        'er hier mit Live-Schichtdauer und Compliance-Status.'
+                    : 'As soon as a driver clocks in via co:timer, they '
+                        'appear here with live shift duration and '
+                        'compliance status.',
               );
             }
 
@@ -480,13 +498,14 @@ class _StatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
             child: _StatChip(
-              label: 'EINGESTEMPELT',
+              label: de ? 'EINGESTEMPELT' : 'CLOCKED IN',
               value: '$active',
               color: AppColors.codriverGreen,
               icon: Icons.circle,
@@ -495,7 +514,7 @@ class _StatsRow extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: _StatChip(
-              label: 'HEUTE GESAMT',
+              label: de ? 'HEUTE GESAMT' : 'TODAY TOTAL',
               value: _fmtHm(totalWorkedSeconds),
               color: const Color(0xFF1C1C1E),
               icon: Icons.schedule_rounded,
@@ -504,7 +523,7 @@ class _StatsRow extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: _StatChip(
-              label: 'IN PAUSE',
+              label: de ? 'IN PAUSE' : 'ON BREAK',
               value: '$onPause',
               color: const Color(0xFFB7791F),
               icon: Icons.pause_circle_filled_rounded,
@@ -513,7 +532,7 @@ class _StatsRow extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: _StatChip(
-              label: 'WARNUNGEN',
+              label: de ? 'WARNUNGEN' : 'WARNINGS',
               value: '$warnings',
               color: warnings > 0
                   ? AppColors.error
@@ -674,6 +693,7 @@ class _ActiveShiftCardState extends State<_ActiveShiftCard> {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final shift = widget.shift;
     final driverName = widget.driverName;
     final start = (shift['startTs'] as Timestamp?)?.toDate();
@@ -690,13 +710,19 @@ class _ActiveShiftCardState extends State<_ActiveShiftCard> {
 
     final warnings = <String>[];
     if (workHours >= 6 && pauseDur < 1800) {
-      warnings.add('Mindestpause noch nicht erreicht');
+      warnings.add(de
+          ? 'Mindestpause noch nicht erreicht'
+          : 'Minimum break not yet taken');
     }
     if (workHours > 9 && pauseDur < 2700) {
-      warnings.add('Bei >9 h sind 45 min Pause Pflicht');
+      warnings.add(de
+          ? 'Bei >9 h sind 45 min Pause Pflicht'
+          : '45 min break required for >9 h');
     }
     if (totalSeconds / 3600 > 10) {
-      warnings.add('Schichtdauer über 10 h (ArbZG §3)');
+      warnings.add(de
+          ? 'Schichtdauer über 10 h (ArbZG §3)'
+          : 'Shift longer than 10 h (German Working Time Act §3)');
     }
 
     // „Nächste Pause fällig in" — sobald 6 h gearbeitet ohne 30 min
@@ -980,11 +1006,16 @@ class _TimeAccountTabState extends State<_TimeAccountTab> {
       '${d.year}-${d.month.toString().padLeft(2, '0')}';
 
   String _monthLabel(DateTime d) {
-    const months = [
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    const monthsDe = [
       'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
       'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
     ];
-    return '${months[d.month - 1]} ${d.year}';
+    const monthsEn = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ];
+    return '${(de ? monthsDe : monthsEn)[d.month - 1]} ${d.year}';
   }
 
   void _prev() => setState(() => _month = DateTime(_month.year, _month.month - 1, 1));
@@ -1096,6 +1127,7 @@ class _TimeAccountTabState extends State<_TimeAccountTab> {
   }
 
   Widget _buildMonthPicker() {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
       decoration: BoxDecoration(
@@ -1109,7 +1141,7 @@ class _TimeAccountTabState extends State<_TimeAccountTab> {
             onPressed: _prev,
             icon: const Icon(Icons.chevron_left_rounded),
             color: Colors.black,
-            tooltip: 'Vorheriger Monat',
+            tooltip: de ? 'Vorheriger Monat' : 'Previous month',
           ),
           Expanded(
             child: Center(
@@ -1126,7 +1158,7 @@ class _TimeAccountTabState extends State<_TimeAccountTab> {
             onPressed: _next,
             icon: const Icon(Icons.chevron_right_rounded),
             color: Colors.black,
-            tooltip: 'Nächster Monat',
+            tooltip: de ? 'Nächster Monat' : 'Next month',
           ),
           const SizedBox(width: 4),
           // 3-Punkte-Menü mit selten gebrauchten Aktionen.
@@ -1195,6 +1227,7 @@ class _TimeAccountTabState extends State<_TimeAccountTab> {
     if (_recomputing) return;
     setState(() => _recomputing = true);
     final messenger = ScaffoldMessenger.of(context);
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final month = _ym(_month);
     try {
       final res = await FirebaseFunctions.instanceFor(region: 'europe-west3')
@@ -1203,8 +1236,11 @@ class _TimeAccountTabState extends State<_TimeAccountTab> {
       final m = res.data is Map ? res.data as Map : const {};
       messenger.showSnackBar(SnackBar(
         content: Text(
-          'Konto neu berechnet für ${m['month'] ?? month} · '
-          '${m['driversProcessed'] ?? '?'} Fahrer',
+          de
+              ? 'Konto neu berechnet für ${m['month'] ?? month} · '
+                  '${m['driversProcessed'] ?? '?'} Fahrer'
+              : 'Account recalculated for ${m['month'] ?? month} · '
+                  '${m['driversProcessed'] ?? '?'} drivers',
         ),
       ));
     } catch (e) {
@@ -2021,12 +2057,16 @@ class _CorrectionsTab extends StatelessWidget {
             }
             final reqs = reqSnap.data?.docs ?? const [];
             if (reqs.isEmpty) {
-              return const _EmptyTabState(
+              final de =
+                  Localizations.localeOf(context).languageCode == 'de';
+              return _EmptyTabState(
                 icon: Icons.inbox_outlined,
-                title: 'Keine offenen Anträge',
-                subtitle:
-                    'Sobald ein Driver einen Korrektur-Antrag stellt, '
-                    'erscheint er hier mit Diff-View und Approve/Reject.',
+                title: de ? 'Keine offenen Anträge' : 'No open requests',
+                subtitle: de
+                    ? 'Sobald ein Driver einen Korrektur-Antrag stellt, '
+                        'erscheint er hier mit Diff-View und Approve/Reject.'
+                    : 'As soon as a driver submits a correction request, '
+                        'it appears here with diff view and approve/reject.',
               );
             }
             return ListView(
@@ -2353,12 +2393,18 @@ class _ComplianceTab extends StatelessWidget {
             }).toList();
 
             if (docs.isEmpty) {
-              return const _EmptyTabState(
+              final de =
+                  Localizations.localeOf(context).languageCode == 'de';
+              return _EmptyTabState(
                 icon: Icons.verified_rounded,
-                title: 'Keine Compliance-Verstöße',
-                subtitle:
-                    'In den letzten 60 Tagen gab es keine erkannten '
-                    'ArbZG-Verstöße. Sauber!',
+                title: de
+                    ? 'Keine Compliance-Verstöße'
+                    : 'No compliance violations',
+                subtitle: de
+                    ? 'In den letzten 60 Tagen gab es keine erkannten '
+                        'ArbZG-Verstöße. Sauber!'
+                    : 'No working-time violations detected in the last '
+                        '60 days. All clear!',
               );
             }
 
@@ -2384,8 +2430,12 @@ class _ComplianceTab extends StatelessWidget {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          '${docs.length} Schichten mit Compliance-Verstößen '
-                          'in den letzten 60 Tagen',
+                          Localizations.localeOf(context).languageCode == 'de'
+                              ? '${docs.length} Schichten mit '
+                                  'Compliance-Verstößen in den letzten '
+                                  '60 Tagen'
+                              : '${docs.length} shifts with compliance '
+                                  'violations in the last 60 days',
                           style: AppTypography.subheadline.copyWith(
                             color: AppColors.error,
                             fontWeight: FontWeight.w800,
@@ -2550,6 +2600,7 @@ Future<void> _openTransferDriverDialog(
   String adminUid,
 ) async {
   final emailCtrl = TextEditingController();
+  final de = Localizations.localeOf(context).languageCode == 'de';
   await showDialog<void>(
     context: context,
     builder: (ctx) {
@@ -2562,7 +2613,9 @@ Future<void> _openTransferDriverDialog(
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
             ),
-            title: const Text('Fahrer auf diesen Admin übernehmen'),
+            title: Text(de
+                ? 'Fahrer auf diesen Admin übernehmen'
+                : 'Transfer driver to this admin'),
             content: SizedBox(
               width: 400,
               child: Column(
@@ -2570,10 +2623,15 @@ Future<void> _openTransferDriverDialog(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'Der Fahrer wird vom alten DSP gelöst und unter '
-                    'diesem Admin-Account verknüpft. Stationen, Soll '
-                    'und Schichten von diesem Admin werden danach '
-                    'für den Fahrer sichtbar.',
+                    de
+                        ? 'Der Fahrer wird vom alten DSP gelöst und unter '
+                            'diesem Admin-Account verknüpft. Stationen, Soll '
+                            'und Schichten von diesem Admin werden danach '
+                            'für den Fahrer sichtbar.'
+                        : 'The driver is detached from the old DSP and '
+                            'linked to this admin account. Stations, target '
+                            'hours and shifts from this admin will then be '
+                            'visible to the driver.',
                     style: AppTypography.footnote.copyWith(
                       color: AppColors.labelSecondaryLight,
                     ),
@@ -2582,10 +2640,10 @@ Future<void> _openTransferDriverDialog(
                   TextField(
                     controller: emailCtrl,
                     keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
-                      labelText: 'Fahrer-Email',
+                    decoration: InputDecoration(
+                      labelText: de ? 'Fahrer-Email' : 'Driver email',
                       hintText: 'driver@example.com',
-                      border: OutlineInputBorder(),
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                   if (error != null) ...[
@@ -2630,7 +2688,7 @@ Future<void> _openTransferDriverDialog(
               TextButton(
                 onPressed:
                     busy ? null : () => Navigator.of(ctx).pop(),
-                child: const Text('Schließen'),
+                child: Text(de ? 'Schließen' : 'Close'),
               ),
               FilledButton(
                 style: FilledButton.styleFrom(
@@ -2641,7 +2699,8 @@ Future<void> _openTransferDriverDialog(
                     : () async {
                         final email = emailCtrl.text.trim();
                         if (email.isEmpty) {
-                          setLocal(() => error = 'Email eintragen');
+                          setLocal(() => error =
+                              de ? 'Email eintragen' : 'Enter an email');
                           return;
                         }
                         setLocal(() {
@@ -2662,11 +2721,14 @@ Future<void> _openTransferDriverDialog(
                               '?';
                           setLocal(() {
                             busy = false;
-                            success =
-                                'Fahrer $email übernommen (TID: $tid). '
-                                'Der Fahrer muss sich einmal aus- und '
-                                'wieder einloggen, damit die '
-                                'Berechtigungen aktualisiert werden.';
+                            success = de
+                                ? 'Fahrer $email übernommen (TID: $tid). '
+                                    'Der Fahrer muss sich einmal aus- und '
+                                    'wieder einloggen, damit die '
+                                    'Berechtigungen aktualisiert werden.'
+                                : 'Driver $email transferred (TID: $tid). '
+                                    'The driver must log out and back in '
+                                    'once so the permissions are updated.';
                           });
                         } catch (e) {
                           setLocal(() {
@@ -2681,7 +2743,7 @@ Future<void> _openTransferDriverDialog(
                         height: 16,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Text('Übernehmen'),
+                    : Text(de ? 'Übernehmen' : 'Transfer'),
               ),
             ],
           );
@@ -2694,6 +2756,7 @@ Future<void> _openTransferDriverDialog(
 
 Future<void> _seedHolidays(BuildContext context) async {
   final messenger = ScaffoldMessenger.of(context);
+  final de = Localizations.localeOf(context).languageCode == 'de';
   showDialog<void>(
     context: context,
     barrierDismissible: false,
@@ -2722,7 +2785,11 @@ Future<void> _seedHolidays(BuildContext context) async {
     final count = (res.data is Map ? res.data['count'] : null) ?? '?';
     if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
     messenger.showSnackBar(
-      SnackBar(content: Text('Feiertage geladen ($count Einträge).')),
+      SnackBar(
+        content: Text(de
+            ? 'Feiertage geladen ($count Einträge).'
+            : 'Holidays loaded ($count entries).'),
+      ),
     );
   } catch (e) {
     if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
@@ -2810,6 +2877,7 @@ class _SetupTab extends StatelessWidget {
           .doc(uid)
           .snapshots(),
       builder: (context, adminSnap) {
+        final de = Localizations.localeOf(context).languageCode == 'de';
         final emp =
             (adminSnap.data?.data()?['cotimerEmployment'] as Map?) ??
                 const {};
@@ -2823,10 +2891,16 @@ class _SetupTab extends StatelessWidget {
                 _iOSSwitchRow(
                   icon: Icons.group_outlined,
                   iconColor: AppColors.codriverGreen,
-                  title: 'co:timer für alle Fahrer',
+                  title: de
+                      ? 'co:timer für alle Fahrer'
+                      : 'co:timer for all drivers',
                   subtitle: addonEnabled
-                      ? 'Alle Fahrer sehen das co:timer-Tile'
-                      : 'Nur du siehst co:timer aktuell',
+                      ? (de
+                          ? 'Alle Fahrer sehen das co:timer-Tile'
+                          : 'All drivers see the co:timer tile')
+                      : (de
+                          ? 'Nur du siehst co:timer aktuell'
+                          : 'Only you see co:timer right now'),
                   value: addonEnabled,
                   onChanged: (v) async {
                     final messenger = ScaffoldMessenger.of(context);
@@ -2840,8 +2914,12 @@ class _SetupTab extends StatelessWidget {
                       }, SetOptions(merge: true));
                       messenger.showSnackBar(SnackBar(
                         content: Text(v
-                            ? 'co:timer freigeschaltet.'
-                            : 'co:timer deaktiviert.'),
+                            ? (de
+                                ? 'co:timer freigeschaltet.'
+                                : 'co:timer enabled.')
+                            : (de
+                                ? 'co:timer deaktiviert.'
+                                : 'co:timer disabled.')),
                       ));
                     } catch (e) {
                       messenger.showSnackBar(
@@ -2857,7 +2935,9 @@ class _SetupTab extends StatelessWidget {
 
             // ── Sektion: Arbeitsvertrag ───────────────────────────
             _iOSSection(
-              title: 'Arbeitsvertrag (gilt für alle Fahrer)',
+              title: de
+                  ? 'Arbeitsvertrag (gilt für alle Fahrer)'
+                  : 'Employment contract (applies to all drivers)',
               children: [
                 _iOSValueRow(
                   icon: Icons.access_time_rounded,
@@ -2914,8 +2994,8 @@ class _SetupTab extends StatelessWidget {
                       iconColor: AppColors.codriverGreen,
                       title: 'Feiertage $year',
                       value: loaded
-                          ? '$count Einträge'
-                          : 'Nicht geladen',
+                          ? (de ? '$count Einträge' : '$count entries')
+                          : (de ? 'Nicht geladen' : 'Not loaded'),
                       onTap: () => _seedHolidays(ctx),
                     );
                   },
@@ -2924,8 +3004,8 @@ class _SetupTab extends StatelessWidget {
                 _iOSValueRow(
                   icon: Icons.swap_horiz_rounded,
                   iconColor: AppColors.codriverGreen,
-                  title: 'Fahrer übernehmen',
-                  value: 'Tippe zum Öffnen',
+                  title: de ? 'Fahrer übernehmen' : 'Transfer driver',
+                  value: de ? 'Tippe zum Öffnen' : 'Tap to open',
                   onTap: () =>
                       _openTransferDriverDialog(context, uid),
                 ),
@@ -3229,7 +3309,9 @@ class _iOSStationsSection extends StatelessWidget {
                     ),
                     const SizedBox(width: 12),
                     Text(
-                      'Station hinzufügen',
+                      Localizations.localeOf(context).languageCode == 'de'
+                          ? 'Station hinzufügen'
+                          : 'Add station',
                       style: AppTypography.subheadline.copyWith(
                         color: AppColors.codriverGreen,
                         fontWeight: FontWeight.w800,
@@ -3467,7 +3549,10 @@ class _StationCard extends StatelessWidget {
             child: OutlinedButton.icon(
               onPressed: () => _openFenceEditor(context),
               icon: const Icon(Icons.add_location_alt_outlined, size: 18),
-              label: const Text('Geofence hinzufügen'),
+              label: Text(
+                  Localizations.localeOf(context).languageCode == 'de'
+                      ? 'Geofence hinzufügen'
+                      : 'Add geofence'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.codriverDeep,
                 side: const BorderSide(
@@ -3632,6 +3717,7 @@ class _FenceEditorDialogState extends State<_FenceEditorDialog> {
     if (query.isEmpty || _searchingAddress) return;
     setState(() => _searchingAddress = true);
     final messenger = ScaffoldMessenger.of(context);
+    final de = Localizations.localeOf(context).languageCode == 'de';
     try {
       final url = Uri.parse(
         'https://nominatim.openstreetmap.org/search'
@@ -3650,7 +3736,9 @@ class _FenceEditorDialogState extends State<_FenceEditorDialog> {
       final list = jsonDecode(resp.body) as List;
       if (list.isEmpty) {
         messenger.showSnackBar(
-          const SnackBar(content: Text('Adresse nicht gefunden')),
+          SnackBar(
+              content:
+                  Text(de ? 'Adresse nicht gefunden' : 'Address not found')),
         );
         return;
       }
@@ -3659,7 +3747,9 @@ class _FenceEditorDialogState extends State<_FenceEditorDialog> {
       final lon = double.tryParse(hit['lon']?.toString() ?? '');
       if (lat == null || lon == null) {
         messenger.showSnackBar(
-          const SnackBar(content: Text('Ungültiges Suchergebnis')),
+          SnackBar(
+              content: Text(
+                  de ? 'Ungültiges Suchergebnis' : 'Invalid search result')),
         );
         return;
       }
@@ -3726,6 +3816,7 @@ class _FenceEditorDialogState extends State<_FenceEditorDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final mediaW = MediaQuery.of(context).size.width;
     final mediaH = MediaQuery.of(context).size.height;
     final dialogW = mediaW < 700 ? mediaW - 24 : 640.0;
@@ -3744,7 +3835,7 @@ class _FenceEditorDialogState extends State<_FenceEditorDialog> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Neuer Geofence',
+                de ? 'Neuer Geofence' : 'New geofence',
                 style: AppTypography.title3.copyWith(
               color: Colors.black,
                   fontWeight: FontWeight.w800,
@@ -3752,8 +3843,12 @@ class _FenceEditorDialogState extends State<_FenceEditorDialog> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Suche per Adresse, nutze GPS oder tippe auf die Karte. '
-                'Fahrer können nur innerhalb des Radius einstempeln.',
+                de
+                    ? 'Suche per Adresse, nutze GPS oder tippe auf die '
+                        'Karte. Fahrer können nur innerhalb des Radius '
+                        'einstempeln.'
+                    : 'Search by address, use GPS or tap the map. '
+                        'Drivers can only clock in within the radius.',
                 style: AppTypography.footnote.copyWith(
                   color: AppColors.labelSecondaryLight,
                 ),
@@ -4130,6 +4225,7 @@ class _SetupGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     return ListView(
       padding: const EdgeInsets.only(bottom: 32),
       children: [
@@ -4169,7 +4265,7 @@ class _SetupGate extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'co:timer einrichten',
+                          de ? 'co:timer einrichten' : 'Set up co:timer',
                           style: AppTypography.title3.copyWith(
               color: Colors.black,
                             fontWeight: FontWeight.w800,
@@ -4177,7 +4273,9 @@ class _SetupGate extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'Zwei Schritte bevor du loslegen kannst.',
+                          de
+                              ? 'Zwei Schritte bevor du loslegen kannst.'
+                              : 'Two steps before you can get started.',
                           style: AppTypography.footnote.copyWith(
               color: Colors.black,
                             fontWeight: FontWeight.w600,
@@ -4197,14 +4295,19 @@ class _SetupGate extends StatelessWidget {
               _SetupStep(
                 done: hasContract,
                 stepNumber: 1,
-                title: 'Vertragseinstellungen',
+                title: de ? 'Vertragseinstellungen' : 'Contract settings',
                 subtitle: hasContract
-                    ? 'Bundesland und Soll-Modus sind gesetzt.'
-                    : 'Wochenstunden bzw. Monatsstunden + Bundesland '
-                        'für die Feiertage festlegen.',
+                    ? (de
+                        ? 'Bundesland und Soll-Modus sind gesetzt.'
+                        : 'Federal state and target mode are set.')
+                    : (de
+                        ? 'Wochenstunden bzw. Monatsstunden + Bundesland '
+                            'für die Feiertage festlegen.'
+                        : 'Set weekly or monthly hours + federal state '
+                            'for the public holidays.'),
                 actionLabel: hasContract
-                    ? 'Bearbeiten'
-                    : 'Jetzt einrichten',
+                    ? (de ? 'Bearbeiten' : 'Edit')
+                    : (de ? 'Jetzt einrichten' : 'Set up now'),
                 onTap: () => EmploymentEditDialog.show(
                   context,
                   adminUid: adminUid,
@@ -4214,21 +4317,35 @@ class _SetupGate extends StatelessWidget {
               _SetupStep(
                 done: hasStation,
                 stepNumber: 2,
-                title: 'Station mit Geofence',
+                title: de ? 'Station mit Geofence' : 'Station with geofence',
                 subtitle: !hasContract
-                    ? 'Erst Vertrag einrichten, dann eine Station anlegen.'
+                    ? (de
+                        ? 'Erst Vertrag einrichten, dann eine Station '
+                            'anlegen.'
+                        : 'Set up the contract first, then create a '
+                            'station.')
                     : hasStation
-                        ? 'Mindestens eine Station hat einen Geofence.'
+                        ? (de
+                            ? 'Mindestens eine Station hat einen Geofence.'
+                            : 'At least one station has a geofence.')
                         : stationCount == 0
-                            ? 'Lege eine Station an und setze auf der '
-                                'Karte den Hub-Mittelpunkt.'
-                            : '$stationCount Station${stationCount == 1 ? '' : 'en'} '
-                                'vorhanden — Geofence fehlt noch. '
-                                'Tippe in der Station-Karte auf '
-                                '„Geofence hinzufügen".',
+                            ? (de
+                                ? 'Lege eine Station an und setze auf der '
+                                    'Karte den Hub-Mittelpunkt.'
+                                : 'Create a station and set the hub center '
+                                    'on the map.')
+                            : (de
+                                ? '$stationCount Station${stationCount == 1 ? '' : 'en'} '
+                                    'vorhanden — Geofence fehlt noch. '
+                                    'Tippe in der Station-Karte auf '
+                                    '„Geofence hinzufügen".'
+                                : '$stationCount station${stationCount == 1 ? '' : 's'} '
+                                    'created — geofence still missing. '
+                                    'Tap "Add geofence" in the station '
+                                    'card.'),
                 actionLabel: stationCount == 0
-                    ? 'Station anlegen'
-                    : 'Geofence hinzufügen',
+                    ? (de ? 'Station anlegen' : 'Create station')
+                    : (de ? 'Geofence hinzufügen' : 'Add geofence'),
                 onTap: !hasContract
                     ? null
                     : stationCount == 0
@@ -4315,6 +4432,7 @@ class _AddonToggleCard extends StatelessWidget {
 
   Future<void> _setEnabled(BuildContext context, bool value) async {
     final messenger = ScaffoldMessenger.of(context);
+    final de = Localizations.localeOf(context).languageCode == 'de';
     try {
       await FirebaseFirestore.instance
           .collection('users')
@@ -4325,8 +4443,12 @@ class _AddonToggleCard extends StatelessWidget {
       }, SetOptions(merge: true));
       messenger.showSnackBar(SnackBar(
         content: Text(value
-            ? 'co:timer für alle Fahrer freigeschaltet.'
-            : 'co:timer deaktiviert — keine Fahrer sehen mehr das Tile.'),
+            ? (de
+                ? 'co:timer für alle Fahrer freigeschaltet.'
+                : 'co:timer enabled for all drivers.')
+            : (de
+                ? 'co:timer deaktiviert — keine Fahrer sehen mehr das Tile.'
+                : 'co:timer disabled — drivers no longer see the tile.')),
       ));
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text('Fehler: $e')));
@@ -4335,6 +4457,7 @@ class _AddonToggleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
@@ -4365,7 +4488,9 @@ class _AddonToggleCard extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Freischaltung für alle Fahrer',
+                  de
+                      ? 'Freischaltung für alle Fahrer'
+                      : 'Enable for all drivers',
                   style: AppTypography.subheadline.copyWith(
               color: Colors.black,
                     fontWeight: FontWeight.w800,
@@ -4373,8 +4498,12 @@ class _AddonToggleCard extends StatelessWidget {
                 ),
                 Text(
                   enabled
-                      ? 'Alle deine Fahrer sehen das co:timer-Tile.'
-                      : 'Nur du siehst co:timer — Fahrer noch nicht.',
+                      ? (de
+                          ? 'Alle deine Fahrer sehen das co:timer-Tile.'
+                          : 'All your drivers see the co:timer tile.')
+                      : (de
+                          ? 'Nur du siehst co:timer — Fahrer noch nicht.'
+                          : 'Only you see co:timer — drivers do not yet.'),
                   style: AppTypography.caption1.copyWith(
                     color: AppColors.labelSecondaryLight,
                     fontWeight: FontWeight.w600,
@@ -4580,6 +4709,7 @@ class _AddStationDialogState extends State<_AddStationDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       insetPadding:
@@ -4592,12 +4722,18 @@ class _AddStationDialogState extends State<_AddStationDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Station anlegen',
+              Text(de ? 'Station anlegen' : 'Create station',
                   style: AppTypography.title3
                       .copyWith(fontWeight: FontWeight.w800)),
               const SizedBox(height: 6),
               Text(
-                'Trage den Amazon-Station-Code ein (z.B. DBN1). Geofence (Lat/Lng/Radius) kannst du danach in der Station-Karte hinzufügen.',
+                de
+                    ? 'Trage den Amazon-Station-Code ein (z.B. DBN1). '
+                        'Geofence (Lat/Lng/Radius) kannst du danach in der '
+                        'Station-Karte hinzufügen.'
+                    : 'Enter the Amazon station code (e.g. DBN1). You can '
+                        'add the geofence (lat/lng/radius) afterwards in '
+                        'the station card.',
                 style: AppTypography.footnote
                     .copyWith(color: AppColors.labelSecondaryLight),
               ),
@@ -4605,19 +4741,20 @@ class _AddStationDialogState extends State<_AddStationDialog> {
               TextField(
                 controller: _codeCtrl,
                 textCapitalization: TextCapitalization.characters,
-                decoration: const InputDecoration(
-                  labelText: 'Station-Code',
-                  hintText: 'z.B. DBN1',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: de ? 'Station-Code' : 'Station code',
+                  hintText: de ? 'z.B. DBN1' : 'e.g. DBN1',
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _labelCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Anzeigename (optional)',
-                  hintText: 'z.B. Bonn-Süd',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText:
+                      de ? 'Anzeigename (optional)' : 'Display name (optional)',
+                  hintText: de ? 'z.B. Bonn-Süd' : 'e.g. Bonn South',
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 12),
@@ -4637,9 +4774,13 @@ class _AddStationDialogState extends State<_AddStationDialog> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Bundesland für Feiertage wird zentral in den '
-                        'Vertragseinstellungen festgelegt — gilt für '
-                        'alle Stationen.',
+                        de
+                            ? 'Bundesland für Feiertage wird zentral in den '
+                                'Vertragseinstellungen festgelegt — gilt für '
+                                'alle Stationen.'
+                            : 'The federal state for public holidays is set '
+                                'centrally in the contract settings — it '
+                                'applies to all stations.',
                         style: AppTypography.caption1.copyWith(
                           color: const Color(0xFF6B7280),
                           fontWeight: FontWeight.w600,

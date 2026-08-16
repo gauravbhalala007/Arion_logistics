@@ -28,10 +28,11 @@ class AdminDispatcherCenterPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final adminUid = AdminScope.adminUidOf(context) ??
         FirebaseAuth.instance.currentUser?.uid;
     if (adminUid == null) {
-      return const Center(child: Text('Bitte einloggen.'));
+      return Center(child: Text(de ? 'Bitte einloggen.' : 'Please sign in.'));
     }
 
     return DefaultTabController(
@@ -43,10 +44,10 @@ class AdminDispatcherCenterPage extends StatelessWidget {
             child: Builder(
               builder: (ctx) => PillTabBar(
                 controller: DefaultTabController.of(ctx),
-                tabs: const [
-                  'Dispatcher (Kontakt)',
+                tabs: [
+                  de ? 'Dispatcher (Kontakt)' : 'Dispatcher (contact)',
                   'Sub-Accounts',
-                  'Aufgaben',
+                  de ? 'Aufgaben' : 'Tasks',
                 ],
               ),
             ),
@@ -121,6 +122,7 @@ class _DispatcherTasksTabState extends State<_DispatcherTasksTab> {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     return Container(
       color: const Color(0xFFF3F6F7),
       child: StreamBuilder<List<String>>(
@@ -160,7 +162,7 @@ class _DispatcherTasksTabState extends State<_DispatcherTasksTab> {
                     Row(
                       children: [
                         Text(
-                          'Aufgaben',
+                          de ? 'Aufgaben' : 'Tasks',
                           style: AppTypography.title2.copyWith(
                             color: AppColors.codriverGraphite,
                           ),
@@ -171,13 +173,15 @@ class _DispatcherTasksTabState extends State<_DispatcherTasksTab> {
                               ? null
                               : () => _openTaskDialog(),
                           icon: const Icon(Icons.add_rounded),
-                          label: const Text('Neue Aufgabe'),
+                          label: Text(de ? 'Neue Aufgabe' : 'New task'),
                         ),
                       ],
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Wiederkehrende Aufgaben pro Dispatcher. Kategorien zur Übersicht.',
+                      de
+                          ? 'Wiederkehrende Aufgaben pro Dispatcher. Kategorien zur Übersicht.'
+                          : 'Recurring tasks per dispatcher. Categories keep it tidy.',
                       style: AppTypography.footnote.copyWith(
                         color: AppColors.labelSecondaryLight,
                       ),
@@ -192,10 +196,14 @@ class _DispatcherTasksTabState extends State<_DispatcherTasksTab> {
                           border:
                               Border.all(color: const Color(0xFFE5E7EB)),
                         ),
-                        child: const Text(
-                          'Lege zuerst Dispatcher im Tab "Dispatcher (Kontakt)" '
-                          'oder "Sub-Accounts" an, dann kannst du hier Aufgaben '
-                          'zuweisen.',
+                        child: Text(
+                          de
+                              ? 'Lege zuerst Dispatcher im Tab "Dispatcher (Kontakt)" '
+                                  'oder "Sub-Accounts" an, dann kannst du hier Aufgaben '
+                                  'zuweisen.'
+                              : 'First add dispatchers in the "Dispatcher (contact)" '
+                                  'or "Sub-Accounts" tab, then you can assign tasks '
+                                  'here.',
                         ),
                       )
                     else
@@ -204,7 +212,7 @@ class _DispatcherTasksTabState extends State<_DispatcherTasksTab> {
                         runSpacing: 6,
                         children: [
                           ChoiceChip(
-                            label: const Text('Alle'),
+                            label: Text(de ? 'Alle' : 'All'),
                             selected: _filterDispatcher == null,
                             onSelected: (_) =>
                                 setState(() => _filterDispatcher = null),
@@ -225,7 +233,7 @@ class _DispatcherTasksTabState extends State<_DispatcherTasksTab> {
                         padding: const EdgeInsets.symmetric(vertical: 32),
                         child: Center(
                           child: Text(
-                            'Keine Aufgaben.',
+                            de ? 'Keine Aufgaben.' : 'No tasks.',
                             style: AppTypography.footnote.copyWith(
                               color: AppColors.labelSecondaryLight,
                             ),
@@ -254,13 +262,17 @@ class _DispatcherTasksTabState extends State<_DispatcherTasksTab> {
                             final ok = await showDialog<bool>(
                               context: context,
                               builder: (c) => AlertDialog(
-                                title: const Text('Aufgabe löschen?'),
-                                content: Text('"${task.title}" entfernen?'),
+                                title: Text(de
+                                    ? 'Aufgabe löschen?'
+                                    : 'Delete task?'),
+                                content: Text(de
+                                    ? '"${task.title}" entfernen?'
+                                    : 'Remove "${task.title}"?'),
                                 actions: [
                                   TextButton(
                                     onPressed: () =>
                                         Navigator.of(c).pop(false),
-                                    child: const Text('Abbrechen'),
+                                    child: Text(de ? 'Abbrechen' : 'Cancel'),
                                   ),
                                   FilledButton(
                                     style: FilledButton.styleFrom(
@@ -268,7 +280,7 @@ class _DispatcherTasksTabState extends State<_DispatcherTasksTab> {
                                     ),
                                     onPressed: () =>
                                         Navigator.of(c).pop(true),
-                                    child: const Text('Löschen'),
+                                    child: Text(de ? 'Löschen' : 'Delete'),
                                   ),
                                 ],
                               ),
@@ -306,6 +318,7 @@ class _TaskRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final done = task.isDoneForNow;
     final due = task.computedNextDue;
     Color recurrenceColor() {
@@ -371,7 +384,7 @@ class _TaskRow extends StatelessWidget {
                       ),
                     if (due != null)
                       _MiniChip(
-                        text: 'fällig '
+                        text: '${de ? 'fällig' : 'due'} '
                             '${due.day.toString().padLeft(2, '0')}.'
                             '${due.month.toString().padLeft(2, '0')}.'
                             '${due.year}',
@@ -388,12 +401,12 @@ class _TaskRow extends StatelessWidget {
             ),
           ),
           IconButton(
-            tooltip: 'Bearbeiten',
+            tooltip: de ? 'Bearbeiten' : 'Edit',
             onPressed: onEdit,
             icon: const Icon(Icons.edit_rounded),
           ),
           IconButton(
-            tooltip: 'Löschen',
+            tooltip: de ? 'Löschen' : 'Delete',
             onPressed: onDelete,
             icon: const Icon(
               Icons.delete_outline_rounded,
@@ -508,9 +521,12 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
   }
 
   Future<void> _save() async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final title = _titleCtrl.text.trim();
     if (title.isEmpty || _dispatcher == null) {
-      setState(() => _error = 'Titel und Dispatcher pflichtfeld.');
+      setState(() => _error = de
+          ? 'Titel und Dispatcher pflichtfeld.'
+          : 'Title and dispatcher are required.');
       return;
     }
     setState(() {
@@ -551,8 +567,11 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     return AlertDialog(
-      title: Text(widget.existing == null ? 'Neue Aufgabe' : 'Aufgabe bearbeiten'),
+      title: Text(widget.existing == null
+          ? (de ? 'Neue Aufgabe' : 'New task')
+          : (de ? 'Aufgabe bearbeiten' : 'Edit task')),
       content: SizedBox(
         width: 460,
         child: Column(
@@ -571,20 +590,26 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
             const SizedBox(height: 8),
             TextField(
               controller: _titleCtrl,
-              decoration: const InputDecoration(labelText: 'Aufgabe'),
+              decoration: InputDecoration(
+                labelText: de ? 'Aufgabe' : 'Task',
+              ),
             ),
             const SizedBox(height: 8),
             TextField(
               controller: _categoryCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Kategorie',
-                hintText: 'z.B. Morgenrunde, Wartung, …',
+              decoration: InputDecoration(
+                labelText: de ? 'Kategorie' : 'Category',
+                hintText: de
+                    ? 'z.B. Morgenrunde, Wartung, …'
+                    : 'e.g. morning round, maintenance, …',
               ),
             ),
             const SizedBox(height: 8),
             DropdownButtonFormField<TaskRecurrence>(
               initialValue: _recurrence,
-              decoration: const InputDecoration(labelText: 'Wiederholung'),
+              decoration: InputDecoration(
+                labelText: de ? 'Wiederholung' : 'Repeat',
+              ),
               items: [
                 for (final r in TaskRecurrence.values)
                   DropdownMenuItem(value: r, child: Text(r.label)),
@@ -600,8 +625,10 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
               child: InputDecorator(
                 decoration: InputDecoration(
                   labelText: _recurrence == TaskRecurrence.once
-                      ? 'Termin (optional)'
-                      : 'Erstmals fällig (optional)',
+                      ? (de ? 'Termin (optional)' : 'Date (optional)')
+                      : (de
+                          ? 'Erstmals fällig (optional)'
+                          : 'First due (optional)'),
                   suffixIcon: _dueDate != null
                       ? IconButton(
                           onPressed: () => setState(() => _dueDate = null),
@@ -611,7 +638,7 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
                 ),
                 child: Text(
                   _dueDate == null
-                      ? '— Datum wählen —'
+                      ? (de ? '— Datum wählen —' : '— Pick a date —')
                       : '${_dueDate!.day.toString().padLeft(2, '0')}.'
                           '${_dueDate!.month.toString().padLeft(2, '0')}.'
                           '${_dueDate!.year}',
@@ -622,7 +649,7 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
             TextField(
               controller: _noteCtrl,
               maxLines: 2,
-              decoration: const InputDecoration(labelText: 'Notiz'),
+              decoration: InputDecoration(labelText: de ? 'Notiz' : 'Note'),
             ),
             if (_error != null) ...[
               const SizedBox(height: 8),
@@ -637,7 +664,7 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
       actions: [
         TextButton(
           onPressed: _saving ? null : () => Navigator.of(context).pop(),
-          child: const Text('Abbrechen'),
+          child: Text(de ? 'Abbrechen' : 'Cancel'),
         ),
         FilledButton(
           onPressed: _saving ? null : _save,
@@ -647,7 +674,7 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
                   height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('Speichern'),
+              : Text(de ? 'Speichern' : 'Save'),
         ),
       ],
     );

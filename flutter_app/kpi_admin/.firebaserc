@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "gaurav-arion-001-3d94a"
+    "default": "codriver-eu",
+    "prod": "codriver-eu",
+    "legacy": "gaurav-arion-001-3d94a"
   }
 }

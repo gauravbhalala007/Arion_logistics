@@ -142,24 +142,23 @@ class TimeAccountRepository {
     }
 
     // Locate the header row: pick the row that contains the literal
-    // "Employee" + "time tracked" + "contractual expected" cells.
+    // "Employee" + "time tracked" cells. Only the Ist-Stunden
+    // ("time tracked") are imported — Soll/Überstunden columns from
+    // the export are deliberately ignored.
     int headerIdx = -1;
     for (var i = 0; i < sheet.rows.length && i < 5; i++) {
       final row = sheet.rows[i];
       final values = row
           .map((c) => (c?.value ?? '').toString().toLowerCase().trim())
           .toList();
-      if (values.contains('employee') &&
-          values.contains('time tracked') &&
-          values.contains('contractual expected')) {
+      if (values.contains('employee') && values.contains('time tracked')) {
         headerIdx = i;
         break;
       }
     }
     if (headerIdx == -1) {
       throw StateError(
-        'Spalten "Employee", "time tracked" und "contractual expected" '
-        'wurden nicht gefunden.',
+        'Spalten "Employee" und "time tracked" wurden nicht gefunden.',
       );
     }
 
@@ -171,9 +170,7 @@ class TimeAccountRepository {
 
     final iEmp = col('Employee');
     final iEmpId = col('Employee ID');
-    final iSoll = col('contractual expected');
     final iIst = col('time tracked');
-    final iOvertime = col('overtime balance');
     final iStation = col('delivery station');
     final iContract = col('contract type');
     final iRate = col('hourly rate');
@@ -206,9 +203,11 @@ class TimeAccountRepository {
       entries.add(_ParsedRow(
         employeeName: emp,
         employeeId: at(iEmpId),
-        sollHours: num0(iSoll),
+        // Nur Ist-Stunden übernehmen — Soll/Überstunden aus dem
+        // Export werden nicht importiert.
+        sollHours: 0,
         istHours: num0(iIst),
-        overtimeBalance: num0(iOvertime),
+        overtimeBalance: 0,
         deliveryStation: at(iStation).isEmpty ? null : at(iStation),
         contractType: at(iContract).isEmpty ? null : at(iContract),
         hourlyRate: num0(iRate),

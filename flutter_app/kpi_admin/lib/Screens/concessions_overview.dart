@@ -7,11 +7,28 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../services/parser_api.dart';
+import '../services/report_section_remover.dart';
 import '../services/report_writer.dart';
 import '../localization/app_localizations.dart';
+import '../widgets/admin_scope.dart';
+import '../widgets/co_button.dart';
+import 'concessions_dashboard.dart';
 import 'concessions_week.dart';
 
 final _intFmt = NumberFormat.decimalPattern('de');
+final _eurFmtTop = NumberFormat.currency(
+  locale: 'de_DE',
+  symbol: '€',
+  decimalDigits: 2,
+);
+
+String _eurStrInline(num eur) {
+  try {
+    return _eurFmtTop.format(eur);
+  } catch (_) {
+    return '€ ${eur.toStringAsFixed(2)}';
+  }
+}
 
 String _intStr(num? v) {
   if (v == null) return '—';
@@ -64,8 +81,11 @@ class ConcessionsOverviewPage extends StatefulWidget {
       _ConcessionsOverviewPageState();
 }
 
+enum _WeekSort { lossDesc, dnrsDesc, dateDesc }
+
 class _ConcessionsOverviewPageState extends State<ConcessionsOverviewPage> {
   bool _busyUpload = false;
+  _WeekSort _weekSort = _WeekSort.lossDesc;
 
   Stream<List<_ConcessionsReportVM>> _reportsStream() {
     final t = AppLocalizations.of(context);
@@ -125,6 +145,97 @@ class _ConcessionsOverviewPageState extends State<ConcessionsOverviewPage> {
           });
           return rows;
         });
+  }
+
+  Future<void> _confirmDeleteWeek(_ConcessionsReportVM r) async {
+    final t = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t.t('concessions_delete_week_title')),
+        content: Text(
+          t.tf('concessions_delete_week_body', {'week': r.label}),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(t.t('admin_home_cancel')),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFB42318),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(t.t('concessions_delete_week_confirm')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _deleteWeek(r);
+  }
+
+  Future<void> _deleteWeek(_ConcessionsReportVM r) async {
+    final t = AppLocalizations.of(context);
+    try {
+      // Nur die Concessions-Sektion entfernen. Alle Features (Scorecard,
+      // POD, CDF, DWC) teilen sich pro Woche dasselbe Report-Dokument und
+      // je Fahrer dasselbe Score-Dokument — ein komplettes Löschen würde
+      // deren Daten mit vernichten.
+      final uid = AdminScope.adminUidOf(context) ??
+          FirebaseAuth.instance.currentUser!.uid;
+      await ReportSectionRemover.removeSection(
+        uid: uid,
+        reportRef: r.ref,
+        sectionKey: 'concessions',
+        scoreFields: const ['concessions'],
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            t.tf('concessions_delete_week_success', {'week': r.label}),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            t.tf('concessions_delete_week_failed', {'error': '$e'}),
+          ),
+        ),
+      );
+    }
+  }
+
+  double _weekLoss(_ConcessionsReportVM r) {
+    final dnr = _num(r.concSummary['dnrCount']) ?? 0;
+    return dnr * 5.50;
+  }
+
+  void _sortWeekList(List<_ConcessionsReportVM> list) {
+    switch (_weekSort) {
+      case _WeekSort.lossDesc:
+        list.sort((a, b) => _weekLoss(b).compareTo(_weekLoss(a)));
+        break;
+      case _WeekSort.dnrsDesc:
+        list.sort((a, b) {
+          final ad = _num(a.concSummary['dnrCount']) ?? 0;
+          final bd = _num(b.concSummary['dnrCount']) ?? 0;
+          return bd.compareTo(ad);
+        });
+        break;
+      case _WeekSort.dateDesc:
+        list.sort((a, b) {
+          final yc = b.year.compareTo(a.year);
+          if (yc != 0) return yc;
+          return b.week.compareTo(a.week);
+        });
+        break;
+    }
   }
 
   Future<void> _uploadConcessionsXlsx() async {
@@ -221,14 +332,29 @@ class _ConcessionsOverviewPageState extends State<ConcessionsOverviewPage> {
                           ),
                     ),
                     const SizedBox(height: 10),
-                    FilledButton.icon(
-                      onPressed: _busyUpload ? null : _uploadConcessionsXlsx,
-                      icon: const Icon(Icons.upload_file),
-                      label: Text(
-                        _busyUpload
-                            ? t.t('uploading')
-                            : t.t('concessions_upload_xlsx'),
-                      ),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        FilledButton.tonalIcon(
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const ConcessionsDashboardPage(),
+                            ),
+                          ),
+                          icon: const Icon(Icons.dashboard_outlined),
+                          label: Text(t.t('concessions_dashboard_open')),
+                        ),
+                        CoButton(
+                          onPressed:
+                              _busyUpload ? null : _uploadConcessionsXlsx,
+                          icon: Icons.upload_file,
+                          label: _busyUpload
+                              ? t.t('uploading')
+                              : t.t('concessions_upload_xlsx'),
+                          busy: _busyUpload,
+                        ),
+                      ],
                     ),
                   ],
                 )
@@ -245,18 +371,50 @@ class _ConcessionsOverviewPageState extends State<ConcessionsOverviewPage> {
                             ),
                       ),
                     ),
-                    FilledButton.icon(
-                      onPressed: _busyUpload ? null : _uploadConcessionsXlsx,
-                      icon: const Icon(Icons.upload_file),
-                      label: Text(
-                        _busyUpload
-                            ? t.t('uploading')
-                            : t.t('concessions_upload_xlsx'),
+                    FilledButton.tonalIcon(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const ConcessionsDashboardPage(),
+                        ),
                       ),
+                      icon: const Icon(Icons.dashboard_outlined),
+                      label: Text(t.t('concessions_dashboard_open')),
+                    ),
+                    const SizedBox(width: 12),
+                    CoButton(
+                      onPressed: _busyUpload ? null : _uploadConcessionsXlsx,
+                      icon: Icons.upload_file,
+                      label: _busyUpload
+                          ? t.t('uploading')
+                          : t.t('concessions_upload_xlsx'),
+                      busy: _busyUpload,
                     ),
                   ],
                 ),
               const SizedBox(height: 16),
+              // Hero-Stats: Gesamt-Verlust + Gesamt-DNRs + Betroffene
+              _OverallTotalsCard(),
+              const SizedBox(height: 16),
+              // Sort-Bar: Wochen-Sortierung (Default: schlechtester Verlust)
+              Row(
+                children: [
+                  Text(
+                    t.t('concessions_weeks_label'),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF6B7280),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const Spacer(),
+                  _WeekSortMenu(
+                    value: _weekSort,
+                    onChanged: (v) => setState(() => _weekSort = v),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
               Expanded(
                 child: StreamBuilder<List<_ConcessionsReportVM>>(
                   stream: _reportsStream(),
@@ -273,8 +431,9 @@ class _ConcessionsOverviewPageState extends State<ConcessionsOverviewPage> {
                         ),
                       );
                     }
-                    final list =
-                        snap.data ?? const <_ConcessionsReportVM>[];
+                    final list = [
+                      ...(snap.data ?? const <_ConcessionsReportVM>[]),
+                    ];
                     if (list.isEmpty) {
                       return Center(
                         child: Text(
@@ -282,6 +441,7 @@ class _ConcessionsOverviewPageState extends State<ConcessionsOverviewPage> {
                         ),
                       );
                     }
+                    _sortWeekList(list);
 
                     return ListView.separated(
                       itemCount: list.length,
@@ -339,7 +499,19 @@ class _ConcessionsOverviewPageState extends State<ConcessionsOverviewPage> {
                                           ),
                                         ),
                                       ),
-                                    const SizedBox(width: 8),
+                                    const SizedBox(width: 6),
+                                    IconButton(
+                                      tooltip: t.t(
+                                        'concessions_delete_week_tooltip',
+                                      ),
+                                      icon: const Icon(
+                                        Icons.delete_outline_rounded,
+                                        color: Color(0xFFB42318),
+                                        size: 22,
+                                      ),
+                                      onPressed: () => _confirmDeleteWeek(r),
+                                    ),
+                                    const SizedBox(width: 4),
                                     const Icon(Icons.chevron_right),
                                   ],
                                 ),
@@ -362,6 +534,11 @@ class _ConcessionsOverviewPageState extends State<ConcessionsOverviewPage> {
                                       label: t.t('concessions_dnr_dpmo'),
                                       value: _intStr(dnrDpmo),
                                       tone: _ChipTone.warn,
+                                    ),
+                                    _StatChip(
+                                      label: t.t('concessions_loss'),
+                                      value: _eurStrInline(_weekLoss(r)),
+                                      tone: _ChipTone.danger,
                                     ),
                                   ],
                                 ),
@@ -482,7 +659,7 @@ class _ConcessionsReportVM {
   });
 }
 
-enum _ChipTone { neutral, good, warn }
+enum _ChipTone { neutral, good, warn, danger }
 
 class _StatChip extends StatelessWidget {
   final String label;
@@ -507,6 +684,10 @@ class _StatChip extends StatelessWidget {
       case _ChipTone.warn:
         bg = const Color(0xFFFFEDD5);
         fg = const Color(0xFF9A3412);
+        break;
+      case _ChipTone.danger:
+        bg = const Color(0xFFFEE4E2);
+        fg = const Color(0xFFB42318);
         break;
       case _ChipTone.neutral:
       default:
@@ -582,6 +763,351 @@ class _MiniStat extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ============================================================
+//  Overall Totals Card — sichtbar oben auf Concessions Overview
+//  Aggregiert ueber alle scores aller Wochen.
+// ============================================================
+
+class _OverallTotalsCard extends StatelessWidget {
+  const _OverallTotalsCard();
+
+  static const double _eurPerDnr = 5.50;
+  static final NumberFormat _intFmt = NumberFormat.decimalPattern('de');
+  static final NumberFormat _decFmt = NumberFormat.decimalPattern('de');
+  static final NumberFormat _eurFmt = NumberFormat.currency(
+    locale: 'de_DE',
+    symbol: '€',
+    decimalDigits: 2,
+  );
+
+  String _intStr(num v) {
+    try {
+      return _intFmt.format(v.round());
+    } catch (_) {
+      return v.toStringAsFixed(0);
+    }
+  }
+
+  String _decStr(num v) {
+    try {
+      return _decFmt.format(double.parse(v.toStringAsFixed(1)));
+    } catch (_) {
+      return v.toStringAsFixed(1);
+    }
+  }
+
+  String _eurStr(num v) {
+    try {
+      return _eurFmt.format(v);
+    } catch (_) {
+      return '€ ${v.toStringAsFixed(2)}';
+    }
+  }
+
+  Stream<QuerySnapshot<Map<String, dynamic>>> _reportsStream() {
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('reports')
+        .snapshots();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: _reportsStream(),
+      builder: (context, snap) {
+        if (!snap.hasData) {
+          return _SkeletonHero();
+        }
+
+        // Pro Wochen-Report die concessions.summary herauslesen.
+        double sumDnr = 0;
+        double sumDpmo = 0;
+        int weekCount = 0;
+        for (final d in snap.data!.docs) {
+          final m = d.data();
+          final summary =
+              (m['summary'] as Map?)?.cast<String, dynamic>() ?? const {};
+          final conc =
+              (summary['concessions'] as Map?)?.cast<String, dynamic>();
+          if (conc == null) continue;
+          final concSum =
+              (conc['summary'] as Map?)?.cast<String, dynamic>() ??
+                  const {};
+          if (concSum.isEmpty) continue;
+
+          double parseN(dynamic v) {
+            if (v is num) return v.toDouble();
+            if (v is String) {
+              return double.tryParse(
+                    v.trim().replaceAll('%', '').replaceAll(',', '.'),
+                  ) ??
+                  0;
+            }
+            return 0;
+          }
+
+          sumDnr += parseN(concSum['dnrCount']);
+          sumDpmo += parseN(concSum['dnrDpmo']);
+          weekCount += 1;
+        }
+
+        final totalLoss = sumDnr * _eurPerDnr;
+        final avgDnr = weekCount > 0 ? sumDnr / weekCount : 0.0;
+        final avgDpmo = weekCount > 0 ? sumDpmo / weekCount : 0.0;
+        final avgLoss = weekCount > 0 ? totalLoss / weekCount : 0.0;
+
+        return Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFFFEF3F2), Color(0xFFFFF7E6)],
+            ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFFECDCA)),
+          ),
+          child: LayoutBuilder(
+            builder: (context, c) {
+              final isNarrow = c.maxWidth < 760;
+              final cells = <Widget>[
+                _HeroCell(
+                  label: t.t('concessions_total_loss'),
+                  value: _eurStr(totalLoss),
+                  accent: const Color(0xFFB42318),
+                  icon: Icons.payments_outlined,
+                ),
+                _HeroCell(
+                  label: t.t('concessions_avg_loss_week'),
+                  value: _eurStr(avgLoss),
+                  accent: const Color(0xFFB54708),
+                  icon: Icons.trending_up_rounded,
+                ),
+                _HeroCell(
+                  label: t.t('concessions_avg_dnr_week'),
+                  value: _decStr(avgDnr),
+                  accent: const Color(0xFF1F2937),
+                  icon: Icons.warning_amber_rounded,
+                ),
+                _HeroCell(
+                  label: t.t('concessions_avg_dpmo'),
+                  value: _intStr(avgDpmo),
+                  accent: const Color(0xFF1F2937),
+                  icon: Icons.equalizer_rounded,
+                ),
+              ];
+
+              if (isNarrow) {
+                return Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(child: cells[0]),
+                        Container(
+                          width: 1,
+                          height: 52,
+                          color: const Color(0xFFFECDCA),
+                        ),
+                        Expanded(child: cells[1]),
+                      ],
+                    ),
+                    Container(
+                      height: 1,
+                      margin: const EdgeInsets.symmetric(vertical: 14),
+                      color: const Color(0xFFFECDCA),
+                    ),
+                    Row(
+                      children: [
+                        Expanded(child: cells[2]),
+                        Container(
+                          width: 1,
+                          height: 52,
+                          color: const Color(0xFFFECDCA),
+                        ),
+                        Expanded(child: cells[3]),
+                      ],
+                    ),
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(child: cells[0]),
+                  Container(
+                    width: 1,
+                    height: 56,
+                    color: const Color(0xFFFECDCA),
+                  ),
+                  Expanded(child: cells[1]),
+                  Container(
+                    width: 1,
+                    height: 56,
+                    color: const Color(0xFFFECDCA),
+                  ),
+                  Expanded(child: cells[2]),
+                  Container(
+                    width: 1,
+                    height: 56,
+                    color: const Color(0xFFFECDCA),
+                  ),
+                  Expanded(child: cells[3]),
+                ],
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _SkeletonHero extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 96,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F4F6),
+        borderRadius: BorderRadius.circular(20),
+      ),
+    );
+  }
+}
+
+class _HeroCell extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color accent;
+  final IconData icon;
+  const _HeroCell({
+    required this.label,
+    required this.value,
+    required this.accent,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 16, color: accent),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF6B7280),
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: accent,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================
+//  Wochen-Sortier-Menu
+// ============================================================
+
+class _WeekSortMenu extends StatelessWidget {
+  final _WeekSort value;
+  final ValueChanged<_WeekSort> onChanged;
+  const _WeekSortMenu({required this.value, required this.onChanged});
+
+  String _label(BuildContext context, _WeekSort v) {
+    final t = AppLocalizations.of(context);
+    switch (v) {
+      case _WeekSort.lossDesc:
+        return t.t("concessions_weeks_sort_loss");
+      case _WeekSort.dnrsDesc:
+        return t.t("concessions_weeks_sort_dnrs");
+      case _WeekSort.dateDesc:
+        return t.t("concessions_weeks_sort_date");
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<_WeekSort>(
+      tooltip: AppLocalizations.of(context).t("concessions_sort_tooltip"),
+      onSelected: onChanged,
+      itemBuilder: (ctx) => _WeekSort.values
+          .map((v) => PopupMenuItem<_WeekSort>(
+                value: v,
+                child: Row(
+                  children: [
+                    if (v == value)
+                      const Icon(Icons.check,
+                          size: 18, color: Color(0xFF1D7F5A))
+                    else
+                      const SizedBox(width: 18),
+                    const SizedBox(width: 8),
+                    Text(_label(ctx, v)),
+                  ],
+                ),
+              ))
+          .toList(),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFE5E7EB)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.swap_vert_rounded,
+                size: 16, color: Color(0xFF374151)),
+            const SizedBox(width: 6),
+            Text(
+              _label(context, value),
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF111827),
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.arrow_drop_down_rounded,
+                size: 20, color: Color(0xFF6B7280)),
+          ],
+        ),
       ),
     );
   }

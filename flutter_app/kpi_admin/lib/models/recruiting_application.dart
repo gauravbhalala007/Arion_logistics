@@ -346,4 +346,13 @@ class RecruitingApplication {
     if (fn.isEmpty && ln.isEmpty) return '— no name —';
     return '$fn $ln'.trim();
   }
+
+  /// Visa permit request type (non-EU channel only), stored in
+  /// [customAnswers]: 'first_issue' | 'employer_change' | ''.
+  String get visaPermitType =>
+      (customAnswers['visaPermitType'] ?? '').toString().trim();
+
+  /// True when this non-EU applicant is an employer change
+  /// ("Arbeitgeberwechsel").
+  bool get isEmployerChange => visaPermitType == 'employer_change';
 }

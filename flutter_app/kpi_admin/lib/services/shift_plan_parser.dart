@@ -20,17 +20,13 @@ Future<ParsedShiftPlan> parseShiftPlanExcelAsync(
   // Phase 1: decode workbook. Sync + heavy — happens in one chunk.
   onPhase?.call('Decoding workbook…');
   await Future<void>.delayed(const Duration(milliseconds: 16));
-  final Excel excel = Excel.decodeBytes(bytes);
+  final Excel excel = _decodeWorkbook(bytes);
   await Future<void>.delayed(const Duration(milliseconds: 16));
 
   // Phase 2: find the right sheet + header row.
   onPhase?.call('Reading header…');
   await Future<void>.delayed(const Duration(milliseconds: 16));
-  final sheetName = excel.tables.keys.firstWhere(
-    (k) => k.toLowerCase().contains('arbeitsbl'),
-    orElse: () => excel.tables.keys.first,
-  );
-  final Sheet sheet = excel.tables[sheetName]!;
+  final Sheet sheet = _pickShiftSheet(excel);
 
   String company = '';
   String station = '';
@@ -39,27 +35,29 @@ Future<ParsedShiftPlan> parseShiftPlanExcelAsync(
     station = _cellString(sheet, col: 2, row: 1);
   }
 
-  int? headerRow;
-  for (var r = 0; r < sheet.maxRows && r < 30; r++) {
-    final cell = _cellString(sheet, col: 0, row: r).toLowerCase();
-    if (cell.startsWith('name des mit')) {
-      headerRow = r;
-      break;
-    }
-  }
-  if (headerRow == null) {
+  // One-time snapshot: the `sheet.rows` getter rebuilds the full
+  // maxRows×maxColumns matrix on EVERY call — repeated calls in loops
+  // froze the tab on large exports.
+  final rows = sheet.rows;
+
+  final header = _findNameHeader(rows);
+  if (header == null) {
     throw const FormatException(
-      'Header-Zeile "Name des Mitarbeiters" wurde nicht gefunden.',
+      'Header-Zeile mit der Namens-Spalte ("Name des Mitarbeiters") '
+      'wurde nicht gefunden. Bitte den Amazon-Export unverändert '
+      'hochladen.',
     );
   }
+  final headerRow = header.row;
+  final nameCol = header.nameCol;
+  final tidCol = header.tidCol;
 
-  // Phase 3: day columns.
+  // Phase 3: day columns (everything to the right of the TID column).
   final year = assumeYear ?? DateTime.now().year;
   final dayCols = <int, DateTime>{};
-  final headerRowData = sheet.rows.length > headerRow
-      ? sheet.rows[headerRow]
-      : const <Data?>[];
-  for (var c = 2; c < headerRowData.length; c++) {
+  final headerRowData =
+      rows.length > headerRow ? rows[headerRow] : const <Data?>[];
+  for (var c = tidCol + 1; c < headerRowData.length; c++) {
     final label = (headerRowData[c]?.value?.toString() ?? '').trim();
     if (label.isEmpty) continue;
     final d = _parseDayLabel(label, year);
@@ -71,25 +69,40 @@ Future<ParsedShiftPlan> parseShiftPlanExcelAsync(
     );
   }
 
-  // Phase 4: walk data rows, yielding every 25 rows so the overlay's
-  // pulse animation keeps painting on slower devices.
+  // Phase 4: walk data rows. We iterate the already-parsed `rows`
+  // (fast, O(1) per cell) instead of calling sheet.cell() per cell, and
+  // yield to the event loop on a FIXED cadence — every row counts, even
+  // skipped/empty ones — so a workbook with thousands of trailing empty
+  // rows can never freeze the tab. We also stop scanning after a long run
+  // of empty rows (the roster is contiguous), which keeps a sheet whose
+  // declared dimension is huge from being walked end to end.
   onPhase?.call('Walking rows…');
   await Future<void>.delayed(const Duration(milliseconds: 16));
   final byDate = <String, List<ShiftPlanEntry>>{};
   final roster = <ShiftRoster>[];
   final seenTids = <String>{};
-  const yieldEvery = 25;
-  var rowsSinceYield = 0;
-  for (var r = headerRow + 1; r < sheet.maxRows; r++) {
-    final name = _cellString(sheet, col: 0, row: r);
-    if (name.isEmpty) continue;
+  const yieldEvery = 60;
+  const stopAfterEmptyRun = 40;
+  var emptyRun = 0;
+  for (var r = headerRow + 1; r < rows.length; r++) {
+    if (r % yieldEvery == 0) {
+      await Future<void>.delayed(Duration.zero);
+    }
+    final row = rows[r];
+    final name = _rowCell(row, nameCol);
+    if (name.isEmpty) {
+      emptyRun++;
+      if (emptyRun >= stopAfterEmptyRun) break;
+      continue;
+    }
+    emptyRun = 0;
     final lower = name.toLowerCase();
     if (lower.startsWith('eingeplant') ||
         lower.startsWith('gesamt') ||
         lower.startsWith('summe')) {
       continue;
     }
-    final tid = _cellString(sheet, col: 1, row: r);
+    final tid = _rowCell(row, tidCol);
     if (tid.isEmpty) continue;
 
     if (seenTids.add(tid.toUpperCase())) {
@@ -99,7 +112,7 @@ Future<ParsedShiftPlan> parseShiftPlanExcelAsync(
     for (final entry in dayCols.entries) {
       final col = entry.key;
       final date = entry.value;
-      final raw = _cellString(sheet, col: col, row: r);
+      final raw = _rowCell(row, col);
       if (raw.isEmpty) continue;
       final blocks = _parseShiftBlocks(raw);
       if (blocks.isEmpty) continue;
@@ -114,11 +127,6 @@ Future<ParsedShiftPlan> parseShiftPlanExcelAsync(
               blocks: blocks,
             ),
           );
-    }
-    rowsSinceYield++;
-    if (rowsSinceYield >= yieldEvery) {
-      rowsSinceYield = 0;
-      await Future<void>.delayed(Duration.zero);
     }
   }
 
@@ -144,12 +152,8 @@ Future<ParsedShiftPlan> parseShiftPlanExcelAsync(
 /// [ParsedShiftPlan]. Only the sheet "Arbeitsblöcke nach Dienstplan"
 /// is used — that's where the actual shift assignments live.
 ParsedShiftPlan parseShiftPlanExcel(Uint8List bytes, {int? assumeYear}) {
-  final Excel excel = Excel.decodeBytes(bytes);
-  final sheetName = excel.tables.keys.firstWhere(
-    (k) => k.toLowerCase().contains('arbeitsbl'),
-    orElse: () => excel.tables.keys.first,
-  );
-  final Sheet sheet = excel.tables[sheetName]!;
+  final Excel excel = _decodeWorkbook(bytes);
+  final Sheet sheet = _pickShiftSheet(excel);
 
   // ─── Pull metadata (row 1 = labels, row 2 = values) ───
   String company = '';
@@ -159,28 +163,26 @@ ParsedShiftPlan parseShiftPlanExcel(Uint8List bytes, {int? assumeYear}) {
     station = _cellString(sheet, col: 2, row: 1);
   }
 
-  // ─── Find the header row that contains "Name des Mitarbeiters" ───
-  int? headerRow;
-  for (var r = 0; r < sheet.maxRows && r < 30; r++) {
-    final cell = _cellString(sheet, col: 0, row: r).toLowerCase();
-    if (cell.startsWith('name des mit')) {
-      headerRow = r;
-      break;
-    }
-  }
-  if (headerRow == null) {
+  // ─── Find the header row + name/TID columns (tolerant) ───
+  final rows = sheet.rows;
+  final header = _findNameHeader(rows);
+  if (header == null) {
     throw const FormatException(
-      'Header-Zeile "Name des Mitarbeiters" wurde nicht gefunden.',
+      'Header-Zeile mit der Namens-Spalte ("Name des Mitarbeiters") '
+      'wurde nicht gefunden. Bitte den Amazon-Export unverändert '
+      'hochladen.',
     );
   }
+  final headerRow = header.row;
+  final nameCol = header.nameCol;
+  final tidCol = header.tidCol;
 
-  // ─── Day columns start at col index 2 ───
+  // ─── Day columns start right of the TID column ───
   final year = assumeYear ?? DateTime.now().year;
   final dayCols = <int, DateTime>{};
-  final headerRowData = sheet.rows.length > headerRow
-      ? sheet.rows[headerRow]
-      : const <Data?>[];
-  for (var c = 2; c < headerRowData.length; c++) {
+  final headerRowData =
+      rows.length > headerRow ? rows[headerRow] : const <Data?>[];
+  for (var c = tidCol + 1; c < headerRowData.length; c++) {
     final label = (headerRowData[c]?.value?.toString() ?? '').trim();
     if (label.isEmpty) continue;
     final d = _parseDayLabel(label, year);
@@ -197,7 +199,7 @@ ParsedShiftPlan parseShiftPlanExcel(Uint8List bytes, {int? assumeYear}) {
   final roster = <ShiftRoster>[];
   final seenTids = <String>{};
   for (var r = headerRow + 1; r < sheet.maxRows; r++) {
-    final name = _cellString(sheet, col: 0, row: r);
+    final name = _cellString(sheet, col: nameCol, row: r);
     if (name.isEmpty) continue;
     final lower = name.toLowerCase();
     if (lower.startsWith('eingeplant') ||
@@ -205,7 +207,7 @@ ParsedShiftPlan parseShiftPlanExcel(Uint8List bytes, {int? assumeYear}) {
         lower.startsWith('summe')) {
       continue;
     }
-    final tid = _cellString(sheet, col: 1, row: r);
+    final tid = _cellString(sheet, col: tidCol, row: r);
     if (tid.isEmpty) continue;
 
     if (seenTids.add(tid.toUpperCase())) {
@@ -249,6 +251,135 @@ ParsedShiftPlan parseShiftPlanExcel(Uint8List bytes, {int? assumeYear}) {
   );
 }
 
+/// Decodes the workbook with a user-readable error instead of the
+/// excel package's internal exceptions (minified stack traces on web).
+Excel _decodeWorkbook(Uint8List bytes) {
+  try {
+    return Excel.decodeBytes(bytes);
+  } catch (e) {
+    throw FormatException(
+      'Die Datei konnte nicht als Excel (.xlsx) gelesen werden. '
+      'Bitte den originalen Amazon-Export unverändert hochladen — '
+      '.xls/CSV oder in LibreOffice neu gespeicherte Dateien werden '
+      'nicht unterstützt. (Details: $e)',
+    );
+  }
+}
+
+/// Picks the "Arbeitsblöcke…" sheet, else the first non-empty sheet.
+Sheet _pickShiftSheet(Excel excel) {
+  final keys = excel.tables.keys.toList();
+  if (keys.isEmpty) {
+    throw const FormatException('Die Excel-Datei enthält keine Tabellen.');
+  }
+  final byName = keys.where((k) => k.toLowerCase().contains('arbeitsbl'));
+  if (byName.isNotEmpty) return excel.tables[byName.first]!;
+  // Fallback: first sheet that actually has rows (skips empty cover sheets).
+  for (final k in keys) {
+    final s = excel.tables[k]!;
+    if (s.maxRows > 0) return s;
+  }
+  return excel.tables[keys.first]!;
+}
+
+/// Reads a trimmed string from a pre-parsed row (from `sheet.rows`).
+/// Much cheaper than `sheet.cell()` because it avoids per-cell index
+/// construction and lookups.
+String _rowCell(List<Data?> row, int col) {
+  if (col < 0 || col >= row.length) return '';
+  final v = row[col]?.value;
+  if (v == null) return '';
+  if (v is TextCellValue) return v.value.text?.trim() ?? '';
+  return v.toString().trim();
+}
+
+/// Where the roster header sits, and which columns hold the driver name
+/// and the transporter-ID.
+class _HeaderLocation {
+  final int row;
+  final int nameCol;
+  final int tidCol;
+  const _HeaderLocation(this.row, this.nameCol, this.tidCol);
+}
+
+/// Tolerantly locates the header row and the name column. Amazon's export
+/// usually puts "Name des Mitarbeiters" in column A, but exports vary
+/// (extra leading columns, English headers, "Mitarbeiter" only). We scan
+/// the first rows/columns for anything that looks like a name header, then
+/// take the next non-empty header cell as the transporter-ID column.
+_HeaderLocation? _findNameHeader(List<List<Data?>> rows) {
+  const maxScanRows = 40;
+  const maxScanCols = 12;
+
+  // Metadaten-Labels wie "Name des Unternehmens" / "Name der Station"
+  // stehen in Zeile 1 des Amazon-Exports und dürfen NICHT als
+  // Mitarbeiter-Spalte erkannt werden.
+  bool looksLikeMeta(String l) {
+    return l.contains('unternehmen') ||
+        l.contains('station') ||
+        l.contains('standort') ||
+        l.contains('firma') ||
+        l.contains('company') ||
+        l.contains('woche');
+  }
+
+  bool looksLikeName(String s) {
+    final l = s.toLowerCase().trim();
+    if (looksLikeMeta(l)) return false;
+    return l.startsWith('name des mit') ||
+        l == 'name' ||
+        l.startsWith('name ') ||
+        l == 'mitarbeiter' ||
+        l.startsWith('mitarbeiter') ||
+        l.contains('employee name') ||
+        (l.contains('name') && l.contains('mitarbeiter'));
+  }
+
+  bool looksLikeTid(String s) {
+    final l = s.toLowerCase().trim();
+    return l.contains('transporter') ||
+        l.contains('mitarbeiter-id') ||
+        l.contains('mitarbeiter id') ||
+        l == 'id' ||
+        l.contains('personal') ||
+        l.endsWith(' id') ||
+        l.contains('tid');
+  }
+
+  final rowCount = rows.length < maxScanRows ? rows.length : maxScanRows;
+  final anyYear = DateTime.now().year;
+  _HeaderLocation? fallback;
+  for (var r = 0; r < rowCount; r++) {
+    final row = rows[r];
+    final colCount = row.length < maxScanCols ? row.length : maxScanCols;
+    for (var c = 0; c < colCount; c++) {
+      final cell = _rowCell(row, c);
+      if (cell.isEmpty || !looksLikeName(cell)) continue;
+      // Found a name column candidate. Pick the TID column: the next
+      // header cell that looks like an ID, else simply the next column.
+      var tidCol = c + 1;
+      for (var cc = c + 1; cc < colCount; cc++) {
+        if (looksLikeTid(_rowCell(row, cc))) {
+          tidCol = cc;
+          break;
+        }
+      }
+      final loc = _HeaderLocation(r, c, tidCol);
+      // Nur Zeilen mit echten Tages-Spalten rechts daneben sind der
+      // Roster-Header; sonst als Fallback merken und weitersuchen.
+      var dayLabels = 0;
+      for (var cc = tidCol + 1; cc < row.length; cc++) {
+        final label = _rowCell(row, cc);
+        if (label.isEmpty) continue;
+        if (_parseDayLabel(label, anyYear) != null) dayLabels++;
+      }
+      if (dayLabels > 0) return loc;
+      fallback ??= loc;
+    }
+  }
+  return fallback;
+}
+
 String _cellString(Sheet sheet, {required int col, required int row}) {
   final c = sheet.cell(
     CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row),
@@ -283,7 +414,10 @@ DateTime? _parseDayLabel(String s, int year) {
   final month = months[raw] ??
       months[raw.length >= 3 ? raw.substring(0, 3) : raw];
   if (month == null) return null;
-  return DateTime(year, month, day);
+  final d = DateTime(year, month, day);
+  // Guard against silent rollover (e.g. "32/Mai" → 1. Juni).
+  if (d.month != month || d.day != day) return null;
+  return d;
 }
 
 final RegExp _timeLineRe = RegExp(

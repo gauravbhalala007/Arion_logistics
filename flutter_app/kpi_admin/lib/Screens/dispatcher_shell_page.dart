@@ -477,6 +477,7 @@ class _DispatcherDisabled extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     return Scaffold(
       body: Center(
         child: Padding(
@@ -491,7 +492,9 @@ class _DispatcherDisabled extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                'Dein Dispatcher-Zugang ist deaktiviert.',
+                de
+                    ? 'Dein Dispatcher-Zugang ist deaktiviert.'
+                    : 'Your dispatcher access is disabled.',
                 style: AppTypography.title3.copyWith(
                   color: AppColors.codriverGraphite,
                 ),
@@ -499,7 +502,9 @@ class _DispatcherDisabled extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Bitte wende dich an deinen Admin.',
+                de
+                    ? 'Bitte wende dich an deinen Admin.'
+                    : 'Please contact your admin.',
                 style: AppTypography.footnote.copyWith(
                   color: AppColors.labelSecondaryLight,
                 ),
@@ -508,7 +513,7 @@ class _DispatcherDisabled extends StatelessWidget {
               const SizedBox(height: 20),
               FilledButton(
                 onPressed: () => FirebaseAuth.instance.signOut(),
-                child: const Text('Abmelden'),
+                child: Text(de ? 'Abmelden' : 'Sign out'),
               ),
             ],
           ),

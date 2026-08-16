@@ -136,20 +136,87 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  Future<void> _reset() async {
+  Future<void> _onForgotPassword() async {
+    // Drivers/employees can't reliably receive reset mails (many use a
+    // system address). Primary guidance: contact your supervisor, who sets
+    // a new password in the Drivers Hub. Admins can still request an email
+    // reset link for their own real address.
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final action = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+        ),
+        title: Text(de ? 'Passwort vergessen?' : 'Forgot password?'),
+        content: Text(
+          de
+              ? 'Mitarbeiter / Fahrer:\n'
+                  'Bitte wende dich an deinen Vorgesetzten (DSP-Admin). Er kann dir '
+                  'in der Fahrerverwaltung ein neues Passwort setzen.\n\n'
+                  'Admin? Wir können dir einen Reset-Link an deine E-Mail senden.'
+              : 'Employees / drivers:\n'
+                  'Please contact your supervisor (DSP admin). They can set a '
+                  'new password for you in the driver management.\n\n'
+                  'Admin? We can send a reset link to your email address.',
+          style: const TextStyle(height: 1.45),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop('close'),
+            child: Text(de ? 'Schließen' : 'Close'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop('email'),
+            child: Text(de ? 'Admin: Reset-Link senden' : 'Admin: send reset link'),
+          ),
+        ],
+      ),
+    );
+    if (action != 'email') return;
+    await _sendResetEmail();
+  }
+
+  Future<void> _sendResetEmail() async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final email = _email.text.trim();
     if (email.isEmpty) {
-      _showError('Enter your email address first.');
+      _showError(
+        de
+            ? 'Bitte zuerst deine E-Mail-Adresse eingeben.'
+            : 'Enter your email address first.',
+      );
+      return;
+    }
+    // System driver addresses can't receive mail — send them to their admin.
+    if (email.toLowerCase().endsWith('@drivers.dsp-copilot.local')) {
+      _showError(
+        de
+            ? 'Dieses Konto hat keine persönliche E-Mail. Bitte wende dich an '
+                'deinen Vorgesetzten für ein neues Passwort.'
+            : 'This account has no personal email — ask your supervisor for a '
+                'new password.',
+      );
       return;
     }
     try {
       await AuthService.resetPassword(email);
-      _showInfo('Password reset email sent. Please check your inbox.');
+      _showInfo(
+        de
+            ? 'Reset-Link gesendet — bitte auch den Spam-Ordner prüfen. Kommt '
+                'nichts an, wende dich an deinen Vorgesetzten.'
+            : 'Reset link sent — please also check your spam folder. If '
+                'nothing arrives, contact your supervisor.',
+      );
     } on FirebaseAuthException catch (e) {
       _showError(_mapResetError(e));
     } catch (_) {
       _showError(
-        'We could not send the password reset email right now. Please try again.',
+        de
+            ? 'Reset-Link konnte gerade nicht gesendet werden. Bitte später '
+                'erneut versuchen.'
+            : 'Could not send the reset email right now. Please try again '
+                'later.',
       );
     }
   }
@@ -297,6 +364,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Widget _buildLoginCard() {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     return Container(
       padding: const EdgeInsets.all(_spXl),
       decoration: BoxDecoration(
@@ -372,7 +440,7 @@ class _LoginPageState extends State<LoginPage> {
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
-                onPressed: _reset,
+                onPressed: _onForgotPassword,
                 style: TextButton.styleFrom(
                   foregroundColor: _codriverDeep,
                   padding: const EdgeInsets.symmetric(
@@ -384,7 +452,7 @@ class _LoginPageState extends State<LoginPage> {
                   shape: const StadiumBorder(),
                 ),
                 child: Text(
-                  'Forgot password?',
+                  de ? 'Passwort vergessen?' : 'Forgot password?',
                   style: _footnote.copyWith(
                     color: _codriverDeep,
                     fontWeight: FontWeight.w600,

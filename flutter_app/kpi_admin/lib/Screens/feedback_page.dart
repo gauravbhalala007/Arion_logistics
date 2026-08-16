@@ -26,8 +26,9 @@ class _FeedbackPageState extends State<FeedbackPage> {
   final _devSearchCtrl = TextEditingController();
 
   bool _submitting = false;
-  Uint8List? _attachmentBytes;
-  String? _attachmentName;
+  // Ticket: mehrere Bilder pro Feedback (max. [_kMaxAttachments]).
+  static const _kMaxAttachments = 6;
+  final List<({Uint8List bytes, String name})> _attachments = [];
 
   String? _profileUid;
   Stream<DocumentSnapshot<Map<String, dynamic>>>? _profileStream;
@@ -180,28 +181,40 @@ class _FeedbackPageState extends State<FeedbackPage> {
       final picked = await FilePicker.platform.pickFiles(
         type: FileType.image,
         withData: true,
+        allowMultiple: true,
       );
       if (picked == null || picked.files.isEmpty) return;
-      final f = picked.files.first;
-      final bytes = f.bytes;
-      if (bytes == null) return;
       setState(() {
-        _attachmentBytes = bytes;
-        _attachmentName = f.name;
+        for (final f in picked.files) {
+          final bytes = f.bytes;
+          if (bytes == null) continue;
+          if (_attachments.length >= _kMaxAttachments) break;
+          _attachments.add((bytes: bytes, name: f.name));
+        }
       });
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Could not pick image: $e')));
+      ).showSnackBar(
+        SnackBar(
+          content: Text(
+            _t(
+              'Could not pick image: $e',
+              'Bild konnte nicht ausgewählt werden: $e',
+            ),
+          ),
+        ),
+      );
     }
   }
 
   void _clearImage() {
-    setState(() {
-      _attachmentBytes = null;
-      _attachmentName = null;
-    });
+    setState(() => _attachments.clear());
+  }
+
+  void _removeAttachmentAt(int index) {
+    setState(() => _attachments.removeAt(index));
   }
 
   Future<void> _openImagePreview(String url) async {
@@ -261,7 +274,13 @@ class _FeedbackPageState extends State<FeedbackPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Download failed: $e')));
+      ).showSnackBar(
+        SnackBar(
+          content: Text(
+            _t('Download failed: $e', 'Download fehlgeschlagen: $e'),
+          ),
+        ),
+      );
     }
   }
 
@@ -293,24 +312,36 @@ class _FeedbackPageState extends State<FeedbackPage> {
       final docRef = FirebaseFirestore.instance.collection('feedback').doc();
       final feedbackId = docRef.id;
 
-      String attachmentUrl = '';
-      String attachmentPath = '';
-      String attachmentName = _attachmentName ?? '';
-      int attachmentSize = 0;
-
-      final bytes = _attachmentBytes;
-      if (bytes != null) {
-        attachmentSize = bytes.lengthInBytes;
-        final safeName = attachmentName.isNotEmpty
-            ? attachmentName
-            : 'image.png';
-        attachmentPath = 'feedback_attachments/$uid/$feedbackId/$safeName';
-        final uploadRef = fb.FirebaseStorage.instance.ref().child(
-          attachmentPath,
+      // Alle Bilder hochladen; die Legacy-Einzelfelder zeigen weiter
+      // auf das ERSTE Bild (Abwärtskompatibilität für Anzeige/E-Mail).
+      final uploaded = <Map<String, dynamic>>[];
+      for (var i = 0; i < _attachments.length; i++) {
+        final a = _attachments[i];
+        final safeName = a.name.trim().isNotEmpty ? a.name.trim() : 'image_$i.png';
+        final path =
+            'feedback_attachments/$uid/$feedbackId/${i}_$safeName';
+        final uploadRef =
+            fb.FirebaseStorage.instance.ref().child(path);
+        final lowerName = safeName.toLowerCase();
+        await uploadRef.putData(
+          a.bytes,
+          fb.SettableMetadata(
+            contentType: lowerName.endsWith('.png')
+                ? 'image/png'
+                : lowerName.endsWith('.webp')
+                    ? 'image/webp'
+                    : 'image/jpeg',
+          ),
         );
-        await uploadRef.putData(bytes);
-        attachmentUrl = await uploadRef.getDownloadURL();
+        final url = await uploadRef.getDownloadURL();
+        uploaded.add({
+          'url': url,
+          'path': path,
+          'name': safeName,
+          'size': a.bytes.lengthInBytes,
+        });
       }
+      final first = uploaded.isEmpty ? null : uploaded.first;
 
       await docRef.set({
         'createdAt': FieldValue.serverTimestamp(),
@@ -320,10 +351,11 @@ class _FeedbackPageState extends State<FeedbackPage> {
         'title': title,
         'description': desc,
         'priority': _priority,
-        'attachmentUrl': attachmentUrl,
-        'attachmentPath': attachmentPath,
-        'attachmentName': attachmentName,
-        'attachmentSize': attachmentSize,
+        'attachmentUrl': (first?['url'] ?? '') as String,
+        'attachmentPath': (first?['path'] ?? '') as String,
+        'attachmentName': (first?['name'] ?? '') as String,
+        'attachmentSize': (first?['size'] ?? 0) as int,
+        'attachments': uploaded,
         'status': 'open',
         'app': 'kpi_admin',
         'platform': _platformLabel(),
@@ -349,7 +381,16 @@ class _FeedbackPageState extends State<FeedbackPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Failed to send feedback: $e')));
+      ).showSnackBar(
+        SnackBar(
+          content: Text(
+            _t(
+              'Failed to send feedback: $e',
+              'Feedback konnte nicht gesendet werden: $e',
+            ),
+          ),
+        ),
+      );
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -375,7 +416,16 @@ class _FeedbackPageState extends State<FeedbackPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Could not update status: $e')));
+      ).showSnackBar(
+        SnackBar(
+          content: Text(
+            _t(
+              'Could not update status: $e',
+              'Status konnte nicht aktualisiert werden: $e',
+            ),
+          ),
+        ),
+      );
     }
   }
 
@@ -420,7 +470,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
               ),
               const SizedBox(height: 16),
               Text(
-                'Als erledigt markieren',
+                _t('Mark as done', 'Als erledigt markieren'),
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
@@ -442,7 +492,10 @@ class _FeedbackPageState extends State<FeedbackPage> {
                 maxLines: 5,
                 minLines: 3,
                 decoration: InputDecoration(
-                  labelText: 'Was wurde umgesetzt? (Note für den Requester)',
+                  labelText: _t(
+                    'What was implemented? (Note for the requester)',
+                    'Was wurde umgesetzt? (Note für den Requester)',
+                  ),
                   filled: true,
                   fillColor: const Color(0xFFF9FAFB),
                   border: OutlineInputBorder(
@@ -456,7 +509,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
                 children: [
                   TextButton(
                     onPressed: () => Navigator.of(ctx).pop(),
-                    child: const Text('Abbrechen'),
+                    child: Text(_t('Cancel', 'Abbrechen')),
                   ),
                   const SizedBox(width: 8),
                   FilledButton.icon(
@@ -466,7 +519,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
                       backgroundColor: const Color(0xFF067647),
                     ),
                     icon: const Icon(Icons.check_rounded, size: 18),
-                    label: const Text('Speichern & schließen'),
+                    label: Text(_t('Save & close', 'Speichern & schließen')),
                   ),
                 ],
               ),
@@ -489,15 +542,27 @@ class _FeedbackPageState extends State<FeedbackPage> {
           }, SetOptions(merge: true));
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: Color(0xFF067647),
-          content: Text('Feedback als erledigt markiert.'),
+        SnackBar(
+          backgroundColor: const Color(0xFF067647),
+          content: Text(
+            _t(
+              'Feedback marked as done.',
+              'Feedback als erledigt markiert.',
+            ),
+          ),
         ),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not update status: $e')),
+        SnackBar(
+          content: Text(
+            _t(
+              'Could not update status: $e',
+              'Status konnte nicht aktualisiert werden: $e',
+            ),
+          ),
+        ),
       );
     }
   }
@@ -521,11 +586,15 @@ class _FeedbackPageState extends State<FeedbackPage> {
           }, SetOptions(merge: true));
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: Color(0xFFB45309),
+        SnackBar(
+          backgroundColor: const Color(0xFFB45309),
           content: Text(
-            'Markiert als "In Bearbeitung" — wird in der nächsten '
-            'Iteration umgesetzt.',
+            _t(
+              'Marked as "Processing" — will be implemented in the next '
+              'iteration.',
+              'Markiert als "In Bearbeitung" — wird in der nächsten '
+              'Iteration umgesetzt.',
+            ),
           ),
         ),
       );
@@ -533,7 +602,16 @@ class _FeedbackPageState extends State<FeedbackPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Could not update status: $e')));
+      ).showSnackBar(
+        SnackBar(
+          content: Text(
+            _t(
+              'Could not update status: $e',
+              'Status konnte nicht aktualisiert werden: $e',
+            ),
+          ),
+        ),
+      );
     }
   }
 
@@ -596,7 +674,13 @@ class _FeedbackPageState extends State<FeedbackPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Delete failed: $e')));
+      ).showSnackBar(
+        SnackBar(
+          content: Text(
+            _t('Delete failed: $e', 'Löschen fehlgeschlagen: $e'),
+          ),
+        ),
+      );
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -606,7 +690,9 @@ class _FeedbackPageState extends State<FeedbackPage> {
   Widget build(BuildContext context) {
     final uid = _uid;
     if (uid == null) {
-      return const Center(child: Text('You must be logged in.'));
+      return Center(
+        child: Text(_t('You must be logged in.', 'Du musst angemeldet sein.')),
+      );
     }
 
     final isNarrow = _isNarrow(context);
@@ -776,12 +862,14 @@ class _FeedbackPageState extends State<FeedbackPage> {
                                       const SizedBox(width: 10),
                                       Expanded(
                                         child: Text(
-                                          _attachmentName?.trim().isNotEmpty ==
-                                                  true
-                                              ? _attachmentName!
+                                          _attachments.isEmpty
+                                              ? _t(
+                                                  'Upload images (up to $_kMaxAttachments)',
+                                                  'Bilder hochladen (bis zu $_kMaxAttachments)',
+                                                )
                                               : _t(
-                                                  'Upload image',
-                                                  'Bild hochladen',
+                                                  '${_attachments.length} image(s) selected — tap to add more',
+                                                  '${_attachments.length} Bild(er) ausgewählt — tippen für weitere',
                                                 ),
                                           style: const TextStyle(
                                             color: Color(0xFF6B7280),
@@ -789,10 +877,11 @@ class _FeedbackPageState extends State<FeedbackPage> {
                                           ),
                                         ),
                                       ),
-                                      if (_attachmentBytes != null &&
+                                      if (_attachments.isNotEmpty &&
                                           !_submitting)
                                         IconButton(
-                                          tooltip: _t('Remove', 'Entfernen'),
+                                          tooltip: _t(
+                                              'Remove all', 'Alle entfernen'),
                                           onPressed: _clearImage,
                                           icon: const Icon(Icons.close_rounded),
                                         ),
@@ -801,16 +890,54 @@ class _FeedbackPageState extends State<FeedbackPage> {
                                 ),
                               ),
                             ),
-                            if (_attachmentBytes != null) ...[
+                            if (_attachments.isNotEmpty) ...[
                               const SizedBox(height: 10),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(18),
-                                child: Image.memory(
-                                  _attachmentBytes!,
-                                  height: 180,
-                                  width: double.infinity,
-                                  fit: BoxFit.cover,
-                                ),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  for (var i = 0;
+                                      i < _attachments.length;
+                                      i++)
+                                    Stack(
+                                      children: [
+                                        ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          child: Image.memory(
+                                            _attachments[i].bytes,
+                                            height: 110,
+                                            width: 110,
+                                            fit: BoxFit.cover,
+                                          ),
+                                        ),
+                                        Positioned(
+                                          top: 2,
+                                          right: 2,
+                                          child: InkWell(
+                                            onTap: _submitting
+                                                ? null
+                                                : () =>
+                                                    _removeAttachmentAt(i),
+                                            child: Container(
+                                              padding:
+                                                  const EdgeInsets.all(2),
+                                              decoration:
+                                                  const BoxDecoration(
+                                                color: Colors.black54,
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: const Icon(
+                                                Icons.close_rounded,
+                                                size: 14,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                ],
                               ),
                             ],
                             const SizedBox(height: 18),
@@ -911,7 +1038,11 @@ class _FeedbackPageState extends State<FeedbackPage> {
                         }
                         if (listSnap.hasError) {
                           return Text(
-                            'Failed to load feedback: ${listSnap.error}',
+                            _t(
+                              'Failed to load feedback: ${listSnap.error}',
+                              'Feedback konnte nicht geladen werden: '
+                                  '${listSnap.error}',
+                            ),
                           );
                         }
 
@@ -1125,6 +1256,32 @@ class _FeedbackPageState extends State<FeedbackPage> {
                                         (data['attachmentName'] ?? '')
                                             .toString()
                                             .trim();
+                                    // Mehrere Bilder (Ticket) — Fallback
+                                    // auf das Legacy-Einzelfeld.
+                                    final attachmentsRaw =
+                                        data['attachments'];
+                                    final attachmentList =
+                                        <({String url, String name})>[
+                                      if (attachmentsRaw is List)
+                                        for (final a in attachmentsRaw)
+                                          if (a is Map &&
+                                              (a['url'] ?? '')
+                                                  .toString()
+                                                  .trim()
+                                                  .isNotEmpty)
+                                            (
+                                              url: a['url'].toString(),
+                                              name: (a['name'] ?? '')
+                                                  .toString(),
+                                            ),
+                                    ];
+                                    if (attachmentList.isEmpty &&
+                                        attachmentUrl.isNotEmpty) {
+                                      attachmentList.add((
+                                        url: attachmentUrl,
+                                        name: attachmentName,
+                                      ));
+                                    }
                                     final createdByUid =
                                         (data['createdByUid'] ?? '')
                                             .toString()
@@ -1222,16 +1379,21 @@ class _FeedbackPageState extends State<FeedbackPage> {
                                                       child: Row(
                                                         mainAxisSize:
                                                             MainAxisSize.min,
-                                                        children: const [
-                                                          Icon(
+                                                        children: [
+                                                          const Icon(
                                                               Icons.check_circle_outline,
                                                               size: 18,
                                                               color: Color(
                                                                   0xFF067647)),
-                                                          SizedBox(width: 8),
+                                                          const SizedBox(
+                                                              width: 8),
                                                           Text(
-                                                            'Als erledigt '
-                                                            'markieren (Done)',
+                                                            _t(
+                                                              'Mark as done '
+                                                              '(Done)',
+                                                              'Als erledigt '
+                                                              'markieren (Done)',
+                                                            ),
                                                           ),
                                                         ],
                                                       ),
@@ -1244,15 +1406,20 @@ class _FeedbackPageState extends State<FeedbackPage> {
                                                       child: Row(
                                                         mainAxisSize:
                                                             MainAxisSize.min,
-                                                        children: const [
-                                                          Icon(Icons.bolt_rounded,
+                                                        children: [
+                                                          const Icon(
+                                                              Icons.bolt_rounded,
                                                               size: 18,
                                                               color: Color(
                                                                   0xFFB45309)),
-                                                          SizedBox(width: 8),
+                                                          const SizedBox(
+                                                              width: 8),
                                                           Text(
-                                                            'In Bearbeitung '
-                                                            'nehmen',
+                                                            _t(
+                                                              'Start processing',
+                                                              'In Bearbeitung '
+                                                              'nehmen',
+                                                            ),
                                                           ),
                                                         ],
                                                       ),
@@ -1344,8 +1511,12 @@ class _FeedbackPageState extends State<FeedbackPage> {
                                                           width: 8),
                                                       Expanded(
                                                         child: Text(
-                                                          'Umgesetzt: '
-                                                          '${data['completionNotes']}',
+                                                          _t(
+                                                            'Implemented: '
+                                                            '${data['completionNotes']}',
+                                                            'Umgesetzt: '
+                                                            '${data['completionNotes']}',
+                                                          ),
                                                           style:
                                                               const TextStyle(
                                                             fontSize: 13,
@@ -1362,46 +1533,69 @@ class _FeedbackPageState extends State<FeedbackPage> {
                                                   ),
                                                 ),
                                               ],
-                                              if (attachmentUrl.isNotEmpty) ...[
+                                              if (attachmentList
+                                                  .isNotEmpty) ...[
                                                 const SizedBox(height: 10),
                                                 Wrap(
                                                   spacing: 8,
                                                   runSpacing: 8,
                                                   children: [
-                                                    CoButton(
-                                                      onPressed: () =>
-                                                          _openImagePreview(
-                                                            attachmentUrl,
-                                                          ),
-                                                      icon: Icons.image_outlined,
-                                                      label: _t(
-                                                        'View image',
-                                                        'Bild ansehen',
-                                                      ),
-                                                      variant:
-                                                          CoButtonVariant.quiet,
-                                                    ),
-                                                    if (isDeveloper)
+                                                    for (var ai = 0;
+                                                        ai <
+                                                            attachmentList
+                                                                .length;
+                                                        ai++) ...[
                                                       CoButton(
                                                         onPressed: () =>
-                                                            _downloadAttachment(
-                                                              url:
-                                                                  attachmentUrl,
-                                                              filename:
-                                                                  attachmentName
-                                                                      .isEmpty
-                                                                  ? 'feedback_attachment'
-                                                                  : attachmentName,
+                                                            _openImagePreview(
+                                                              attachmentList[
+                                                                      ai]
+                                                                  .url,
                                                             ),
                                                         icon: Icons
-                                                            .download_outlined,
-                                                        label: _t(
-                                                          'Download',
-                                                          'Download',
-                                                        ),
-                                                        variant: CoButtonVariant
-                                                            .quiet,
+                                                            .image_outlined,
+                                                        label: attachmentList
+                                                                    .length ==
+                                                                1
+                                                            ? _t(
+                                                                'View image',
+                                                                'Bild ansehen',
+                                                              )
+                                                            : _t(
+                                                                'Image ${ai + 1}',
+                                                                'Bild ${ai + 1}',
+                                                              ),
+                                                        variant:
+                                                            CoButtonVariant
+                                                                .quiet,
                                                       ),
+                                                      if (isDeveloper)
+                                                        CoButton(
+                                                          onPressed: () =>
+                                                              _downloadAttachment(
+                                                                url: attachmentList[
+                                                                        ai]
+                                                                    .url,
+                                                                filename: attachmentList[
+                                                                            ai]
+                                                                        .name
+                                                                        .isEmpty
+                                                                    ? 'feedback_attachment_${ai + 1}'
+                                                                    : attachmentList[
+                                                                            ai]
+                                                                        .name,
+                                                              ),
+                                                          icon: Icons
+                                                              .download_outlined,
+                                                          label: _t(
+                                                            'Download',
+                                                            'Download',
+                                                          ),
+                                                          variant:
+                                                              CoButtonVariant
+                                                                  .quiet,
+                                                        ),
+                                                    ],
                                                   ],
                                                 ),
                                               ],
@@ -1470,6 +1664,7 @@ class _StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     Color bg;
     Color border;
     Color fg;
@@ -1491,7 +1686,7 @@ class _StatusPill extends StatelessWidget {
         bg = const Color(0xFFFEF3C7);
         border = const Color(0xFFFCD34D);
         fg = const Color(0xFF92400E);
-        label = 'IN BEARBEITUNG';
+        label = de ? 'IN BEARBEITUNG' : 'PROCESSING';
         break;
       case 'open':
       default:

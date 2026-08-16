@@ -201,12 +201,17 @@ class _DriverTimeAccountPageState extends State<DriverTimeAccountPage> {
   }
 
   Widget _buildSummaryCard(Map<String, dynamic>? data) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final sollH = (data?['soll'] as num?)?.toDouble() ?? 0;
     final istH = (data?['ist'] as num?)?.toDouble() ?? 0;
     final stampedH = (data?['istStamped'] as num?)?.toDouble() ?? istH;
     final creditedH = (data?['istCredited'] as num?)?.toDouble() ?? 0;
     final saldoH = (data?['saldo'] as num?)?.toDouble() ?? (istH - sollH);
     final vacationDays = (data?['vacationDays'] as num?)?.toInt() ?? 0;
+    // Unbezahlter Urlaub wird dem Zeitkonto NICHT gutgeschrieben —
+    // ältere Monatsdokumente kennen das Feld nicht (dann 0).
+    final unpaidVacationDays =
+        (data?['vacationDaysUnpaid'] as num?)?.toInt() ?? 0;
     final sickDays = (data?['sickDays'] as num?)?.toInt() ?? 0;
     final holidays = (data?['holidayDays'] as num?)?.toInt() ?? 0;
 
@@ -285,10 +290,25 @@ class _DriverTimeAccountPageState extends State<DriverTimeAccountPage> {
             if (creditedH > 0) ...[
               const SizedBox(height: 10),
               Text(
-                'Davon ${fmt(creditedH)} aus Urlaub/Krank angerechnet',
+                de
+                    ? 'Davon ${fmt(creditedH)} aus Urlaub/Krank angerechnet'
+                    : 'Includes ${fmt(creditedH)} credited from leave/sickness',
                 style: AppTypography.caption1.copyWith(
                   color: const Color(0xFF6B7280),
                   fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+            if (unpaidVacationDays > 0) ...[
+              const SizedBox(height: 6),
+              Text(
+                de
+                    ? 'Davon $unpaidVacationDays T unbezahlter Urlaub — '
+                        'keine Gutschrift'
+                    : '$unpaidVacationDays d of unpaid leave — not credited',
+                style: AppTypography.caption1.copyWith(
+                  color: const Color(0xFF9A3412),
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],

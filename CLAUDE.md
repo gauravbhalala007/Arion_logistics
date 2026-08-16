@@ -71,6 +71,19 @@ Ausnahmen (vorher fragen):
 - Firestore-Rules-, Storage-Rules- oder Functions-Deploys (`firebase deploy --only firestore` / `--only storage` / `--only functions`)
 - Schema-Migrationen, die existierende Daten ändern
 
+## Sprache / Lokalisierung (Pflicht)
+
+**Alle neuen UI-Texte immer zweisprachig DE/EN** — Englisch, wenn der Admin Englisch als
+Sprache gewählt hat. Pattern wie im Bestand:
+
+```dart
+final de = Localizations.localeOf(context).languageCode == 'de';
+Text(de ? 'Monat erfassen' : 'Add month')
+```
+
+Gilt für Labels, Dialoge, Tooltips, Snackbars, Tabellen-Header, PDF-Exporte usw.
+Niemals neue Screens/Features nur auf Deutsch (oder nur auf Englisch) bauen.
+
 ## Arbeitsweise: einfach loslegen
 
 Bei Umsetzungs-Arbeit (Features, Feedback-Tickets, UI-/Logik-Änderungen): **einfach

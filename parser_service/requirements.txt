@@ -8,3 +8,5 @@ Pillow
 python-multipart
 pydantic
 openpyxl
+beautifulsoup4
+lxml

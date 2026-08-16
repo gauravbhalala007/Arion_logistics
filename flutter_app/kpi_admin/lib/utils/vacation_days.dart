@@ -21,6 +21,9 @@ int vacationChargeableDays(DateTime? from, DateTime? to) {
 bool _isWeekend(DateTime value) =>
     value.weekday == DateTime.saturday || value.weekday == DateTime.sunday;
 
+/// Bundesweite deutsche Feiertage (die 9 nationalen, ohne Länder-Extras).
+bool isGermanyPublicHoliday(DateTime value) => _isGermanyPublicHoliday(value);
+
 bool _isGermanyPublicHoliday(DateTime value) {
   final date = _dateOnly(value);
   final easter = _easterSunday(date.year);

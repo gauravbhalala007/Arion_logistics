@@ -17,7 +17,9 @@ import 'package:firebase_storage/firebase_storage.dart' as fb;
 
 import '../localization/app_localizations.dart';
 import '../models/driver_notification.dart';
+
 import '../theme/app_button_style.dart';
+import '../widgets/app_update_popup.dart';
 import '../widgets/maintenance_banner.dart';
 import 'driver_academy_page.dart';
 import 'driver_absence_page.dart';
@@ -32,11 +34,32 @@ import 'driver_tasks_view.dart';
 import 'driver_shift_plan_view.dart';
 import 'driver_waveplan_view.dart';
 
-import '../widgets/notification_pin_dialogs.dart';
 import 'driver_profile_page.dart';
 import 'driver_faq_page.dart';
+import 'driver_da_requests_view.dart';
 import 'driver_incident_report_page.dart';
 import 'login_page.dart';
+
+/// MIME-Type für Foto-Uploads aus dem Dateinamen — ohne expliziten
+/// contentType blockt die Storage-Rule isImage() den Upload.
+String _photoContentType(String name) {
+  final ext =
+      name.contains('.') ? name.split('.').last.toLowerCase() : '';
+  switch (ext) {
+    case 'png':
+      return 'image/png';
+    case 'webp':
+      return 'image/webp';
+    case 'gif':
+      return 'image/gif';
+    case 'heic':
+    case 'heif':
+      return 'image/heic';
+    default:
+      return 'image/jpeg';
+  }
+}
+
 
 // same colors as in dashboard
 const _kBg = Color(0xFFF3F6F7);
@@ -62,6 +85,7 @@ enum DriverView {
   shiftPlan,
   absence,
   incidentReport,
+  daRequests,
   comingSoon,
   dashboard,
   faq,
@@ -117,7 +141,6 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
         .collection('tasks');
   }
 
-  bool _pinPromptShown = false;
 
   @override
   void initState() {
@@ -125,8 +148,13 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
     _startCountSubscriptions();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _ensurePinOnLogin();
+      // PIN removed — no forced PIN setup on login (it failed for new drivers
+      // whose identity wasn't propagated yet). Confirmations use signatures.
       _ensureDriverLocaleLoaded();
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
+        AppUpdatePopup.maybeShow(context, uid: uid, side: 'driver');
+      }
     });
   }
 
@@ -235,33 +263,6 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
         }, onError: (_) {});
   }
 
-  Future<void> _ensurePinOnLogin() async {
-    if (_pinPromptShown) return;
-    _pinPromptShown = true;
-
-    try {
-      final pin = await NotificationPinService.getPin(
-        dspUid: widget.dspUid,
-        transporterId: widget.driverTransporterId.toUpperCase(),
-      );
-
-      if (!mounted) return;
-
-      if (pin == null) {
-        await showDialog<void>(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => SetNotificationPinDialog(
-            dspUid: widget.dspUid,
-            transporterId: widget.driverTransporterId.toUpperCase(),
-            force: true,
-          ),
-        );
-      }
-    } catch (_) {
-      // silent fail; we don't want to block login if Firestore fails
-    }
-  }
 
   /// Use the SAME logic as DriverOnboardingPage._pickAndUploadProfilePhoto
   /// so data is consistent everywhere.
@@ -304,7 +305,13 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
           .child(driverRef.id)
           .child('profile_${DateTime.now().millisecondsSinceEpoch}_${f.name}');
 
-      await ref.putData(bytes);
+      // contentType MUSS gesetzt sein — ohne Metadata lädt Flutter Web
+      // als application/octet-stream hoch und die Storage-Rule
+      // isImage() lehnt den Upload ab.
+      await ref.putData(
+        bytes,
+        fb.SettableMetadata(contentType: _photoContentType(f.name)),
+      );
       final url = await ref.getDownloadURL();
 
       // 1) store on driver onboarding document
@@ -507,6 +514,12 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
               _view = DriverView.incidentReport;
             });
           },
+          onOpenDaRequests: () {
+            setState(() {
+              _tabIndex = 0;
+              _view = DriverView.daRequests;
+            });
+          },
           onOpenWaveplan: () {
             setState(() {
               _tabIndex = 0;
@@ -559,6 +572,18 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
 
       case DriverView.incidentReport:
         return DriverIncidentReportPage(
+          dspUid: widget.dspUid,
+          driverTransporterId: widget.driverTransporterId,
+          onBack: () {
+            setState(() {
+              _tabIndex = 0;
+              _view = DriverView.home;
+            });
+          },
+        );
+
+      case DriverView.daRequests:
+        return DriverDaRequestsView(
           dspUid: widget.dspUid,
           driverTransporterId: widget.driverTransporterId,
           onBack: () {
@@ -726,6 +751,10 @@ class _HeaderBar extends StatelessWidget {
         return 'assets/flags/tr.svg';
       case 'ru':
         return 'assets/flags/ru.svg';
+      case 'bg':
+        return 'assets/flags/bg.svg';
+      case 'es':
+        return 'assets/flags/es.svg';
       default:
         return 'assets/flags/gb.svg'; // fallback
     }
@@ -751,6 +780,10 @@ class _HeaderBar extends StatelessWidget {
         return 'Turkce';
       case 'ru':
         return 'Русский';
+      case 'bg':
+        return 'Български';
+      case 'es':
+        return 'Español';
       default:
         return code;
     }

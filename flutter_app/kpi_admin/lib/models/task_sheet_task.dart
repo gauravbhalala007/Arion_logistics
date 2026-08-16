@@ -68,6 +68,13 @@ class TaskSheetTask {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  /// Language the admin originally wrote [title]/[description] in.
+  final String sourceLang;
+
+  /// Per-language translations: `{ langCode: { 'title': ..., 'description': ... } }`.
+  /// Empty when auto-translation was off at creation time.
+  final Map<String, Map<String, String>> translations;
+
   const TaskSheetTask({
     required this.id,
     required this.title,
@@ -85,7 +92,23 @@ class TaskSheetTask {
     required this.completedConfirmed,
     required this.createdAt,
     required this.updatedAt,
+    this.sourceLang = '',
+    this.translations = const <String, Map<String, String>>{},
   });
+
+  /// Title in [langCode] if a translation exists, otherwise the source text.
+  String localizedTitle(String langCode) =>
+      _localized('title', langCode, title);
+
+  /// Description in [langCode] if a translation exists, otherwise the source.
+  String localizedDescription(String langCode) =>
+      _localized('description', langCode, description);
+
+  String _localized(String field, String langCode, String fallback) {
+    final row = translations[langCode.toLowerCase()];
+    final value = (row?[field] ?? '').trim();
+    return value.isNotEmpty ? value : fallback;
+  }
 
   bool get isFeedbackText => taskKind == 'feedback_text';
 
@@ -119,6 +142,19 @@ class TaskSheetTask {
         .trim();
     final statusRaw = (data['status'] ?? 'pending').toString().trim();
     final completedConfirmed = data['completedConfirmed'] == true;
+    final sourceLang = (data['sourceLang'] ?? '').toString().trim();
+    final translations = <String, Map<String, String>>{};
+    final rawTranslations = data['translations'];
+    if (rawTranslations is Map) {
+      rawTranslations.forEach((key, value) {
+        if (value is Map) {
+          translations[key.toString().toLowerCase()] = <String, String>{
+            'title': (value['title'] ?? '').toString(),
+            'description': (value['description'] ?? '').toString(),
+          };
+        }
+      });
+    }
 
     return TaskSheetTask(
       id: doc.id,
@@ -139,6 +175,8 @@ class TaskSheetTask {
       completedConfirmed: completedConfirmed,
       createdAt: _toDateTime(data['createdAt']),
       updatedAt: _toDateTime(data['updatedAt']),
+      sourceLang: sourceLang,
+      translations: translations,
     );
   }
 }

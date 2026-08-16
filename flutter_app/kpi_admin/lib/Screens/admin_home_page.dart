@@ -11,7 +11,11 @@ import '../theme/app_colors.dart';
 import '../widgets/co_button.dart';
 import '../widgets/co_pressable.dart';
 import '../utils/driver_activity.dart';
+import '../models/fleet_vehicle_document.dart';
+import '../services/fleet_vehicle_document_service.dart';
+import '../widgets/operative_tasks_card.dart';
 import 'admin_calendar_page.dart';
+import 'drivers_hub_page.dart';
 
 class AdminHomePage extends StatefulWidget {
   const AdminHomePage({super.key});
@@ -287,6 +291,76 @@ class _AdminHomePageState extends State<AdminHomePage> {
           final pad = _r(24, scale);
           final gap = _r(isTight ? 12 : 16, scale);
 
+          // Cleaned-up home: notifications feed (60%) + calendar with
+          // upcoming events below it (40%). The other old dashboard cards
+          // stay in this file in case they return.
+          // ignore: dead_code
+          if (true) {
+            if (isStacked) {
+              // Mobile: notifications + quick calendar actions + upcoming
+              // events. No month grid — the button leads to the calendar.
+              // Mobile order: operative tasks → upcoming events →
+              // notifications. Calendar + add-event live in the
+              // upcoming card's header buttons.
+              return SingleChildScrollView(
+                padding: EdgeInsets.all(pad),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (_uid != null) ...[
+                      SizedBox(
+                        height: 360,
+                        child: OperativeTasksCard(adminUid: _uid!),
+                      ),
+                      SizedBox(height: gap),
+                    ],
+                    const SizedBox(
+                      height: 320,
+                      child: CalendarUpcomingCard(),
+                    ),
+                    SizedBox(height: gap),
+                    SizedBox(
+                      height: 460,
+                      child: _AlertCenterCard(scale: scale),
+                    ),
+                  ],
+                ),
+              );
+            }
+            // Desktop: operative tasks LEFT (replaces the month grid — the
+            // full calendar lives on its own nav page), upcoming events
+            // below, notifications RIGHT — 50/50.
+            return Padding(
+              padding: EdgeInsets.all(pad),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: Column(
+                      children: [
+                        Expanded(
+                          child: _uid != null
+                              ? OperativeTasksCard(adminUid: _uid!)
+                              : const SizedBox.shrink(),
+                        ),
+                        SizedBox(height: gap),
+                        const SizedBox(
+                          height: 240,
+                          child: CalendarUpcomingCard(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: gap),
+                  Expanded(
+                    child: _AlertCenterCard(scale: scale),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          // ignore: dead_code
           return Padding(
             padding: EdgeInsets.all(pad),
             child: isStacked
@@ -375,12 +449,10 @@ class _DesktopLayout extends StatelessWidget {
                   flex: 5,
                   child: Column(
                     children: [
+                      // Unified alert feed — TÜV, Visum, Führerschein,
+                      // Ausweis, Arbeitsvertrag in ONE place.
                       Expanded(
-                        child: _NotificationHistoryCard(
-                          scale: scale,
-                          dspUid: dspUid,
-                          onOpenMissing: onOpenMissing,
-                        ),
+                        child: _AlertCenterCard(scale: scale),
                       ),
                       SizedBox(height: gap),
                       // Slim upcoming-events overview — full calendar
@@ -393,6 +465,15 @@ class _DesktopLayout extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ),
+          SizedBox(height: gap),
+          SizedBox(
+            height: 320,
+            child: _NotificationHistoryCard(
+              scale: scale,
+              dspUid: dspUid,
+              onOpenMissing: onOpenMissing,
             ),
           ),
           SizedBox(height: gap),
@@ -438,6 +519,12 @@ class _StackedLayout extends StatelessWidget {
     return SingleChildScrollView(
       child: Column(
         children: [
+          // Unified alert feed first — the most important info on top.
+          SizedBox(
+            height: 420,
+            child: _AlertCenterCard(scale: scale),
+          ),
+          SizedBox(height: gap),
           // Slim upcoming-events overview — full calendar lives on
           // its own nav page.
           const SizedBox(
@@ -666,6 +753,31 @@ class _ScorecardCardState extends State<_ScorecardCard> {
             if (tid.isNotEmpty && name.isNotEmpty) m[tid] = name;
           }
           return m;
+        });
+  }
+
+  /// Transporter IDs of drivers who are still actively working for this
+  /// DSP (`isDriverWorking` filters out deleted / archived / left etc.).
+  /// Used to keep the scorecard leaderboard free of ex-employees who
+  /// happen to still appear in historic Amazon scorecard uploads.
+  Stream<Set<String>> _activeDriverTidsGlobal() {
+    final uid = _uid;
+    if (uid == null) return const Stream.empty();
+
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('drivers')
+        .snapshots()
+        .map((snap) {
+          final out = <String>{};
+          for (final d in snap.docs) {
+            final data = d.data();
+            if (!isDriverWorking(data)) continue;
+            final tid = (data['transporterId'] ?? '').toString().trim();
+            if (tid.isNotEmpty) out.add(tid);
+          }
+          return out;
         });
   }
 
@@ -965,6 +1077,16 @@ class _ScorecardCardState extends State<_ScorecardCard> {
                     ..addAll(globalNames)
                     ..addAll(weekNames);
 
+                  return StreamBuilder<Set<String>>(
+                    stream: _activeDriverTidsGlobal(),
+                    builder: (ctx, activeSnap) {
+                      // Until the driver collection has loaded once we
+                      // pass null so the leaderboard still renders
+                      // (with the zero-package filter still active).
+                      final activeTids = activeSnap.hasData
+                          ? activeSnap.data
+                          : null;
+
                   // WEEK: live stream
                   if (isWeekView && reportRefs.isNotEmpty) {
                     return StreamBuilder<
@@ -983,6 +1105,7 @@ class _ScorecardCardState extends State<_ScorecardCard> {
                           nameMap,
                           scoreFromDoc: _scoreFromDoc,
                           fallbackName: t.t('admin_home_name_fallback'),
+                          activeTids: activeTids,
                         );
 
                         return _ScorecardShellLive(
@@ -1025,6 +1148,7 @@ class _ScorecardCardState extends State<_ScorecardCard> {
                         scoreFromDoc: _scoreFromDoc,
                         aggregateAveragePerDriver: true,
                         fallbackName: t.t('admin_home_name_fallback'),
+                        activeTids: activeTids,
                       );
 
                       return _ScorecardShellLive(
@@ -1046,6 +1170,8 @@ class _ScorecardCardState extends State<_ScorecardCard> {
                             ? t.t('admin_home_loading_scores')
                             : null,
                       );
+                    },
+                  );
                     },
                   );
                 },
@@ -1084,20 +1210,51 @@ class _BestWorstResult {
   const _BestWorstResult({required this.best, required this.worst});
 }
 
-// Worst Defender ranking rule: lowest comp.FinalScore = worst
+/// Read the delivered-packages count off a scorecard row. Different
+/// scorecard formats use different field casings (`Delivered`,
+/// `DELIVERED`, `delivered`) so we probe all of them and fall back to
+/// 0 — which then causes the driver to be excluded from the leaderboard.
+double _packagesFromDoc(Map<String, dynamic> data) {
+  final kpisRaw = data['kpis'];
+  final kpis = kpisRaw is Map
+      ? Map<String, dynamic>.from(kpisRaw as Map)
+      : <String, dynamic>{};
+  final v = kpis['Delivered'] ?? kpis['DELIVERED'] ?? kpis['delivered'];
+  if (v == null) return 0.0;
+  if (v is num) return v.toDouble();
+  return double.tryParse(v.toString().trim().replaceAll(',', '.')) ?? 0.0;
+}
+
+// Worst Defender ranking rule: lowest comp.FinalScore = worst.
+// `activeTids`: only drivers in this set are considered. Pass null to
+//               disable the activity filter (legacy behaviour).
+// Drivers with zero delivered packages are always excluded — an empty
+// week means the person didn't actually work and shouldn't rank either
+// at the top or the bottom of the scorecard.
 _BestWorstResult _computeBestWorst(
   List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
   Map<String, String> nameMap, {
   required double Function(Map<String, dynamic>) scoreFromDoc,
   bool aggregateAveragePerDriver = false,
   String fallbackName = '—',
+  Set<String>? activeTids,
 }) {
+  bool isEligible(Map<String, dynamic> data, String tid) {
+    if (_packagesFromDoc(data) <= 0) return false;
+    if (activeTids != null && tid.isNotEmpty && !activeTids.contains(tid)) {
+      return false;
+    }
+    return true;
+  }
+
   if (!aggregateAveragePerDriver) {
     final entries = <_ScoreEntry>[];
 
     for (final d in docs) {
       final data = d.data();
       final tid = (data['transporterId'] ?? '').toString().trim();
+      if (!isEligible(data, tid)) continue;
+
       final score = scoreFromDoc(data);
 
       final name = (tid.isNotEmpty && (nameMap[tid] ?? '').trim().isNotEmpty)
@@ -1118,7 +1275,9 @@ _BestWorstResult _computeBestWorst(
     );
   }
 
-  // Month/Year: average score per transporterId
+  // Month/Year: average score per transporterId. Only count weeks where
+  // the driver actually delivered packages — otherwise an inactive week
+  // would drag the average toward 0 unfairly.
   final sum = <String, double>{};
   final count = <String, int>{};
 
@@ -1126,6 +1285,7 @@ _BestWorstResult _computeBestWorst(
     final data = d.data();
     final tid = (data['transporterId'] ?? '').toString().trim();
     if (tid.isEmpty) continue;
+    if (!isEligible(data, tid)) continue;
 
     final score = scoreFromDoc(data);
     sum[tid] = (sum[tid] ?? 0) + score;
@@ -1488,13 +1648,13 @@ class _NotificationHistoryCardState extends State<_NotificationHistoryCard> {
           Row(
             children: [
               Icon(
-                Icons.notifications_none,
+                Icons.gavel_rounded,
                 color: AdminHomePage._kGreen,
                 size: _r(22, scale),
               ),
               SizedBox(width: _r(10, scale)),
               Text(
-                t.t('admin_home_notification_history'),
+                'Company Rules',
                 style: TextStyle(
                   fontSize: _r(20, scale),
                   fontWeight: FontWeight.w900,
@@ -3111,6 +3271,9 @@ class _DriverDocumentsCardState extends State<_DriverDocumentsCard> {
     _ExpiryField(
       key: 'residencePermitExpiry',
       label: 'admin_home_doc_residence_permit',
+      // Third-country residence permit: warn 90 days ahead (Ausländerbehörde
+      // lead time is far longer than 30 days) — ticket request.
+      soonDays: 90,
     ),
   ];
 
@@ -3541,16 +3704,25 @@ class _DriverDocumentsCardState extends State<_DriverDocumentsCard> {
                 // ---- Expiry scan from onboarding fields ----
                 if (hasOnboarding) {
                   for (final f in _expiryFields) {
+                    // Skip documents explicitly marked "no expiry date".
+                    if (onboarding[f.key.replaceAll('Expiry', 'NoExpiry')] ==
+                        true) {
+                      continue;
+                    }
                     final dt = _parseDate(onboarding[f.key]);
                     if (dt == null) continue;
 
                     final day = DateTime(dt.year, dt.month, dt.day);
 
+                    // Per-field warning window (residence permit = 90 days).
+                    final fieldSoonLimit =
+                        today.add(Duration(days: f.soonDays));
+
                     final isExpired = day.isBefore(today);
                     final isSoon =
                         !isExpired &&
-                        (day.isBefore(soonLimit) ||
-                            day.isAtSameMomentAs(soonLimit));
+                        (day.isBefore(fieldSoonLimit) ||
+                            day.isAtSameMomentAs(fieldSoonLimit));
 
                     if (isExpired || isSoon) {
                       expiredPillsByDriver.putIfAbsent(
@@ -3687,9 +3859,9 @@ class _DriverDocumentsCardState extends State<_DriverDocumentsCard> {
                     missingNamesUi, // ✅ DO NOT LIMIT (scroll will show all)
 
                 contractSoonCount: contractSoonDrivers.length,
-                contractRows: contractRowsUi
-                    .take(4)
-                    .toList(), // keep dashboard summary
+                // Show ALL affected drivers (card scrolls) — user feedback:
+                // the 3–4 cap hid drivers whose contract is ending.
+                contractRows: contractRowsUi,
 
                 footerText:
                     (docsSnap.connectionState == ConnectionState.waiting)
@@ -4429,7 +4601,13 @@ class _DocRowUi {
 class _ExpiryField {
   final String key;
   final String label;
-  const _ExpiryField({required this.key, required this.label});
+  /// Days-ahead window for the "expiring soon" warning (default 30).
+  final int soonDays;
+  const _ExpiryField({
+    required this.key,
+    required this.label,
+    this.soonDays = 30,
+  });
 }
 
 class _RequiredField {
@@ -4581,3 +4759,955 @@ double _r(double v, double scale) => v * scale;
 
 double _clampDouble(double v, double min, double max) =>
     math.max(min, math.min(max, v));
+
+// ════════════════════════════════════════════════════════════════════════════
+//  ALERT CENTER — unified notifications on the home page.
+//  Aggregates every expiry-type alert in ONE feed, sorted by urgency:
+//    • TÜV expired / due soon (per vehicle)
+//    • Visa / residence permit expiring (per driver)
+//    • Driving licence + ID document expiring (per driver)
+//    • Work contract ending (per driver)
+// ════════════════════════════════════════════════════════════════════════════
+
+class _HomeAlert {
+  final IconData icon;
+  final String title;
+  final String subject;
+  final DateTime date;
+  final int daysLeft; // negative = overdue
+
+  /// Transporter ID for driver-related alerts — tapping the row opens the
+  /// driver profile. Empty for vehicle alerts (TÜV).
+  final String tid;
+
+  /// Kategorie für die Filter-Chips (visa / zusatzblatt / licence /
+  /// id / probation / contract / tuv).
+  final String kind;
+
+  const _HomeAlert({
+    required this.icon,
+    required this.title,
+    required this.subject,
+    required this.date,
+    required this.daysLeft,
+    this.tid = '',
+    this.kind = '',
+  });
+  bool get expired => daysLeft < 0;
+}
+
+/// One row in the "Missing data" tab — an employee or a vehicle with
+/// the list of fields that have never been filled in.
+class _MissingEntry {
+  final IconData icon;
+  final String subject;
+  final List<String> missing;
+  final String tid; // empty for vehicles
+
+  const _MissingEntry({
+    required this.icon,
+    required this.subject,
+    required this.missing,
+    this.tid = '',
+  });
+}
+
+class _AlertCenterCard extends StatefulWidget {
+  final double scale;
+  const _AlertCenterCard({required this.scale});
+
+  @override
+  State<_AlertCenterCard> createState() => _AlertCenterCardState();
+}
+
+class _AlertCenterCardState extends State<_AlertCenterCard> {
+  static const int _kSoonDays = 30;
+
+  /// 0 = expiring alerts, 1 = missing data.
+  int _tab = 0;
+
+  /// Ticket: Kategorie-Filter für die Ablauf-Warnungen ('all' oder
+  /// eine _HomeAlert.kind wie 'probation' / 'zusatzblatt').
+  String _alertKindFilter = 'all';
+
+  String _alertKindLabel(String kind) {
+    switch (kind) {
+      case 'probation':
+        return _tr('Probezeit', 'Probation');
+      case 'zusatzblatt':
+        return 'Zusatzblatt';
+      case 'visa':
+        return _tr('Visum', 'Visa');
+      case 'licence':
+        return _tr('Führerschein', 'Licence');
+      case 'id':
+        return _tr('Ausweis', 'ID');
+      case 'contract':
+        return _tr('Vertrag', 'Contract');
+      case 'tuv':
+        return 'TÜV';
+      default:
+        return kind;
+    }
+  }
+
+  /// German when the app language is German, English otherwise.
+  bool get _de => Localizations.localeOf(context).languageCode == 'de';
+  String _tr(String de, String en) => _de ? de : en;
+
+  String? get _uid {
+    final scoped = AdminScope.maybeOf(context)?.adminUid;
+    if (scoped != null && scoped.isNotEmpty) return scoped;
+    return FirebaseAuth.instance.currentUser?.uid;
+  }
+
+  // Cache the per-driver documents future so the stream rebuilds don't
+  // refetch every subcollection on each tick.
+  String _docsCacheKey = '';
+  Future<Map<String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>>?
+      _docsFuture;
+
+  DateTime? _parseDate(dynamic v) {
+    if (v == null) return null;
+    if (v is Timestamp) return v.toDate();
+    final s = v.toString().trim();
+    if (s.isEmpty) return null;
+    final m =
+        RegExp(r'^(\d{1,2})[\/.](\d{1,2})[\/.](\d{4})$').firstMatch(s);
+    if (m != null) {
+      return DateTime(
+        int.parse(m.group(3)!),
+        int.parse(m.group(2)!),
+        int.parse(m.group(1)!),
+      );
+    }
+    final iso = DateTime.tryParse(s);
+    if (iso != null) return DateTime(iso.year, iso.month, iso.day);
+    return null;
+  }
+
+  Future<Map<String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>>
+      _loadDriverDocs(
+    String uid,
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> drivers,
+  ) async {
+    final out = <String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>{};
+    await Future.wait(drivers.map((d) async {
+      final tid = (d.data()['transporterId'] ?? d.id).toString().trim();
+      if (tid.isEmpty) return;
+      final snap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('drivers')
+          .doc(tid)
+          .collection('documents')
+          .get();
+      out[tid] = snap.docs;
+    }));
+    return out;
+  }
+
+  List<_HomeAlert> _buildAlerts({
+    required List<QueryDocumentSnapshot<Map<String, dynamic>>> drivers,
+    required Map<String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>
+        docsByTid,
+    required List<FleetVehicleDocument> fleetDocs,
+  }) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final alerts = <_HomeAlert>[];
+
+    void add(IconData icon, String base, String subject, DateTime date,
+        {String tid = '', int? soonDays, String kind = ''}) {
+      final daysLeft = date.difference(today).inDays;
+      if (daysLeft > (soonDays ?? _kSoonDays)) return;
+      alerts.add(_HomeAlert(
+        icon: icon,
+        title: daysLeft < 0
+            ? _tr('$base abgelaufen', '$base expired')
+            : _tr('$base läuft ab', '$base expiring'),
+        subject: subject,
+        date: date,
+        daysLeft: daysLeft,
+        tid: tid,
+        kind: kind,
+      ));
+    }
+
+    // ── Drivers: onboarding expiries + contract end ──
+    for (final d in drivers) {
+      final data = d.data();
+      // Inactive / archived / terminated drivers create no alerts.
+      if (!isDriverWorking(data)) continue;
+      final tid = (data['transporterId'] ?? d.id).toString().trim();
+      final name = (data['driverName'] ?? data['fullName'] ?? tid)
+          .toString()
+          .trim();
+      final onboardingRaw = data['onboarding'];
+      final onboarding = onboardingRaw is Map
+          ? Map<String, dynamic>.from(onboardingRaw as Map)
+          : <String, dynamic>{};
+
+      // EU work-permit drivers need no visa / Zusatzblatt — no expiry alerts.
+      final isEu = _isEuWorkPermit(onboarding);
+
+      // Working visa / residence permit — same fields the Drivers Hub
+      // badge uses (workVisaExpiry with residencePermitExpiry fallback).
+      final visa = _parseDate(onboarding['workVisaExpiry'] ??
+          onboarding['residencePermitExpiry'] ??
+          onboarding['workPermitExpiry']);
+      // Third-country immigration documents: warn 90 days ahead — dealing
+      // with the Ausländerbehörde takes far longer than 30 days (ticket).
+      if (visa != null && !isEu) {
+        add(Icons.badge_outlined,
+            _tr('Visum / Aufenthaltstitel', 'Visa / residence permit'),
+            name, visa,
+            tid: tid, soonDays: 90, kind: 'visa');
+      }
+      final zusatzblatt = _parseDate(onboarding['zusatzblattExpiry']);
+      if (zusatzblatt != null &&
+          !isEu &&
+          onboarding['zusatzblattNoExpiry'] != true) {
+        add(Icons.note_outlined, 'Zusatzblatt', name, zusatzblatt,
+            tid: tid, soonDays: 90, kind: 'zusatzblatt');
+      }
+      final license = _parseDate(onboarding['licenseExpiry']);
+      if (license != null && onboarding['licenseNoExpiry'] != true) {
+        add(Icons.directions_car_outlined,
+            _tr('Führerschein', 'Driving licence'), name, license,
+            tid: tid, kind: 'licence');
+      }
+      final idDoc = _parseDate(onboarding['idDocExpiry']);
+      if (idDoc != null) {
+        add(Icons.credit_card_outlined, _tr('Ausweis', 'ID document'), name,
+            idDoc, tid: tid, kind: 'id');
+      }
+
+      // Probezeit: Ende = Arbeitsbeginn + 6 Monate − 1 Tag. Zeigt sich ab
+      // 30 Tage vorher und bleibt bis 7 Tage nach Ablauf sichtbar.
+      final workStart = _parseDate(onboarding['workStartDate']);
+      if (workStart != null) {
+        final totalMonths = (workStart.month - 1) + 6;
+        final year = workStart.year + (totalMonths ~/ 12);
+        final month = (totalMonths % 12) + 1;
+        final lastDay = DateTime(year, month + 1, 0).day;
+        final day = workStart.day <= lastDay ? workStart.day : lastDay;
+        final probationEnd =
+            DateTime(year, month, day).subtract(const Duration(days: 1));
+        final diff = probationEnd.difference(today).inDays;
+        if (diff <= _kSoonDays && diff >= -7) {
+          alerts.add(_HomeAlert(
+            icon: Icons.hourglass_bottom_rounded,
+            title: diff < 0
+                ? _tr('Probezeit beendet', 'Probation ended')
+                : _tr('Probezeit endet', 'Probation ends'),
+            subject: name,
+            date: probationEnd,
+            daysLeft: diff,
+            tid: tid,
+            kind: 'probation',
+          ));
+        }
+      }
+
+      // Contract end — onboarding field first (what the Drivers Hub badge
+      // uses), the contract document as fallback. Unlimited contracts
+      // never alert.
+      final contractUnlimited = onboarding['contractUnlimited'] == true;
+      final contractExpiry = contractUnlimited
+          ? null
+          : _parseDate(onboarding['contractExpiry']);
+      if (contractExpiry != null) {
+        final daysLeft = contractExpiry.difference(today).inDays;
+        if (daysLeft <= _kSoonDays) {
+          alerts.add(_HomeAlert(
+            icon: Icons.description_outlined,
+            title: daysLeft < 0
+                ? _tr('Arbeitsvertrag abgelaufen', 'Contract expired')
+                : _tr('Arbeitsvertrag endet', 'Contract ends'),
+            subject: name,
+            date: contractExpiry,
+            daysLeft: daysLeft,
+            tid: tid,
+            kind: 'contract',
+          ));
+        }
+      }
+
+      // Contract end from the driver's documents.
+      final docs = docsByTid[tid] ?? const [];
+      if (contractExpiry != null || contractUnlimited) {
+        // onboarding already covered it — skip the document fallback.
+      } else
+      for (final doc in docs) {
+        final docData = doc.data();
+        final docType = (docData['type'] ?? docData['docType'] ?? '')
+            .toString()
+            .toLowerCase();
+        final isContract = doc.id.toLowerCase() == 'contract' ||
+            docType.contains('contract');
+        if (!isContract) continue;
+        DateTime? end;
+        for (final k in ['endDate', 'expiry', 'expiresAt', 'validUntil']) {
+          end = _parseDate(docData[k]);
+          if (end != null) break;
+        }
+        if (end != null) {
+          final daysLeft = end.difference(today).inDays;
+          if (daysLeft <= _kSoonDays) {
+            alerts.add(_HomeAlert(
+              icon: Icons.description_outlined,
+              title: daysLeft < 0
+                  ? _tr('Arbeitsvertrag abgelaufen', 'Contract expired')
+                  : _tr('Arbeitsvertrag endet', 'Contract ends'),
+              subject: name,
+              date: end,
+              daysLeft: daysLeft,
+              tid: tid,
+              kind: 'contract',
+            ));
+          }
+        }
+        break;
+      }
+    }
+
+    // ── Vehicles: TÜV (newest cert per plate) ──
+    final tuvByPlate = <String, FleetVehicleDocument>{};
+    for (final doc in fleetDocs) {
+      if (!doc.documentType.toUpperCase().contains('TUV')) continue;
+      final plate = doc.plateNumber.trim().toUpperCase();
+      if (plate.isEmpty) continue;
+      final current = tuvByPlate[plate];
+      final docDate = doc.updatedAt ?? doc.createdAt;
+      final curDate = current == null
+          ? null
+          : (current.updatedAt ?? current.createdAt);
+      if (current == null ||
+          (docDate != null &&
+              (curDate == null || docDate.isAfter(curDate)))) {
+        tuvByPlate[plate] = doc;
+      }
+    }
+    for (final entry in tuvByPlate.entries) {
+      final expiry = _parseDate(entry.value.expiryDate);
+      if (expiry == null) continue;
+      add(Icons.local_shipping_outlined, 'TÜV', entry.key, expiry,
+          kind: 'tuv');
+    }
+
+    alerts.sort((a, b) => a.daysLeft.compareTo(b.daysLeft));
+    return alerts;
+  }
+
+  /// True when the driver's work permit resolves to EU — those drivers need
+  /// no visa / Zusatzblatt expiry, so those fields are neither flagged as
+  /// "missing" nor alerted on. Mirrors the Drivers-Hub work-permit
+  /// normalization so this stays consistent with the pill on each card.
+  bool _isEuWorkPermit(Map<String, dynamic> onboarding) {
+    final value =
+        (onboarding['workPermitType'] ?? '').toString().trim().toLowerCase();
+    if (value == 'eu' || value == 'permit_eu_id' || value == 'eu_id') {
+      return true;
+    }
+    if (value == 'working_visa' ||
+        value == 'work_visa' ||
+        value == 'permit_work_visa' ||
+        value == 'visa') {
+      return false;
+    }
+    // Any other explicit value counts as non-EU; unset falls back to the
+    // legacy heuristic (a residence-permit expiry on file ⇒ visa driver).
+    if (value.isNotEmpty) return false;
+    final hasLegacyExpiry = (onboarding['residencePermitExpiry'] ?? '')
+        .toString()
+        .trim()
+        .isNotEmpty;
+    return !hasLegacyExpiry;
+  }
+
+  /// "Missing data" tab: working drivers whose key expiry fields were
+  /// never entered (licence, visa, Zusatzblatt, ID) and vehicles with
+  /// no recorded TÜV date.
+  List<_MissingEntry> _buildMissing({
+    required List<QueryDocumentSnapshot<Map<String, dynamic>>> drivers,
+    required List<FleetVehicleDocument> fleetDocs,
+    required List<QueryDocumentSnapshot<Map<String, dynamic>>> vehicles,
+  }) {
+    final out = <_MissingEntry>[];
+
+    for (final d in drivers) {
+      final data = d.data();
+      if (!isDriverWorking(data)) continue;
+      final tid = (data['transporterId'] ?? d.id).toString().trim();
+      final name = (data['driverName'] ?? data['fullName'] ?? tid)
+          .toString()
+          .trim();
+      final onboardingRaw = data['onboarding'];
+      final onboarding = onboardingRaw is Map
+          ? Map<String, dynamic>.from(onboardingRaw as Map)
+          : <String, dynamic>{};
+
+      final isEu = _isEuWorkPermit(onboarding);
+
+      final missing = <String>[];
+      if (_parseDate(onboarding['licenseExpiry']) == null &&
+          onboarding['licenseNoExpiry'] != true) {
+        missing.add(_tr('Führerschein', 'Driving licence'));
+      }
+      // EU work-permit drivers need no visa / Zusatzblatt — don't flag those.
+      if (!isEu &&
+          _parseDate(onboarding['workVisaExpiry'] ??
+                  onboarding['residencePermitExpiry'] ??
+                  onboarding['workPermitExpiry']) ==
+              null) {
+        missing.add(_tr('Visum / Aufenthaltstitel', 'Visa / residence permit'));
+      }
+      if (!isEu &&
+          _parseDate(onboarding['zusatzblattExpiry']) == null &&
+          onboarding['zusatzblattNoExpiry'] != true) {
+        missing.add('Zusatzblatt');
+      }
+      if (_parseDate(onboarding['idDocExpiry']) == null) {
+        missing.add(_tr('Ausweis', 'ID document'));
+      }
+      // Probezeit is derived from the work start date — flag when the
+      // start date was never entered.
+      if (_parseDate(onboarding['workStartDate']) == null) {
+        missing.add(_tr('Arbeitsbeginn (Probezeit)',
+            'Work start (probation)'));
+      }
+      if (onboarding['contractUnlimited'] != true &&
+          _parseDate(onboarding['contractExpiry']) == null) {
+        missing.add(_tr('Vertragsende', 'Contract end'));
+      }
+      // Ticket: fehlende Transporter-ID und fehlende Employee ID
+      // (Zeiterfassung) ebenfalls als Missing Data melden.
+      if (data['tidPending'] == true ||
+          (data['transporterId'] ?? '').toString().trim().isEmpty) {
+        missing.add('Transporter-ID');
+      }
+      if ((data['employeeNumber'] ?? '').toString().trim().isEmpty) {
+        missing.add('Employee ID');
+      }
+      if (missing.isNotEmpty) {
+        out.add(_MissingEntry(
+          icon: Icons.person_outline,
+          subject: name,
+          missing: missing,
+          tid: tid,
+        ));
+      }
+    }
+
+    // Vehicles without any TÜV date on file.
+    final tuvPlates = <String>{};
+    for (final doc in fleetDocs) {
+      if (!doc.documentType.toUpperCase().contains('TUV')) continue;
+      if (_parseDate(doc.expiryDate) == null) continue;
+      final plate = doc.plateNumber.trim().toUpperCase();
+      if (plate.isNotEmpty) tuvPlates.add(plate);
+    }
+    final missingTuv = <String>{};
+    for (final v in vehicles) {
+      final data = v.data();
+      if (data['isDeleted'] == true) continue;
+      final status = (data['status'] ?? '').toString().toUpperCase();
+      if (status == 'INACTIVE') continue;
+      final plate = (data['plateNumber'] ?? data['vehicleNumber'] ?? v.id)
+          .toString()
+          .trim()
+          .toUpperCase();
+      if (plate.isEmpty || tuvPlates.contains(plate)) continue;
+      missingTuv.add(plate);
+    }
+    for (final plate in missingTuv.toList()..sort()) {
+      out.add(_MissingEntry(
+        icon: Icons.local_shipping_outlined,
+        subject: plate,
+        missing: const ['TÜV'],
+      ));
+    }
+    return out;
+  }
+
+  Stream<QuerySnapshot<Map<String, dynamic>>>? _driversStream(String uid) {
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('drivers')
+        .snapshots();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = widget.scale;
+    final uid = _uid;
+    if (uid == null) {
+      return _AdminCard(scale: scale, child: const SizedBox.shrink());
+    }
+
+    return _AdminCard(
+      scale: scale,
+      child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: _driversStream(uid),
+        builder: (context, driverSnap) {
+          final drivers = driverSnap.data?.docs ??
+              const <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+          // Refresh the docs future only when the driver set changes.
+          final key = '$uid:${drivers.length}';
+          if (key != _docsCacheKey) {
+            _docsCacheKey = key;
+            _docsFuture = _loadDriverDocs(uid, drivers.toList());
+          }
+          return StreamBuilder<List<FleetVehicleDocument>>(
+            stream:
+                FleetVehicleDocumentService().watchScopeDocuments(dspUid: uid),
+            builder: (context, fleetSnap) {
+              return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(uid)
+                    .collection('vehicles')
+                    .snapshots(),
+                builder: (context, vehiclesSnap) {
+                return FutureBuilder<
+                  Map<String,
+                      List<QueryDocumentSnapshot<Map<String, dynamic>>>>>(
+                future: _docsFuture,
+                builder: (context, docsSnap) {
+                  final alerts = _buildAlerts(
+                    drivers: drivers.toList(),
+                    docsByTid: docsSnap.data ?? const {},
+                    fleetDocs:
+                        fleetSnap.data ?? const <FleetVehicleDocument>[],
+                  );
+                  final missing = _buildMissing(
+                    drivers: drivers.toList(),
+                    fleetDocs:
+                        fleetSnap.data ?? const <FleetVehicleDocument>[],
+                    vehicles: vehiclesSnap.data?.docs.toList() ??
+                        const <QueryDocumentSnapshot<Map<String, dynamic>>>[],
+                  );
+                  final expired = alerts.where((a) => a.expired).length;
+                  final soon = alerts.length - expired;
+
+                  // Ticket: Filter-Chips pro Kategorie mit Anzahl.
+                  final kindCounts = <String, int>{};
+                  for (final a in alerts) {
+                    if (a.kind.isEmpty) continue;
+                    kindCounts[a.kind] = (kindCounts[a.kind] ?? 0) + 1;
+                  }
+                  // Weggefallene Kategorie → zurück auf "All".
+                  final activeKindFilter =
+                      kindCounts.containsKey(_alertKindFilter)
+                          ? _alertKindFilter
+                          : 'all';
+                  final visibleAlerts = activeKindFilter == 'all'
+                      ? alerts
+                      : alerts
+                          .where((a) => a.kind == activeKindFilter)
+                          .toList();
+                  const kindOrder = [
+                    'probation',
+                    'zusatzblatt',
+                    'visa',
+                    'licence',
+                    'id',
+                    'contract',
+                    'tuv',
+                  ];
+                  final presentKinds = [
+                    for (final k in kindOrder)
+                      if (kindCounts.containsKey(k)) k,
+                    // Unbekannte Kinds (Zukunft) hinten anhängen.
+                    for (final k in kindCounts.keys)
+                      if (!kindOrder.contains(k)) k,
+                  ];
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.notifications_active_outlined,
+                            color: AdminHomePage._kGreen,
+                            size: _r(22, scale),
+                          ),
+                          SizedBox(width: _r(10, scale)),
+                          Expanded(
+                            child: Text(
+                              'Notifications',
+                              style: TextStyle(
+                                fontSize: _r(20, scale),
+                                fontWeight: FontWeight.w900,
+                                color: AdminHomePage._kText,
+                              ),
+                            ),
+                          ),
+                          if (expired > 0)
+                            _alertCountChip(
+                                _tr('$expired abgelaufen', '$expired expired'),
+                                const Color(0xFFB91C1C)),
+                          if (expired > 0 && soon > 0)
+                            SizedBox(width: _r(6, scale)),
+                          if (soon > 0)
+                            _alertCountChip(
+                                _tr('$soon bald fällig', '$soon due soon'),
+                                const Color(0xFFB45309)),
+                        ],
+                      ),
+                      SizedBox(height: _r(10, scale)),
+                      Row(
+                        children: [
+                          _tabChip(0, _tr('Ablaufend', 'Expiring'),
+                              alerts.length),
+                          const SizedBox(width: 8),
+                          _tabChip(1, _tr('Fehlende Daten', 'Missing data'),
+                              missing.length),
+                        ],
+                      ),
+                      // Kategorie-Filter (nur im "Ablaufend"-Tab):
+                      // "All" zuerst, dann eine Chip pro Fall mit Anzahl.
+                      if (_tab == 0 && alerts.isNotEmpty) ...[
+                        SizedBox(height: _r(8, scale)),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              _kindChip('all',
+                                  _tr('Alle', 'All'), alerts.length,
+                                  activeKindFilter),
+                              for (final k in presentKinds) ...[
+                                const SizedBox(width: 6),
+                                _kindChip(k, _alertKindLabel(k),
+                                    kindCounts[k] ?? 0, activeKindFilter),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                      SizedBox(height: _r(10, scale)),
+                      const Divider(height: 1),
+                      SizedBox(height: _r(8, scale)),
+                      Expanded(
+                        child: (_tab == 0
+                                ? visibleAlerts.isEmpty
+                                : missing.isEmpty)
+                            ? Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.check_circle_outline,
+                                        color: Color(0xFF16A34A), size: 32),
+                                    SizedBox(height: _r(8, scale)),
+                                    Text(
+                                      _tab == 0
+                                          ? _tr('Alles im grünen Bereich.',
+                                              'All clear.')
+                                          : _tr('Keine fehlenden Daten.',
+                                              'No missing data.'),
+                                      style: TextStyle(
+                                        color: AdminHomePage._kMuted,
+                                        fontSize: _r(13, scale),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : (_tab == 0
+                                ? ListView.builder(
+                                    itemCount: visibleAlerts.length,
+                                    itemBuilder: (context, i) =>
+                                        _alertRow(visibleAlerts[i], i),
+                                  )
+                                : ListView.builder(
+                                    itemCount: missing.length,
+                                    itemBuilder: (context, i) =>
+                                        _missingRow(missing[i], i),
+                                  )),
+                      ),
+                    ],
+                  );
+                },
+              );
+                },
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  /// Kategorie-Chip für die Ablauf-Warnungen ("Alle (12)", "Probezeit
+  /// (3)" …) — [current] ist der gerade wirksame Filter.
+  Widget _kindChip(String kind, String label, int count, String current) {
+    final selected = current == kind;
+    return InkWell(
+      onTap: () => setState(() => _alertKindFilter = kind),
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFF111827) : Colors.white,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color:
+                selected ? const Color(0xFF111827) : const Color(0xFFE5E7EB),
+          ),
+        ),
+        child: Text(
+          '$label ($count)',
+          style: TextStyle(
+            color: selected ? Colors.white : const Color(0xFF475569),
+            fontSize: 11.5,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _tabChip(int index, String label, int count) {
+    final selected = _tab == index;
+    return InkWell(
+      onTap: () => setState(() => _tab = index),
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected ? AdminHomePage._kGreen : Colors.white,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected ? AdminHomePage._kGreen : const Color(0xFFE5E7EB),
+          ),
+        ),
+        child: Text(
+          '$label ($count)',
+          style: TextStyle(
+            color: selected ? Colors.white : const Color(0xFF475569),
+            fontWeight: FontWeight.w800,
+            fontSize: 12,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _missingRow(_MissingEntry m, int index) {
+    final scale = widget.scale;
+    final row = Container(
+      color: index.isOdd ? const Color(0xFFF6F7F9) : Colors.white,
+      padding: EdgeInsets.symmetric(
+          horizontal: _r(10, scale), vertical: _r(8, scale)),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: _r(30, scale),
+            height: _r(30, scale),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF7ED),
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Icon(m.icon,
+                size: _r(16, scale), color: const Color(0xFFEA580C)),
+          ),
+          SizedBox(width: _r(10, scale)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  m.subject,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: _r(13, scale),
+                    fontWeight: FontWeight.w800,
+                    color: AdminHomePage._kText,
+                  ),
+                ),
+                SizedBox(height: _r(4, scale)),
+                Wrap(
+                  spacing: 5,
+                  runSpacing: 4,
+                  children: [
+                    for (final label in m.missing)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEA580C)
+                              .withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          label,
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFFC2410C),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          if (m.tid.isNotEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 6),
+              child: Icon(Icons.chevron_right,
+                  size: 16, color: Color(0xFF9CA3AF)),
+            ),
+        ],
+      ),
+    );
+    if (m.tid.isEmpty) return row;
+    return InkWell(
+      onTap: () => _openDriverProfile(m.tid),
+      child: row,
+    );
+  }
+
+  Widget _alertCountChip(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w800,
+          fontSize: 11,
+        ),
+      ),
+    );
+  }
+
+  /// Opens the tapped driver's profile inside a pushed Drivers-Hub route.
+  void _openDriverProfile(String tid) {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => Scaffold(
+        backgroundColor: AdminHomePage._kPageBg,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          foregroundColor: AdminHomePage._kText,
+          elevation: 0,
+          centerTitle: true,
+          title: const Text('Drivers Hub'),
+        ),
+        body: SafeArea(child: DriversHubPage(initialOpenTid: tid)),
+      ),
+    ));
+  }
+
+  Widget _alertRow(_HomeAlert a, int index) {
+    final scale = widget.scale;
+    final color = a.expired
+        ? const Color(0xFFB91C1C)
+        : (a.daysLeft <= 7
+            ? const Color(0xFFEA580C)
+            : const Color(0xFFB45309));
+    final when = a.expired
+        ? (a.daysLeft == 0
+            ? _tr('heute', 'today')
+            : _tr('vor ${-a.daysLeft} T', '${-a.daysLeft} d ago'))
+        : (a.daysLeft == 0
+            ? _tr('heute', 'today')
+            : _tr('in ${a.daysLeft} T', 'in ${a.daysLeft} d'));
+    String two(int n) => n.toString().padLeft(2, '0');
+    final dateStr =
+        '${two(a.date.day)}.${two(a.date.month)}.${a.date.year % 100}';
+
+    return InkWell(
+      onTap: a.tid.isEmpty ? null : () => _openDriverProfile(a.tid),
+      child: Container(
+      // Alternating white / light grey for readability.
+      color: index.isOdd ? const Color(0xFFF6F7F9) : Colors.white,
+      padding: EdgeInsets.symmetric(
+          vertical: _r(8, scale), horizontal: _r(6, scale)),
+      child: Row(
+        children: [
+          Container(
+            width: _r(34, scale),
+            height: _r(34, scale),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.10),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(a.icon, size: _r(17, scale), color: color),
+          ),
+          SizedBox(width: _r(10, scale)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  a.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: _r(13.5, scale),
+                    fontWeight: FontWeight.w700,
+                    color: AdminHomePage._kText,
+                  ),
+                ),
+                Text(
+                  a.subject,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: _r(12, scale),
+                    color: AdminHomePage._kMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(width: _r(8, scale)),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  when,
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w800,
+                    fontSize: _r(11, scale),
+                  ),
+                ),
+              ),
+              SizedBox(height: _r(2, scale)),
+              Text(
+                dateStr,
+                style: TextStyle(
+                  fontSize: _r(10.5, scale),
+                  color: AdminHomePage._kMuted,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+      ),
+    );
+  }
+}

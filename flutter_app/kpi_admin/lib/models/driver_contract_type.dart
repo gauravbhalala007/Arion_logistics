@@ -8,7 +8,9 @@ enum DriverContractType {
   parttime4d('parttime_4d'),
   parttime3d('parttime_3d'),
   parttime2d('parttime_2d'),
-  minijob('minijob');
+  minijob('minijob'),
+  dispatcher('dispatcher'),
+  outSoon('out_soon');
 
   const DriverContractType(this.value);
   final String value;
@@ -36,6 +38,10 @@ enum DriverContractType {
         return 'Parttime 2 Days';
       case DriverContractType.minijob:
         return 'Minijob';
+      case DriverContractType.dispatcher:
+        return 'Dispatcher';
+      case DriverContractType.outSoon:
+        return 'Out Soon';
     }
   }
 
@@ -53,6 +59,10 @@ enum DriverContractType {
         return 'PT · 2d';
       case DriverContractType.minijob:
         return 'Minijob';
+      case DriverContractType.dispatcher:
+        return 'Dispatcher';
+      case DriverContractType.outSoon:
+        return 'Out Soon';
     }
   }
 
@@ -68,6 +78,10 @@ enum DriverContractType {
         return const Color(0xFFB45309);
       case DriverContractType.minijob:
         return const Color(0xFF6B7280);
+      case DriverContractType.dispatcher:
+        return const Color(0xFF0F766E);
+      case DriverContractType.outSoon:
+        return const Color(0xFFDC2626);
     }
   }
 }

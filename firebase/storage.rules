@@ -130,10 +130,10 @@ service firebase.storage {
         isAdmin() || isDispatcher() || isSelfDriver(tid)
       );
       allow create, update: if signedIn()
-          && (isAdmin() || isSelfDriver(tid))
+          && (isAdmin() || isDispatcher() || isSelfDriver(tid))
           && isImageOrPdf()
           && maxMb(20);
-      allow delete: if signedIn() && isAdmin();
+      allow delete: if signedIn() && (isAdmin() || isDispatcher());
     }
 
     // ============================================================
@@ -297,6 +297,20 @@ service firebase.storage {
     // ============================================================
     match /dsgvo_exports/{fileName} {
       allow read, write: if false;
+    }
+
+    // ============================================================
+    //  RESIDENCE PERMIT PDFs (Aufenthaltserlaubnis-Antraege)
+    //  residence_permits/{dspUid}/{driverDocId}/{file}
+    //  Generiert ausschliesslich von der Cloud Function
+    //  `generateResidencePermitPdf`. Lesen via Signed URLs aus der
+    //  Function; Admin/Dispatcher des DSP duerfen das Objekt zusaetzlich
+    //  direkt mit Auth lesen (z. B. fuer Re-Download im Admin-Panel).
+    //  Schreiben passiert nur via Admin SDK → Client-Schreiben ist tabu.
+    // ============================================================
+    match /residence_permits/{dspUid}/{driverDocId}/{fileName} {
+      allow read: if isAdminOfDsp(dspUid) || isDispatcherOfDsp(dspUid);
+      allow write: if false;
     }
 
     // ============================================================

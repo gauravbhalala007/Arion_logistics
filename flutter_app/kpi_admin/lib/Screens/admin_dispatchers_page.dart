@@ -25,7 +25,7 @@ import '../theme/app_typography.dart';
 /// default-permissions in the Cloud Function. Keep these in sync.
 const List<_PermissionDef> kDispatcherPermissions = [
   _PermissionDef('waveplan', 'Waveplan'),
-  _PermissionDef('calendar', 'Kalender'),
+  _PermissionDef('calendar', 'Kalender', 'Calendar'),
   _PermissionDef('drivers_hub', 'Drivers Hub'),
   _PermissionDef('tasks', 'Tasks'),
   _PermissionDef('shift_absence', 'Shift & Absence'),
@@ -41,7 +41,13 @@ const List<_PermissionDef> kDispatcherPermissions = [
 class _PermissionDef {
   final String key;
   final String label;
-  const _PermissionDef(this.key, this.label);
+
+  /// English label; falls back to [label] for names that stay identical
+  /// (product/Amazon terms such as Waveplan, Drivers Hub, Fleet Hub …).
+  final String? labelEn;
+  const _PermissionDef(this.key, this.label, [this.labelEn]);
+
+  String labelFor(bool de) => de ? label : (labelEn ?? label);
 }
 
 class AdminDispatchersPage extends StatelessWidget {
@@ -49,10 +55,13 @@ class AdminDispatchersPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final adminUid = FirebaseAuth.instance.currentUser?.uid;
     if (adminUid == null) {
-      return const Scaffold(
-        body: Center(child: Text('Bitte zuerst einloggen.')),
+      return Scaffold(
+        body: Center(
+          child: Text(de ? 'Bitte zuerst einloggen.' : 'Please sign in first.'),
+        ),
       );
     }
 
@@ -72,7 +81,7 @@ class AdminDispatchersPage extends StatelessWidget {
                   ),
                   const SizedBox(width: AppSpacing.sm),
                   Text(
-                    'Dispatcher-Accounts',
+                    de ? 'Dispatcher-Accounts' : 'Dispatcher accounts',
                     style: AppTypography.title2.copyWith(
                       color: AppColors.codriverGraphite,
                     ),
@@ -80,7 +89,7 @@ class AdminDispatchersPage extends StatelessWidget {
                   const Spacer(),
                   CoButton(
                     onPressed: () => _showCreateDialog(context, adminUid),
-                    label: 'Anlegen',
+                    label: de ? 'Anlegen' : 'Add',
                     icon: Icons.add_rounded,
                   ),
                 ],
@@ -112,8 +121,11 @@ class AdminDispatchersPage extends StatelessWidget {
                         content = Center(
                           key: const ValueKey('empty'),
                           child: Text(
-                            'Noch keine Dispatcher angelegt.\n'
-                            'Tipp: oben rechts auf „Anlegen" klicken.',
+                            de
+                                ? 'Noch keine Dispatcher angelegt.\n'
+                                    'Tipp: oben rechts auf „Anlegen" klicken.'
+                                : 'No dispatchers created yet.\n'
+                                    'Tip: tap "Add" in the top right.',
                             textAlign: TextAlign.center,
                             style: AppTypography.footnote.copyWith(
                               color: AppColors.labelSecondaryLight,
@@ -152,6 +164,7 @@ class _DispatcherRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final data = doc.data();
     final email = (data['email'] ?? '').toString();
     final name = (data['displayName'] ?? '').toString();
@@ -240,8 +253,9 @@ class _DispatcherRow extends StatelessWidget {
               ),
               child: Text(
                 active
-                    ? '$allowedCount/${kDispatcherPermissions.length} Module'
-                    : 'Deaktiviert',
+                    ? '$allowedCount/${kDispatcherPermissions.length} '
+                        '${de ? 'Module' : 'modules'}'
+                    : (de ? 'Deaktiviert' : 'Deactivated'),
                 style: AppTypography.caption2.copyWith(
                   color: active
                       ? AppColors.codriverDeep
@@ -262,6 +276,7 @@ class _DispatcherRow extends StatelessWidget {
 }
 
 Future<void> _showCreateDialog(BuildContext context, String adminUid) async {
+  final de = Localizations.localeOf(context).languageCode == 'de';
   final emailCtrl = TextEditingController();
   final nameCtrl = TextEditingController();
   final pwCtrl = TextEditingController();
@@ -278,8 +293,10 @@ Future<void> _showCreateDialog(BuildContext context, String adminUid) async {
             final email = emailCtrl.text.trim();
             final pw = pwCtrl.text;
             if (email.isEmpty || pw.length < 6) {
-              setStateDialog(() => error =
-                  'E-Mail und ein Passwort mit mind. 6 Zeichen sind nötig.');
+              setStateDialog(() => error = de
+                  ? 'E-Mail und ein Passwort mit mind. 6 Zeichen sind nötig.'
+                  : 'An email and a password with at least 6 characters '
+                      'are required.');
               return;
             }
             setStateDialog(() {
@@ -298,7 +315,8 @@ Future<void> _showCreateDialog(BuildContext context, String adminUid) async {
             } on FirebaseFunctionsException catch (e) {
               setStateDialog(() {
                 submitting = false;
-                error = e.message ?? 'Fehler: ${e.code}';
+                error = e.message ??
+                    (de ? 'Fehler: ${e.code}' : 'Error: ${e.code}');
               });
             } catch (e) {
               setStateDialog(() {
@@ -309,7 +327,9 @@ Future<void> _showCreateDialog(BuildContext context, String adminUid) async {
           }
 
           return AlertDialog(
-            title: const Text('Neuen Dispatcher anlegen'),
+            title: Text(
+              de ? 'Neuen Dispatcher anlegen' : 'Add new dispatcher',
+            ),
             content: SizedBox(
               width: 420,
               child: Column(
@@ -326,16 +346,18 @@ Future<void> _showCreateDialog(BuildContext context, String adminUid) async {
                   TextField(
                     controller: emailCtrl,
                     keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
-                      labelText: 'E-Mail',
+                    decoration: InputDecoration(
+                      labelText: de ? 'E-Mail' : 'Email',
                     ),
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   TextField(
                     controller: pwCtrl,
                     obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Initial-Passwort (min. 6 Zeichen)',
+                    decoration: InputDecoration(
+                      labelText: de
+                          ? 'Initial-Passwort (min. 6 Zeichen)'
+                          : 'Initial password (min. 6 characters)',
                     ),
                   ),
                   if (error != null) ...[
@@ -351,12 +373,12 @@ Future<void> _showCreateDialog(BuildContext context, String adminUid) async {
             actions: [
               CoButton(
                 onPressed: submitting ? null : () => Navigator.of(ctx).pop(),
-                label: 'Abbrechen',
+                label: de ? 'Abbrechen' : 'Cancel',
                 variant: CoButtonVariant.quiet,
               ),
               CoButton(
                 onPressed: submitting ? null : submit,
-                label: 'Anlegen',
+                label: de ? 'Anlegen' : 'Add',
                 busy: submitting,
               ),
             ],
@@ -376,6 +398,7 @@ Future<void> _showEditSheet(
   required bool active,
   required Map<String, bool> permissions,
 }) async {
+  final de = Localizations.localeOf(context).languageCode == 'de';
   bool localActive = active;
   final localPerms = <String, bool>{
     for (final p in kDispatcherPermissions) p.key: permissions[p.key] ?? false,
@@ -411,7 +434,8 @@ Future<void> _showEditSheet(
             } on FirebaseFunctionsException catch (e) {
               setSheetState(() {
                 saving = false;
-                error = e.message ?? 'Fehler: ${e.code}';
+                error = e.message ??
+                    (de ? 'Fehler: ${e.code}' : 'Error: ${e.code}');
               });
             } catch (e) {
               setSheetState(() {
@@ -425,20 +449,25 @@ Future<void> _showEditSheet(
             final confirm = await showDialog<bool>(
               context: sheetCtx,
               builder: (c) => AlertDialog(
-                title: const Text('Dispatcher löschen?'),
+                title: Text(
+                  de ? 'Dispatcher löschen?' : 'Delete dispatcher?',
+                ),
                 content: Text(
-                  'Der Account "${displayName.isNotEmpty ? displayName : email}" '
-                  'wird unwiderruflich entfernt.',
+                  de
+                      ? 'Der Account "${displayName.isNotEmpty ? displayName : email}" '
+                          'wird unwiderruflich entfernt.'
+                      : 'The account "${displayName.isNotEmpty ? displayName : email}" '
+                          'will be removed permanently.',
                 ),
                 actions: [
                   CoButton(
                     onPressed: () => Navigator.of(c).pop(false),
-                    label: 'Abbrechen',
+                    label: de ? 'Abbrechen' : 'Cancel',
                     variant: CoButtonVariant.quiet,
                   ),
                   CoButton(
                     onPressed: () => Navigator.of(c).pop(true),
-                    label: 'Löschen',
+                    label: de ? 'Löschen' : 'Delete',
                     variant: CoButtonVariant.destructive,
                   ),
                 ],
@@ -457,7 +486,8 @@ Future<void> _showEditSheet(
             } on FirebaseFunctionsException catch (e) {
               setSheetState(() {
                 deleting = false;
-                error = e.message ?? 'Fehler: ${e.code}';
+                error = e.message ??
+                    (de ? 'Fehler: ${e.code}' : 'Error: ${e.code}');
               });
             }
           }
@@ -498,9 +528,11 @@ Future<void> _showEditSheet(
                   const SizedBox(height: AppSpacing.md),
                   SwitchListTile.adaptive(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('Account aktiv'),
-                    subtitle: const Text(
-                      'Bei „Aus" kann sich der Dispatcher nicht mehr einloggen.',
+                    title: Text(de ? 'Account aktiv' : 'Account active'),
+                    subtitle: Text(
+                      de
+                          ? 'Bei „Aus" kann sich der Dispatcher nicht mehr einloggen.'
+                          : 'When off, the dispatcher can no longer sign in.',
                     ),
                     value: localActive,
                     onChanged: saving || deleting
@@ -509,7 +541,7 @@ Future<void> _showEditSheet(
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   Text(
-                    'Modul-Zugriff',
+                    de ? 'Modul-Zugriff' : 'Module access',
                     style: AppTypography.subheadline.copyWith(
                       color: AppColors.codriverGraphite,
                       fontWeight: FontWeight.w800,
@@ -523,7 +555,7 @@ Future<void> _showEditSheet(
                           SwitchListTile.adaptive(
                             contentPadding: EdgeInsets.zero,
                             dense: true,
-                            title: Text(p.label),
+                            title: Text(p.labelFor(de)),
                             value: localPerms[p.key] ?? false,
                             onChanged: saving || deleting || !localActive
                                 ? null
@@ -546,7 +578,7 @@ Future<void> _showEditSheet(
                     children: [
                       CoButton(
                         onPressed: deleting || saving ? null : delete,
-                        label: 'Löschen',
+                        label: de ? 'Löschen' : 'Delete',
                         icon: Icons.delete_outline_rounded,
                         variant: CoButtonVariant.destructiveQuiet,
                         busy: deleting,
@@ -556,13 +588,13 @@ Future<void> _showEditSheet(
                         onPressed: saving || deleting
                             ? null
                             : () => Navigator.of(sheetCtx).pop(),
-                        label: 'Abbrechen',
+                        label: de ? 'Abbrechen' : 'Cancel',
                         variant: CoButtonVariant.quiet,
                       ),
                       const SizedBox(width: AppSpacing.xs),
                       CoButton(
                         onPressed: saving || deleting ? null : save,
-                        label: 'Speichern',
+                        label: de ? 'Speichern' : 'Save',
                         busy: saving,
                       ),
                     ],

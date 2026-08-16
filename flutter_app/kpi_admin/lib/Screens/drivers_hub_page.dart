@@ -10,6 +10,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
@@ -19,14 +20,18 @@ import 'package:http/http.dart' as http;
 
 import '../localization/app_localizations.dart';
 import '../models/driver_contract_type.dart';
+import '../models/employment_period.dart';
 import 'add_driver_dialog.dart';
+import 'driver_hub_detail_page.dart';
 import 'driver_residence_permit_form_page.dart';
 import '../services/driver_csv.dart';
 import '../services/driver_export_service.dart';
+import '../widgets/app_side_menu.dart';
 import '../widgets/admin_scope.dart';
+import '../widgets/driver_reviews_card.dart';
+import '../widgets/incident_count_chip.dart';
 import '../widgets/web_preview.dart'
     if (dart.library.html) '../widgets/web_preview_web.dart';
-import '../widgets/notification_pin_dialogs.dart';
 
 // Keep this out of source control by passing --dart-define=DEFAULT_DRIVER_PASSWORD=...
 const String kDefaultDriverPassword = String.fromEnvironment(
@@ -45,6 +50,8 @@ enum _DriverSort {
   pending,
   approved,
   rejected,
+  tidPending,
+  employeeIdMissing,
 }
 
 class _DriverOverallScoreData {
@@ -57,8 +64,20 @@ class _DriverOverallScoreData {
   final int weeksCount;
 }
 
+/// Result of the "switch driver off" dialog. Returned only when the admin
+/// confirmed — `endDate == null` means "deactivate, leaving date still open".
+class _DeactivateChoice {
+  const _DeactivateChoice({required this.endDate});
+
+  final DateTime? endDate;
+}
+
 class DriversHubPage extends StatefulWidget {
-  const DriversHubPage({super.key});
+  const DriversHubPage({super.key, this.initialOpenTid});
+
+  /// When set, the driver with this transporter ID is opened right after
+  /// the page mounts (deep link from the home notifications).
+  final String? initialOpenTid;
 
   @override
   State<DriversHubPage> createState() => _DriversHubPageState();
@@ -66,6 +85,28 @@ class DriversHubPage extends StatefulWidget {
 
 class _DriversHubPageState extends State<DriversHubPage> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  bool _autoOpenHandled = false;
+
+  /// Aktuell eingebettet geöffnete Fahrer-Detailseite (Design 2a) —
+  /// gerendert im Shell-Inhalt, damit das Seitenmenü sichtbar bleibt.
+  DocumentSnapshot<Map<String, dynamic>>? _detailDriverDoc;
+
+  Future<void> _maybeAutoOpenDriver() async {
+    final tid = widget.initialOpenTid?.trim() ?? '';
+    if (_autoOpenHandled || tid.isEmpty) return;
+    _autoOpenHandled = true;
+    final uid = _uid;
+    if (uid == null) return;
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('drivers')
+        .doc(tid)
+        .get();
+    if (!mounted || !doc.exists) return;
+    await _openDriverDetails(doc);
+  }
 
   User? get _user => _auth.currentUser;
 
@@ -97,6 +138,26 @@ class _DriversHubPageState extends State<DriversHubPage> {
   Timer? _defaultPwdSaveDebounce;
 
   String _search = '';
+
+  // Ticket "CTRL+F": Cmd/Ctrl+F fokussiert das Suchfeld der Seite
+  // (Browser-Suche greift in Flutter-Web nicht).
+  final FocusNode _searchFocus = FocusNode();
+
+  bool _onGlobalKey(KeyEvent e) {
+    if (e is KeyDownEvent &&
+        e.logicalKey == LogicalKeyboardKey.keyF &&
+        (HardwareKeyboard.instance.isControlPressed ||
+            HardwareKeyboard.instance.isMetaPressed)) {
+      if (_searchFocus.canRequestFocus) {
+        _searchFocus.requestFocus();
+        return true;
+      }
+    }
+    return false;
+  }
+  // Archive view: inactive drivers are moved out of the main list into a
+  // separate archive; toggled by the "Archiv" button.
+  bool _showArchive = false;
   _DriverSort _driverSort = _DriverSort.nameAsc;
   // null = no filter; if filtering on "Unset", use the special sentinel.
   DriverContractType? _contractFilter;
@@ -129,17 +190,27 @@ class _DriversHubPageState extends State<DriversHubPage> {
         return t.t('drivers_hub_sort_approved');
       case _DriverSort.rejected:
         return t.t('drivers_hub_sort_rejected');
+      case _DriverSort.tidPending:
+        return 'TID ausstehend';
+      case _DriverSort.employeeIdMissing:
+        return 'Employee ID missing';
     }
   }
 
   @override
   void initState() {
     super.initState();
+    HardwareKeyboard.instance.addHandler(_onGlobalKey);
     _bulkPwdCtrl.addListener(_onDefaultPasswordChanged);
+    // Deep link from the home notifications: open the driver directly.
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _maybeAutoOpenDriver());
   }
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_onGlobalKey);
+    _searchFocus.dispose();
     _defaultPwdSaveDebounce?.cancel();
     unawaited(_persistDefaultDriverPassword());
     _bulkPwdCtrl.removeListener(_onDefaultPasswordChanged);
@@ -204,6 +275,18 @@ class _DriversHubPageState extends State<DriversHubPage> {
   @override
   Widget build(BuildContext context) {
     _loadDefaultDriverPasswordOnce();
+    // Detailseite eingebettet rendern, damit das Shell-Menü links
+    // sichtbar bleibt; Zurück-Pfeil der Detailseite räumt den State.
+    final detailDoc = _detailDriverDoc;
+    if (detailDoc != null) {
+      return DriverHubDetailPage(
+        key: ValueKey('driver-detail-${detailDoc.reference.path}'),
+        driverRef: detailDoc.reference,
+        dspUid: _uid,
+        actions: _detailActionsFor(detailDoc.reference),
+        onBack: () => setState(() => _detailDriverDoc = null),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.all(24.0),
       child: Column(
@@ -393,6 +476,75 @@ class _DriversHubPageState extends State<DriversHubPage> {
     }
   }
 
+  // ADMIN: Edit the driver's main display name (top-level `driverName`).
+  // Feedback: admins had to delete + re-add a driver just to fix the name.
+  Future<void> _adminEditDriverName({
+    required DocumentReference<Map<String, dynamic>> driverRef,
+    required String initialValue,
+  }) async {
+    final t = AppLocalizations.of(context);
+    final label =
+        Localizations.localeOf(context).languageCode == 'de'
+            ? 'Anzeigename'
+            : 'Display name';
+    final ctrl = TextEditingController(text: initialValue);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t.tf('drivers_hub_edit_label', {'label': label})),
+        content: SizedBox(
+          width: 520,
+          child: TextFormField(
+            controller: ctrl,
+            textCapitalization: TextCapitalization.words,
+            decoration: InputDecoration(
+              labelText: label,
+              border: const OutlineInputBorder(),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(t.t('admin_home_cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(t.t('button_save')),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) {
+      ctrl.dispose();
+      return;
+    }
+    try {
+      final v = ctrl.text.trim();
+      if (v.isEmpty) {
+        ctrl.dispose();
+        return;
+      }
+      await driverRef.set({
+        'driverName': v,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(t.tf('drivers_hub_label_updated', {'label': label})),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$e')),
+      );
+    } finally {
+      ctrl.dispose();
+    }
+  }
+
   String _normalizeWorkPermitType(dynamic raw, {dynamic fallbackExpiry}) {
     final value = (raw ?? '').toString().trim().toLowerCase();
     if (value.isEmpty) {
@@ -520,6 +672,92 @@ class _DriversHubPageState extends State<DriversHubPage> {
               'error': '$e',
             }),
           ),
+        ),
+      );
+    }
+  }
+
+  /// Admin picker for the driver's preferred language. Writes the language
+  /// code to `onboarding.language` on the driver doc (same field the
+  /// onboarding form uses; value is a `Locale.languageCode` like 'de'/'en').
+  Future<void> _adminEditDriverLanguage({
+    required DocumentReference<Map<String, dynamic>> driverRef,
+    required dynamic initialValue,
+  }) async {
+    final t = AppLocalizations.of(context);
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final current = (initialValue ?? '').toString().trim();
+    String selected = AppLocalizations.supportedLocales
+            .any((l) => l.languageCode == current)
+        ? current
+        : Localizations.localeOf(context).languageCode;
+    if (!AppLocalizations.supportedLocales
+        .any((l) => l.languageCode == selected)) {
+      selected = 'de';
+    }
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(de ? 'Fahrersprache' : 'Driver language'),
+        content: SizedBox(
+          width: 420,
+          child: StatefulBuilder(
+            builder: (ctx, setLocal) => DropdownButtonFormField<String>(
+              value: selected,
+              isExpanded: true,
+              decoration: InputDecoration(
+                labelText: de ? 'Sprache' : 'Language',
+                border: const OutlineInputBorder(),
+              ),
+              items: [
+                for (final loc in AppLocalizations.supportedLocales)
+                  DropdownMenuItem(
+                    value: loc.languageCode,
+                    child: Text(languageLabel(loc.languageCode)),
+                  ),
+              ],
+              onChanged: (value) {
+                if (value != null) setLocal(() => selected = value);
+              },
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(t.t('admin_home_cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(t.t('button_save')),
+          ),
+        ],
+      ),
+    );
+
+    if (ok != true) return;
+
+    try {
+      await driverRef.set({
+        'onboarding': {'language': selected},
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(de
+              ? 'Fahrersprache gespeichert: ${languageLabel(selected)}'
+              : 'Driver language saved: ${languageLabel(selected)}'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              '${de ? 'Speichern fehlgeschlagen' : 'Save failed'}: $e'),
         ),
       );
     }
@@ -722,43 +960,284 @@ class _DriversHubPageState extends State<DriversHubPage> {
     required Map<String, dynamic> onboarding,
   }) {
     final t = AppLocalizations.of(context);
+    final label = t.t('drivers_hub_field_remaining_vacation_days');
     final annualVacationDays = _annualVacationDaysFromOnboarding(onboarding);
     final workStartDate = _dateFromDynamic(onboarding['workStartDate']);
+
+    // Manual admin override (feedback ticket). When present it wins over the
+    // auto-calculated value and is flagged as edited — admin-only view.
+    final overrideRaw = onboarding['remainingVacationDaysOverride'];
+    double? override;
+    if (overrideRaw is num) {
+      override = overrideRaw.toDouble();
+    } else if (overrideRaw is String && overrideRaw.trim().isNotEmpty) {
+      override = double.tryParse(overrideRaw.trim().replaceAll(',', '.'));
+    }
+    final editedAt = _dateFromDynamic(onboarding['remainingVacationDaysOverrideAt']);
 
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: driverRef.collection('absence_requests').snapshots(),
       builder: (context, snap) {
-        if (snap.hasError) {
-          return _detailRowReadOnly(
-            label: t.t('drivers_hub_field_remaining_vacation_days'),
-            value: '—',
+        double? computed;
+        if (!snap.hasError &&
+            snap.connectionState != ConnectionState.waiting) {
+          final approvedVacationDays = _approvedVacationDaysFromRequests(
+            snap.data?.docs ??
+                const <QueryDocumentSnapshot<Map<String, dynamic>>>[],
           );
+          final now = DateTime.now();
+          final accruedDays = workStartDate == null
+              ? annualVacationDays
+              : (annualVacationDays / 12.0) *
+                    _completedMonthsSince(workStartDate, now);
+          final remainingDays = accruedDays - approvedVacationDays;
+          computed = remainingDays < 0 ? 0 : remainingDays;
         }
 
-        if (snap.connectionState == ConnectionState.waiting) {
-          return _detailRowReadOnly(
-            label: t.t('drivers_hub_field_remaining_vacation_days'),
-            value: '...',
-          );
-        }
+        final showValue = override ?? computed;
+        final valueText = showValue == null
+            ? (snap.hasError ? '—' : '...')
+            : _formatVacationDays(showValue);
 
-        final approvedVacationDays = _approvedVacationDaysFromRequests(
-          snap.data?.docs ??
-              const <QueryDocumentSnapshot<Map<String, dynamic>>>[],
-        );
-        final now = DateTime.now();
-        final accruedDays = workStartDate == null
-            ? annualVacationDays
-            : (annualVacationDays / 12.0) *
-                  _completedMonthsSince(workStartDate, now);
-        final remainingDays = accruedDays - approvedVacationDays;
-
-        return _detailRowReadOnly(
-          label: t.t('drivers_hub_field_remaining_vacation_days'),
-          value: _formatVacationDays(remainingDays < 0 ? 0 : remainingDays),
+        return _remainingVacationRowUI(
+          label: label,
+          value: valueText,
+          edited: override != null,
+          editedAt: editedAt,
+          computedText:
+              computed == null ? null : _formatVacationDays(computed),
+          onEdit: () => _editRemainingVacationOverride(
+            driverRef: driverRef,
+            label: label,
+            currentOverride: override,
+            computed: computed,
+          ),
         );
       },
     );
+  }
+
+  /// Row for "remaining vacation days": value + optional "edited" badge +
+  /// admin edit pencil. The badge and pencil only ever render inside the
+  /// admin Drivers Hub, so this is admin-only by construction.
+  Widget _remainingVacationRowUI({
+    required String label,
+    required String value,
+    required bool edited,
+    required DateTime? editedAt,
+    required String? computedText,
+    required VoidCallback onEdit,
+  }) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final hasText = value.trim().isNotEmpty && value != '—';
+
+    String editedTooltip() {
+      final parts = <String>[
+        de ? 'Manuell bearbeitet' : 'Manually edited',
+        if (computedText != null)
+          de ? 'Berechnet: $computedText' : 'Calculated: $computedText',
+        if (editedAt != null)
+          '${editedAt.day.toString().padLeft(2, '0')}.'
+              '${editedAt.month.toString().padLeft(2, '0')}.${editedAt.year}',
+      ];
+      return parts.join(' · ');
+    }
+
+    return _DetailRow(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 160,
+            child: SelectableText(
+              label,
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+                color: Color(0xFF6B7280),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                SelectableText(
+                  hasText ? value : '—',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: hasText
+                        ? const Color(0xFF111827)
+                        : const Color(0xFFCBD5E1),
+                  ),
+                ),
+                if (edited) ...[
+                  const SizedBox(width: 8),
+                  Tooltip(
+                    message: editedTooltip(),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF7ED),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: const Color(0xFFFDBA74)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.edit_note_rounded,
+                              size: 13, color: Color(0xFFC2410C)),
+                          const SizedBox(width: 3),
+                          Text(
+                            de ? 'bearbeitet' : 'edited',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFFC2410C),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined, size: 16),
+                  padding: EdgeInsets.zero,
+                  constraints:
+                      const BoxConstraints.tightFor(width: 28, height: 28),
+                  visualDensity: VisualDensity.compact,
+                  splashRadius: 16,
+                  color: const Color(0xFF6B7280),
+                  tooltip: AppLocalizations.of(context)
+                      .tf('drivers_hub_edit_label', {'label': label}),
+                  onPressed: onEdit,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Admin dialog to set or clear the manual remaining-vacation override.
+  Future<void> _editRemainingVacationOverride({
+    required DocumentReference<Map<String, dynamic>> driverRef,
+    required String label,
+    required double? currentOverride,
+    required double? computed,
+  }) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final t = AppLocalizations.of(context);
+    final ctrl = TextEditingController(
+      text: currentOverride != null
+          ? _formatVacationDays(currentOverride)
+          : (computed != null ? _formatVacationDays(computed) : ''),
+    );
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t.tf('drivers_hub_edit_label', {'label': label})),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 460,
+              child: TextField(
+                controller: ctrl,
+                autofocus: true,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  hintText: de ? 'z. B. 12' : 'e.g. 12',
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              computed != null
+                  ? (de
+                      ? 'Automatisch berechnet: ${_formatVacationDays(computed)} Tage. '
+                          'Leeren + Speichern setzt auf den berechneten Wert zurück.'
+                      : 'Auto-calculated: ${_formatVacationDays(computed)} days. '
+                          'Clear + Save reverts to the calculated value.')
+                  : (de
+                      ? 'Leeren + Speichern entfernt die manuelle Anpassung.'
+                      : 'Clear + Save removes the manual override.'),
+              style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop('__cancel__'),
+            child: Text(t.t('admin_home_cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
+            child: Text(t.t('button_save')),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (result == null || result == '__cancel__') return;
+
+    try {
+      if (result.isEmpty) {
+        // Clear the override → back to auto-calculation.
+        await driverRef.set({
+          'onboarding': {
+            'remainingVacationDaysOverride': FieldValue.delete(),
+            'remainingVacationDaysOverrideAt': FieldValue.delete(),
+          },
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      } else {
+        final parsed =
+            double.tryParse(result.replaceAll(',', '.'));
+        if (parsed == null) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(de ? 'Ungültige Zahl.' : 'Invalid number.'),
+            ),
+          );
+          return;
+        }
+        final stored = parsed % 1 == 0 ? parsed.toInt() : parsed;
+        await driverRef.set({
+          'onboarding': {
+            'remainingVacationDaysOverride': stored,
+            'remainingVacationDaysOverrideAt': FieldValue.serverTimestamp(),
+          },
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(t.tf('drivers_hub_label_updated', {'label': label})),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            t.tf('drivers_hub_failed_update_label',
+                {'label': label, 'error': '$e'}),
+          ),
+        ),
+      );
+    }
   }
 
   double _annualVacationDaysFromOnboarding(Map<String, dynamic> onboarding) {
@@ -777,6 +1256,13 @@ class _DriversHubPageState extends State<DriversHubPage> {
     return _parseIsoDate(raw?.toString());
   }
 
+  /// Verbrauchte Tage des **bezahlten** Urlaubskontingents.
+  ///
+  /// Ticket KJV4n2S: Unbezahlter Urlaub (`paid == false`) darf das
+  /// bezahlte Kontingent NICHT belasten — er wird nur angezeigt, nicht
+  /// verrechnet. Fehlt das Feld (alle Bestandsdaten), gilt der Antrag
+  /// wie bisher als bezahlt und zählt weiter mit (gleiche Konvention
+  /// wie `computeMonthlyAccount` serverseitig: `paid !== false`).
   double _approvedVacationDaysFromRequests(
     List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
   ) {
@@ -786,6 +1272,8 @@ class _DriversHubPageState extends State<DriversHubPage> {
       final type = (data['type'] ?? '').toString().trim().toLowerCase();
       final status = (data['status'] ?? '').toString().trim().toLowerCase();
       if (type != 'vacation' || status != 'approved') continue;
+      final paid = data['paid'] is bool ? data['paid'] as bool : true;
+      if (!paid) continue;
 
       total += _inclusiveDays(
         _dateFromDynamic(data['fromDate']),
@@ -915,7 +1403,13 @@ class _DriversHubPageState extends State<DriversHubPage> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Export fehlgeschlagen: $e')),
+        SnackBar(
+          content: Text(
+            Localizations.localeOf(context).languageCode == 'de'
+                ? 'Export fehlgeschlagen: $e'
+                : 'Export failed: $e',
+          ),
+        ),
       );
     } finally {
       if (mounted) {
@@ -1082,7 +1576,13 @@ class _DriversHubPageState extends State<DriversHubPage> {
     );
     if (!ok || !mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Fahrer angelegt.')),
+      SnackBar(
+        content: Text(
+          Localizations.localeOf(context).languageCode == 'de'
+              ? 'Fahrer angelegt.'
+              : 'Driver created.',
+        ),
+      ),
     );
   }
 
@@ -1431,7 +1931,289 @@ class _DriversHubPageState extends State<DriversHubPage> {
     }
   }
 
+  /// Ask for the contract end date before a driver is switched off.
+  ///
+  /// Returns `null` when the admin cancelled (the driver must stay active).
+  /// A returned choice either carries the picked [DateTime] or says
+  /// "deactivate without an end date" — a leaving date is not always known
+  /// yet, so switching off must never be blocked by it.
+  Future<_DeactivateChoice?> _askContractEndDateDialog({
+    required String driverName,
+    required DateTime? periodStart,
+  }) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    String tr(String d, String e) => de ? d : e;
+
+    final today = DateTime.now();
+    DateTime endDate = DateTime(today.year, today.month, today.day);
+
+    return showDialog<_DeactivateChoice>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheet) {
+            return AlertDialog(
+              shape:
+                  RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              title: Text(
+                tr('Fahrer deaktivieren', 'Deactivate driver'),
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+              ),
+              content: SizedBox(
+                width: 380,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      driverName.trim().isEmpty
+                          ? tr(
+                              'Das Vertragsende wird im Beschäftigungszeitraum '
+                                  'gespeichert und schließt den laufenden Vertrag ab.',
+                              'The contract end date is stored on the employment '
+                                  'period and closes the running contract.',
+                            )
+                          : tr(
+                              '$driverName wird abgeschaltet. Das Vertragsende '
+                                  'wird im Beschäftigungszeitraum gespeichert und '
+                                  'schließt den laufenden Vertrag ab.',
+                              '$driverName will be switched off. The contract end '
+                                  'date is stored on the employment period and '
+                                  'closes the running contract.',
+                            ),
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        height: 1.35,
+                        color: Color(0xFF6B7280),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: ctx,
+                          initialDate: endDate,
+                          firstDate: DateTime(1990),
+                          lastDate: DateTime(2100),
+                        );
+                        if (picked != null) setSheet(() => endDate = picked);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 11),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF9FAFB),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFE5E7EB)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.event_rounded,
+                                size: 16, color: Color(0xFF6B7280)),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                tr('Vertragsende', 'Contract end'),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF6B7280),
+                                ),
+                              ),
+                            ),
+                            Text(
+                              _formatDate(endDate),
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF111827),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            const Icon(Icons.edit_calendar_rounded,
+                                size: 15, color: Color(0xFF9CA3AF)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (periodStart != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        tr(
+                          'Vertragsbeginn: ${_formatDate(periodStart)}',
+                          'Contract start: ${_formatDate(periodStart)}',
+                        ),
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF9CA3AF),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 14),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          foregroundColor: const Color(0xFF6B7280),
+                        ),
+                        onPressed: () => Navigator.of(ctx)
+                            .pop(const _DeactivateChoice(endDate: null)),
+                        icon: const Icon(Icons.block_rounded, size: 15),
+                        label: Text(
+                          tr('Ohne Datum deaktivieren',
+                              'Deactivate without a date'),
+                          style: const TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: Text(tr('Abbrechen', 'Cancel')),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    if (periodStart != null && endDate.isBefore(periodStart)) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        SnackBar(
+                          backgroundColor: const Color(0xFFB42318),
+                          content: Text(tr(
+                              'Das Vertragsende liegt vor dem Beginn.',
+                              'The contract end is before the start.')),
+                        ),
+                      );
+                      return;
+                    }
+                    Navigator.of(ctx).pop(_DeactivateChoice(endDate: endDate));
+                  },
+                  child: Text(tr('Übernehmen', 'Apply')),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Asks whether a still-set contract end date should be dropped when a
+  /// driver is switched back on. Never removes anything on its own — an
+  /// active driver with an end date in the past is contradictory, so we let
+  /// the admin decide instead of silently rewriting the period.
+  ///
+  /// Returns `null` on cancel, `true` to clear the end date, `false` to keep it.
+  Future<bool?> _askClearContractEndDialog(DateTime end) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    String tr(String d, String e) => de ? d : e;
+    final shown = _formatDate(end);
+
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Text(
+          tr('Fahrer aktivieren', 'Activate driver'),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+        ),
+        content: SizedBox(
+          width: 380,
+          child: Text(
+            tr(
+              'Für diesen Fahrer ist ein Vertragsende am $shown hinterlegt. '
+                  'Soll das Enddatum entfernt werden, damit der Vertrag wieder '
+                  'als laufend gilt?',
+              'This driver has a contract end date on $shown. Remove the end '
+                  'date so the contract counts as running again?',
+            ),
+            style: const TextStyle(
+              fontSize: 12.5,
+              height: 1.35,
+              color: Color(0xFF6B7280),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(tr('Abbrechen', 'Cancel')),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(tr('Datum behalten', 'Keep the date')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(tr('Enddatum entfernen', 'Remove end date')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Writes [endDate] (or `null` to reopen the contract) onto the driver's
+  /// current employment period — always through [_saveEmploymentPeriods], so
+  /// the legacy `onboarding.*` mirror stays in sync.
+  Future<void> _setContractEndOnCurrentPeriod({
+    required DocumentSnapshot<Map<String, dynamic>> driverDoc,
+    required DateTime? endDate,
+  }) async {
+    final data = driverDoc.data() ?? <String, dynamic>{};
+    final periods = employmentPeriodsOf(data);
+    final currentTid = (data['transporterId'] ?? '').toString().trim();
+    final iso = endDate == null ? '' : formatIsoDate(endDate);
+
+    List<EmploymentPeriod> next;
+    if (periods.isEmpty) {
+      // No period and no legacy start date known. Reopening makes no sense
+      // here, and we do not invent a contract out of nothing.
+      if (endDate == null) return;
+      // Seed one period so the end date has somewhere to live: the driver
+      // document's creation day is the best start we have, clamped to the
+      // end date when it is newer (or missing).
+      final created = parseFlexibleDate(data['createdAt']);
+      final start = (created == null || created.isAfter(endDate))
+          ? endDate
+          : created;
+      next = [
+        EmploymentPeriod(
+          start: formatIsoDate(start),
+          end: iso,
+          transporterId: currentTid,
+        ),
+      ];
+    } else {
+      final current = currentEmploymentPeriod(periods);
+      if (current == null) return;
+      final index = periods.indexWhere((p) =>
+          p.start == current.start &&
+          p.end == current.end &&
+          p.transporterId == current.transporterId);
+      if (index < 0) return;
+      next = [...periods];
+      next[index] = current.copyWith(end: iso);
+    }
+
+    await _saveEmploymentPeriods(
+      driverRef: driverDoc.reference,
+      periods: next,
+      previousTid: currentTid,
+    );
+  }
+
   /// Toggle active / suspended state.
+  ///
+  /// Switching a driver **off** first asks for the contract end date (feedback
+  /// ticket): the date is stored on the running employment period, but the
+  /// admin can also deactivate without one when the leaving date is still open.
   Future<void> _onToggleActiveDriver(
     DocumentSnapshot<Map<String, dynamic>> driverDoc,
     bool currentlyActive,
@@ -1439,6 +2221,45 @@ class _DriversHubPageState extends State<DriversHubPage> {
     final t = AppLocalizations.of(context);
     if (_uid == null) return;
     final newActive = !currentlyActive;
+
+    final data = driverDoc.data() ?? <String, dynamic>{};
+    final current = currentEmploymentPeriod(employmentPeriodsOf(data));
+
+    DateTime? pendingEnd;
+    var clearEnd = false;
+
+    if (!newActive) {
+      final choice = await _askContractEndDateDialog(
+        driverName: (data['driverName'] ?? '').toString(),
+        periodStart: current?.startDate,
+      );
+      if (choice == null) return; // cancelled — driver stays active
+      pendingEnd = choice.endDate;
+    } else {
+      // Re-activating never drops the end date on its own; we only offer it,
+      // because an active driver whose contract ended in the past would show
+      // up as "expired" in every report that reads onboarding.contractExpiry.
+      final existingEnd = current?.endDate;
+      if (existingEnd != null) {
+        final answer = await _askClearContractEndDialog(existingEnd);
+        if (answer == null) return; // cancelled — driver stays inactive
+        clearEnd = answer;
+      }
+    }
+
+    if (!mounted) return;
+
+    if (pendingEnd != null) {
+      await _setContractEndOnCurrentPeriod(
+        driverDoc: driverDoc,
+        endDate: pendingEnd,
+      );
+    } else if (clearEnd) {
+      await _setContractEndOnCurrentPeriod(
+        driverDoc: driverDoc,
+        endDate: null,
+      );
+    }
 
     await driverDoc.reference.set({
       'active': newActive,
@@ -1700,6 +2521,10 @@ class _DriversHubPageState extends State<DriversHubPage> {
     switch (docType) {
       case 'resident_permit':
         return t.t('work_permit');
+      case 'resident_permit_back':
+        return Localizations.localeOf(context).languageCode == 'de'
+            ? 'Aufenthaltstitel (Rückseite)'
+            : 'Residence permit (back)';
       case 'driver_license_front':
         return t.t('driver_license_front');
       case 'driver_license_back':
@@ -1718,6 +2543,18 @@ class _DriversHubPageState extends State<DriversHubPage> {
         return t.t('doc_insurance');
       case 'contract':
         return t.t('admin_home_contract');
+      case 'safety_training_certificate':
+        return Localizations.localeOf(context).languageCode == 'de'
+            ? 'Sicherheitsunterweisung (Zertifikat)'
+            : 'Safety instruction (certificate)';
+      case 'privacy_training_certificate':
+        return Localizations.localeOf(context).languageCode == 'de'
+            ? 'Datenschutz-Schulung (Zertifikat)'
+            : 'Privacy training (certificate)';
+      case 'privacy_notice_ack':
+        return Localizations.localeOf(context).languageCode == 'de'
+            ? 'Datenschutzinformation (Kenntnisnahme)'
+            : 'Privacy notice (acknowledgement)';
       default:
         return docType;
     }
@@ -1826,6 +2663,7 @@ class _DriversHubPageState extends State<DriversHubPage> {
     DocumentSnapshot<Map<String, dynamic>> driverDoc,
     String currentTid,
   ) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final ctrl = TextEditingController(text: currentTid);
     final result = await showModalBottomSheet<String>(
       context: context,
@@ -1857,20 +2695,24 @@ class _DriversHubPageState extends State<DriversHubPage> {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
-                'Transporter ID bearbeiten',
-                style: TextStyle(
+              Text(
+                de ? 'Transporter ID bearbeiten' : 'Edit Transporter ID',
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
                   color: Color(0xFF111827),
                 ),
               ),
               const SizedBox(height: 6),
-              const Text(
-                'Die TID identifiziert den Fahrer in Amazon-Reports. '
-                'Buchstaben + Zahlen, ohne Leerzeichen. Wird beim '
-                'Speichern automatisch in Großbuchstaben gewandelt.',
-                style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+              Text(
+                de
+                    ? 'Die TID identifiziert den Fahrer in Amazon-Reports. '
+                        'Buchstaben + Zahlen, ohne Leerzeichen. Wird beim '
+                        'Speichern automatisch in Großbuchstaben gewandelt.'
+                    : 'The TID identifies the driver in Amazon reports. '
+                        'Letters + digits, no spaces. Converted to upper '
+                        'case automatically on save.',
+                style: const TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
               ),
               const SizedBox(height: 14),
               TextField(
@@ -1907,14 +2749,14 @@ class _DriversHubPageState extends State<DriversHubPage> {
                 children: [
                   TextButton(
                     onPressed: () => Navigator.of(ctx).pop(),
-                    child: const Text('Abbrechen'),
+                    child: Text(de ? 'Abbrechen' : 'Cancel'),
                   ),
                   const SizedBox(width: 8),
                   FilledButton.icon(
                     onPressed: () =>
                         Navigator.of(ctx).pop(ctrl.text.trim().toUpperCase()),
                     icon: const Icon(Icons.save_outlined, size: 18),
-                    label: const Text('Speichern'),
+                    label: Text(de ? 'Speichern' : 'Save'),
                   ),
                 ],
               ),
@@ -1941,7 +2783,9 @@ class _DriversHubPageState extends State<DriversHubPage> {
             SnackBar(
               backgroundColor: const Color(0xFFB42318),
               content: Text(
-                'Ein anderer Fahrer benutzt die TID "$newTid" bereits.',
+                de
+                    ? 'Ein anderer Fahrer benutzt die TID "$newTid" bereits.'
+                    : 'Another driver already uses the TID "$newTid".',
               ),
             ),
           );
@@ -1974,13 +2818,55 @@ class _DriversHubPageState extends State<DriversHubPage> {
         }, SetOptions(merge: true));
       }
 
+      // Fahrer-Login (users-Doc + Auth-Claims) auf die neue TID
+      // mitziehen — sonst vergleichen die Firestore-Rules weiter die
+      // alte ID und Fahrer-Schreibzugriffe (z. B. Vorschussantrag)
+      // scheitern mit permission-denied.
+      var loginSyncWarning = false;
+      final loginEmail = ((data['email'] ??
+                  data['loginEmail'] ??
+                  (data['onboarding'] is Map
+                      ? (data['onboarding'] as Map)['email']
+                      : null)) ??
+              '')
+          .toString()
+          .trim();
+      if (newTid.isNotEmpty && loginEmail.isNotEmpty) {
+        try {
+          await FirebaseFunctions.instance
+              .httpsCallable('syncDriverLoginTransporterId')
+              .call(<String, dynamic>{
+            'driverEmail': loginEmail,
+            'newTransporterId': newTid,
+          });
+        } catch (_) {
+          // Nicht fatal: TID-Wechsel selbst ist durch. Ohne Sync bleibt
+          // das Login aber auf der alten ID — deshalb warnen.
+          loginSyncWarning = true;
+        }
+      }
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
+          backgroundColor:
+              loginSyncWarning ? const Color(0xFFB45309) : null,
           content: Text(
             newTid.isEmpty
-                ? 'Transporter ID entfernt.'
-                : 'Transporter ID auf "$newTid" geändert.',
+                ? (de
+                    ? 'Transporter ID entfernt.'
+                    : 'Transporter ID removed.')
+                : loginSyncWarning
+                    ? (de
+                        ? 'Transporter ID auf "$newTid" geändert — Login-'
+                            'Sync fehlgeschlagen, Fahrer-Login zeigt evtl. '
+                            'noch auf die alte ID.'
+                        : 'Transporter ID changed to "$newTid" — login '
+                            'sync failed, the driver login may still '
+                            'point to the old ID.')
+                    : (de
+                        ? 'Transporter ID auf "$newTid" geändert.'
+                        : 'Transporter ID changed to "$newTid".'),
           ),
         ),
       );
@@ -1989,7 +2875,9 @@ class _DriversHubPageState extends State<DriversHubPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: const Color(0xFFB42318),
-          content: Text('Konnte TID nicht ändern: $e'),
+          content: Text(
+            de ? 'Konnte TID nicht ändern: $e' : 'Could not change TID: $e',
+          ),
         ),
       );
     }
@@ -2060,7 +2948,19 @@ class _DriversHubPageState extends State<DriversHubPage> {
                       ),
                       DropdownMenuItem(
                         value: 'resident_permit',
-                        child: Text(t.t('work_permit')),
+                        child: Text(
+                          Localizations.localeOf(context).languageCode == 'de'
+                              ? 'Aufenthaltstitel (Vorderseite)'
+                              : 'Residence permit (front)',
+                        ),
+                      ),
+                      DropdownMenuItem(
+                        value: 'resident_permit_back',
+                        child: Text(
+                          Localizations.localeOf(context).languageCode == 'de'
+                              ? 'Aufenthaltstitel (Rückseite)'
+                              : 'Residence permit (back)',
+                        ),
                       ),
                       DropdownMenuItem(
                         value: 'id_card_front',
@@ -2163,17 +3063,1542 @@ class _DriversHubPageState extends State<DriversHubPage> {
     );
   }
 
+  /// Settings gear shown in the detail page's top AppBar — hosts every
+  /// hero-level action (notification PIN, login/password).
+  Widget _driverSettingsMenu(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data() ?? const <String, dynamic>{};
+    final tid = (data['transporterId'] ?? '').toString();
+    final canManageLogins = _uid != null && tid.isNotEmpty;
+
+    Widget menuIcon(IconData icon, Color bg, Color fg) => Container(
+          width: 28,
+          height: 28,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 16, color: fg),
+        );
+
+    return PopupMenuButton<String>(
+      tooltip: _trText('Einstellungen', 'Settings'),
+      position: PopupMenuPosition.under,
+      offset: const Offset(0, 8),
+      icon: const Icon(Symbols.settings, size: 23, color: Color(0xFF5B6572)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: Color(0xFFE5E7EB)),
+      ),
+      color: Colors.white,
+      elevation: 8,
+      onSelected: (value) async {
+        switch (value) {
+          case 'password':
+            if (!canManageLogins) return;
+            await _onCreateOrResetLogin(doc);
+            break;
+          case 'email':
+            if (_uid == null) return;
+            await _onChangeDriverEmail(doc);
+            break;
+          case 'legacy':
+            await _openLegacyDriverDetails(doc);
+            break;
+        }
+      },
+      itemBuilder: (_) => <PopupMenuEntry<String>>[
+        PopupMenuItem<String>(
+          value: 'password',
+          enabled: canManageLogins,
+          height: 44,
+          child: Row(
+            children: [
+              menuIcon(Icons.key_outlined, const Color(0xFFEFF6FF),
+                  const Color(0xFF1D4ED8)),
+              const SizedBox(width: 12),
+              const Text(
+                'Passwort verwalten',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+            ],
+          ),
+        ),
+        PopupMenuItem<String>(
+          value: 'email',
+          enabled: _uid != null,
+          height: 44,
+          child: Row(
+            children: [
+              menuIcon(Icons.alternate_email_rounded,
+                  const Color(0xFFECFDF5), const Color(0xFF047857)),
+              const SizedBox(width: 12),
+              Text(
+                _trText('E-Mail ändern', 'Change email'),
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Zugang zur klassischen Ansicht: Dokumenten-Upload/-Vorschau,
+        // Beschäftigungszeiträume und die Exporte leben weiter dort — das
+        // 2a-Design zeigt Dokumente bewusst nur als Status.
+        PopupMenuItem<String>(
+          value: 'legacy',
+          height: 44,
+          child: Row(
+            children: [
+              menuIcon(Icons.folder_open_rounded, const Color(0xFFF1F5F9),
+                  const Color(0xFF475569)),
+              const SizedBox(width: 12),
+              Text(
+                _trText('Dokumente & Export', 'Documents & export'),
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _trText(String de, String en) =>
+      Localizations.localeOf(context).languageCode == 'de' ? de : en;
+
+  /// Ticket: change a driver's (login) email in place. Calls the
+  /// `updateDriverEmail` Cloud Function so the existing Auth user keeps
+  /// its uid/claims instead of getting a duplicate account.
+  Future<void> _onChangeDriverEmail(
+    DocumentSnapshot<Map<String, dynamic>> driverDoc,
+  ) async {
+    final data = driverDoc.data() ?? const <String, dynamic>{};
+    final currentEmail =
+        (data['loginEmail'] ?? data['email'] ?? '').toString().trim();
+    final hasLogin = data['hasLogin'] == true ||
+        (data['authUid'] ?? '').toString().trim().isNotEmpty;
+    final emailCtrl = TextEditingController(text: currentEmail);
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          _trText('E-Mail ändern', 'Change email'),
+          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+        ),
+        content: SizedBox(
+          width: 380,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                hasLogin
+                    ? _trText(
+                        'Die Login-E-Mail dieses Fahrers wird geändert. '
+                            'Der Fahrer meldet sich danach mit der neuen '
+                            'E-Mail an (Passwort bleibt gleich).',
+                        'This changes the driver\'s login email. The '
+                            'driver signs in with the new email afterwards '
+                            '(password stays the same).')
+                    : _trText(
+                        'Dieser Fahrer hat noch keinen Login — die E-Mail '
+                            'wird im Profil gespeichert.',
+                        'This driver has no login yet — the email is '
+                            'stored on the profile.'),
+                style: const TextStyle(
+                    fontSize: 12.5, color: Color(0xFF6B7280)),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: emailCtrl,
+                autofocus: true,
+                keyboardType: TextInputType.emailAddress,
+                decoration: _pillInputDecoration(
+                    _trText('Neue E-Mail', 'New email')),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(_trText('Abbrechen', 'Cancel')),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF00B287)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(_trText('Speichern', 'Save')),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    final newEmail = emailCtrl.text.trim().toLowerCase();
+    if (newEmail.isEmpty || !newEmail.contains('@')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(_trText('Bitte eine gültige E-Mail eingeben.',
+                'Please enter a valid email.'))),
+      );
+      return;
+    }
+    if (newEmail == currentEmail.toLowerCase()) return;
+
+    try {
+      final callable =
+          FirebaseFunctions.instance.httpsCallable('updateDriverEmail');
+      await callable.call(<String, dynamic>{
+        'driverDocId': driverDoc.id,
+        'email': newEmail,
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFF067647),
+          content: Text(_trText(
+              'E-Mail geändert: $newEmail', 'Email changed: $newEmail')),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(_trText('E-Mail-Änderung fehlgeschlagen: $e',
+                'Email change failed: $e'))),
+      );
+    }
+  }
+
+  /// Normalized driving-licence type: 'eu' or 'non_eu'. Legacy drivers
+  /// without the field count as non-EU when a first-day date exists.
+  String _normalizeLicenseType(dynamic raw, Map<String, dynamic> onboarding) {
+    final v = (raw ?? '').toString().trim().toLowerCase();
+    if (v == 'eu') return 'eu';
+    if (v == 'non_eu' || v == 'noneu' || v == 'non-eu') return 'non_eu';
+    final firstDay =
+        (onboarding['firstDayInGermany'] ?? '').toString().trim();
+    return firstDay.isNotEmpty ? 'non_eu' : 'eu';
+  }
+
+  /// Compact date row inside the hero expiry panel. Red when expired,
+  /// orange when due within 30 days.
+  Widget _heroDateRow(String label, DateTime? date, {VoidCallback? onTap}) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    Color valueColor = const Color(0xFF111827);
+    if (date != null) {
+      final diff = date.difference(today).inDays;
+      if (diff < 0) {
+        valueColor = const Color(0xFFB91C1C);
+      } else if (diff <= 30) {
+        valueColor = const Color(0xFFEA580C);
+      }
+    }
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF6B7280),
+                ),
+              ),
+            ),
+            Text(
+              date == null ? '—' : _formatDate(date),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: date == null ? const Color(0xFFCBD5E1) : valueColor,
+              ),
+            ),
+            if (onTap != null) ...[
+              const SizedBox(width: 5),
+              const Icon(Icons.edit_outlined,
+                  size: 12, color: Color(0xFF9CA3AF)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Date picker writing `onboarding.<fieldKey>` (dd/MM/yyyy), plus any
+  /// extra onboarding fields in the same write.
+  Future<void> _pickHeroDate({
+    required DocumentReference<Map<String, dynamic>> driverRef,
+    required String fieldKey,
+    String? current,
+    Map<String, String> Function(DateTime picked)? extraFields,
+  }) async {
+    final initial = _parseIsoDate(current) ?? DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(1990),
+      lastDate: DateTime(2100),
+    );
+    if (picked == null) return;
+    final update = <String, dynamic>{fieldKey: _formatDate(picked)};
+    if (extraFields != null) update.addAll(extraFields(picked));
+    await driverRef.set({'onboarding': update}, SetOptions(merge: true));
+  }
+
+  /// Expiry row that also supports an explicit "no expiry date" state
+  /// (stored via a companion `<field>NoExpiry` bool). Shows the date, or
+  /// "Kein Ablaufdatum", or "—".
+  Widget _heroExpiryRow(
+    String label,
+    DateTime? date,
+    bool noExpiry, {
+    VoidCallback? onTap,
+    String? noExpiryText,
+  }) {
+    if (!noExpiry) return _heroDateRow(label, date, onTap: onTap);
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF6B7280),
+                ),
+              ),
+            ),
+            Text(
+              noExpiryText ?? (de ? 'Kein Ablaufdatum' : 'No expiry date'),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF059669),
+              ),
+            ),
+            if (onTap != null) ...[
+              const SizedBox(width: 5),
+              const Icon(Icons.edit_outlined,
+                  size: 12, color: Color(0xFF9CA3AF)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Lets the admin pick an expiry date OR mark the document as having no
+  /// expiry date. Writes `onboarding.<dateKey>` + `onboarding.<noExpiryKey>`.
+  Future<void> _editExpiryOrNone({
+    required DocumentReference<Map<String, dynamic>> driverRef,
+    required String dateKey,
+    required String noExpiryKey,
+    String? currentDate,
+    Map<String, dynamic> Function(DateTime picked)? extraFields,
+    String? dialogTitle,
+    String? pickDateLabel,
+    String? noneLabel,
+  }) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(dialogTitle ?? (de ? 'Ablaufdatum' : 'Expiry date'),
+            style:
+                const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, 'date'),
+            child: Row(children: [
+              const Icon(Icons.event_rounded,
+                  size: 18, color: Color(0xFF374151)),
+              const SizedBox(width: 10),
+              Text(
+                  pickDateLabel ??
+                      (de ? 'Ablaufdatum wählen' : 'Pick expiry date'),
+                  style: const TextStyle(fontSize: 14)),
+            ]),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, 'none'),
+            child: Row(children: [
+              const Icon(Icons.all_inclusive_rounded,
+                  size: 18, color: Color(0xFF059669)),
+              const SizedBox(width: 10),
+              Text(noneLabel ?? (de ? 'Kein Ablaufdatum' : 'No expiry date'),
+                  style: const TextStyle(fontSize: 14)),
+            ]),
+          ),
+        ],
+      ),
+    );
+    if (choice == null) return;
+    if (choice == 'none') {
+      await driverRef.set({
+        'onboarding': {dateKey: '', noExpiryKey: true},
+      }, SetOptions(merge: true));
+      return;
+    }
+    final initial = _parseIsoDate(currentDate) ?? DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(1990),
+      lastDate: DateTime(2100),
+    );
+    if (picked == null) return;
+    final update = <String, dynamic>{
+      dateKey: _formatDate(picked),
+      noExpiryKey: false,
+    };
+    if (extraFields != null) update.addAll(extraFields(picked));
+    await driverRef.set({'onboarding': update}, SetOptions(merge: true));
+  }
+
+  /// Personalnummer / Employee-ID editor — writes the top-level
+  /// `employeeNumber` field. Führende Nullen werden entfernt, damit die
+  /// Nummer zum Zeiterfassungs-Export passt ("00023" → "23").
+  Future<void> _editEmployeeNumber({
+    required DocumentReference<Map<String, dynamic>> driverRef,
+    required String current,
+  }) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final ctrl = TextEditingController(text: current);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          de ? 'Personalnummer / Employee ID' : 'Employee ID',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+        ),
+        content: SizedBox(
+          width: 320,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                de
+                    ? 'Employee ID aus dem Zeiterfassungsprogramm — wird '
+                        'beim Stunden-Import zum Zuordnen der Fahrer '
+                        'genutzt.'
+                    : 'Employee ID from the time-tracking tool — used to '
+                        'match drivers during the hours import.',
+                style: const TextStyle(
+                    fontSize: 12.5, color: Color(0xFF6B7280)),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: ctrl,
+                autofocus: true,
+                decoration: _pillInputDecoration(
+                    de ? 'z. B. 23' : 'e.g. 23'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(de ? 'Abbrechen' : 'Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF00B287)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(de ? 'Speichern' : 'Save'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    // "00023" → "23"; komplett leeres Feld löscht die Nummer.
+    final cleaned =
+        ctrl.text.trim().replaceFirst(RegExp(r'^0+(?=\d)'), '');
+    await driverRef.set({
+      'employeeNumber':
+          cleaned.isEmpty ? FieldValue.delete() : cleaned,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  /// Contract-type picker — writes the top-level `contractType` field.
+  Future<void> _adminEditContractType({
+    required DocumentReference<Map<String, dynamic>> driverRef,
+    required DriverContractType? current,
+  }) async {
+    final picked = await showDialog<DriverContractType>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Vertragstyp',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+        ),
+        children: [
+          for (final c in DriverContractType.values)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(ctx, c),
+              child: Row(
+                children: [
+                  Icon(
+                    current == c
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_off,
+                    size: 18,
+                    color: current == c
+                        ? const Color(0xFF00B287)
+                        : const Color(0xFF9CA3AF),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(c.label, style: const TextStyle(fontSize: 14)),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+    if (picked == null || picked == current) return;
+    await driverRef.set(
+      {'contractType': picked.value},
+      SetOptions(merge: true),
+    );
+  }
+
+  Future<void> _adminEditLicenseType({
+    required DocumentReference<Map<String, dynamic>> driverRef,
+    required String current,
+  }) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final picked = await showDialog<String>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          de ? 'Führerschein-Typ' : 'Driving licence type',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+        ),
+        children: [
+          for (final opt in [
+            ('eu', de ? 'EU-Führerschein' : 'EU licence'),
+            ('non_eu', de ? 'Nicht-EU-Führerschein' : 'Non-EU licence'),
+          ])
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(ctx, opt.$1),
+              child: Row(
+                children: [
+                  Icon(
+                    current == opt.$1
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_off,
+                    size: 18,
+                    color: current == opt.$1
+                        ? const Color(0xFF00B287)
+                        : const Color(0xFF9CA3AF),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(opt.$2, style: const TextStyle(fontSize: 14)),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+    if (picked == null || picked == current) return;
+    await driverRef.set({
+      'onboarding': {'licenseType': picked},
+    }, SetOptions(merge: true));
+  }
+
+  /// Fixed-term vs. unlimited contract picker. Choosing "unlimited"
+  /// clears the stored end date (no expiry alerts fire).
+  Future<void> _adminEditContractEndMode({
+    required DocumentReference<Map<String, dynamic>> driverRef,
+    required bool unlimited,
+  }) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final current = unlimited ? 'unlimited' : 'fixed';
+    final picked = await showDialog<String>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          de ? 'Vertragsende' : 'Contract end',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+        ),
+        children: [
+          for (final opt in [
+            ('fixed', de ? 'Befristet (mit Datum)' : 'Fixed term (with date)'),
+            ('unlimited', de ? 'Unbefristet' : 'Unlimited'),
+          ])
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(ctx, opt.$1),
+              child: Row(
+                children: [
+                  Icon(
+                    current == opt.$1
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_off,
+                    size: 18,
+                    color: current == opt.$1
+                        ? const Color(0xFF00B287)
+                        : const Color(0xFF9CA3AF),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(opt.$2, style: const TextStyle(fontSize: 14)),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+    if (picked == null || picked == current) return;
+    if (picked == 'unlimited') {
+      await driverRef.set({
+        'onboarding': {
+          'contractUnlimited': true,
+          'contractExpiry': FieldValue.delete(),
+        },
+      }, SetOptions(merge: true));
+    } else {
+      await driverRef.set({
+        'onboarding': {'contractUnlimited': false},
+      }, SetOptions(merge: true));
+    }
+  }
+
+  /// Hero panel with the most important expiry dates: work permit
+  /// (EU vs. work visa → passport / visa / Zusatzblatt) and driving
+  /// licence (EU vs. non-EU → first day in Germany + derived 6-month
+  /// validity).
+  Widget _heroExpiryPanel({
+    required DocumentReference<Map<String, dynamic>> driverRef,
+    required Map<String, dynamic> onboarding,
+  }) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    String tr(String d, String e) => de ? d : e;
+    final t = AppLocalizations.of(context);
+
+    final permitType = _normalizeWorkPermitType(
+      onboarding['workPermitType'],
+      fallbackExpiry: onboarding['residencePermitExpiry'],
+    );
+    final isVisa = permitType == 'working_visa';
+    final licenseType =
+        _normalizeLicenseType(onboarding['licenseType'], onboarding);
+    final isNonEu = licenseType == 'non_eu';
+    final firstDay =
+        _parseIsoDate(onboarding['firstDayInGermany']?.toString());
+    final licenseUntil =
+        firstDay == null ? null : _addMonthsClamped(firstDay, 6);
+
+    final driverLang = (onboarding['language'] ?? '').toString().trim();
+
+    Widget sectionHeader(String label, String chipText, VoidCallback onTap) {
+      return Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.5,
+                color: Color(0xFF94A3B8),
+              ),
+            ),
+          ),
+          InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(999),
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    chipText,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF334155),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.keyboard_arrow_down_rounded,
+                      size: 14, color: Color(0xFF94A3B8)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          sectionHeader(
+            tr('FAHRERSPRACHE', 'DRIVER LANGUAGE'),
+            driverLang.isEmpty
+                ? tr('Wählen', 'Choose')
+                : languageLabel(driverLang),
+            () => _adminEditDriverLanguage(
+              driverRef: driverRef,
+              initialValue: onboarding['language'],
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Divider(height: 1, color: Color(0xFFE5E7EB)),
+          ),
+          sectionHeader(
+            'WORK PERMIT',
+            isVisa
+                ? t.t('drivers_hub_work_permit_working_visa')
+                : t.t('drivers_hub_work_permit_eu'),
+            () => _adminEditWorkPermitType(
+              driverRef: driverRef,
+              initialValue: onboarding['workPermitType'],
+              fallbackExpiry: onboarding['residencePermitExpiry'],
+            ),
+          ),
+          if (isVisa) ...[
+            const SizedBox(height: 6),
+            _heroDateRow(
+              tr('Passport Expiry', 'Passport expiry'),
+              _parseIsoDate(onboarding['idDocExpiry']?.toString()),
+              onTap: () => _pickHeroDate(
+                driverRef: driverRef,
+                fieldKey: 'idDocExpiry',
+                current: onboarding['idDocExpiry']?.toString(),
+              ),
+            ),
+            _heroDateRow(
+              tr('Visa Expiry', 'Visa expiry'),
+              _parseIsoDate((onboarding['workVisaExpiry'] ??
+                      onboarding['residencePermitExpiry'])
+                  ?.toString()),
+              onTap: () => _pickHeroDate(
+                driverRef: driverRef,
+                fieldKey: 'workVisaExpiry',
+                current: (onboarding['workVisaExpiry'] ??
+                        onboarding['residencePermitExpiry'])
+                    ?.toString(),
+              ),
+            ),
+            _heroExpiryRow(
+              tr('Zusatzblatt Expiry', 'Zusatzblatt expiry'),
+              _parseIsoDate(onboarding['zusatzblattExpiry']?.toString()),
+              onboarding['zusatzblattNoExpiry'] == true,
+              onTap: () => _editExpiryOrNone(
+                driverRef: driverRef,
+                dateKey: 'zusatzblattExpiry',
+                noExpiryKey: 'zusatzblattNoExpiry',
+                currentDate: onboarding['zusatzblattExpiry']?.toString(),
+              ),
+            ),
+          ],
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Divider(height: 1, color: Color(0xFFE5E7EB)),
+          ),
+          sectionHeader(
+            tr('FÜHRERSCHEIN', 'DRIVING LICENCE'),
+            isNonEu ? tr('Nicht-EU', 'Non-EU') : 'EU',
+            () => _adminEditLicenseType(
+              driverRef: driverRef,
+              current: licenseType,
+            ),
+          ),
+          if (isNonEu) ...[
+            const SizedBox(height: 6),
+            _heroDateRow(
+              tr('1. Tag in Deutschland', 'First day in Germany'),
+              firstDay,
+              onTap: () => _pickHeroDate(
+                driverRef: driverRef,
+                fieldKey: 'firstDayInGermany',
+                current: onboarding['firstDayInGermany']?.toString(),
+                // Non-EU licences are only valid for 6 months from the
+                // first day in Germany — persist the derived expiry so
+                // the notification center picks it up.
+                extraFields: (picked) => {
+                  'licenseExpiry':
+                      _formatDate(_addMonthsClamped(picked, 6)),
+                },
+              ),
+            ),
+            _heroDateRow(
+              tr('Führerschein gültig bis (6 Mon.)',
+                  'Licence valid until (6 mo)'),
+              licenseUntil,
+            ),
+          ] else ...[
+            // EU licence: still ask for an expiry date, with a "no expiry"
+            // option (some EU licences are open-ended).
+            const SizedBox(height: 6),
+            _heroExpiryRow(
+              tr('Führerschein gültig bis', 'Licence valid until'),
+              _parseIsoDate(onboarding['licenseExpiry']?.toString()),
+              onboarding['licenseNoExpiry'] == true,
+              onTap: () => _editExpiryOrNone(
+                driverRef: driverRef,
+                dateKey: 'licenseExpiry',
+                noExpiryKey: 'licenseNoExpiry',
+                currentDate: onboarding['licenseExpiry']?.toString(),
+              ),
+            ),
+          ],
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Divider(height: 1, color: Color(0xFFE5E7EB)),
+          ),
+          Builder(builder: (context) {
+            final contractUnlimited =
+                onboarding['contractUnlimited'] == true;
+            final contractEnd =
+                _parseIsoDate(onboarding['contractExpiry']?.toString());
+            final contractStart =
+                _parseIsoDate(onboarding['workStartDate']?.toString());
+            // Probation ends automatically 6 months after the contract start.
+            final probationEnd = contractStart == null
+                ? null
+                : _addMonthsClamped(contractStart, 6);
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                sectionHeader(
+                  tr('VERTRAG', 'CONTRACT'),
+                  contractUnlimited
+                      ? tr('Unbefristet', 'Unlimited')
+                      : tr('Befristet', 'Fixed term'),
+                  () => _adminEditContractEndMode(
+                    driverRef: driverRef,
+                    unlimited: contractUnlimited,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                _heroDateRow(
+                  tr('Vertragsbeginn', 'Contract start'),
+                  contractStart,
+                  onTap: () => _pickHeroDate(
+                    driverRef: driverRef,
+                    fieldKey: 'workStartDate',
+                    current: onboarding['workStartDate']?.toString(),
+                  ),
+                ),
+                _heroDateRow(
+                  tr('Probezeit-Ende (6 Mon.)', 'Probation ends (6 mo)'),
+                  probationEnd,
+                ),
+                _heroExpiryRow(
+                  tr('Vertragsende', 'Contract end'),
+                  contractEnd,
+                  contractUnlimited,
+                  noExpiryText: tr('Unbefristet', 'Unlimited'),
+                  onTap: () => _editExpiryOrNone(
+                    driverRef: driverRef,
+                    dateKey: 'contractExpiry',
+                    noExpiryKey: 'contractUnlimited',
+                    currentDate: onboarding['contractExpiry']?.toString(),
+                    dialogTitle: tr('Vertragsende', 'Contract end'),
+                    pickDateLabel:
+                        tr('Vertragsende wählen', 'Pick contract end date'),
+                    noneLabel: tr('Unbefristet', 'Unlimited'),
+                  ),
+                ),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Employment periods (rehires): several contract spans + Transporter-IDs
+  // ---------------------------------------------------------------------------
+
+  /// Persists [periods] and mirrors the current one back into the legacy
+  /// single-value fields (`transporterId`, `onboarding.workStartDate`,
+  /// `onboarding.contractExpiry`, `onboarding.contractUnlimited`) so every
+  /// existing report, filter and the wave-plan matching keeps working.
+  Future<bool> _saveEmploymentPeriods({
+    required DocumentReference<Map<String, dynamic>> driverRef,
+    required List<EmploymentPeriod> periods,
+    required String previousTid,
+  }) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final update = employmentPeriodsMirror(periods);
+    final nextTid = (update['transporterId'] ?? '').toString().trim();
+    final oldTid = previousTid.trim().toUpperCase();
+
+    // A TID must stay unique across the DSP — same guard the dedicated
+    // Transporter-ID editor uses. We only patch the field here (never move
+    // the document), which is the supported "auto-id doc" state.
+    if (nextTid.isNotEmpty && nextTid != oldTid) {
+      try {
+        final existing = await driverRef.parent.doc(nextTid).get();
+        if (existing.exists && existing.id != driverRef.id) {
+          if (!mounted) return false;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: const Color(0xFFB42318),
+              content: Text(
+                de
+                    ? 'Ein anderer Fahrer benutzt die TID "$nextTid" bereits.'
+                    : 'Another driver already uses the TID "$nextTid".',
+              ),
+            ),
+          );
+          return false;
+        }
+      } catch (_) {
+        // Read failure must not block the period edit — skip the guard.
+      }
+    }
+
+    try {
+      await driverRef.set({
+        ...update,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      return true;
+    } catch (e) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFFB42318),
+          content: Text(
+            de
+                ? 'Beschäftigungszeitraum konnte nicht gespeichert werden: $e'
+                : 'Could not save employment period: $e',
+          ),
+        ),
+      );
+      return false;
+    }
+  }
+
+  /// Add / edit sheet for one employment period.
+  Future<EmploymentPeriod?> _editEmploymentPeriodDialog({
+    EmploymentPeriod? initial,
+    required String fallbackTid,
+  }) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    String tr(String d, String e) => de ? d : e;
+
+    DateTime? start = initial?.startDate;
+    DateTime? end = initial?.endDate;
+    var ongoing = initial == null ? true : initial.isOngoing;
+    final tidCtrl = TextEditingController(
+      text: (initial?.transporterId.isNotEmpty ?? false)
+          ? initial!.transporterId
+          : fallbackTid,
+    );
+
+    final result = await showDialog<EmploymentPeriod>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheet) {
+            Widget dateField({
+              required String label,
+              required DateTime? value,
+              required bool enabled,
+              required ValueChanged<DateTime> onPicked,
+            }) {
+              return Opacity(
+                opacity: enabled ? 1 : 0.45,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: !enabled
+                      ? null
+                      : () async {
+                          final picked = await showDatePicker(
+                            context: ctx,
+                            initialDate: value ?? DateTime.now(),
+                            firstDate: DateTime(1990),
+                            lastDate: DateTime(2100),
+                          );
+                          if (picked != null) onPicked(picked);
+                        },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 11),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF9FAFB),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.event_rounded,
+                            size: 16, color: Color(0xFF6B7280)),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            label,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF6B7280),
+                            ),
+                          ),
+                        ),
+                        Text(
+                          value == null ? '—' : _formatDate(value),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: value == null
+                                ? const Color(0xFFCBD5E1)
+                                : const Color(0xFF111827),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18)),
+              title: Text(
+                initial == null
+                    ? tr('Beschäftigungszeitraum hinzufügen',
+                        'Add employment period')
+                    : tr('Beschäftigungszeitraum bearbeiten',
+                        'Edit employment period'),
+                style: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.w800),
+              ),
+              content: SizedBox(
+                width: 380,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    dateField(
+                      label: tr('Vertragsbeginn', 'Contract start'),
+                      value: start,
+                      enabled: true,
+                      onPicked: (d) => setSheet(() => start = d),
+                    ),
+                    const SizedBox(height: 10),
+                    dateField(
+                      label: tr('Vertragsende', 'Contract end'),
+                      value: ongoing ? null : end,
+                      enabled: !ongoing,
+                      onPicked: (d) => setSheet(() => end = d),
+                    ),
+                    const SizedBox(height: 2),
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      value: ongoing,
+                      onChanged: (v) => setSheet(() => ongoing = v),
+                      title: Text(
+                        tr('Laufende Beschäftigung (kein Enddatum)',
+                            'Ongoing employment (no end date)'),
+                        style: const TextStyle(
+                            fontSize: 12.5, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: tidCtrl,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(
+                            RegExp(r'[A-Za-z0-9-]')),
+                        LengthLimitingTextInputFormatter(32),
+                      ],
+                      textCapitalization: TextCapitalization.characters,
+                      decoration: InputDecoration(
+                        labelText: 'Transporter ID',
+                        helperText: tr(
+                          'Bei Wiedereinstellung kann die TID abweichen.',
+                          'After a rehire the TID may differ.',
+                        ),
+                        helperMaxLines: 2,
+                        filled: true,
+                        fillColor: const Color(0xFFF9FAFB),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide:
+                              const BorderSide(color: Color(0xFFE5E7EB)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide:
+                              const BorderSide(color: Color(0xFFE5E7EB)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: Text(tr('Abbrechen', 'Cancel')),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    final s = start;
+                    if (s == null) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        SnackBar(
+                          backgroundColor: const Color(0xFFB42318),
+                          content: Text(tr('Bitte Vertragsbeginn wählen.',
+                              'Please pick a contract start date.')),
+                        ),
+                      );
+                      return;
+                    }
+                    final e = ongoing ? null : end;
+                    if (e != null && e.isBefore(s)) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        SnackBar(
+                          backgroundColor: const Color(0xFFB42318),
+                          content: Text(tr(
+                              'Das Vertragsende liegt vor dem Beginn.',
+                              'The contract end is before the start.')),
+                        ),
+                      );
+                      return;
+                    }
+                    Navigator.of(ctx).pop(EmploymentPeriod(
+                      start: formatIsoDate(s),
+                      end: e == null ? '' : formatIsoDate(e),
+                      transporterId: tidCtrl.text.trim().toUpperCase(),
+                    ));
+                  },
+                  child: Text(tr('Speichern', 'Save')),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    tidCtrl.dispose();
+    return result;
+  }
+
+  /// Section listing every employment period of a driver. Stays a single
+  /// slim row for the common case (one uninterrupted contract).
+  Widget _employmentPeriodsKachel({
+    required DocumentReference<Map<String, dynamic>> driverRef,
+    required Map<String, dynamic> data,
+  }) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    String tr(String d, String e) => de ? d : e;
+
+    final periods = employmentPeriodsOf(data);
+    final current = currentEmploymentPeriod(periods);
+    final currentTid = (data['transporterId'] ?? '').toString().trim();
+
+    Future<void> replaceAll(List<EmploymentPeriod> next) async {
+      await _saveEmploymentPeriods(
+        driverRef: driverRef,
+        periods: next,
+        previousTid: currentTid,
+      );
+    }
+
+    Future<void> addPeriod() async {
+      final created = await _editEmploymentPeriodDialog(
+        fallbackTid: currentTid,
+      );
+      if (created == null) return;
+      // A rehire implies the previous stint is over — but we never guess a
+      // date for it, the admin closes it explicitly.
+      await replaceAll([...periods, created]);
+    }
+
+    Future<void> editPeriod(int index) async {
+      final edited = await _editEmploymentPeriodDialog(
+        initial: periods[index],
+        fallbackTid: currentTid,
+      );
+      if (edited == null) return;
+      final next = [...periods];
+      next[index] = edited;
+      await replaceAll(next);
+    }
+
+    Future<void> deletePeriod(int index) async {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: Text(
+            tr('Zeitraum löschen?', 'Delete period?'),
+            style:
+                const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+          ),
+          content: Text(
+            tr('Der Beschäftigungszeitraum wird aus dem Fahrer entfernt.',
+                'The employment period will be removed from this driver.'),
+            style: const TextStyle(fontSize: 13),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(tr('Abbrechen', 'Cancel')),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFB42318)),
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(tr('Löschen', 'Delete')),
+            ),
+          ],
+        ),
+      );
+      if (ok != true) return;
+      final next = [...periods]..removeAt(index);
+      await replaceAll(next);
+    }
+
+    Widget periodRow(int index) {
+      final p = periods[index];
+      final s = p.startDate;
+      final e = p.endDate;
+      final isCurrent = current != null &&
+          current.start == p.start &&
+          current.end == p.end &&
+          current.transporterId == p.transporterId;
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 7),
+        child: Row(
+          children: [
+            Container(
+              width: 7,
+              height: 7,
+              margin: const EdgeInsets.only(right: 9),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: p.isOngoing
+                    ? const Color(0xFF16A34A)
+                    : const Color(0xFFCBD5E1),
+              ),
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          s == null ? '—' : _formatDate(s),
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF111827),
+                          ),
+                        ),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 5),
+                        child: Text('–',
+                            style: TextStyle(
+                                fontSize: 12.5, color: Color(0xFF9CA3AF))),
+                      ),
+                      if (p.isOngoing)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.play_circle_fill_rounded,
+                                size: 13, color: Color(0xFF16A34A)),
+                            const SizedBox(width: 4),
+                            Text(
+                              tr('aktiv', 'active'),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF16A34A),
+                              ),
+                            ),
+                          ],
+                        )
+                      else
+                        Flexible(
+                          child: Text(
+                            e == null ? '—' : _formatDate(e),
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF111827),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  if (p.transporterId.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        'TID ${p.transporterId}'
+                        '${isCurrent && periods.length > 1 ? ' · ${tr('aktuell', 'current')}' : ''}',
+                        style: const TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF94A3B8),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            IconButton(
+              tooltip: tr('Bearbeiten', 'Edit'),
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+              padding: EdgeInsets.zero,
+              onPressed: () => editPeriod(index),
+              icon: const Icon(Icons.edit_outlined,
+                  size: 15, color: Color(0xFF6B7280)),
+            ),
+            IconButton(
+              tooltip: tr('Löschen', 'Delete'),
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+              padding: EdgeInsets.zero,
+              onPressed: () => deletePeriod(index),
+              icon: const Icon(Icons.delete_outline_rounded,
+                  size: 15, color: Color(0xFFB91C1C)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return _DetailKachel(
+      title: tr('BESCHÄFTIGUNGSZEITRÄUME', 'EMPLOYMENT PERIODS'),
+      icon: Icons.work_history_rounded,
+      children: [
+        if (periods.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Text(
+              tr('Noch kein Beschäftigungszeitraum hinterlegt.',
+                  'No employment period recorded yet.'),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF9CA3AF),
+              ),
+            ),
+          )
+        else
+          for (var i = 0; i < periods.length; i++) periodRow(i),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: addPeriod,
+              style: TextButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                foregroundColor: const Color(0xFF0E5C45),
+              ),
+              icon: const Icon(Icons.add_rounded, size: 16),
+              label: Text(
+                periods.isEmpty
+                    ? tr('Zeitraum hinzufügen', 'Add period')
+                    : tr('Wiedereinstellung hinzufügen', 'Add rehire'),
+                style: const TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.w800),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // Driver details dialog: responsive layout (no stats / weekly scores)
   // ---------------------------------------------------------------------------
 
+  /// Fahrer-Detailseite im Kunden-Design „2a"
+  /// (siehe `driver_hub_detail_page.dart`).
+  ///
+  /// Die Seite ist reine Darstellung — jedes Stift-Icon ruft über
+  /// [DriverHubDetailActions] genau den Editor auf, der hier in dieser Datei
+  /// schon existiert. Es wird **keine** Editor-Logik dupliziert.
   Future<void> _openDriverDetails(
+    DocumentSnapshot<Map<String, dynamic>> driverDoc,
+  ) async {
+    // Eingebettet statt als eigene Route — so bleibt das Seitenmenü der
+    // Shell links sichtbar (gilt generell für alle Admin-Seiten).
+    setState(() => _detailDriverDoc = driverDoc);
+  }
+
+  /// Aktions-Brücke der 2a-Detailseite auf die Bestandseditoren.
+  DriverHubDetailActions _detailActionsFor(
+    DocumentReference<Map<String, dynamic>> driverRef,
+  ) {
+    return DriverHubDetailActions(
+          editOnboardingField: ({
+            required String label,
+            required String fieldKey,
+            required String initialValue,
+            bool isDate = false,
+            bool isNumeric = false,
+          }) =>
+              _adminEditField(
+            driverRef: driverRef,
+            label: label,
+            fieldKey: fieldKey,
+            initialValue: initialValue,
+            isDate: isDate,
+            isNumeric: isNumeric,
+          ),
+          pickOnboardingDate: ({
+            required String fieldKey,
+            String? current,
+            Map<String, String> Function(DateTime picked)? extraFields,
+          }) =>
+              _pickHeroDate(
+            driverRef: driverRef,
+            fieldKey: fieldKey,
+            current: current,
+            extraFields: extraFields,
+          ),
+          editExpiryOrNone: ({
+            required String dateKey,
+            required String noExpiryKey,
+            String? currentDate,
+            String? dialogTitle,
+            String? pickDateLabel,
+            String? noneLabel,
+          }) =>
+              _editExpiryOrNone(
+            driverRef: driverRef,
+            dateKey: dateKey,
+            noExpiryKey: noExpiryKey,
+            currentDate: currentDate,
+            dialogTitle: dialogTitle,
+            pickDateLabel: pickDateLabel,
+            noneLabel: noneLabel,
+          ),
+          editDriverName: (initialValue) => _adminEditDriverName(
+            driverRef: driverRef,
+            initialValue: initialValue,
+          ),
+          editWorkPermitType: (initialValue, fallbackExpiry) =>
+              _adminEditWorkPermitType(
+            driverRef: driverRef,
+            initialValue: initialValue,
+            fallbackExpiry: fallbackExpiry,
+          ),
+          editDriverLanguage: (initialValue) => _adminEditDriverLanguage(
+            driverRef: driverRef,
+            initialValue: initialValue,
+          ),
+          editRemainingVacation: ({
+            required String label,
+            required double? currentOverride,
+            required double? computed,
+          }) =>
+              _editRemainingVacationOverride(
+            driverRef: driverRef,
+            label: label,
+            currentOverride: currentOverride,
+            computed: computed,
+          ),
+          editEmployeeNumber: (current) => _editEmployeeNumber(
+            driverRef: driverRef,
+            current: current,
+          ),
+          editLicenseType: (current) => _adminEditLicenseType(
+            driverRef: driverRef,
+            current: current,
+          ),
+          editTransporterId: _editTransporterId,
+          settingsMenuBuilder: _driverSettingsMenu,
+          profileImage: _profileImageFromOnboarding,
+          workPermitTypeLabel: (raw, fallbackExpiry) => _workPermitTypeLabel(
+            AppLocalizations.of(context),
+            raw,
+            fallbackExpiry: fallbackExpiry,
+          ),
+          languageLabelOf: languageLabel,
+    );
+  }
+
+  /// Klassische Detailansicht (alle Felder, Dokumenten-Upload/-Vorschau,
+  /// Beschäftigungszeiträume, ZIP-/PDF-Export). Erreichbar über das
+  /// Zahnrad-Menü der neuen Detailseite — das 2a-Design zeigt bewusst nur
+  /// den Dokumenten-**Status**, ohne Upload/Download.
+  Future<void> _openLegacyDriverDetails(
     DocumentSnapshot<Map<String, dynamic>> driverDoc,
   ) async {
     await Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (ctx) {
-        bool showPin = false;
-
         return StatefulBuilder(
           builder: (ctxState, setStateDialog) {
             return Scaffold(
@@ -2199,6 +4624,20 @@ class _DriversHubPageState extends State<DriversHubPage> {
                     color: Color(0xFF111827),
                   ),
                 ),
+                actions: [
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: StreamBuilder<
+                        DocumentSnapshot<Map<String, dynamic>>>(
+                      stream: driverDoc.reference.snapshots(),
+                      builder: (c, s) {
+                        final d = s.data;
+                        if (d == null) return const SizedBox.shrink();
+                        return _driverSettingsMenu(d);
+                      },
+                    ),
+                  ),
+                ],
               ),
               body: Center(
                 child: ConstrainedBox(
@@ -2220,11 +4659,6 @@ class _DriversHubPageState extends State<DriversHubPage> {
                     final contractType = DriverContractType.fromValue(
                       data['contractType'],
                     );
-                    final pin = (data['notificationPin'] ?? '')
-                        .toString()
-                        .trim();
-                    final canEditPin = (_uid != null && tid.isNotEmpty);
-
                     // onboarding map
                     final raw = data['onboarding'];
                     Map<String, dynamic> onboarding = const {};
@@ -2348,7 +4782,8 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                               ),
                                             ),
                                             IconButton(
-                                              tooltip: 'TID bearbeiten',
+                                              tooltip: _trText(
+                                                  'TID bearbeiten', 'Edit TID'),
                                               icon: const Icon(
                                                 Icons.edit_outlined,
                                                 size: 14,
@@ -2371,210 +4806,33 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                           ],
                                         ),
                                       ),
-                                      const SizedBox(height: 8),
-                                      Wrap(
-                                        spacing: 6,
-                                        runSpacing: 6,
-                                        children: [
-                                          _statusChipFromData(data, ctx2),
-                                          _loginChipFromData(data, ctx2),
-                                          _expiryChipDetailedFromOnboardingRaw(
-                                            onboarding,
-                                            ctx2,
-                                          ),
-                                        ],
-                                      ),
                                     ],
                                   );
 
-                                  // Single 44×44 settings affordance — every
-                                  // hero-level action (PIN, password, …)
-                                  // lives behind this menu so the hero stays
-                                  // calm. Hit-target stays ≥ 44 even though
-                                  // the visual is a 36 px chip.
-                                  final canManageLogins =
-                                      _uid != null && tid.isNotEmpty;
-                                  final settingsButton = Material(
-                                    color: const Color(0xFFF8FAFC),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      side: const BorderSide(
-                                        color: Color(0xFFE5E7EB),
+                                  // Status chips side by side, full width
+                                  // below the identity block.
+                                  final chipsRow = Wrap(
+                                    spacing: 6,
+                                    runSpacing: 6,
+                                    crossAxisAlignment:
+                                        WrapCrossAlignment.center,
+                                    children: [
+                                      _statusChipFromData(data, ctx2),
+                                      _loginChipFromData(data, ctx2),
+                                      _expiryChipDetailedFromOnboardingRaw(
+                                        onboarding,
+                                        ctx2,
                                       ),
-                                    ),
-                                    child: PopupMenuButton<String>(
-                                      tooltip: 'Einstellungen',
-                                      position: PopupMenuPosition.under,
-                                      offset: const Offset(0, 8),
-                                      padding: EdgeInsets.zero,
-                                      icon: const Padding(
-                                        padding: EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 6,
-                                        ),
-                                        child: Icon(
-                                          Icons.settings_rounded,
-                                          size: 20,
-                                          color: Color(0xFF334155),
-                                        ),
+                                      // Fahrzeug-Unfälle dieses Fahrers —
+                                      // dieselbe count()-Aggregation wie im
+                                      // Incident-Center, damit beide Stellen
+                                      // nie auseinanderlaufen.
+                                      IncidentCountChip.driver(
+                                        dspUid: _uid,
+                                        transporterId: tid,
+                                        dense: true,
                                       ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(14),
-                                        side: const BorderSide(
-                                          color: Color(0xFFE5E7EB),
-                                        ),
-                                      ),
-                                      color: Colors.white,
-                                      elevation: 8,
-                                      onSelected: (value) async {
-                                        switch (value) {
-                                          case 'pin':
-                                            if (!canEditPin) return;
-                                            await showDialog<void>(
-                                              context: ctx2,
-                                              barrierDismissible: false,
-                                              builder: (_) =>
-                                                  SetNotificationPinDialog(
-                                                dspUid: _uid!,
-                                                transporterId:
-                                                    tid.toUpperCase(),
-                                                force: true,
-                                              ),
-                                            );
-                                            break;
-                                          case 'password':
-                                            if (!canManageLogins) return;
-                                            await _onCreateOrResetLogin(
-                                              snap.data!,
-                                            );
-                                            break;
-                                        }
-                                      },
-                                      itemBuilder: (_) => <
-                                          PopupMenuEntry<String>>[
-                                        PopupMenuItem<String>(
-                                          value: 'pin',
-                                          enabled: canEditPin,
-                                          height: 44,
-                                          child: Row(
-                                            children: [
-                                              Container(
-                                                width: 28,
-                                                height: 28,
-                                                alignment: Alignment.center,
-                                                decoration: BoxDecoration(
-                                                  color: pin.isEmpty
-                                                      ? const Color(
-                                                          0xFFF1F5F9,
-                                                        )
-                                                      : const Color(
-                                                          0xFFECFDF5,
-                                                        ),
-                                                  borderRadius:
-                                                      BorderRadius.circular(8),
-                                                ),
-                                                child: Icon(
-                                                  pin.isEmpty
-                                                      ? Icons.pin_outlined
-                                                      : Icons.pin_rounded,
-                                                  size: 16,
-                                                  color: pin.isEmpty
-                                                      ? const Color(
-                                                          0xFF475569,
-                                                        )
-                                                      : const Color(
-                                                          0xFF065F46,
-                                                        ),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 12),
-                                              Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Text(
-                                                    pin.isEmpty
-                                                        ? t.t(
-                                                            'drivers_hub_set_pin',
-                                                          )
-                                                        : t.t(
-                                                            'drivers_hub_change_pin',
-                                                          ),
-                                                    style: const TextStyle(
-                                                      fontSize: 13,
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                      color: Color(0xFF0F172A),
-                                                    ),
-                                                  ),
-                                                  Text(
-                                                    pin.isEmpty
-                                                        ? 'Push-Benachrichtigungen freischalten'
-                                                        : 'Benachrichtigungs-PIN aktualisieren',
-                                                    style: const TextStyle(
-                                                      fontSize: 11,
-                                                      color: Color(0xFF64748B),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        const PopupMenuDivider(height: 1),
-                                        PopupMenuItem<String>(
-                                          value: 'password',
-                                          enabled: canManageLogins,
-                                          height: 44,
-                                          child: Row(
-                                            children: [
-                                              Container(
-                                                width: 28,
-                                                height: 28,
-                                                alignment: Alignment.center,
-                                                decoration: BoxDecoration(
-                                                  color: const Color(
-                                                    0xFFEFF6FF,
-                                                  ),
-                                                  borderRadius:
-                                                      BorderRadius.circular(8),
-                                                ),
-                                                child: const Icon(
-                                                  Icons.key_outlined,
-                                                  size: 16,
-                                                  color: Color(0xFF1D4ED8),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 12),
-                                              const Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Text(
-                                                    'Passwort verwalten',
-                                                    style: TextStyle(
-                                                      fontSize: 13,
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                      color: Color(0xFF0F172A),
-                                                    ),
-                                                  ),
-                                                  Text(
-                                                    'Login zurücksetzen oder neu vergeben',
-                                                    style: TextStyle(
-                                                      fontSize: 11,
-                                                      color: Color(0xFF64748B),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                                    ],
                                   );
 
                                   // Tappable score chip — lives inside
@@ -2736,17 +4994,6 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                           },
                                         );
 
-                                  // Top strip = just the settings gear in
-                                  // the right corner of the hero. The score
-                                  // moved down into `_EmploymentInfoCard`.
-                                  final heroTopStrip = Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    children: [
-                                      const Spacer(),
-                                      settingsButton,
-                                    ],
-                                  );
 
                                   // Employment block (Personalnummer +
                                   // Vertragstyp + Score-Accordion-Handle).
@@ -2754,70 +5001,101 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                     employeeNumber: employeeNumber,
                                     contractType: contractType,
                                     scoreSection: scoreSection,
+                                    onEditContractType: () =>
+                                        _adminEditContractType(
+                                      driverRef: driverRef,
+                                      current: contractType,
+                                    ),
+                                    onEditNumber: () =>
+                                        _editEmployeeNumber(
+                                      driverRef: driverRef,
+                                      current: employeeNumber,
+                                    ),
                                   );
 
-                                  final hero = Container(
+                                  // Key expiry dates (work permit +
+                                  // driving licence) right in the hero.
+                                  final expiryPanel = _heroExpiryPanel(
+                                    driverRef: driverRef,
+                                    onboarding: onboarding,
+                                  );
+
+                                  final heroDecoration = BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(20),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color:
+                                            Colors.black.withOpacity(0.03),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 3),
+                                      ),
+                                    ],
+                                  );
+
+                                  // Profile card: identity → chips →
+                                  // employment, separated by subtle lines.
+                                  final profileCard = Container(
                                     padding: const EdgeInsets.fromLTRB(
-                                      18,
-                                      14,
-                                      18,
-                                      18,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(20),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(
-                                            0.03,
-                                          ),
-                                          blurRadius: 8,
-                                          offset: const Offset(0, 3),
+                                        18, 16, 18, 16),
+                                    decoration: heroDecoration,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            avatar,
+                                            const SizedBox(width: 16),
+                                            Expanded(child: identityCol),
+                                          ],
                                         ),
+                                        const SizedBox(height: 12),
+                                        const Divider(
+                                            height: 1,
+                                            color: Color(0xFFEDF0F3)),
+                                        const SizedBox(height: 10),
+                                        chipsRow,
+                                        const SizedBox(height: 10),
+                                        const Divider(
+                                            height: 1,
+                                            color: Color(0xFFEDF0F3)),
+                                        const SizedBox(height: 12),
+                                        employmentCard,
                                       ],
                                     ),
-                                    child: isNarrow
-                                        ? Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              heroTopStrip,
-                                              const SizedBox(height: 12),
-                                              Row(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  avatar,
-                                                  const SizedBox(width: 14),
-                                                  Expanded(
-                                                      child: identityCol),
-                                                ],
-                                              ),
-                                              const SizedBox(height: 12),
-                                              employmentCard,
-                                            ],
-                                          )
-                                        : Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              heroTopStrip,
-                                              const SizedBox(height: 12),
-                                              Row(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  avatar,
-                                                  const SizedBox(width: 16),
-                                                  Expanded(
-                                                      child: identityCol),
-                                                  const SizedBox(width: 12),
-                                                  employmentCard,
-                                                ],
-                                              ),
-                                            ],
-                                          ),
                                   );
+
+                                  // Data card: the key expiry dates.
+                                  final dataCard = Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.fromLTRB(
+                                        18, 16, 18, 16),
+                                    decoration: heroDecoration,
+                                    child: expiryPanel,
+                                  );
+
+                                  final hero = isNarrow
+                                      ? Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.stretch,
+                                          children: [
+                                            profileCard,
+                                            const SizedBox(height: 12),
+                                            dataCard,
+                                          ],
+                                        )
+                                      : Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Expanded(child: profileCard),
+                                            const SizedBox(width: 16),
+                                            Expanded(child: dataCard),
+                                          ],
+                                        );
 
                                   // ─── Kacheln ──────────────────────────
                                   Widget originHeader() => _DetailKachelHeader(
@@ -2832,6 +5110,22 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                     ),
                                     icon: Icons.person_rounded,
                                     children: [
+                                      _detailRowEditable(
+                                        driverRef: driverRef,
+                                        label: Localizations.localeOf(context)
+                                                    .languageCode ==
+                                                'de'
+                                            ? 'Anzeigename'
+                                            : 'Display name',
+                                        value: data['driverName'],
+                                        fieldKey: 'driverName',
+                                        onEdit: () => _adminEditDriverName(
+                                          driverRef: driverRef,
+                                          initialValue:
+                                              (data['driverName'] ?? '')
+                                                  .toString(),
+                                        ),
+                                      ),
                                       _detailRowEditable(
                                         driverRef: driverRef,
                                         label: t.t(
@@ -3150,6 +5444,14 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                     ],
                                   );
 
+                                  // Rehires: every contract span with the
+                                  // Transporter-ID used back then.
+                                  final employmentPeriodsKachel =
+                                      _employmentPeriodsKachel(
+                                    driverRef: driverRef,
+                                    data: data,
+                                  );
+
                                   final notesKachel = _DetailKachel(
                                     title: t.t(
                                       'drivers_hub_section_other_notes',
@@ -3215,6 +5517,14 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                                 docType: docType,
                                               ),
                                         ),
+                                        // Monatliche Bewertungen — vorerst
+                                        // ausgeblendet, siehe
+                                        // kDriverReviewsEnabled.
+                                        if (kDriverReviewsEnabled)
+                                          DriverReviewsCard(
+                                            adminUid: _uid!,
+                                            driverTransporterId: driverRef.id,
+                                          ),
                                       ],
                                     ),
                                   );
@@ -3244,6 +5554,8 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                         licenseKachel,
                                         permitsKachel,
                                       ),
+                                      const SizedBox(height: 16),
+                                      employmentPeriodsKachel,
                                       const SizedBox(height: 16),
                                       gridRow(
                                         paymentKachel,
@@ -3728,6 +6040,7 @@ class _DriversHubPageState extends State<DriversHubPage> {
   Future<List<_EmbeddedDoc>> _collectDriverDocsForPdf({
     required String transporterId,
   }) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final uid = _uid;
     if (uid == null) return const [];
     final tid = transporterId.trim();
@@ -3755,18 +6068,31 @@ class _DriversHubPageState extends State<DriversHubPage> {
       'driver_license_front',
       'driver_license_back',
     ];
-    const labels = {
-      'contract': 'Arbeitsvertrag',
-      'resident_permit': 'Aufenthaltsgenehmigung',
-      'tax_id': 'Steuer-ID',
-      'insurance': 'Krankenkasse',
-      'id_card_front': 'Personalausweis (Vorne)',
-      'id_card_back': 'Personalausweis (Hinten)',
-      'passport_front': 'Reisepass (Vorne)',
-      'passport_back': 'Reisepass (Hinten)',
-      'driver_license_front': 'Führerschein (Vorne)',
-      'driver_license_back': 'Führerschein (Hinten)',
-    };
+    final labels = de
+        ? const {
+            'contract': 'Arbeitsvertrag',
+            'resident_permit': 'Aufenthaltsgenehmigung',
+            'tax_id': 'Steuer-ID',
+            'insurance': 'Krankenkasse',
+            'id_card_front': 'Personalausweis (Vorne)',
+            'id_card_back': 'Personalausweis (Hinten)',
+            'passport_front': 'Reisepass (Vorne)',
+            'passport_back': 'Reisepass (Hinten)',
+            'driver_license_front': 'Führerschein (Vorne)',
+            'driver_license_back': 'Führerschein (Hinten)',
+          }
+        : const {
+            'contract': 'Employment contract',
+            'resident_permit': 'Residence permit',
+            'tax_id': 'Tax ID',
+            'insurance': 'Health insurance',
+            'id_card_front': 'ID card (front)',
+            'id_card_back': 'ID card (back)',
+            'passport_front': 'Passport (front)',
+            'passport_back': 'Passport (back)',
+            'driver_license_front': 'Driver\'s licence (front)',
+            'driver_license_back': 'Driver\'s licence (back)',
+          };
 
     final byType = <String, Map<String, dynamic>>{
       for (final d in snap.docs)
@@ -4007,6 +6333,276 @@ class _DriversHubPageState extends State<DriversHubPage> {
   // Driver list – unified desktop-style layout (for all screen sizes)
   // ---------------------------------------------------------------------------
 
+  // ---------------------------------------------------------------------------
+  // Mobile-Leiste: 48er-Icon-Buttons + Bottom-Sheets (gleiches Muster wie im
+  // Fleet Hub, `fleet_status_page.dart`).
+  // ---------------------------------------------------------------------------
+
+  static const Color _kMobileGreen = Color(0xFF0D8A60);
+  static const Color _kMobileGreenTint = Color(0xFFE7F6EF);
+  static const Color _kMobileLine = Color(0xFFE5E9EE);
+  static const Color _kMobileInk = Color(0xFF1A212B);
+  static const Color _kMobileFaint = Color(0xFF8A93A0);
+
+  /// Quadratischer 48er-Icon-Button der Mobile-Leiste. Aktive Zustände
+  /// bekommen den Grünton plus einen Punkt-Badge.
+  Widget _mobileIconButton({
+    required IconData icon,
+    required String tooltip,
+    required bool active,
+    required VoidCallback onTap,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      waitDuration: const Duration(milliseconds: 500),
+      child: Material(
+        color: active ? _kMobileGreenTint : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: active ? _kMobileGreen : _kMobileLine),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: SizedBox(
+            width: 48,
+            height: 48,
+            child: Stack(
+              children: [
+                Center(child: Icon(icon, size: 21, color: _kMobileGreen)),
+                if (active)
+                  Positioned(
+                    top: 9,
+                    right: 9,
+                    child: Container(
+                      width: 7,
+                      height: 7,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _kMobileGreen,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Rahmen aller Mobile-Sheets: Griff, Titel, Inhalt.
+  Future<T?> _showMobileSheet<T>({
+    required String title,
+    required Widget Function(BuildContext ctx) builder,
+  }) {
+    return showModalBottomSheet<T>(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
+          ),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(ctx).size.height * 0.8,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 10),
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: _kMobileLine,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: _kMobileInk,
+                    ),
+                  ),
+                ),
+                Flexible(child: SingleChildScrollView(child: builder(ctx))),
+                const SizedBox(height: 12),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Auswahlzeile eines Sheets — 48px hoch, Häkchen für die aktive Option.
+  Widget _mobileSheetOption({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      minVerticalPadding: 12,
+      leading: Icon(
+        selected ? Icons.radio_button_checked : Icons.circle_outlined,
+        size: 20,
+        color: selected ? _kMobileGreen : _kMobileFaint,
+      ),
+      title: Text(
+        label,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+          color: selected ? _kMobileGreen : _kMobileInk,
+        ),
+      ),
+      onTap: onTap,
+    );
+  }
+
+  Future<void> _showMobileSortSheet() async {
+    await _showMobileSheet<void>(
+      title: _trText('Sortieren nach', 'Sort by'),
+      builder: (ctx) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final option in _DriverSort.values)
+            _mobileSheetOption(
+              label: _driverSortLabel(option),
+              selected: _driverSort == option,
+              onTap: () {
+                setState(() => _driverSort = option);
+                Navigator.of(ctx).pop();
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Standard-Fahrer-Passwort im Sheet — anzeigen/verbergen, bearbeiten
+  /// (derselbe Controller, also dieselbe Speicherung wie in der
+  /// Desktop-Zeile) und kopieren.
+  Future<void> _showMobilePasswordSheet() async {
+    final t = AppLocalizations.of(context);
+    await _showMobileSheet<void>(
+      title: t.t('drivers_hub_default_driver_password'),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                _trText(
+                  'Wird für neu angelegte Fahrer-Logins verwendet.',
+                  'Used for newly created driver logins.',
+                ),
+                style: const TextStyle(fontSize: 12.5, color: _kMobileFaint),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 48,
+                child: TextField(
+                  controller: _bulkPwdCtrl,
+                  obscureText: !_bulkPwdVisible,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: _kMobileInk,
+                  ),
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.lock_outline,
+                        size: 19, color: _kMobileFaint),
+                    hintText: '••••••••',
+                    isDense: true,
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: _kMobileLine),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: _kMobileLine),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide:
+                          const BorderSide(color: _kMobileGreen, width: 1.4),
+                    ),
+                    suffixIcon: IconButton(
+                      iconSize: 20,
+                      color: _kMobileFaint,
+                      tooltip: _bulkPwdVisible
+                          ? _trText('Verbergen', 'Hide')
+                          : _trText('Anzeigen', 'Show'),
+                      icon: Icon(_bulkPwdVisible
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined),
+                      onPressed: () {
+                        _bulkPwdVisible = !_bulkPwdVisible;
+                        setSheet(() {});
+                        if (mounted) setState(() {});
+                      },
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 48,
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    await Clipboard.setData(
+                      ClipboardData(text: _bulkPwdCtrl.text),
+                    );
+                    if (!ctx.mounted) return;
+                    Navigator.of(ctx).pop();
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          _trText('Passwort kopiert', 'Password copied'),
+                        ),
+                      ),
+                    );
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _kMobileGreen,
+                    side: const BorderSide(color: _kMobileLine),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: const Icon(Icons.copy_rounded, size: 18),
+                  label: Text(_trText('Kopieren', 'Copy')),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildDriversList() {
     final t = AppLocalizations.of(context);
     if (_uid == null) {
@@ -4017,8 +6613,9 @@ class _DriversHubPageState extends State<DriversHubPage> {
     final isNarrowControls = width < 720;
 
     final searchField = SizedBox(
-      height: 44,
+      height: isNarrowControls ? 48 : 44,
       child: TextField(
+        focusNode: _searchFocus,
         style: const TextStyle(
           fontFamily: 'Inter',
           fontSize: 14,
@@ -4071,6 +6668,50 @@ class _DriversHubPageState extends State<DriversHubPage> {
       onSelected: (value) {
         setState(() => _driverSort = value);
       },
+    );
+
+    // Archive toggle — moves inactive drivers out of the main list.
+    final archiveToggle = Material(
+      color: _showArchive ? const Color(0xFF111827) : Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => setState(() => _showArchive = !_showArchive),
+        child: Container(
+          height: 44,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border:
+                Border.all(color: const Color(0xFFE5E5EA), width: 0.6),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                _showArchive
+                    ? Icons.arrow_back_rounded
+                    : Icons.archive_outlined,
+                size: 18,
+                color: _showArchive
+                    ? Colors.white
+                    : const Color(0xFF6B7280),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                _showArchive ? 'Aktive Fahrer' : 'Archiv',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: _showArchive
+                      ? Colors.white
+                      : const Color(0xFF374151),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
 
     final passwordField = Column(
@@ -4154,14 +6795,41 @@ class _DriversHubPageState extends State<DriversHubPage> {
         // 🔹 Top controls — Apple-Style: Suche links, Sortier-Pille
         //    rechts, darunter (optional) das Default-Passwort-Feld.
         if (isNarrowControls)
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          // Mobile: eine Zeile — Suchfeld plus drei 48er-Icon-Buttons
+          // (Sortierung · Standard-Passwort · Archiv). Die drei bisherigen
+          // Vollbreite-Zeilen wandern in Bottom-Sheets, gleiches Muster wie
+          // im Fleet Hub.
+          Row(
             children: [
-              searchField,
-              const SizedBox(height: 10),
-              sortField,
-              const SizedBox(height: 10),
-              passwordField,
+              Expanded(child: searchField),
+              const SizedBox(width: 8),
+              _mobileIconButton(
+                icon: Icons.swap_vert,
+                tooltip: _trText('Sortieren', 'Sort'),
+                active: _driverSort != _DriverSort.nameAsc,
+                onTap: _showMobileSortSheet,
+              ),
+              const SizedBox(width: 8),
+              _mobileIconButton(
+                icon: Icons.lock_outline,
+                tooltip: _trText(
+                  'Standard-Passwort',
+                  'Default password',
+                ),
+                active: false,
+                onTap: _showMobilePasswordSheet,
+              ),
+              const SizedBox(width: 8),
+              _mobileIconButton(
+                icon: _showArchive
+                    ? Icons.arrow_back_rounded
+                    : Icons.archive_outlined,
+                tooltip: _showArchive
+                    ? _trText('Aktive Fahrer', 'Active drivers')
+                    : _trText('Archiv', 'Archive'),
+                active: _showArchive,
+                onTap: () => setState(() => _showArchive = !_showArchive),
+              ),
             ],
           )
         else
@@ -4173,6 +6841,8 @@ class _DriversHubPageState extends State<DriversHubPage> {
                   Expanded(flex: 3, child: searchField),
                   const SizedBox(width: 12),
                   Expanded(flex: 2, child: sortField),
+                  const SizedBox(width: 12),
+                  archiveToggle,
                 ],
               ),
               const SizedBox(height: 10),
@@ -4248,25 +6918,57 @@ class _DriversHubPageState extends State<DriversHubPage> {
                 }).toList();
               }
 
+              // Archive: inactive drivers live in the archive view; the
+              // main list shows only active drivers.
+              if (_showArchive) {
+                filtered = filtered.where((d) {
+                  return ((d.data()['active'] as bool?) ?? true) == false;
+                }).toList();
+              } else {
+                filtered = filtered.where((d) {
+                  return ((d.data()['active'] as bool?) ?? true) != false;
+                }).toList();
+              }
+
               // Pending / Approved / Rejected filtern nach den echten
-              // Feldern (active, hasLogin) — passend zum Status-Punkt der
-              // Zeile (grün = aktiv, rot = inaktiv).
-              if (_driverSort == _DriverSort.pending) {
+              // Feldern (active, hasLogin) — im Archiv nicht anwenden.
+              if (!_showArchive && _driverSort == _DriverSort.pending) {
                 // Noch kein Login angelegt → Einrichtung ausstehend.
                 filtered = filtered.where((d) {
                   return (d.data()['hasLogin'] as bool?) != true;
                 }).toList();
-              } else if (_driverSort == _DriverSort.approved) {
+              } else if (!_showArchive &&
+                  _driverSort == _DriverSort.approved) {
                 // Aktiv mit Login (grüner Punkt).
                 filtered = filtered.where((d) {
                   final data = d.data();
                   final active = (data['active'] as bool?) ?? true;
                   return active && data['hasLogin'] == true;
                 }).toList();
-              } else if (_driverSort == _DriverSort.rejected) {
+              } else if (!_showArchive &&
+                  _driverSort == _DriverSort.rejected) {
                 // Deaktiviert/abgelehnt (roter Punkt).
                 filtered = filtered.where((d) {
                   return ((d.data()['active'] as bool?) ?? true) == false;
+                }).toList();
+              } else if (!_showArchive &&
+                  _driverSort == _DriverSort.tidPending) {
+                // Nur Fahrer ohne zugewiesene Transporter-ID.
+                filtered = filtered.where((d) {
+                  final data = d.data();
+                  final tid =
+                      (data['transporterId'] ?? '').toString().trim();
+                  return data['tidPending'] == true || tid.isEmpty;
+                }).toList();
+              } else if (!_showArchive &&
+                  _driverSort == _DriverSort.employeeIdMissing) {
+                // Nur Fahrer ohne Personalnummer / Employee ID
+                // (Zeiterfassung).
+                filtered = filtered.where((d) {
+                  return (d.data()['employeeNumber'] ?? '')
+                      .toString()
+                      .trim()
+                      .isEmpty;
                 }).toList();
               }
 
@@ -4343,6 +7045,8 @@ class _DriversHubPageState extends State<DriversHubPage> {
                   case _DriverSort.pending:
                   case _DriverSort.approved:
                   case _DriverSort.rejected:
+                  case _DriverSort.tidPending:
+                  case _DriverSort.employeeIdMissing:
                     return byName();
                 }
               });
@@ -4389,6 +7093,33 @@ class _DriversHubPageState extends State<DriversHubPage> {
                     filteredDocs,
                   );
 
+                  // Overall-score sort needs the aggregated scores, which are
+                  // only available here (not on the driver doc). Re-sort now
+                  // so "Score (low → high)" actually orders by real score.
+                  if (_driverSort == _DriverSort.scoreLowToHigh) {
+                    double scoreOf(
+                      QueryDocumentSnapshot<Map<String, dynamic>> d,
+                    ) {
+                      final tid = (d.data()['transporterId'] ?? d.id)
+                          .toString()
+                          .trim()
+                          .toUpperCase();
+                      return overallScores[tid]?.averageScore ?? 9999.0;
+                    }
+
+                    filtered.sort((a, b) {
+                      final c = scoreOf(a).compareTo(scoreOf(b));
+                      if (c != 0) return c;
+                      final an = (a.data()['driverName'] ?? '')
+                          .toString()
+                          .toLowerCase();
+                      final bn = (b.data()['driverName'] ?? '')
+                          .toString()
+                          .toLowerCase();
+                      return an.compareTo(bn);
+                    });
+                  }
+
                   // Contract-type breakdown — counts every ACTIVE
                   // driver in the unfiltered set so the totals stay
                   // stable while the admin searches/filters. Rejected
@@ -4400,11 +7131,15 @@ class _DriversHubPageState extends State<DriversHubPage> {
                     final data = d.data();
                     final active = (data['active'] as bool?) ?? true;
                     if (!active) continue;
-                    activeTotal++;
                     final ct = DriverContractType.fromValue(
                       data['contractType'],
                     );
                     contractCounts[ct] = (contractCounts[ct] ?? 0) + 1;
+                    // Ticket: drivers without a contract type ("unset") and
+                    // "Out Soon" drivers are NOT counted in the active total.
+                    if (ct != null && ct != DriverContractType.outSoon) {
+                      activeTotal++;
+                    }
                   }
 
                   return LayoutBuilder(
@@ -4569,10 +7304,30 @@ class _DetailKachel extends StatelessWidget {
     required this.children,
   });
 
-  /// No dividers — rows rely solely on their own internal padding for
-  /// rhythm. Keeps the card visually quiet, in line with the impeccable
-  /// "near-white, near-black, hairlines only when meaningful" guidance.
-  List<Widget> _buildSeparated() => List<Widget>.from(children);
+  /// Alternating white / light-grey row backgrounds for readability.
+  /// Sub-headers (`_DetailKachelHeader`) reset the zebra counter so the
+  /// first row under each header always starts white.
+  List<Widget> _buildSeparated() {
+    final out = <Widget>[];
+    var i = 0;
+    for (final c in children) {
+      if (c is _DetailKachelHeader) {
+        out.add(c);
+        i = 0;
+        continue;
+      }
+      out.add(Container(
+        decoration: BoxDecoration(
+          color: i.isOdd ? const Color(0xFFF6F7F9) : Colors.white,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: c,
+      ));
+      i++;
+    }
+    return out;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -4936,6 +7691,275 @@ class _NewActionButton extends StatelessWidget {
 /// Apple-Card-Zeile für die Drivers-Hub-Übersicht. Saubere Oberfläche:
 /// Avatar links, Name (groß) plus „X Dokumente fehlen"-Badge darunter,
 /// rechts kompakter Score + Aktiv-Switch + 3-Punkt-Menü.
+/// Normalizes a stored work-permit type to 'eu' | 'working_visa'. Mirrors
+/// `_DriversHubPageState._normalizeWorkPermitType` so the stateless list-row
+/// pill resolves the same value without needing the State.
+String _driverWorkPermitType(dynamic raw, {dynamic fallbackExpiry}) {
+  final value = (raw ?? '').toString().trim().toLowerCase();
+  if (value.isEmpty) {
+    final hasLegacyExpiry =
+        (fallbackExpiry ?? '').toString().trim().isNotEmpty;
+    return hasLegacyExpiry ? 'working_visa' : 'eu';
+  }
+  if (value == 'eu' || value == 'permit_eu_id' || value == 'eu_id') {
+    return 'eu';
+  }
+  if (value == 'working_visa' ||
+      value == 'work_visa' ||
+      value == 'permit_work_visa' ||
+      value == 'visa') {
+    return 'working_visa';
+  }
+  return value;
+}
+
+/// Normalizes a stored licence type to 'eu' | 'non_eu'. Mirrors
+/// `_DriversHubPageState._normalizeLicenseType`.
+String _driverLicenseType(dynamic raw, Map<String, dynamic> onboarding) {
+  final v = (raw ?? '').toString().trim().toLowerCase();
+  if (v == 'eu') return 'eu';
+  if (v == 'non_eu' || v == 'noneu' || v == 'non-eu') return 'non_eu';
+  final firstDay = (onboarding['firstDayInGermany'] ?? '').toString().trim();
+  return firstDay.isNotEmpty ? 'non_eu' : 'eu';
+}
+
+/// A single choice in an [_InlineChoicePill].
+class _PillOption {
+  const _PillOption(this.value, this.label, this.color);
+  final String value;
+  final String label;
+  final Color color;
+}
+
+/// Compact inline pill (driver list-row) that opens a popup to pick one of a
+/// small set of [options] and writes the chosen value via [onChanged]. Visual
+/// twin of [_ContractTypePill], reused for work-permit and driving-licence.
+class _InlineChoicePill extends StatelessWidget {
+  const _InlineChoicePill({
+    required this.icon,
+    required this.value,
+    required this.options,
+    required this.tooltip,
+    required this.onChanged,
+  });
+  final IconData icon;
+  final String value;
+  final List<_PillOption> options;
+  final String tooltip;
+  final Future<void> Function(String value) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final current = options.firstWhere(
+      (o) => o.value == value,
+      orElse: () => options.first,
+    );
+    final accent = current.color;
+
+    return PopupMenuButton<String>(
+      tooltip: tooltip,
+      position: PopupMenuPosition.under,
+      color: Colors.white,
+      elevation: 8,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      onSelected: (v) async {
+        if (v != value) await onChanged(v);
+      },
+      itemBuilder: (ctx) => [
+        for (final o in options)
+          PopupMenuItem<String>(
+            value: o.value,
+            height: 38,
+            child: Row(
+              children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: o.color,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  o.label,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 13,
+                    fontWeight:
+                        o.value == value ? FontWeight.w800 : FontWeight.w600,
+                    color: const Color(0xFF111827),
+                  ),
+                ),
+                if (o.value == value) ...[
+                  const SizedBox(width: 8),
+                  Icon(Icons.check_rounded, size: 16, color: o.color),
+                ],
+              ],
+            ),
+          ),
+      ],
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(8, 3, 6, 3),
+        decoration: BoxDecoration(
+          color: accent.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: accent.withValues(alpha: 0.35)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 11, color: accent),
+            const SizedBox(width: 4),
+            Text(
+              current.label,
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 10.5,
+                fontWeight: FontWeight.w800,
+                color: accent,
+                letterSpacing: 0.2,
+              ),
+            ),
+            const SizedBox(width: 3),
+            Icon(Icons.keyboard_arrow_down_rounded,
+                size: 12, color: accent.withValues(alpha: 0.8)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Kleines Pill in der Fahrerliste: zeigt die Personalnummer /
+/// Employee ID (Zeiterfassung) und öffnet per Tap ein Eingabefeld.
+/// Führende Nullen werden beim Speichern entfernt ("00023" → "23").
+class _EmployeeNumberPill extends StatelessWidget {
+  final QueryDocumentSnapshot<Map<String, dynamic>> driverDoc;
+  const _EmployeeNumberPill({required this.driverDoc});
+
+  Future<void> _edit(BuildContext context) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final current =
+        (driverDoc.data()['employeeNumber'] ?? '').toString().trim();
+    final ctrl = TextEditingController(text: current);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          de ? 'Personalnummer / Employee ID' : 'Employee ID',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+        ),
+        content: SizedBox(
+          width: 300,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                de
+                    ? 'Employee ID aus dem Zeiterfassungsprogramm — wird '
+                        'beim Stunden-Import zum Zuordnen genutzt.'
+                    : 'Employee ID from the time-tracking tool — used to '
+                        'match drivers during the hours import.',
+                style: const TextStyle(
+                    fontSize: 12.5, color: Color(0xFF6B7280)),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: ctrl,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: de ? 'z. B. 23' : 'e.g. 23',
+                  isDense: true,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(de ? 'Abbrechen' : 'Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF00B287)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(de ? 'Speichern' : 'Save'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final cleaned =
+        ctrl.text.trim().replaceFirst(RegExp(r'^0+(?=\d)'), '');
+    await driverDoc.reference.set({
+      'employeeNumber': cleaned.isEmpty ? FieldValue.delete() : cleaned,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final number =
+        (driverDoc.data()['employeeNumber'] ?? '').toString().trim();
+    final hasNumber = number.isNotEmpty;
+    return Tooltip(
+      message: de
+          ? 'Personalnummer / Employee ID'
+          : 'Employee ID',
+      child: InkWell(
+        onTap: () => _edit(context),
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: hasNumber
+                ? const Color(0xFFEEF2FF)
+                : const Color(0xFFF3F4F6),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.tag_rounded,
+                size: 11,
+                color: hasNumber
+                    ? const Color(0xFF4338CA)
+                    : const Color(0xFF9CA3AF),
+              ),
+              const SizedBox(width: 3),
+              Text(
+                hasNumber ? number : (de ? 'Nr.' : 'ID'),
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                  color: hasNumber
+                      ? const Color(0xFF4338CA)
+                      : const Color(0xFF6B7280),
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _DriverHubRow extends StatelessWidget {
   final QueryDocumentSnapshot<Map<String, dynamic>> driverDoc;
   final String displayName;
@@ -4982,10 +8006,86 @@ class _DriverHubRow extends StatelessWidget {
     return const Color(0xFFCE4121);
   }
 
+  /// Score-Kreis der Mobile-Kachel — Ring in der Amazon-Bucket-Farbe der
+  /// Liste (≥93 Teal · ≥86 Blau · ≥70 Amber · ≥50 Orange · sonst Rot), die
+  /// Prozentzahl steht im Kreis. Ohne Score: neutraler Ring mit „—".
+  Widget _mobileScoreCircle(double? score) {
+    final color = score == null
+        ? const Color(0xFF9CA3AF)
+        : _driversHubBucketColor(score);
+    return SizedBox(
+      width: 58,
+      height: 58,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          SizedBox(
+            width: 58,
+            height: 58,
+            child: CircularProgressIndicator(
+              value: score == null ? 0.0 : (score / 100).clamp(0.0, 1.0),
+              strokeWidth: 4,
+              strokeCap: StrokeCap.round,
+              backgroundColor: color.withOpacity(0.14),
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+            ),
+          ),
+          if (score == null)
+            Text(
+              '—',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: color,
+              ),
+            )
+          else
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  score.toStringAsFixed(1).replaceAll('.', ','),
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w800,
+                    color: color,
+                    letterSpacing: -0.3,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+                Text(
+                  '%',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    color: color.withOpacity(0.75),
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final score = overallScore?.averageScore;
+
+    final onboarding = (driverDoc.data()['onboarding'] as Map?)
+            ?.cast<String, dynamic>() ??
+        const <String, dynamic>{};
+    final workPermitType = _driverWorkPermitType(
+      onboarding['workPermitType'],
+      fallbackExpiry: onboarding['residencePermitExpiry'],
+    );
+    final licenseType =
+        _driverLicenseType(onboarding['licenseType'], onboarding);
 
     final scoreBlock = score == null
         ? Column(
@@ -5055,8 +8155,8 @@ class _DriverHubRow extends StatelessWidget {
     );
 
     final menuButton = Container(
-      width: 40,
-      height: 40,
+      width: isCompact ? 44 : 40,
+      height: isCompact ? 44 : 40,
       decoration: BoxDecoration(
         color: Colors.white,
         shape: BoxShape.circle,
@@ -5156,6 +8256,190 @@ class _DriverHubRow extends StatelessWidget {
       ),
     );
 
+    // ── Mobile-Kachel ────────────────────────────────────────────────────
+    // Links der Score-Kreis, in der Mitte Name + Chips, rechts das
+    // 3-Punkte-Menü mit Chevron darunter. Desktop bleibt unverändert.
+    if (isCompact) {
+      final contractPill = _ContractTypePill(
+        type: contractType,
+        onChanged: (newType) async {
+          await driverDoc.reference.update(<String, dynamic>{
+            if (newType == null)
+              'contractType': FieldValue.delete()
+            else
+              'contractType': newType.value,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        },
+      );
+      final licencePill = _InlineChoicePill(
+        icon: Icons.directions_car_filled_outlined,
+        tooltip: de ? 'Führerschein' : 'Driving licence',
+        value: licenseType,
+        options: const [
+          _PillOption('eu', 'EU', Color(0xFF00B287)),
+          _PillOption('non_eu', 'Non-EU', Color(0xFFF47400)),
+        ],
+        onChanged: (v) => driverDoc.reference.update(<String, dynamic>{
+          'onboarding.licenseType': v,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }),
+      );
+      final permitPill = _InlineChoicePill(
+        icon: Icons.badge_outlined,
+        tooltip: de ? 'Arbeitserlaubnis' : 'Work permit',
+        value: workPermitType,
+        options: [
+          const _PillOption('eu', 'EU', Color(0xFF0082AF)),
+          _PillOption(
+            'working_visa',
+            de ? 'Visum' : 'Visa',
+            const Color(0xFFF59E0B),
+          ),
+        ],
+        onChanged: (v) => driverDoc.reference.update(<String, dynamic>{
+          'onboarding.workPermitType': v,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }),
+      );
+
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE5E5EA), width: 0.5),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x0A000000),
+                  blurRadius: 6,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                _mobileScoreCircle(score),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          // Aktivitätspunkt jetzt neben dem Namen.
+                          Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              color: active
+                                  ? const Color(0xFF34C759)
+                                  : const Color(0xFFEF4444),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              displayName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF1F2937),
+                                letterSpacing: -0.1,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          _EmployeeNumberPill(driverDoc: driverDoc),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          contractPill,
+                          licencePill,
+                          permitPill,
+                          if (tidPending)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF3F4F6),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                de ? 'TID ausstehend' : 'TID pending',
+                                style: const TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF6B7280),
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child:
+                              _MissingDocsBadge(driverRef: driverDoc.reference),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    menuButton,
+                    const SizedBox(height: 2),
+                    Material(
+                      color: Colors.transparent,
+                      shape: const CircleBorder(),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        onTap: onTap,
+                        child: SizedBox(
+                          width: 44,
+                          height: 44,
+                          child: Tooltip(
+                            message: t.t('drivers_hub_tooltip_view_details'),
+                            waitDuration: const Duration(milliseconds: 500),
+                            child: const Icon(
+                              Icons.chevron_right,
+                              size: 30,
+                              color: Color(0xFF8A93A0),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -5240,6 +8524,9 @@ class _DriverHubRow extends StatelessWidget {
                       spacing: 6,
                       runSpacing: 4,
                       children: [
+                        // Personalnummer / Employee ID — direkt in der
+                        // Übersicht eintragbar (vor dem Vertragstyp).
+                        _EmployeeNumberPill(driverDoc: driverDoc),
                         _ContractTypePill(
                           type: contractType,
                           onChanged: (newType) async {
@@ -5255,6 +8542,47 @@ class _DriverHubRow extends StatelessWidget {
                               },
                             );
                           },
+                        ),
+                        _InlineChoicePill(
+                          icon: Icons.badge_outlined,
+                          tooltip: de
+                              ? 'Arbeitserlaubnis'
+                              : 'Work permit',
+                          value: workPermitType,
+                          options: [
+                            const _PillOption(
+                                'eu', 'EU', Color(0xFF0082AF)),
+                            _PillOption(
+                                'working_visa',
+                                de ? 'Visum' : 'Visa',
+                                const Color(0xFFF59E0B)),
+                          ],
+                          onChanged: (v) => driverDoc.reference.update(
+                            <String, dynamic>{
+                              'onboarding.workPermitType': v,
+                              'updatedAt':
+                                  FieldValue.serverTimestamp(),
+                            },
+                          ),
+                        ),
+                        _InlineChoicePill(
+                          icon: Icons.directions_car_filled_outlined,
+                          tooltip: de
+                              ? 'Führerschein'
+                              : 'Driving licence',
+                          value: licenseType,
+                          options: const [
+                            _PillOption('eu', 'EU', Color(0xFF00B287)),
+                            _PillOption(
+                                'non_eu', 'Non-EU', Color(0xFFF47400)),
+                          ],
+                          onChanged: (v) => driverDoc.reference.update(
+                            <String, dynamic>{
+                              'onboarding.licenseType': v,
+                              'updatedAt':
+                                  FieldValue.serverTimestamp(),
+                            },
+                          ),
                         ),
                         if (tidPending)
                           Container(
@@ -5303,6 +8631,8 @@ class _EmploymentInfoCard extends StatelessWidget {
     required this.employeeNumber,
     required this.contractType,
     this.scoreSection,
+    this.onEditContractType,
+    this.onEditNumber,
   });
 
   final String employeeNumber;
@@ -5313,10 +8643,19 @@ class _EmploymentInfoCard extends StatelessWidget {
   /// contract type instead of in the page header.
   final Widget? scoreSection;
 
+  /// When set, the Vertragstyp pill becomes tappable (opens the
+  /// contract-type picker) and shows even without a stored value.
+  final VoidCallback? onEditContractType;
+
+  /// When set, the Personalnummer becomes editable (pencil) and the
+  /// section shows even without a stored value.
+  final VoidCallback? onEditNumber;
+
   @override
   Widget build(BuildContext context) {
-    final hasNumber = employeeNumber.trim().isNotEmpty;
-    final hasContract = contractType != null;
+    final hasNumber =
+        employeeNumber.trim().isNotEmpty || onEditNumber != null;
+    final hasContract = contractType != null || onEditContractType != null;
     final hasScore = scoreSection != null;
     if (!hasNumber && !hasContract && !hasScore) {
       return const SizedBox.shrink();
@@ -5342,7 +8681,7 @@ class _EmploymentInfoCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  'PERSONALNUMMER',
+                  'PERSONALNUMMER / EMPLOYEE ID',
                   style: TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 10.5,
@@ -5354,15 +8693,33 @@ class _EmploymentInfoCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 2),
-            SelectableText(
-              employeeNumber,
-              style: const TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF111827),
-                letterSpacing: -0.2,
-                fontFeatures: [FontFeature.tabularFigures()],
+            InkWell(
+              onTap: onEditNumber,
+              borderRadius: BorderRadius.circular(6),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SelectableText(
+                    employeeNumber.trim().isEmpty
+                        ? '—'
+                        : employeeNumber,
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: employeeNumber.trim().isEmpty
+                          ? const Color(0xFFCBD5E1)
+                          : const Color(0xFF111827),
+                      letterSpacing: -0.2,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                  if (onEditNumber != null) ...[
+                    const SizedBox(width: 6),
+                    const Icon(Icons.edit_outlined,
+                        size: 14, color: Color(0xFF9CA3AF)),
+                  ],
+                ],
               ),
             ),
           ],
@@ -5380,7 +8737,7 @@ class _EmploymentInfoCard extends StatelessWidget {
                 Icon(
                   Icons.work_outline_rounded,
                   size: 14,
-                  color: contractType!.pillColor,
+                  color: contractType?.pillColor ?? const Color(0xFF6B7280),
                 ),
                 const SizedBox(width: 6),
                 Text(
@@ -5396,30 +8753,52 @@ class _EmploymentInfoCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 10,
-                vertical: 4,
-              ),
-              decoration: BoxDecoration(
-                color: contractType!.pillColor.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(
-                  color:
-                      contractType!.pillColor.withValues(alpha: 0.35),
+            Builder(builder: (context) {
+              final pillColor =
+                  contractType?.pillColor ?? const Color(0xFF6B7280);
+              final pill = Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
                 ),
-              ),
-              child: Text(
-                contractType!.label,
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: contractType!.pillColor,
-                  letterSpacing: 0.1,
+                decoration: BoxDecoration(
+                  color: pillColor.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: pillColor.withValues(alpha: 0.35),
+                  ),
                 ),
-              ),
-            ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      contractType?.label ?? '—',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: pillColor,
+                        letterSpacing: 0.1,
+                      ),
+                    ),
+                    if (onEditContractType != null) ...[
+                      const SizedBox(width: 5),
+                      Icon(Icons.edit_outlined,
+                          size: 12, color: pillColor),
+                    ],
+                  ],
+                ),
+              );
+              if (onEditContractType == null) return pill;
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: InkWell(
+                  onTap: onEditContractType,
+                  borderRadius: BorderRadius.circular(999),
+                  child: pill,
+                ),
+              );
+            }),
           ],
           if (hasScore) ...[
             if (hasContract || hasNumber)
@@ -5561,6 +8940,23 @@ class _ContractTypeStatsRow extends StatelessWidget {
           compact: compact,
           isSelected: selectedUnset,
           onTap: () => onSelect(null, !selectedUnset, false),
+        ),
+      if ((counts[DriverContractType.outSoon] ?? 0) > 0)
+        _ContractStatTile(
+          label: 'Out Soon',
+          value: counts[DriverContractType.outSoon] ?? 0,
+          accent: DriverContractType.outSoon.pillColor,
+          icon: Icons.logout_rounded,
+          compact: compact,
+          isSelected: _isType(DriverContractType.outSoon),
+          onTap: () {
+            final clear = _isType(DriverContractType.outSoon);
+            onSelect(
+              clear ? null : DriverContractType.outSoon,
+              false,
+              false,
+            );
+          },
         ),
     ];
 
@@ -5861,6 +9257,16 @@ class _ContractMenuChoice {
   final bool clear;
 }
 
+/// Bucket-Farbe der Fahrerliste (Amazon-Stufen) — identisch zu
+/// `_normalizedDriverScoreBucket` + `_driverScoreBucketColor`.
+Color _driversHubBucketColor(double score) {
+  if (score >= 93) return const Color(0xFF14B8A6);
+  if (score >= 86) return const Color(0xFF0EA5E9);
+  if (score >= 70) return const Color(0xFFF59E0B);
+  if (score >= 50) return const Color(0xFFFB923C);
+  return const Color(0xFFEF4444);
+}
+
 /// Helper-Klasse, kapselt das Score-Formatting für die Driver-Row.
 class NumberFormatScore {
   static String format(double v) {
@@ -5997,6 +9403,14 @@ class _DriverSortPill extends StatelessWidget {
                 value: _DriverSort.rejected,
                 child: Text(t.t('drivers_hub_sort_rejected')),
               ),
+              const PopupMenuItem(
+                value: _DriverSort.tidPending,
+                child: Text('TID ausstehend'),
+              ),
+              const PopupMenuItem(
+                value: _DriverSort.employeeIdMissing,
+                child: Text('Employee ID missing'),
+              ),
             ],
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -6112,6 +9526,7 @@ class _AdminDriverToolsRowState extends State<_AdminDriverToolsRow> {
 
   Future<void> _generateResidencePermitPdf() async {
     if (widget.dspUid == null || widget.driverDocId == null) return;
+    final de = Localizations.localeOf(context).languageCode == 'de';
     setState(() => _generatingPdf = true);
     try {
       final callable = FirebaseFunctions.instanceFor(region: 'europe-west3')
@@ -6129,8 +9544,12 @@ class _AdminDriverToolsRowState extends State<_AdminDriverToolsRow> {
     } on FirebaseFunctionsException catch (e) {
       if (!mounted) return;
       final msg = e.code == 'not-found'
-          ? 'Noch kein Antrag gespeichert — bitte den Fahrer zuerst das Formular ausfüllen lassen.'
-          : 'PDF-Generierung fehlgeschlagen: ${e.message ?? e.code}';
+          ? (de
+              ? 'Noch kein Antrag gespeichert — bitte den Fahrer zuerst das Formular ausfüllen lassen.'
+              : 'No application saved yet — please have the driver fill in the form first.')
+          : (de
+              ? 'PDF-Generierung fehlgeschlagen: ${e.message ?? e.code}'
+              : 'PDF generation failed: ${e.message ?? e.code}');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(msg), backgroundColor: const Color(0xFFB42318)),
       );
@@ -6138,7 +9557,9 @@ class _AdminDriverToolsRowState extends State<_AdminDriverToolsRow> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('PDF-Generierung fehlgeschlagen: $e'),
+          content: Text(
+            de ? 'PDF-Generierung fehlgeschlagen: $e' : 'PDF generation failed: $e',
+          ),
           backgroundColor: const Color(0xFFB42318),
         ),
       );
@@ -6190,11 +9611,8 @@ class _AdminDriverToolsRowState extends State<_AdminDriverToolsRow> {
               side: const BorderSide(color: Color(0xFF7C3AED)),
             ),
           ),
-        FilledButton.icon(
-          onPressed: widget.onUploadDoc,
-          icon: const Icon(Icons.upload_outlined, size: 18),
-          label: Text(t.t('drivers_hub_upload_doc')),
-        ),
+        // Neue Uploads deaktiviert — Dokumente leben künftig im Company
+        // Drive; Bestandsdateien bleiben abrufbar.
       ],
     );
   }
@@ -6216,6 +9634,10 @@ class _DriverDocumentsList extends StatelessWidget {
     switch (docType) {
       case 'resident_permit':
         return t.t('work_permit');
+      case 'resident_permit_back':
+        return Localizations.localeOf(context).languageCode == 'de'
+            ? 'Aufenthaltstitel (Rückseite)'
+            : 'Residence permit (back)';
       case 'driver_license_front':
         return t.t('driver_license_front');
       case 'driver_license_back':
@@ -6234,6 +9656,18 @@ class _DriverDocumentsList extends StatelessWidget {
         return t.t('doc_insurance');
       case 'contract':
         return t.t('admin_home_contract');
+      case 'safety_training_certificate':
+        return Localizations.localeOf(context).languageCode == 'de'
+            ? 'Sicherheitsunterweisung (Zertifikat)'
+            : 'Safety instruction (certificate)';
+      case 'privacy_training_certificate':
+        return Localizations.localeOf(context).languageCode == 'de'
+            ? 'Datenschutz-Schulung (Zertifikat)'
+            : 'Privacy training (certificate)';
+      case 'privacy_notice_ack':
+        return Localizations.localeOf(context).languageCode == 'de'
+            ? 'Datenschutzinformation (Kenntnisnahme)'
+            : 'Privacy notice (acknowledgement)';
       default:
         return docType;
     }
@@ -6329,8 +9763,9 @@ class _DriverDocumentsList extends StatelessWidget {
       }, SetOptions(merge: true));
     } catch (e) {
       if (!context.mounted) return;
+      final de = Localizations.localeOf(context).languageCode == 'de';
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Fehler: $e')),
+        SnackBar(content: Text(de ? 'Fehler: $e' : 'Error: $e')),
       );
     }
   }
@@ -6759,10 +10194,11 @@ class _DriverDocumentsList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: driverRef
-          .collection('documents')
-          .orderBy('uploadedAt', descending: true)
-          .snapshots(),
+      // NO orderBy here: `orderBy('uploadedAt')` silently EXCLUDES docs
+      // without that field — e.g. ones only marked "saved in own drive" —
+      // which made the toggle look broken. Rows are keyed by docType, so
+      // ordering is irrelevant anyway.
+      stream: driverRef.collection('documents').snapshots(),
       builder: (ctx, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
           return const Padding(
@@ -6780,6 +10216,7 @@ class _DriverDocumentsList extends StatelessWidget {
         const docTypes = <String>[
           'contract',
           'resident_permit',
+          'resident_permit_back',
           'tax_id',
           'insurance',
         ];
@@ -6802,7 +10239,7 @@ class _DriverDocumentsList extends StatelessWidget {
           final subtitle = hasUrl
               ? name
               : (inOwnDrive
-                    ? 'Im eigenen Drive vorhanden'
+                    ? 'Saved in own drive'
                     : t.t('drivers_hub_not_uploaded'));
 
           return Material(
@@ -6872,37 +10309,69 @@ class _DriverDocumentsList extends StatelessWidget {
                         ],
                       ),
                     ),
-                    if (inOwnDrive)
-                      Container(
-                        margin: const EdgeInsets.only(right: 2),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
+                    // Always-visible toggle: "saved in own drive". A tap
+                    // flips the flag — green when on, grey outline when off.
+                    Tooltip(
+                      message: Localizations.localeOf(context).languageCode ==
+                              'de'
+                          ? (inOwnDrive
+                              ? 'Saved in own drive — Klick zum Entfernen'
+                              : 'Als "Saved in own drive" markieren')
+                          : (inOwnDrive
+                              ? 'Saved in own drive — tap to remove'
+                              : 'Mark as "Saved in own drive"'),
+                      child: InkWell(
+                        onTap: () => _setOwnDriveFlag(
+                          context: context,
+                          docType: docType,
+                          value: !inOwnDrive,
                         ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFD1FAE5),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.check_rounded,
-                              size: 12,
-                              color: Color(0xFF065F46),
+                        borderRadius: BorderRadius.circular(999),
+                        child: Container(
+                          margin: const EdgeInsets.only(right: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: inOwnDrive
+                                ? const Color(0xFFD1FAE5)
+                                : Colors.white,
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: inOwnDrive
+                                  ? const Color(0xFF6EE7B7)
+                                  : const Color(0xFFD1D5DB),
                             ),
-                            SizedBox(width: 2),
-                            Text(
-                              'Eigenes Drive',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF065F46),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                inOwnDrive
+                                    ? Icons.check_rounded
+                                    : Icons.cloud_outlined,
+                                size: 12,
+                                color: inOwnDrive
+                                    ? const Color(0xFF065F46)
+                                    : const Color(0xFF9CA3AF),
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 2),
+                              Text(
+                                'Saved in own drive',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: inOwnDrive
+                                      ? const Color(0xFF065F46)
+                                      : const Color(0xFF9CA3AF),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
+                    ),
                     PopupMenuButton<String>(
                       icon: const Icon(
                         Icons.more_vert,
@@ -6913,9 +10382,6 @@ class _DriverDocumentsList extends StatelessWidget {
                       padding: EdgeInsets.zero,
                       onSelected: (value) async {
                         switch (value) {
-                          case 'upload':
-                            await onUploadDoc(docType);
-                            break;
                           case 'download':
                             await _downloadDoc(
                               context: context,
@@ -6945,22 +10411,9 @@ class _DriverDocumentsList extends StatelessWidget {
                         }
                       },
                       itemBuilder: (ctx) => [
-                        PopupMenuItem<String>(
-                          value: 'upload',
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.upload_outlined,
-                                size: 16,
-                                color: Color(0xFF374151),
-                              ),
-                              const SizedBox(width: 10),
-                              Text(
-                                hasUrl ? 'Datei ersetzen' : t.t('upload'),
-                              ),
-                            ],
-                          ),
-                        ),
+                        // Neue Uploads sind deaktiviert — Dokumente leben
+                        // künftig im Company Drive. Bereits hochgeladene
+                        // Dateien bleiben abrufbar (Vorschau/Download).
                         if (hasUrl)
                           PopupMenuItem<String>(
                             value: 'download',
@@ -6979,7 +10432,7 @@ class _DriverDocumentsList extends StatelessWidget {
                         CheckedPopupMenuItem<String>(
                           value: 'toggle_drive',
                           checked: inOwnDrive,
-                          child: const Text('Im eigenen Drive vorhanden'),
+                          child: const Text('Saved in own drive'),
                         ),
                         if (hasUrl) const PopupMenuDivider(),
                         if (hasUrl)
@@ -7016,6 +10469,19 @@ class _DriverDocumentsList extends StatelessWidget {
           for (final pair in docPairs) ...pair,
         ];
 
+        // Nachweise aus Schulungen (Zertifikate, Kenntnisnahmen): alles,
+        // was in `documents` liegt, aber keinem festen Upload-Slot
+        // entspricht. Nur anzeigen, wenn tatsächlich eine Datei/URL da
+        // ist — sonst blähen leere Platzhalter die Liste auf.
+        final extraDocTypes = docsByType.keys
+            .where((k) => !allDocTypes.contains(k))
+            .where((k) =>
+                (docsByType[k]!['downloadUrl'] ?? '').toString().isNotEmpty)
+            .toList()
+          ..sort();
+
+        final isDe = Localizations.localeOf(context).languageCode == 'de';
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -7029,6 +10495,22 @@ class _DriverDocumentsList extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 6),
                 child: docTile(docType),
               ),
+            if (extraDocTypes.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                isDe ? 'Nachweise & Zertifikate' : 'Certificates & records',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 6),
+              for (final docType in extraDocTypes)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: docTile(docType),
+                ),
+            ],
           ],
         );
       },

@@ -52,10 +52,59 @@ class AdminCalendarPage extends StatelessWidget {
 /// no outer padding. Use this on the admin home so the calendar lives
 /// alongside the other home cards.
 class AdminCalendarSection extends StatefulWidget {
-  const AdminCalendarSection({super.key});
+  const AdminCalendarSection({super.key, this.collapsibleDayPanel = false});
+
+  /// When true (dashboard embed) the day-events panel stays hidden until a
+  /// day is tapped — the month grid gets the full width.
+  final bool collapsibleDayPanel;
 
   @override
   State<AdminCalendarSection> createState() => _AdminCalendarPageState();
+}
+
+/// Opens the add-event dialog and saves the result. Public so the home
+/// dashboard's "+ Termin" button can use the exact same flow.
+Future<void> showAddCalendarEventDialog(BuildContext context) async {
+  final result = await showDialog<_NewEventResult>(
+    context: context,
+    builder: (ctx) => _AddEventDialog(prefillStart: DateTime.now()),
+  );
+  if (result == null) return;
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return;
+  try {
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('calendar_events')
+        .add({
+      'start': Timestamp.fromDate(result.start),
+      'end': Timestamp.fromDate(result.end),
+      'title': result.title,
+      'category': result.category,
+      'location': result.location,
+      'dispatcher': result.dispatcher,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    if (!context.mounted) return;
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(de
+            ? 'Termin "${result.title}" hinzugefügt.'
+            : 'Event "${result.title}" added.'),
+      ),
+    );
+  } catch (e) {
+    if (!context.mounted) return;
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content:
+            Text(de ? 'Fehler beim Speichern: $e' : 'Error while saving: $e'),
+      ),
+    );
+  }
 }
 
 class _AdminCalendarPageState extends State<AdminCalendarSection> {
@@ -77,6 +126,74 @@ class _AdminCalendarPageState extends State<AdminCalendarSection> {
 
   Future<void> _showEventDetail(_CalEvent event) =>
       showCalendarEventDetail(context, event);
+
+  /// Whether the inline day panel is visible. The dashboard embed
+  /// (collapsible mode) never shows it inline — day taps open a popup
+  /// instead, so the month grid keeps its full width.
+  bool get _showDayPanel => !widget.collapsibleDayPanel;
+
+  /// Day tap: select + (dashboard embed) open the day popup.
+  void _handleSelectDay(DateTime d) {
+    setState(() => _selectedDay = d);
+    if (widget.collapsibleDayPanel) _openDayPopup(d);
+  }
+
+  /// Dashboard embed: the day's events as a popup dialog instead of an
+  /// inline panel that would crush the month grid.
+  ///
+  /// Wichtig: _DayEventsPanel enthält Expanded-Kinder und braucht daher
+  /// eine TIGHT begrenzte Höhe — sonst wirft das Layout im Release-Build
+  /// (grauer ErrorWidget-Kasten statt Inhalt).
+  Future<void> _openDayPopup(DateTime day) async {
+    final screen = MediaQuery.of(context).size;
+    final width = screen.width < 470 ? screen.width - 48 : 420.0;
+    final height =
+        (screen.height - 120).clamp(320.0, 540.0).toDouble();
+    // Eigener Stream fürs Popup: _eventsStream ist single-subscription
+    // (StreamController) und wird bereits vom Monats-Grid gehört — ein
+    // zweites listen() darauf wirft "Stream has already been listened
+    // to" und ließ das Popup als grauen ErrorWidget-Kasten rendern.
+    final popupStream = _streamAllCalendarEvents();
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding:
+            const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+        child: SizedBox(
+          width: width,
+          height: height,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              StreamBuilder<List<_CalEvent>>(
+                stream: popupStream,
+                builder: (ctx2, snap) => _DayEventsPanel(
+                  selectedDay: day,
+                  events: snap.data ?? const <_CalEvent>[],
+                  onEventTap: (e) => _showEventDetail(e),
+                  onAddForSelected: () => _addEvent(prefillStart: day),
+                ),
+              ),
+              Positioned(
+                top: 10,
+                right: 10,
+                child: InkWell(
+                  onTap: () => Navigator.of(ctx).pop(),
+                  borderRadius: BorderRadius.circular(999),
+                  child: const Padding(
+                    padding: EdgeInsets.all(4),
+                    child: Icon(Icons.close_rounded,
+                        size: 20, color: Color(0xFF6B7280)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   Future<void> _addEvent({DateTime? prefillStart}) async {
     final result = await showDialog<_NewEventResult>(
@@ -101,13 +218,22 @@ class _AdminCalendarPageState extends State<AdminCalendarSection> {
             'createdAt': FieldValue.serverTimestamp(),
           });
       if (!mounted) return;
+      final de = Localizations.localeOf(context).languageCode == 'de';
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Termin "${result.title}" hinzugefügt.')),
+        SnackBar(
+          content: Text(de
+              ? 'Termin "${result.title}" hinzugefügt.'
+              : 'Event "${result.title}" added.'),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
+      final de = Localizations.localeOf(context).languageCode == 'de';
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Fehler beim Speichern: $e')),
+        SnackBar(
+          content:
+              Text(de ? 'Fehler beim Speichern: $e' : 'Error while saving: $e'),
+        ),
       );
     }
   }
@@ -229,23 +355,24 @@ class _AdminCalendarPageState extends State<AdminCalendarSection> {
                             visibleMonth: _visibleMonth,
                             selectedDay: _selectedDay,
                             events: events,
-                            onSelectDay: (d) =>
-                                setState(() => _selectedDay = d),
+                            onSelectDay: _handleSelectDay,
                             onEventTap: _showEventDetail,
                             isMobile: isMobile,
                           ),
                         ),
-                        const SizedBox(height: AppSpacing.md),
-                        SizedBox(
-                          height: isMobile ? 360 : 280,
-                          child: _DayEventsPanel(
-                            selectedDay: _selectedDay,
-                            events: events,
-                            onEventTap: _showEventDetail,
-                            onAddForSelected: () =>
-                                _addEvent(prefillStart: _selectedDay),
+                        if (_showDayPanel) ...[
+                          const SizedBox(height: AppSpacing.md),
+                          SizedBox(
+                            height: isMobile ? 360 : 280,
+                            child: _DayEventsPanel(
+                              selectedDay: _selectedDay,
+                              events: events,
+                              onEventTap: _showEventDetail,
+                              onAddForSelected: () =>
+                                  _addEvent(prefillStart: _selectedDay),
+                            ),
                           ),
-                        ),
+                        ],
                       ],
                     )
                   : Row(
@@ -257,23 +384,24 @@ class _AdminCalendarPageState extends State<AdminCalendarSection> {
                             visibleMonth: _visibleMonth,
                             selectedDay: _selectedDay,
                             events: events,
-                            onSelectDay: (d) =>
-                                setState(() => _selectedDay = d),
+                            onSelectDay: _handleSelectDay,
                             onEventTap: _showEventDetail,
                             isMobile: false,
                           ),
                         ),
-                        const SizedBox(width: AppSpacing.md),
-                        SizedBox(
-                          width: 320,
-                          child: _DayEventsPanel(
-                            selectedDay: _selectedDay,
-                            events: events,
-                            onEventTap: _showEventDetail,
-                            onAddForSelected: () =>
-                                _addEvent(prefillStart: _selectedDay),
+                        if (_showDayPanel) ...[
+                          const SizedBox(width: AppSpacing.md),
+                          SizedBox(
+                            width: 320,
+                            child: _DayEventsPanel(
+                              selectedDay: _selectedDay,
+                              events: events,
+                              onEventTap: _showEventDetail,
+                              onAddForSelected: () =>
+                                  _addEvent(prefillStart: _selectedDay),
+                            ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
             ),
@@ -306,6 +434,7 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     // Wider screens get the full month name; on mobile we use the
     // short variant ("Mai 2026") so it fits next to nav + actions.
     final monthFmt = isMobile ? 'MMM yyyy' : 'MMMM yyyy';
@@ -347,7 +476,7 @@ class _Header extends StatelessWidget {
           )
         else ...[
           const SizedBox(width: AppSpacing.xs),
-          _PillButton(label: 'Heute', onTap: onToday),
+          _PillButton(label: de ? 'Heute' : 'Today', onTap: onToday),
         ],
         const Spacer(),
         _AddEventButton(onTap: onAddEvent, isMobile: isMobile),
@@ -365,6 +494,7 @@ class _AddEventButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final h = isMobile ? 32.0 : 38.0;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -393,7 +523,7 @@ class _AddEventButton extends StatelessWidget {
               if (!isMobile) ...[
                 const SizedBox(width: 4),
                 Text(
-                  'Termin',
+                  de ? 'Termin' : 'Event',
                   style: AppTypography.subheadline.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.w700,
@@ -894,13 +1024,16 @@ class _DayEventsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final today = DateTime.now();
     final day = selectedDay ?? DateTime(today.year, today.month, today.day);
     final isToday = _sameDay(day, today);
     final df = DateFormat('EEE, d. MMMM yyyy', _localeForFormat(context));
     final filtered = events.where((e) => e.coversDay(day)).toList()
       ..sort((a, b) => a.start.compareTo(b.start));
-    final subtitle = isToday ? 'Heute · ${df.format(day)}' : df.format(day);
+    final subtitle = isToday
+        ? '${de ? 'Heute' : 'Today'} · ${df.format(day)}'
+        : df.format(day);
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
@@ -926,7 +1059,7 @@ class _DayEventsPanel extends StatelessWidget {
               const SizedBox(width: AppSpacing.xs),
               Expanded(
                 child: Text(
-                  'Termine',
+                  de ? 'Termine' : 'Events',
                   style: AppTypography.headline.copyWith(
                     color: AppColors.codriverGraphite,
                   ),
@@ -973,7 +1106,9 @@ class _DayEventsPanel extends StatelessWidget {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            'Keine Termine an diesem Tag.',
+                            de
+                                ? 'Keine Termine an diesem Tag.'
+                                : 'No events on this day.',
                             style: AppTypography.footnote.copyWith(
                               color: AppColors.labelTertiaryLight,
                             ),
@@ -981,7 +1116,7 @@ class _DayEventsPanel extends StatelessWidget {
                           const SizedBox(height: AppSpacing.sm),
                           CoButton(
                             onPressed: onAddForSelected,
-                            label: 'Termin hinzufügen',
+                            label: de ? 'Termin hinzufügen' : 'Add event',
                             icon: Icons.add_rounded,
                             variant: CoButtonVariant.quiet,
                           ),
@@ -1165,6 +1300,77 @@ class _EventTile extends StatelessWidget {
   }
 }
 
+/// Compact one-line event tile for the dashboard "upcoming" card:
+/// `| 09:00  Title … 📍`. Full details open on tap.
+class _CompactEventTile extends StatelessWidget {
+  final _CalEvent event;
+  final VoidCallback? onTap;
+  const _CompactEventTile({required this.event, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final tf = DateFormat.Hm(_localeForFormat(context));
+    final color = _categoryColorFor(event.category);
+    final card = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(9),
+        border: Border(left: BorderSide(color: color, width: 3)),
+      ),
+      child: Row(
+        children: [
+          Text(
+            tf.format(event.start),
+            style: AppTypography.caption1.copyWith(
+              color: color,
+              fontWeight: FontWeight.w800,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              event.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTypography.footnote.copyWith(
+                color: AppColors.codriverGraphite,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          if (event.dispatcher.isNotEmpty) ...[
+            const SizedBox(width: 6),
+            const Icon(
+              Icons.headset_mic_rounded,
+              size: 11,
+              color: AppColors.codriverDeep,
+            ),
+          ],
+          if (event.location.isNotEmpty) ...[
+            const SizedBox(width: 4),
+            const Icon(
+              Icons.place_rounded,
+              size: 11,
+              color: AppColors.labelTertiaryLight,
+            ),
+          ],
+        ],
+      ),
+    );
+    if (onTap == null) return card;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: CoPressable(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(9),
+        child: card,
+      ),
+    );
+  }
+}
+
 /// Standalone "Anstehende Termine" card — drop into the admin Home
 /// dashboard. Streams events from `users/{uid}/calendar_events` and
 /// displays the upcoming 7 days, grouped by date.
@@ -1211,9 +1417,8 @@ class _UpcomingHomePanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final until = today.add(const Duration(days: 7));
     final filtered = events
-        .where((e) => !e.start.isBefore(today) && e.start.isBefore(until))
+        .where((e) => !e.start.isBefore(today))
         .toList()
       ..sort((a, b) => a.start.compareTo(b.start));
 
@@ -1237,56 +1442,114 @@ class _UpcomingHomePanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Icon(Icons.event_rounded,
-                  size: 18, color: AppColors.codriverDeep),
-              const SizedBox(width: AppSpacing.xs),
-              Text(
-                'Anstehend',
-                style: AppTypography.headline.copyWith(
-                  color: AppColors.codriverGraphite,
+          Builder(builder: (context) {
+            final de = Localizations.localeOf(context).languageCode == 'de';
+            return Row(
+              children: [
+                const Icon(Icons.event_rounded,
+                    size: 18, color: AppColors.codriverDeep),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          de ? 'Anstehende Termine' : 'Upcoming events',
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.headline.copyWith(
+                            color: AppColors.codriverGraphite,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      if (filtered.isNotEmpty)
+                        Text(
+                          '${filtered.length}',
+                          style: AppTypography.footnote.copyWith(
+                            color: AppColors.labelSecondaryLight,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                'nächste 7 Tage',
-                style: AppTypography.footnote.copyWith(
-                  color: AppColors.labelSecondaryLight,
+                CoIconButton(
+                  onPressed: () => Navigator.of(context)
+                      .pushNamedAndRemoveUntil('/calendar', (r) => false),
+                  icon: Icons.calendar_month_rounded,
+                  size: 34,
+                  tooltip: de ? 'Zum Kalender' : 'Open calendar',
                 ),
-              ),
-            ],
-          ),
+                const SizedBox(width: 6),
+                CoIconButton(
+                  onPressed: () => showAddCalendarEventDialog(context),
+                  icon: Icons.add_rounded,
+                  size: 34,
+                  tooltip: de ? 'Termin hinzufügen' : 'Add event',
+                ),
+              ],
+            );
+          }),
           const SizedBox(height: AppSpacing.sm),
           if (filtered.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
               child: Center(
-                child: Text(
-                  'Keine Termine in den nächsten 7 Tagen.',
-                  style: AppTypography.footnote.copyWith(
-                    color: AppColors.labelTertiaryLight,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
+                child: Builder(builder: (context) {
+                  final de =
+                      Localizations.localeOf(context).languageCode == 'de';
+                  return Text(
+                    de ? 'Keine anstehenden Termine.' : 'No upcoming events.',
+                    style: AppTypography.footnote.copyWith(
+                      color: AppColors.labelTertiaryLight,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  );
+                }),
               ),
             )
           else
-            for (final entry in grouped.entries) ...[
-              _DayHeader(date: entry.key),
-              const SizedBox(height: 4),
-              for (final e in entry.value)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Builder(
-                    builder: (ctx) => _EventTile(
-                      event: e,
-                      onTap: () => showCalendarEventDetail(ctx, e),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  // Side-by-side compact tiles when the card is wide enough
+                  // (desktop dashboard); single column on narrow screens.
+                  const gap = 6.0;
+                  final cols = constraints.maxWidth >= 520 ? 2 : 1;
+                  final tileW =
+                      (constraints.maxWidth - (cols - 1) * gap) / cols;
+                  return SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        for (final entry in grouped.entries) ...[
+                          _DayHeader(date: entry.key),
+                          const SizedBox(height: 4),
+                          Wrap(
+                            spacing: gap,
+                            runSpacing: gap,
+                            children: [
+                              for (final e in entry.value)
+                                SizedBox(
+                                  width: tileW,
+                                  child: Builder(
+                                    builder: (ctx) => _CompactEventTile(
+                                      event: e,
+                                      onTap: () =>
+                                          showCalendarEventDetail(ctx, e),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                        ],
+                      ],
                     ),
-                  ),
-                ),
-              const SizedBox(height: AppSpacing.sm),
-            ],
+                  );
+                },
+              ),
+            ),
         ],
       ),
     );
@@ -2035,10 +2298,22 @@ class _AddEventDialogState extends State<_AddEventDialog> {
   Widget build(BuildContext context) {
     final df = DateFormat('EEE, d. MMMM y', _localeForFormat(context));
     return AlertDialog(
-      title: Text(_isEditing ? 'Termin bearbeiten' : 'Neuer Termin'),
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+      contentPadding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
+      title: Text(
+        _isEditing ? 'Termin bearbeiten' : 'Neuer Termin',
+        style: AppTypography.title3.copyWith(
+          color: AppColors.codriverGraphite,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
       content: SizedBox(
-        width: 480,
-        child: Column(
+        width: 400,
+        child: SingleChildScrollView(
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -2134,6 +2409,7 @@ class _AddEventDialogState extends State<_AddEventDialog> {
               ),
             ],
           ],
+          ),
         ),
       ),
       actions: [

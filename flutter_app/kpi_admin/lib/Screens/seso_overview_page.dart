@@ -36,6 +36,7 @@ class _SesoOverviewPageState extends State<SesoOverviewPage> {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     return Container(
       color: const Color(0xFFF3F6F7),
       child: StreamBuilder<List<SesoConfirmation>>(
@@ -71,7 +72,7 @@ class _SesoOverviewPageState extends State<SesoOverviewPage> {
                 Row(
                   children: [
                     Text(
-                      'SESO Fahrzeuge',
+                      de ? 'SESO Fahrzeuge' : 'SESO vehicles',
                       style: AppTypography.title2.copyWith(
                         color: AppColors.codriverGraphite,
                       ),
@@ -80,13 +81,15 @@ class _SesoOverviewPageState extends State<SesoOverviewPage> {
                     CoButton(
                       onPressed: () => _openCreateOrEditDialog(),
                       icon: Icons.add_rounded,
-                      label: 'Anlegen',
+                      label: de ? 'Anlegen' : 'Add',
                     ),
                   ],
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Confirmations für selbst beschaffte Fahrzeuge + Zahlungs-Tracking.',
+                  de
+                      ? 'Confirmations für selbst beschaffte Fahrzeuge + Zahlungs-Tracking.'
+                      : 'Confirmations for self-sourced vehicles + payment tracking.',
                   style: AppTypography.footnote.copyWith(
                     color: AppColors.labelSecondaryLight,
                   ),
@@ -96,7 +99,7 @@ class _SesoOverviewPageState extends State<SesoOverviewPage> {
                   children: [
                     Expanded(
                       child: _StatCard(
-                        label: 'Offen',
+                        label: de ? 'Offen' : 'Open',
                         value: _euro(totalOpen),
                         color: AppColors.warning,
                       ),
@@ -104,7 +107,7 @@ class _SesoOverviewPageState extends State<SesoOverviewPage> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: _StatCard(
-                        label: 'Bezahlt',
+                        label: de ? 'Bezahlt' : 'Paid',
                         value: _euro(totalPaid),
                         color: AppColors.success,
                       ),
@@ -112,7 +115,7 @@ class _SesoOverviewPageState extends State<SesoOverviewPage> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: _StatCard(
-                        label: '# Unbezahlte Wochen',
+                        label: de ? '# Unbezahlte Wochen' : '# Unpaid weeks',
                         value: '$openWeeks',
                         color: AppColors.codriverDeep,
                       ),
@@ -280,6 +283,7 @@ class _ConfirmationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final c = confirmation;
     final typeColor = c.vehicleType == SesoVehicleType.lwb
         ? const Color(0xFF7B5BFF)
@@ -338,7 +342,9 @@ class _ConfirmationCard extends StatelessWidget {
                       if (c.orderId.isNotEmpty &&
                           c.transactionId.isNotEmpty)
                         Text(
-                          'Auftrag: ${c.orderId}',
+                          de
+                              ? 'Auftrag: ${c.orderId}'
+                              : 'Order: ${c.orderId}',
                           style: AppTypography.caption2.copyWith(
                             color: AppColors.labelSecondaryLight,
                           ),
@@ -351,8 +357,8 @@ class _ConfirmationCard extends StatelessWidget {
                 const SizedBox(width: 10),
                 Text(
                   c.offPeak
-                      ? '€${c.dailyRate.toStringAsFixed(2)}/T · Off-Peak'
-                      : '€${c.dailyRate.toStringAsFixed(2)}/T',
+                      ? '€${c.dailyRate.toStringAsFixed(2)}/${de ? 'T' : 'd'} · Off-Peak'
+                      : '€${c.dailyRate.toStringAsFixed(2)}/${de ? 'T' : 'd'}',
                   style: AppTypography.footnote.copyWith(
                     color: AppColors.labelSecondaryLight,
                     fontWeight: FontWeight.w600,
@@ -400,7 +406,8 @@ class _ConfirmationCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 3),
                         Text(
-                          'KW ${w.weekNumber.toString().padLeft(2, '0')}',
+                          '${de ? 'KW' : 'CW'} '
+                          '${w.weekNumber.toString().padLeft(2, '0')}',
                           style: AppTypography.caption2.copyWith(
                             color: w.paid
                                 ? AppColors.codriverDeep
@@ -423,13 +430,13 @@ class _ConfirmationCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 _MetricChip(
-                  label: 'Bezahlt',
+                  label: de ? 'Bezahlt' : 'Paid',
                   value: _euro(c.paidCost),
                   color: AppColors.success,
                 ),
                 const SizedBox(width: 8),
                 _MetricChip(
-                  label: 'Offen',
+                  label: de ? 'Offen' : 'Open',
                   value: _euro(c.openCost),
                   color: c.openCost > 0 ? AppColors.warning : AppColors.success,
                 ),
@@ -536,6 +543,7 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     return Center(
       child: SizedBox(
         width: 360,
@@ -559,7 +567,9 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             Text(
-              'Noch keine SESO-Confirmations.',
+              de
+                  ? 'Noch keine SESO-Confirmations.'
+                  : 'No SESO confirmations yet.',
               style: AppTypography.subheadline.copyWith(
                 color: AppColors.codriverGraphite,
                 fontWeight: FontWeight.w700,
@@ -568,7 +578,9 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              'Lege eine Confirmation an: Fahrzeugtyp, Tagespreis und KWs.',
+              de
+                  ? 'Lege eine Confirmation an: Fahrzeugtyp, Tagespreis und KWs.'
+                  : 'Create a confirmation: vehicle type, daily rate and CWs.',
               style: AppTypography.footnote.copyWith(
                 color: AppColors.labelSecondaryLight,
               ),
@@ -579,7 +591,7 @@ class _EmptyState extends StatelessWidget {
               child: CoButton(
                 onPressed: onAdd,
                 icon: Icons.add_rounded,
-                label: 'Confirmation anlegen',
+                label: de ? 'Confirmation anlegen' : 'Add confirmation',
               ),
             ),
           ],
@@ -732,20 +744,27 @@ class _SesoEditorDialogState extends State<_SesoEditorDialog> {
   }
 
   Future<void> _save() async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final rate = _rate;
     final partnerRate = _partnerRate;
     final txId = _transactionIdCtrl.text.trim();
     final orderId = _orderIdCtrl.text.trim();
     if (txId.isEmpty && orderId.isEmpty) {
-      setState(() => _error = 'Mindestens Transaktions-ID oder Auftrags-ID eingeben.');
+      setState(() => _error = de
+          ? 'Mindestens Transaktions-ID oder Auftrags-ID eingeben.'
+          : 'Enter at least a transaction ID or an order ID.');
       return;
     }
     if (rate <= 0) {
-      setState(() => _error = 'Tagespreis muss > 0 sein.');
+      setState(() => _error = de
+          ? 'Tagespreis muss > 0 sein.'
+          : 'Daily rate must be > 0.');
       return;
     }
     if (_selectedWeeks.isEmpty) {
-      setState(() => _error = 'Mindestens eine KW auswählen.');
+      setState(() => _error = de
+          ? 'Mindestens eine KW auswählen.'
+          : 'Select at least one calendar week.');
       return;
     }
     setState(() {
@@ -850,6 +869,7 @@ class _SesoEditorDialogState extends State<_SesoEditorDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final isEdit = widget.existing != null;
     final weekCount = _selectedWeeks.length;
     final vehicleCount =
@@ -874,7 +894,11 @@ class _SesoEditorDialogState extends State<_SesoEditorDialog> {
     }
 
     return AlertDialog(
-      title: Text(isEdit ? 'Confirmation bearbeiten' : 'Neue Confirmation'),
+      title: Text(
+        isEdit
+            ? (de ? 'Confirmation bearbeiten' : 'Edit confirmation')
+            : (de ? 'Neue Confirmation' : 'New confirmation'),
+      ),
       content: SizedBox(
         width: 560,
         child: SingleChildScrollView(
@@ -887,9 +911,11 @@ class _SesoEditorDialogState extends State<_SesoEditorDialog> {
                   Expanded(
                     child: TextField(
                       controller: _transactionIdCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Transaktions-ID',
-                        hintText: 'aus der E-Mail einfügen',
+                      decoration: InputDecoration(
+                        labelText: de ? 'Transaktions-ID' : 'Transaction ID',
+                        hintText: de
+                            ? 'aus der E-Mail einfügen'
+                            : 'paste from the email',
                       ),
                       onChanged: (_) => setState(() {}),
                     ),
@@ -898,9 +924,11 @@ class _SesoEditorDialogState extends State<_SesoEditorDialog> {
                   Expanded(
                     child: TextField(
                       controller: _orderIdCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Auftrags-ID',
-                        hintText: 'aus der E-Mail einfügen',
+                      decoration: InputDecoration(
+                        labelText: de ? 'Auftrags-ID' : 'Order ID',
+                        hintText: de
+                            ? 'aus der E-Mail einfügen'
+                            : 'paste from the email',
                       ),
                       onChanged: (_) => setState(() {}),
                     ),
@@ -989,13 +1017,13 @@ class _SesoEditorDialogState extends State<_SesoEditorDialog> {
                       Expanded(
                         child: DropdownButtonFormField<String?>(
                           initialValue: _rentalCompanyId,
-                          decoration: const InputDecoration(
-                            labelText: 'Mietfirma',
+                          decoration: InputDecoration(
+                            labelText: de ? 'Mietfirma' : 'Rental company',
                           ),
                           items: [
-                            const DropdownMenuItem<String?>(
+                            DropdownMenuItem<String?>(
                               value: null,
-                              child: Text('— keine —'),
+                              child: Text(de ? '— keine —' : '— none —'),
                             ),
                             for (final c in companies)
                               DropdownMenuItem<String?>(
@@ -1009,7 +1037,9 @@ class _SesoEditorDialogState extends State<_SesoEditorDialog> {
                       ),
                       const SizedBox(width: 8),
                       IconButton(
-                        tooltip: 'Mietfirmen verwalten',
+                        tooltip: de
+                            ? 'Mietfirmen verwalten'
+                            : 'Manage rental companies',
                         icon: const Icon(Icons.business_rounded),
                         onPressed: () => _showRentalCompaniesDialog(
                           context: context,
@@ -1029,9 +1059,11 @@ class _SesoEditorDialogState extends State<_SesoEditorDialog> {
               TextField(
                 controller: _vehicleCountCtrl,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Anzahl Fahrzeuge im Zeitraum',
-                  prefixIcon: Icon(Icons.local_shipping_outlined),
+                decoration: InputDecoration(
+                  labelText: de
+                      ? 'Anzahl Fahrzeuge im Zeitraum'
+                      : 'Number of vehicles in period',
+                  prefixIcon: const Icon(Icons.local_shipping_outlined),
                 ),
                 onChanged: (_) => setState(() {}),
               ),
@@ -1046,9 +1078,13 @@ class _SesoEditorDialogState extends State<_SesoEditorDialog> {
                       controller: _rateCtrl,
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(
-                        labelText: 'Vergüteter DSP-Tagespreis (netto)',
-                        helperText: 'Was Amazon pro Tag zahlt',
+                      decoration: InputDecoration(
+                        labelText: de
+                            ? 'Vergüteter DSP-Tagespreis (netto)'
+                            : 'DSP daily rate paid (net)',
+                        helperText: de
+                            ? 'Was Amazon pro Tag zahlt'
+                            : 'What Amazon pays per day',
                         prefixText: '€ ',
                       ),
                       onChanged: (_) => setState(() {}),
@@ -1060,9 +1096,13 @@ class _SesoEditorDialogState extends State<_SesoEditorDialog> {
                       controller: _partnerRateCtrl,
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(
-                        labelText: 'Tatsächlicher Mietpreis / Tag',
-                        helperText: 'Was die Mietfirma pro Tag berechnet',
+                      decoration: InputDecoration(
+                        labelText: de
+                            ? 'Tatsächlicher Mietpreis / Tag'
+                            : 'Actual rental price / day',
+                        helperText: de
+                            ? 'Was die Mietfirma pro Tag berechnet'
+                            : 'What the rental company charges per day',
                         prefixText: '€ ',
                       ),
                       onChanged: (_) => setState(() {}),
@@ -1074,7 +1114,7 @@ class _SesoEditorDialogState extends State<_SesoEditorDialog> {
               Row(
                 children: [
                   Text(
-                    'Jahr:',
+                    de ? 'Jahr:' : 'Year:',
                     style: AppTypography.subheadline.copyWith(
                       color: AppColors.codriverGraphite,
                       fontWeight: FontWeight.w700,
@@ -1099,7 +1139,7 @@ class _SesoEditorDialogState extends State<_SesoEditorDialog> {
                   const Spacer(),
                   if (weekCount > 0)
                     Text(
-                      '$weekCount KWs',
+                      de ? '$weekCount KWs' : '$weekCount CWs',
                       style: AppTypography.caption1.copyWith(
                         color: AppColors.codriverDeep,
                         fontWeight: FontWeight.w800,
@@ -1142,7 +1182,8 @@ class _SesoEditorDialogState extends State<_SesoEditorDialog> {
                       Padding(
                         padding: const EdgeInsets.only(bottom: 4),
                         child: Text(
-                          'Zeitraum: ${_dmy(periodStart)} → ${_dmy(periodEnd)}',
+                          '${de ? 'Zeitraum' : 'Period'}: '
+                          '${_dmy(periodStart)} → ${_dmy(periodEnd)}',
                           style: AppTypography.caption2.copyWith(
                             color: AppColors.codriverDeep,
                             fontWeight: FontWeight.w700,
@@ -1152,12 +1193,14 @@ class _SesoEditorDialogState extends State<_SesoEditorDialog> {
                       ),
                     _PreviewRow(
                       label: vehicleCount > 0
-                          ? 'Wochenpreis ($vehicleCount Fahrzeug${vehicleCount == 1 ? '' : 'e'})'
-                          : 'Wochenpreis',
+                          ? (de
+                              ? 'Wochenpreis ($vehicleCount Fahrzeug${vehicleCount == 1 ? '' : 'e'})'
+                              : 'Weekly cost ($vehicleCount vehicle${vehicleCount == 1 ? '' : 's'})')
+                          : (de ? 'Wochenpreis' : 'Weekly cost'),
                       value: _euro(weeklyCost),
                     ),
                     _PreviewRow(
-                      label: 'Gesamt DSP',
+                      label: de ? 'Gesamt DSP' : 'Total DSP',
                       value:
                           '${_euro(totalCost)}  ($weekCount × ${_euro(weeklyCost)})',
                       bold: true,
@@ -1166,18 +1209,24 @@ class _SesoEditorDialogState extends State<_SesoEditorDialog> {
                       const Divider(height: 16, thickness: 0.5),
                       _PreviewRow(
                         label: vehicleCount > 0
-                            ? 'Mietpartner pro Woche ($vehicleCount Fahrzeug${vehicleCount == 1 ? '' : 'e'})'
-                            : 'Mietpartner pro Woche',
+                            ? (de
+                                ? 'Mietpartner pro Woche ($vehicleCount Fahrzeug${vehicleCount == 1 ? '' : 'e'})'
+                                : 'Rental partner per week ($vehicleCount vehicle${vehicleCount == 1 ? '' : 's'})')
+                            : (de
+                                ? 'Mietpartner pro Woche'
+                                : 'Rental partner per week'),
                         value: _euro(weeklyPartner),
                       ),
                       _PreviewRow(
-                        label: 'Gesamt Mietpartner',
+                        label: de
+                            ? 'Gesamt Mietpartner'
+                            : 'Total rental partner',
                         value: _euro(totalPartner),
                         bold: true,
                       ),
                       const SizedBox(height: 6),
                       _PreviewRow(
-                        label: 'Differenz / Tag',
+                        label: de ? 'Differenz / Tag' : 'Difference / day',
                         value:
                             '${dailyDiff >= 0 ? '+' : ''}${dailyDiff.toStringAsFixed(2)} €',
                         color: dailyDiff >= 0
@@ -1185,7 +1234,7 @@ class _SesoEditorDialogState extends State<_SesoEditorDialog> {
                             : AppColors.error,
                       ),
                       _PreviewRow(
-                        label: 'Marge Woche',
+                        label: de ? 'Marge Woche' : 'Margin week',
                         value:
                             '${weeklyDiff >= 0 ? '+' : ''}${_euro(weeklyDiff)}',
                         color: weeklyDiff >= 0
@@ -1193,7 +1242,7 @@ class _SesoEditorDialogState extends State<_SesoEditorDialog> {
                             : AppColors.error,
                       ),
                       _PreviewRow(
-                        label: 'Marge Gesamt',
+                        label: de ? 'Marge Gesamt' : 'Margin total',
                         value:
                             '${totalDiff >= 0 ? '+' : ''}${_euro(totalDiff)}',
                         color: totalDiff >= 0
@@ -1209,28 +1258,30 @@ class _SesoEditorDialogState extends State<_SesoEditorDialog> {
               TextField(
                 controller: _noteCtrl,
                 maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: 'Notiz (optional)',
+                decoration: InputDecoration(
+                  labelText: de ? 'Notiz (optional)' : 'Note (optional)',
                 ),
               ),
               const SizedBox(height: 12),
               _FilePickRow(
-                label: 'Confirmation (E-Mail/Screenshot)',
+                label: de
+                    ? 'Confirmation (E-Mail/Screenshot)'
+                    : 'Confirmation (email/screenshot)',
                 pickedName: _confirmationFileName,
                 existingPlaceholder:
                     widget.existing?.confirmationScreenshotPath != null
-                        ? 'Bereits hochgeladen'
-                        : 'Keine Datei ausgewählt',
+                        ? (de ? 'Bereits hochgeladen' : 'Already uploaded')
+                        : (de ? 'Keine Datei ausgewählt' : 'No file selected'),
                 onPick: _saving ? null : _pickConfirmationFile,
               ),
               const SizedBox(height: 8),
               _FilePickRow(
-                label: 'Bezahlte Rechnung',
+                label: de ? 'Bezahlte Rechnung' : 'Paid invoice',
                 pickedName: _invoiceFileName,
                 existingPlaceholder:
                     widget.existing?.invoiceScreenshotPath != null
-                        ? 'Bereits hochgeladen'
-                        : 'Keine Datei ausgewählt',
+                        ? (de ? 'Bereits hochgeladen' : 'Already uploaded')
+                        : (de ? 'Keine Datei ausgewählt' : 'No file selected'),
                 onPick: _saving ? null : _pickInvoiceFile,
               ),
               if (_error != null) ...[

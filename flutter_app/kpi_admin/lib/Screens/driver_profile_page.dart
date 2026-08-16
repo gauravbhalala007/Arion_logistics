@@ -10,10 +10,12 @@ import 'package:printing/printing.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../data/privacy_notice/privacy_notice_content.dart';
+import '../data/privacy_notice/privacy_notice_texts.dart';
 import '../localization/app_localizations.dart';
-import '../widgets/notification_pin_dialogs.dart';
 import '../widgets/web_preview.dart'
     if (dart.library.html) '../widgets/web_preview_web.dart';
+import 'driver_privacy_notice_page.dart';
 
 const _kBg = Color(0xFFF3F6F7);
 const _kText = Color(0xFF22252F);
@@ -35,29 +37,6 @@ class DriverProfilePage extends StatefulWidget {
 
 class _DriverProfilePageState extends State<DriverProfilePage> {
   bool _weeklyScoreSummaryExpanded = false;
-
-  Future<void> _resetPin() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      barrierDismissible: true,
-      builder: (_) => VerifyNotificationPinDialog(
-        dspUid: widget.dspUid,
-        transporterId: widget.driverTransporterId.toUpperCase(),
-      ),
-    );
-
-    if (ok != true || !mounted) return;
-
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => SetNotificationPinDialog(
-        dspUid: widget.dspUid,
-        transporterId: widget.driverTransporterId.toUpperCase(),
-        force: true,
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -86,7 +65,6 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
               .toString()
               .trim()
               .toUpperCase();
-          final pin = (data['notificationPin'] ?? '').toString().trim();
 
           return SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(18, 6, 18, 18),
@@ -111,7 +89,6 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
                   driverName: name,
                   email: email,
                   transporterId: transporterId,
-                  pin: pin,
                 ),
                 const SizedBox(height: 16),
                 if (transporterId.isNotEmpty)
@@ -125,11 +102,123 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
                   driverRef: driverRef,
                   onboarding: onboarding,
                 ),
+                const SizedBox(height: 16),
+                _buildPrivacyNoticeCard(context: context),
               ],
             ),
           );
         },
       ),
+    );
+  }
+
+  /// Dauerhafter Zugang zur vollständigen Datenschutzinformation.
+  ///
+  /// Beim Login sieht der Fahrer nur die Kurzinformation im Pop-up
+  /// (gestuftes Hinweismodell nach Art. 12 Abs. 1 DSGVO). Damit die
+  /// vollständige Information nach der Kenntnisnahme nicht verschwindet,
+  /// hängt sie hier — rein zum Nachlesen, ohne Bestätigungsteil, mit
+  /// dem Datum der bereits erfolgten Kenntnisnahme.
+  Widget _buildPrivacyNoticeCard({required BuildContext context}) {
+    final lang = Localizations.localeOf(context).languageCode;
+    String t(String key, [Map<String, String>? vars]) =>
+        privacyNoticeText(lang, key, vars: vars);
+
+    final ackRef = FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.dspUid)
+        .collection('academy_test_results')
+        .doc(kPrivacyNoticeTestId)
+        .collection('drivers')
+        .doc(widget.driverTransporterId);
+
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: ackRef.snapshots(),
+      builder: (context, snap) {
+        final raw = snap.data?.data()?['acknowledgedAt'];
+        final acknowledgedAt = raw is Timestamp ? raw.toDate() : null;
+        final statusText = acknowledgedAt == null
+            ? t('ack_not_yet')
+            : t('ack_confirmed_on', {
+                'date': _driverProfileFormatDate(acknowledgedAt),
+              });
+
+        return Material(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: () => openPrivacyNoticeDetail(
+              context,
+              acknowledgedAt: acknowledgedAt,
+              showAckStatus: true,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEAEEF9),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.shield_outlined,
+                      size: 20,
+                      color: Color(0xFF1E3A8A),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          t('appbar_title'),
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: _kText,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          t('later_entry_sub'),
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            height: 1.35,
+                            color: _kMuted,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          statusText,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: acknowledgedAt == null
+                                ? _kMuted
+                                : const Color(0xFF1E3A8A),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 22,
+                    color: Color(0xFF9CA3AF),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -142,7 +231,6 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
     required String driverName,
     required String email,
     required String transporterId,
-    required String pin,
   }) {
     final t = AppLocalizations.of(context);
 
@@ -351,70 +439,6 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
                     ],
                   ),
                 ],
-              ),
-              const SizedBox(height: 12),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFE5E7EB)),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            t.t('drivers_hub_notification_pin'),
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF6B7280),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            pin.isEmpty ? t.t('drivers_hub_not_set') : '••••',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF111827),
-                              letterSpacing: 2,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    OutlinedButton(
-                      onPressed: pin.isEmpty
-                          ? () async {
-                              await showDialog<void>(
-                                context: context,
-                                barrierDismissible: false,
-                                builder: (_) => SetNotificationPinDialog(
-                                  dspUid: widget.dspUid,
-                                  transporterId:
-                                      widget.driverTransporterId.toUpperCase(),
-                                  force: true,
-                                ),
-                              );
-                            }
-                          : _resetPin,
-                      child: Text(
-                        pin.isEmpty
-                            ? t.t('drivers_hub_set_pin')
-                            : t.t('drivers_hub_change_pin'),
-                      ),
-                    ),
-                  ],
-                ),
               ),
             ],
           );
@@ -1768,6 +1792,11 @@ DateTime? _driverProfileDateFromDynamic(dynamic raw) {
   return _driverProfileParseIsoDate(raw?.toString());
 }
 
+/// Verbrauchte Tage des **bezahlten** Urlaubskontingents.
+///
+/// Ticket KJV4n2S: Unbezahlter Urlaub (`paid == false`) belastet das
+/// bezahlte Kontingent nicht. Fehlt das Feld (Bestandsdaten), gilt der
+/// Antrag als bezahlt und zählt weiter mit.
 double _driverProfileApprovedVacationDaysFromRequests(
   List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
 ) {
@@ -1777,6 +1806,8 @@ double _driverProfileApprovedVacationDaysFromRequests(
     final type = (data['type'] ?? '').toString().trim().toLowerCase();
     final status = (data['status'] ?? '').toString().trim().toLowerCase();
     if (type != 'vacation' || status != 'approved') continue;
+    final paid = data['paid'] is bool ? data['paid'] as bool : true;
+    if (!paid) continue;
 
     total += _driverProfileInclusiveDays(
       _driverProfileDateFromDynamic(data['fromDate']),

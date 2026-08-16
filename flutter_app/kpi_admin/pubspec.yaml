@@ -49,6 +49,9 @@ dependencies:
   firebase_auth: ^6.1.2
   pdf: ^3.11.0
   printing: ^5.13.0
+  crypto: ^3.0.7
+  signature: ^5.5.0
+  syncfusion_flutter_pdf: ^28.2.12
   syncfusion_flutter_pdfviewer: ^28.2.12
   url_launcher: ^6.3.0
   video_player: ^2.9.2
@@ -64,6 +67,7 @@ dependencies:
   image: ^4.3.0
   cross_file: ^0.3.4+2
   material_symbols_icons: ^4.2719.3
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:
@@ -124,6 +128,9 @@ flutter:
         - asset: assets/fonts/MaterialSymbolsOutlined.ttf
   assets:
     - assets/
+    - assets/forms/
     - assets/flags/
     - assets/icons/
+    - assets/academy/safety/
+    - assets/academy/driving/
     - assets/da_academy/activity1/

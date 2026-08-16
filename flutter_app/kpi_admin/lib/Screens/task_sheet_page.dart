@@ -1,4 +1,5 @@
 ﻿import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../widgets/admin_scope.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +10,7 @@ import '../theme/app_colors.dart';
 import '../utils/driver_activity.dart';
 import '../widgets/co_button.dart';
 import '../widgets/co_pressable.dart';
+import '../widgets/operative_tasks_card.dart';
 
 enum _TaskComposerKind { standard, feedbackText, feedbackChoice }
 
@@ -50,11 +52,13 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
     TextEditingController(),
   ];
   bool _creating = false;
+  bool _autoTranslateTasks = true;
   bool _assignToEveryone = false;
   String? _selectedTransporterId;
   String? _selectedDriverName;
   String _driverQuery = '';
   _TaskComposerKind _taskKind = _TaskComposerKind.standard;
+  bool _showOperative = false;
 
   String? get _uid {
     final scoped = AdminScope.maybeOf(context)?.adminUid;
@@ -138,6 +142,58 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
     }
   }
 
+  /// The language code the admin is currently composing in (falls back to
+  /// 'en' when the active locale isn't one of the supported driver languages).
+  String _sourceLangCode() {
+    final supported = AppLocalizations.supportedLocales
+        .map((l) => l.languageCode.toLowerCase())
+        .toSet();
+    final code = Localizations.localeOf(context).languageCode.toLowerCase();
+    return supported.contains(code) ? code : 'en';
+  }
+
+  /// Auto-translates the task into every supported driver language via the
+  /// shared `translateFaqText` cloud function. Returns
+  /// `{ langCode: { 'title': ..., 'description': ... } }`. On any failure it
+  /// returns whatever it managed (possibly empty) so task creation still
+  /// succeeds — the driver then sees the original source text.
+  Future<Map<String, Map<String, String>>> _computeTaskTranslations({
+    required String title,
+    required String description,
+    required String sourceLang,
+  }) async {
+    final mapped = <String, Map<String, String>>{};
+    final targets = AppLocalizations.supportedLocales
+        .map((l) => l.languageCode.toLowerCase())
+        .where((c) => c.isNotEmpty && c != sourceLang)
+        .toList(growable: false);
+    if (targets.isEmpty) return mapped;
+    try {
+      final resp = await FirebaseFunctions.instance
+          .httpsCallable('translateFaqText')
+          .call(<String, dynamic>{
+        'sourceLang': sourceLang,
+        'targetLangs': targets,
+        'question': title,
+        'answer': description,
+      });
+      final raw = (resp.data as Map?)?['translations'];
+      if (raw is Map) {
+        for (final code in targets) {
+          final row = raw[code];
+          if (row is! Map) continue;
+          final tt = (row['question'] ?? '').toString().trim();
+          final td = (row['answer'] ?? '').toString().trim();
+          if (tt.isEmpty && td.isEmpty) continue;
+          mapped[code] = <String, String>{'title': tt, 'description': td};
+        }
+      }
+    } catch (_) {
+      // Swallow — task creation must not fail because translation did.
+    }
+    return mapped;
+  }
+
   Future<void> _createTask() async {
     final l10n = AppLocalizations.of(context);
     if (_uid == null) {
@@ -173,9 +229,11 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
       return;
     }
 
+    final sourceLang = _sourceLangCode();
     final basePayload = <String, dynamic>{
       'title': title,
       'description': description,
+      'sourceLang': sourceLang,
       'taskKind': _taskKindValue(),
       'feedbackOptions': feedbackOptions,
       'feedbackText': '',
@@ -190,6 +248,15 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
 
     setState(() => _creating = true);
     try {
+      // Translate once up-front; the same translations are reused for the
+      // single write and every per-driver batch write below.
+      if (_autoTranslateTasks) {
+        basePayload['translations'] = await _computeTaskTranslations(
+          title: title,
+          description: description,
+          sourceLang: sourceLang,
+        );
+      }
       if (_assignToEveryone) {
         final driversSnap = await _driversCol().get();
         final activeDrivers = driversSnap.docs
@@ -613,6 +680,8 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
           final left = _buildComposerCard(compactLayout: stack);
           final right = _buildHistoryCard();
 
+          final de = Localizations.localeOf(context).languageCode == 'de';
+
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -629,29 +698,101 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
                       fontWeight: FontWeight.w800,
                     ),
                   ),
+                  const SizedBox(width: 4),
+                  _viewToggle(de),
                 ],
               ),
               const SizedBox(height: 16),
               Expanded(
-                child: stack
-                    ? ListView(
-                        children: [
-                          left,
-                          const SizedBox(height: 16),
-                          SizedBox(height: historyH, child: right),
-                        ],
-                      )
-                    : Row(
-                        children: [
-                          Expanded(flex: 6, child: left),
-                          const SizedBox(width: 18),
-                          Expanded(flex: 4, child: right),
-                        ],
-                      ),
+                child: _showOperative
+                    ? OperativeTasksCard(adminUid: _uid!)
+                    : stack
+                        ? ListView(
+                            children: [
+                              left,
+                              const SizedBox(height: 16),
+                              SizedBox(height: historyH, child: right),
+                            ],
+                          )
+                        : Row(
+                            children: [
+                              Expanded(flex: 6, child: left),
+                              const SizedBox(width: 18),
+                              Expanded(flex: 4, child: right),
+                            ],
+                          ),
               ),
             ],
           );
         },
+      ),
+    );
+  }
+
+  /// Segmented toggle: driver tasks (existing composer/history) vs.
+  /// admin-only operative tasks.
+  Widget _viewToggle(bool de) {
+    Widget seg(String label, IconData icon, bool operative) {
+      final selected = _showOperative == operative;
+      return InkWell(
+        onTap: () => setState(() => _showOperative = operative),
+        borderRadius: BorderRadius.circular(8),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeOut,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            color: selected ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon,
+                  size: 15,
+                  color: selected
+                      ? const Color(0xFF111827)
+                      : const Color(0xFF6B7280)),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: selected
+                      ? const Color(0xFF111827)
+                      : const Color(0xFF6B7280),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEEF1F3),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          seg(de ? 'Fahrer-Tasks' : 'Driver tasks',
+              Icons.people_alt_outlined, false),
+          const SizedBox(width: 3),
+          seg('Operativ Tasks', Icons.checklist_rounded, true),
+        ],
       ),
     );
   }
@@ -1065,6 +1206,18 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
                         hint: l10n.t('task_sheet_details_hint'),
                       ),
                     ),
+                  ),
+                  const SizedBox(height: 8),
+                  _AutoTranslateToggle(
+                    value: _autoTranslateTasks,
+                    onChanged: (v) =>
+                        setState(() => _autoTranslateTasks = v),
+                    label: Localizations.localeOf(context).languageCode == 'de'
+                        ? 'Automatisch in alle Sprachen übersetzen'
+                        : 'Auto-translate into all languages',
+                    hint: Localizations.localeOf(context).languageCode == 'de'
+                        ? 'Fahrer sehen die Aufgabe in ihrer App-Sprache.'
+                        : 'Drivers see the task in their app language.',
                   ),
                   if (_taskKind == _TaskComposerKind.feedbackChoice) ...[
                     const SizedBox(height: 12),
@@ -2378,3 +2531,80 @@ class _TaskListItem {
   bool get isGroup => batchId != null;
 }
 
+
+/// Compact, on-brand toggle for enabling automatic task translation.
+/// Kept local to the task composer; mirrors the green selection styling
+/// used elsewhere in the app rather than the default Material switch.
+class _AutoTranslateToggle extends StatelessWidget {
+  const _AutoTranslateToggle({
+    required this.value,
+    required this.onChanged,
+    required this.label,
+    required this.hint,
+  });
+
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  final String label;
+  final String hint;
+
+  @override
+  Widget build(BuildContext context) {
+    return CoPressable(
+      onTap: () => onChanged(!value),
+      borderRadius: BorderRadius.circular(18),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 140),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: value ? const Color(0xFFECFDF5) : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: value ? AppColors.codriverGreen : const Color(0xFFE5E7EB),
+            width: value ? 1.4 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.translate_rounded,
+              size: 20,
+              color: value ? AppColors.codriverGreen : const Color(0xFF6B7280),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF111827),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    hint,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      color: Color(0xFF6B7280),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Switch.adaptive(
+              value: value,
+              onChanged: onChanged,
+              activeThumbColor: AppColors.codriverGreen,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

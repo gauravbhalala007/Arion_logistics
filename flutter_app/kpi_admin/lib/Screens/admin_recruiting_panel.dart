@@ -188,7 +188,7 @@ class _AdminRecruitingPanelState extends State<AdminRecruitingPanel>
   }
 }
 
-class _ChannelTab extends StatelessWidget {
+class _ChannelTab extends StatefulWidget {
   const _ChannelTab({
     required this.channel,
     required this.stream,
@@ -207,9 +207,21 @@ class _ChannelTab extends StatelessWidget {
   final Future<void> Function(String id) onDelete;
 
   @override
+  State<_ChannelTab> createState() => _ChannelTabState();
+}
+
+class _ChannelTabState extends State<_ChannelTab> {
+  // null = show all ("Gesamt"); otherwise the list is filtered to this status.
+  RecruitingStatus? _filter;
+  // Free-text search over name / email / phone.
+  String _search = '';
+  // Non-EU only: when true, show just "Arbeitgeberwechsel" applicants.
+  bool _employerChangeOnly = false;
+
+  @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<RecruitingApplication>>(
-      stream: stream,
+      stream: widget.stream,
       builder: (context, snap) {
         final apps = snap.data ?? const <RecruitingApplication>[];
         return Column(
@@ -238,7 +250,7 @@ class _ChannelTab extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          channel == RecruitingChannel.visa
+                          widget.channel == RecruitingChannel.visa
                               ? 'Non-EU / Working Visa form'
                               : 'Local / EU form',
                           style: AppTypography.subheadline.copyWith(
@@ -258,14 +270,14 @@ class _ChannelTab extends StatelessWidget {
                     ),
                   ),
                   CoButton(
-                    onPressed: onShareLink,
+                    onPressed: widget.onShareLink,
                     label: 'Copy link',
                     icon: Icons.content_copy_rounded,
                     variant: CoButtonVariant.secondaryOutlined,
                   ),
                   const SizedBox(width: 6),
                   CoButton(
-                    onPressed: onOpenLink,
+                    onPressed: widget.onOpenLink,
                     label: 'Open',
                     icon: Icons.open_in_new_rounded,
                   ),
@@ -287,6 +299,7 @@ class _ChannelTab extends StatelessWidget {
     AsyncSnapshot<List<RecruitingApplication>> snap,
     List<RecruitingApplication> apps,
   ) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     if (snap.hasError) {
       return Center(
         child: Padding(
@@ -362,14 +375,164 @@ class _ChannelTab extends StatelessWidget {
         ),
       );
     }
-    return ListView.separated(
-      itemCount: apps.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
-      itemBuilder: (ctx, i) => _ApplicationRow(
-        app: apps[i],
-        onTap: () => _openDetail(ctx, apps[i]),
-        onUpdateStatus: (s) => onUpdateStatus(apps[i].id, s),
-      ),
+    var visible = _filter == null
+        ? apps
+        : apps.where((a) => a.status == _filter).toList();
+    // Non-EU: optional "Arbeitgeberwechsel" filter pill.
+    if (_employerChangeOnly) {
+      visible = visible.where((a) => a.isEmployerChange).toList();
+    }
+    if (_search.isNotEmpty) {
+      final q = _search;
+      visible = visible.where((a) {
+        return a.displayName.toLowerCase().contains(q) ||
+            a.email.toLowerCase().contains(q) ||
+            a.phoneWhatsApp.toLowerCase().contains(q);
+      }).toList();
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Search bar — find an applicant by name, email or phone.
+        TextField(
+          onChanged: (v) => setState(() => _search = v.trim().toLowerCase()),
+          decoration: InputDecoration(
+            isDense: true,
+            prefixIcon: const Icon(Icons.search_rounded,
+                size: 20, color: Color(0xFF9CA3AF)),
+            hintText: de
+                ? 'Bewerber suchen (Name, E-Mail, Telefon) …'
+                : 'Search applicants (name, email, phone) …',
+            hintStyle: const TextStyle(color: Color(0xFF9CA3AF)),
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE5E5EA)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE5E5EA)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide:
+                  const BorderSide(color: AppColors.codriverGreen, width: 1.4),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        // Counter chips double as a status filter. Counts always reflect the
+        // full list; tapping a chip filters the list below (tap again = all).
+        _StatusCounterBar(
+          apps: apps,
+          selected: _filter,
+          onSelect: (s) => setState(() => _filter = s),
+        ),
+        // Non-EU only: extra pill to filter down to employer-change applicants.
+        if (widget.channel == RecruitingChannel.visa) ...[
+          const SizedBox(height: 8),
+          Builder(builder: (context) {
+            final count = apps.where((a) => a.isEmployerChange).length;
+            final selected = _employerChangeOnly;
+            return Align(
+              alignment: Alignment.centerLeft,
+              child: InkWell(
+                onTap: () =>
+                    setState(() => _employerChangeOnly = !_employerChangeOnly),
+                borderRadius: BorderRadius.circular(999),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? const Color(0xFFFEF3C7)
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: selected
+                          ? const Color(0xFFD97706)
+                          : const Color(0xFFE5E5EA),
+                      width: selected ? 1.4 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.swap_horiz_rounded,
+                        size: 15,
+                        color: selected
+                            ? const Color(0xFFB45309)
+                            : const Color(0xFF6B7280),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Arbeitgeberwechsel',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: selected
+                              ? const Color(0xFFB45309)
+                              : const Color(0xFF4B5563),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? const Color(0xFFFDE68A)
+                              : const Color(0xFFF3F4F6),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          '$count',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w800,
+                            color: selected
+                                ? const Color(0xFF92400E)
+                                : const Color(0xFF6B7280),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+        ],
+        const SizedBox(height: 10),
+        Expanded(
+          child: visible.isEmpty
+              ? Center(
+                  child: Text(
+                    de
+                        ? 'Keine Bewerbungen mit diesem Status.'
+                        : 'No applications with this status.',
+                    style: AppTypography.body.copyWith(
+                      color: AppColors.labelSecondaryLight,
+                    ),
+                  ),
+                )
+              : ListView.separated(
+                  itemCount: visible.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (ctx, i) => _ApplicationRow(
+                    app: visible[i],
+                    onTap: () => _openDetail(ctx, visible[i]),
+                    onUpdateStatus: (s) =>
+                        widget.onUpdateStatus(visible[i].id, s),
+                  ),
+                ),
+        ),
+      ],
     );
   }
 
@@ -382,8 +545,8 @@ class _ChannelTab extends StatelessWidget {
         builder: (_) => RecruitingApplicationDetailPage(
           app: app,
           adminUid: app.adminUid,
-          onUpdateStatus: (s) => onUpdateStatus(app.id, s),
-          onDelete: () => onDelete(app.id),
+          onUpdateStatus: (s) => widget.onUpdateStatus(app.id, s),
+          onDelete: () => widget.onDelete(app.id),
         ),
       ),
     );
@@ -719,11 +882,16 @@ class _RecruitingApplicationDetailPageState
   }
 
   String _convertedDriverSubtitle() {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final tid = (_convertedToDriver?['tid'] ?? '').toString().trim();
     if (tid.isEmpty) {
-      return 'Dieser Bewerber wurde bereits in einen Driver übernommen.';
+      return de
+          ? 'Dieser Bewerber wurde bereits in einen Driver übernommen.'
+          : 'This applicant has already been converted to a driver.';
     }
-    return 'Driver-ID: $tid · Daten & Dokumente wurden übernommen.';
+    return de
+        ? 'Driver-ID: $tid · Daten & Dokumente wurden übernommen.'
+        : 'Driver ID: $tid · Data & documents were carried over.';
   }
 
   String _fmtDate(DateTime? d) =>
@@ -778,9 +946,12 @@ class _RecruitingApplicationDetailPageState
     await Clipboard.setData(ClipboardData(text: b.toString()));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Alle Daten in die Zwischenablage kopiert.'),
-        duration: Duration(seconds: 2),
+      SnackBar(
+        content: Text(
+            Localizations.localeOf(context).languageCode == 'de'
+                ? 'Alle Daten in die Zwischenablage kopiert.'
+                : 'All data copied to clipboard.'),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -905,7 +1076,11 @@ class _RecruitingApplicationDetailPageState
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                'Als Driver übernommen',
+                                Localizations.localeOf(context)
+                                            .languageCode ==
+                                        'de'
+                                    ? 'Als Driver übernommen'
+                                    : 'Converted to driver',
                                 style: AppTypography.subheadline.copyWith(
                                   color: AppColors.codriverDeep,
                                   fontWeight: FontWeight.w800,
@@ -1039,6 +1214,16 @@ class _RecruitingApplicationDetailPageState
                     answers: app.customAnswers,
                     adminUid: widget.adminUid,
                     channel: app.channel,
+                  ),
+                // Werbeprämie: nur sichtbar, wenn die Bewerbung eine
+                // werbende Person nennt.
+                if ((app.customAnswers['referredBy'] ?? '')
+                    .toString()
+                    .trim()
+                    .isNotEmpty)
+                  _ReferralNotice(
+                    referredBy:
+                        app.customAnswers['referredBy'].toString().trim(),
                   ),
                 const SizedBox(height: 14),
                 Text(
@@ -1316,7 +1501,10 @@ class _DetailRow extends StatelessWidget {
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('„${label.trim()}" kopiert.'),
+                    content: Text(
+                        Localizations.localeOf(context).languageCode == 'de'
+                            ? '„${label.trim()}" kopiert.'
+                            : '"${label.trim()}" copied.'),
                     duration: const Duration(seconds: 1),
                   ),
                 );
@@ -1331,6 +1519,68 @@ class _DetailRow extends StatelessWidget {
                 ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Hinweis in der Bewerbungs-Detailansicht, wenn die Bewerberin oder der
+/// Bewerber von jemandem geworben wurde — inklusive Erinnerung an die
+/// 100-€-Werbeprämie (Aktion bis Ende September).
+class _ReferralNotice extends StatelessWidget {
+  const _ReferralNotice({required this.referredBy});
+
+  final String referredBy;
+
+  @override
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.green50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.codriverGreen.withValues(alpha: 0.35),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.card_giftcard_rounded,
+              size: 18, color: AppColors.codriverDeep),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  de
+                      ? 'Werbeprämie — geworben von: $referredBy'
+                      : 'Referral bonus — referred by: $referredBy',
+                  style: AppTypography.caption1.copyWith(
+                    color: AppColors.codriverDeep,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  de
+                      ? 'Aktion bis Ende September: 100 € Prämie, wenn die '
+                          'geworbene Person mindestens einen Monat bleibt.'
+                      : 'Promotion until the end of September: €100 bonus if '
+                          'the referred person stays for at least one month.',
+                  style: AppTypography.caption2.copyWith(
+                    color: AppColors.codriverDeep.withValues(alpha: 0.8),
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -1356,9 +1606,17 @@ class _CustomAnswersGroup extends StatelessWidget {
   /// admin-configured custom questions) get human labels here so the
   /// applicant detail view shows „Krankenkasse" instead of „healthInsurance".
   static const Map<String, String> _builtInLabels = {
+    'formLanguage': 'Formular-Sprache',
     'employmentInterest': 'Beschäftigungs-Wunsch',
     'parttimeDaysPerWeek': 'Teilzeit-Tage pro Woche',
+    'parttimeWeekdays': 'Teilzeit-Wochentage',
     'birthCountry': 'Geburtsland',
+    'needsAccommodation': 'Unterkunft benötigt',
+    'earliestStart': 'Möglicher Starttermin',
+    'referredBy': 'Geworben von',
+    'visaPermitType': 'Visum-Antrag',
+    'iban': 'IBAN',
+    'ibanSubmitLater': 'IBAN wird nachgereicht',
     'taxId': 'Steueridentifikationsnummer',
     'taxIdSubmitLater': 'Steuer-ID wird nachgereicht',
     'socialSecurityNumber': 'Sozialversicherungsnummer',
@@ -1372,13 +1630,46 @@ class _CustomAnswersGroup extends StatelessWidget {
     'notes': 'Anmerkungen',
   };
 
+  /// English counterparts of [_builtInLabels] for admins using EN.
+  static const Map<String, String> _builtInLabelsEn = {
+    'formLanguage': 'Form language',
+    'employmentInterest': 'Employment preference',
+    'parttimeDaysPerWeek': 'Part-time days per week',
+    'parttimeWeekdays': 'Part-time weekdays',
+    'birthCountry': 'Country of birth',
+    'needsAccommodation': 'Accommodation needed',
+    'earliestStart': 'Possible start date',
+    'referredBy': 'Referred by',
+    'visaPermitType': 'Visa application',
+    'iban': 'IBAN',
+    'ibanSubmitLater': 'IBAN to be submitted later',
+    'taxId': 'Tax identification number',
+    'taxIdSubmitLater': 'Tax ID to be submitted later',
+    'socialSecurityNumber': 'Social security number',
+    'socialSecuritySubmitLater': 'Social security no. to be submitted later',
+    'healthInsuranceStatus': 'Health insurance status',
+    'healthInsurance': 'Health insurance',
+    'aokBayernRegisterRequested': 'AOK Bayern registration requested',
+    'maritalStatus': 'Marital status',
+    'childrenChoice': 'Children',
+    'childrenCount': 'Number of children',
+    'notes': 'Notes',
+  };
+
   /// Stable display order for built-in keys, so the admin always sees
   /// payroll → family → notes in the same sequence regardless of map
   /// iteration order.
   static const List<String> _builtInOrder = [
+    'formLanguage',
     'employmentInterest',
     'parttimeDaysPerWeek',
+    'parttimeWeekdays',
+    'earliestStart',
     'birthCountry',
+    'needsAccommodation',
+    'visaPermitType',
+    'iban',
+    'ibanSubmitLater',
     'taxId',
     'taxIdSubmitLater',
     'socialSecurityNumber',
@@ -1390,6 +1681,7 @@ class _CustomAnswersGroup extends StatelessWidget {
     'childrenChoice',
     'childrenCount',
     'notes',
+    'referredBy',
   ];
 
   @override
@@ -1400,6 +1692,8 @@ class _CustomAnswersGroup extends StatelessWidget {
         channel: channel,
       ),
       builder: (context, snap) {
+        final de = Localizations.localeOf(context).languageCode == 'de';
+        final labels = de ? _builtInLabels : _builtInLabelsEn;
         final cfg = snap.data ?? RecruitingFormConfig.empty();
         final byId = <String, RecruitingCustomField>{
           for (final f in cfg.fields) f.id: f,
@@ -1410,8 +1704,8 @@ class _CustomAnswersGroup extends StatelessWidget {
         for (final key in _builtInOrder) {
           if (!answers.containsKey(key)) continue;
           rows.add(_DetailRow(
-            _builtInLabels[key] ?? key,
-            _formatAnswer(key, answers[key]),
+            labels[key] ?? key,
+            _formatAnswer(key, answers[key], de),
           ));
         }
 
@@ -1422,7 +1716,8 @@ class _CustomAnswersGroup extends StatelessWidget {
           if (_builtInLabels.containsKey(entry.key)) continue;
           final field = byId[entry.key];
           final label = field?.label ?? entry.key;
-          rows.add(_DetailRow(label, _formatAnswer(entry.key, entry.value)));
+          rows.add(
+              _DetailRow(label, _formatAnswer(entry.key, entry.value, de)));
         }
 
         if (rows.isEmpty) return const SizedBox.shrink();
@@ -1434,50 +1729,249 @@ class _CustomAnswersGroup extends StatelessWidget {
     );
   }
 
-  String _formatAnswer(String key, dynamic v) {
+  String _formatAnswer(String key, dynamic v, bool de) {
     if (v == null) return '—';
-    if (v is bool) return v ? 'Ja' : 'Nein';
+    if (v is bool) return v ? (de ? 'Ja' : 'Yes') : (de ? 'Nein' : 'No');
+    if (key == 'parttimeWeekdays' && v is List) {
+      final labels = de
+          ? const <String, String>{
+              'mon': 'Mo',
+              'tue': 'Di',
+              'wed': 'Mi',
+              'thu': 'Do',
+              'fri': 'Fr',
+              'sat': 'Sa',
+              'sun': 'So',
+            }
+          : const <String, String>{
+              'mon': 'Mon',
+              'tue': 'Tue',
+              'wed': 'Wed',
+              'thu': 'Thu',
+              'fri': 'Fri',
+              'sat': 'Sat',
+              'sun': 'Sun',
+            };
+      final days = v
+          .map((e) => labels[e.toString()] ?? e.toString())
+          .where((e) => e.isNotEmpty)
+          .join(', ');
+      return days.isEmpty ? '—' : days;
+    }
     final s = v is String ? v : v.toString();
     if (s.isEmpty) return '—';
     switch (key) {
-      case 'employmentInterest':
+      case 'formLanguage':
         return const {
-              'fulltime': 'Vollzeit',
-              'parttime': 'Teilzeit',
-              'minijob': 'Minijob',
-              'werkstudent': 'Werkstudent',
+              'de': 'Deutsch',
+              'en': 'English',
+              'bg': 'Български',
+              'hu': 'Magyar',
+              'ro': 'Română',
+              'sq': 'Shqip',
             }[s] ??
+            s;
+      case 'earliestStart':
+        // Stored as ISO yyyy-MM-dd → show dd.MM.yyyy.
+        final d = DateTime.tryParse(s);
+        if (d == null) return s;
+        return '${d.day.toString().padLeft(2, '0')}.'
+            '${d.month.toString().padLeft(2, '0')}.${d.year}';
+      case 'employmentInterest':
+        return (de
+                ? const {
+                    'fulltime': 'Vollzeit',
+                    'parttime': 'Teilzeit',
+                    'minijob': 'Minijob',
+                    'werkstudent': 'Werkstudent',
+                  }
+                : const {
+                    'fulltime': 'Full-time',
+                    'parttime': 'Part-time',
+                    'minijob': 'Mini-job',
+                    'werkstudent': 'Working student',
+                  })[s] ??
             s;
       case 'healthInsuranceStatus':
-        return const {
-              'has': 'Vorhanden',
-              'none': 'Aktuell nicht versichert',
-            }[s] ??
+        return (de
+                ? const {
+                    'has': 'Vorhanden',
+                    'none': 'Aktuell nicht versichert',
+                  }
+                : const {
+                    'has': 'Insured',
+                    'none': 'Currently not insured',
+                  })[s] ??
             s;
       case 'parttimeDaysPerWeek':
-        return '$s Tage';
+        return de ? '$s Tage' : '$s days';
       case 'maritalStatus':
-        return const {
-              'single': 'Ledig',
-              'divorced': 'Geschieden',
-              'married_or_separated': 'Verheiratet oder getrennt lebend',
-              'widowed': 'Verwitwet',
-              'married': 'Verheiratet', // legacy
-              'later': 'Wird nachgereicht',
-            }[s] ??
+        return (de
+                ? const {
+                    'single': 'Ledig',
+                    'divorced': 'Geschieden',
+                    'married_or_separated':
+                        'Verheiratet oder getrennt lebend',
+                    'widowed': 'Verwitwet',
+                    'married': 'Verheiratet', // legacy
+                    'later': 'Wird nachgereicht',
+                  }
+                : const {
+                    'single': 'Single',
+                    'divorced': 'Divorced',
+                    'married_or_separated': 'Married or separated',
+                    'widowed': 'Widowed',
+                    'married': 'Married', // legacy
+                    'later': 'To be submitted later',
+                  })[s] ??
             s;
       case 'childrenChoice':
-        return const {
-              'none': 'Keine Kinder',
-              'count': 'Ja',
-              'later': 'Wird nachgereicht',
-            }[s] ??
+        return (de
+                ? const {
+                    'none': 'Keine Kinder',
+                    'count': 'Ja',
+                    'later': 'Wird nachgereicht',
+                  }
+                : const {
+                    'none': 'No children',
+                    'count': 'Yes',
+                    'later': 'To be submitted later',
+                  })[s] ??
+            s;
+      case 'visaPermitType':
+        return (de
+                ? const {
+                    'first_issue': 'Ersterteilung',
+                    'employer_change': '⚠ Arbeitgeberwechsel',
+                  }
+                : const {
+                    'first_issue': 'First issuance',
+                    'employer_change': '⚠ Employer change',
+                  })[s] ??
             s;
       case 'taxId':
       case 'socialSecurityNumber':
-        return s == 'later' ? 'Wird später nachgereicht' : s;
+      case 'iban':
+        return s == 'later'
+            ? (de ? 'Wird später nachgereicht' : 'To be submitted later')
+            : s;
     }
     return s;
+  }
+}
+
+/// Horizontal bar of per-status counters shown above the applications list.
+class _StatusCounterBar extends StatelessWidget {
+  final List<RecruitingApplication> apps;
+  final RecruitingStatus? selected;
+  final ValueChanged<RecruitingStatus?> onSelect;
+  const _StatusCounterBar({
+    required this.apps,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  // Same status colors as the application rows (_ApplicationRow._statusColor).
+  Color _color(RecruitingStatus s) {
+    switch (s) {
+      case RecruitingStatus.newApp:
+        return const Color(0xFFB45309);
+      case RecruitingStatus.onboarded:
+        return const Color(0xFF1D4ED8);
+      case RecruitingStatus.scheduledTraining:
+        return const Color(0xFF7C3AED);
+      case RecruitingStatus.ready:
+        return AppColors.codriverGreen;
+      case RecruitingStatus.contacted:
+        return const Color(0xFF1D4ED8);
+      case RecruitingStatus.scheduled:
+        return const Color(0xFF7C3AED);
+      case RecruitingStatus.zavRequest:
+        return const Color(0xFF0369A1);
+      case RecruitingStatus.preApproval:
+        return const Color(0xFF7C3AED);
+      case RecruitingStatus.contractEzb:
+        return const Color(0xFFC2410C);
+      case RecruitingStatus.hired:
+        return AppColors.codriverGreen;
+      case RecruitingStatus.rejected:
+        return const Color(0xFFB91C1C);
+    }
+  }
+
+  Widget _chip(String label, int n, Color c,
+      {required bool active, required VoidCallback onTap}) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(999),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: active ? c : c.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                  color: active ? c : c.withValues(alpha: 0.35)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(label,
+                    style: TextStyle(
+                        color: active ? Colors.white : c,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12)),
+                const SizedBox(width: 6),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: active ? Colors.white : c,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text('$n',
+                      style: TextStyle(
+                          color: active ? c : Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 11)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final counts = <RecruitingStatus, int>{};
+    for (final a in apps) {
+      counts[a.status] = (counts[a.status] ?? 0) + 1;
+    }
+    final ordered = RecruitingStatus.values
+        .where((s) => (counts[s] ?? 0) > 0)
+        .toList();
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    return SizedBox(
+      height: 34,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: [
+          _chip(de ? 'Gesamt' : 'Total', apps.length,
+              const Color(0xFF334155),
+              active: selected == null, onTap: () => onSelect(null)),
+          for (final s in ordered)
+            _chip(s.label, counts[s]!, _color(s),
+                active: selected == s,
+                // Tap an active chip again to clear the filter.
+                onTap: () => onSelect(selected == s ? null : s)),
+        ],
+      ),
+    );
   }
 }
 
@@ -1485,18 +1979,22 @@ class _DocumentPreview extends StatelessWidget {
   const _DocumentPreview({required this.doc});
   final RecruitingDocument doc;
 
-  String _labelFor(String label) {
+  String _labelFor(String label, bool de) {
     switch (label) {
       case 'passport':
-        return 'Pass / Personalausweis · Vorderseite';
+        return de
+            ? 'Pass / Personalausweis · Vorderseite'
+            : 'Passport / ID card · Front';
       case 'id_back':
-        return 'Personalausweis · Rückseite';
+        return de ? 'Personalausweis · Rückseite' : 'ID card · Back';
       case 'selfie':
         return 'Selfie · Driver Badge';
       case 'license_front':
-        return 'Führerschein · Vorderseite';
+        return de
+            ? 'Führerschein · Vorderseite'
+            : 'Driving licence · Front';
       case 'license_back':
-        return 'Führerschein · Rückseite';
+        return de ? 'Führerschein · Rückseite' : 'Driving licence · Back';
       default:
         return label;
     }
@@ -1584,7 +2082,10 @@ class _DocumentPreview extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        _labelFor(doc.label),
+                        _labelFor(
+                            doc.label,
+                            Localizations.localeOf(context).languageCode ==
+                                'de'),
                         style: AppTypography.subheadline.copyWith(
                           color: const Color(0xFF111827),
                           fontWeight: FontWeight.w800,

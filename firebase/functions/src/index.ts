@@ -5,6 +5,7 @@
 // Minimal Firebase Functions file just for driver sub-accounts + notifications
 
 import {onCall, HttpsError} from "firebase-functions/v2/https";
+import {defineSecret} from "firebase-functions/params";
 import * as logger from "firebase-functions/logger";
 import * as https from "node:https";
 
@@ -14,11 +15,34 @@ import { getAuth, UserRecord } from "firebase-admin/auth";
 import {getStorage} from "firebase-admin/storage";
 
 import {onSchedule} from "firebase-functions/v2/scheduler";
+import {onDocumentUpdated} from "firebase-functions/v2/firestore";
 
 // Initialize Admin SDK once
 initializeApp();
 
 const db = getFirestore();
+
+// SMTP config for outgoing feedback e-mails (set via
+// `firebase functions:secrets:set SMTP_HOST` etc.).
+const smtpHost = defineSecret("SMTP_HOST");
+const smtpPort = defineSecret("SMTP_PORT");
+const smtpUser = defineSecret("SMTP_USER");
+const smtpPass = defineSecret("SMTP_PASS");
+const smtpFrom = defineSecret("SMTP_FROM");
+const geminiApiKey = defineSecret("GEMINI_API_KEY");
+
+/**
+ * Escapes HTML-special characters for safe inline embedding.
+ * @param {string} s
+ * @return {string}
+ */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
 const auth = getAuth();
 
 type CreateDriverLoginData = {
@@ -62,6 +86,11 @@ type ReorderRulesData = {
 type DeleteDriverData = {
   dspUid?: string;
   transporterId?: string;
+};
+
+type UpdateDriverEmailData = {
+  driverDocId?: string;
+  email?: string;
 };
 
 type CreateDispatcherAccountData = {
@@ -277,6 +306,81 @@ function parseTranslatedSegments(raw: unknown): string {
  * @param {string} targetLang
  * @return {Promise<string>}
  */
+/**
+ * OAuth access token for the function's runtime service account (ADC),
+ * from the GCP metadata server. "" if unavailable.
+ * @return {Promise<string>}
+ */
+async function metadataAccessToken(): Promise<string> {
+  try {
+    const r = await fetch(
+      "http://metadata.google.internal/computeMetadata/v1/" +
+      "instance/service-accounts/default/token",
+      {headers: {"Metadata-Flavor": "Google"}},
+    );
+    if (!r.ok) return "";
+    const j = (await r.json()) as {access_token?: string};
+    return j.access_token || "";
+  } catch (err) {
+    logger.warn("metadataAccessToken failed", err);
+    return "";
+  }
+}
+
+/**
+ * Translate [clean] into [targetLang] via the official Cloud Translation
+ * API (v2), authenticated with the runtime service account. Source language
+ * is auto-detected. Returns "" on any failure so callers can fall back.
+ * @param {string} clean
+ * @param {string} targetLang
+ * @return {Promise<string>}
+ */
+async function translateViaOfficialApi(
+  clean: string,
+  targetLang: string,
+): Promise<string> {
+  try {
+    const token = await metadataAccessToken();
+    if (!token) return "";
+    const r = await fetch(
+      "https://translation.googleapis.com/language/translate/v2",
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          q: clean,
+          target: targetLang,
+          format: "text",
+        }),
+      },
+    );
+    if (!r.ok) {
+      logger.warn(`translate HTTP ${r.status} ->${targetLang}`);
+      return "";
+    }
+    const j = (await r.json()) as {
+      data?: {translations?: Array<{translatedText?: string}>};
+    };
+    const t = j.data?.translations?.[0]?.translatedText;
+    return (t || "").trim();
+  } catch (err) {
+    logger.warn(`translateViaOfficialApi failed ->${targetLang}`, err);
+    return "";
+  }
+}
+
+/**
+ * Best-effort translation. Primary path is the official Cloud Translation
+ * API (works from Cloud IPs); the legacy free endpoint is kept only as a
+ * fallback because it is blocked from Cloud IPs (returns HTML, not JSON).
+ * @param {string} text
+ * @param {string} sourceLang
+ * @param {string} targetLang
+ * @return {Promise<string>}
+ */
 async function translateTextBestEffort(
   text: string,
   sourceLang: string,
@@ -285,12 +389,11 @@ async function translateTextBestEffort(
   const clean = text.trim();
   if (!clean) return "";
 
+  const official = await translateViaOfficialApi(clean, targetLang);
+  if (official) return official;
+
+  // Fallback: legacy endpoint (may work from some IPs / short texts).
   try {
-    // POST so long texts go in the body (GET URL length limit broke
-    // translation of long notification/rule bodies).
-    // sl=auto: detect the real source language. (Deriving it from the
-    // admin's UI locale was wrong — e.g. English UI but German text →
-    // Google translated "German as English" and left it unchanged.)
     const url =
       "https://translate.googleapis.com/translate_a/single" +
       "?client=gtx&sl=auto" +
@@ -298,10 +401,10 @@ async function translateTextBestEffort(
     const responseText = await postText(url, `q=${encodeURIComponent(clean)}`);
     const parsed = JSON.parse(responseText) as unknown;
     const translated = parseTranslatedSegments(parsed).trim();
-    return translated || clean;
+    return translated || "";
   } catch (err) {
     logger.warn(
-      `translateTextBestEffort failed ${sourceLang}->${targetLang}`,
+      `translateTextBestEffort fallback failed ${sourceLang}->${targetLang}`,
       err,
     );
     return "";
@@ -567,7 +670,7 @@ export const createDriverLogin = onCall(async (request) => {
  * - users/{dspUid}/drivers/{TID}/notifications/{notifId} (fan-out)
  */
 const SUPPORTED_DRIVER_LANGS = [
-  "de", "en", "sq", "hu", "ro", "hr", "ar", "tr", "ru",
+  "de", "en", "sq", "hu", "ro", "hr", "ar", "tr", "ru", "bg",
 ];
 
 /**
@@ -1396,6 +1499,132 @@ export const deleteDriverAccount = onCall(async (request) => {
 });
 
 /**
+ * Changes a driver's (login) email address.
+ *
+ * Unlike re-running createDriverLogin with a new email (which would create a
+ * SECOND auth user and orphan the old one), this updates the existing Auth
+ * user in place, so uid, claims, notifications and history stay intact.
+ *
+ * Security:
+ * - caller must be authenticated
+ * - driver doc must live under users/{callerUid}/drivers/{driverDocId}
+ * - if the driver has an auth user owned by another DSP → permission-denied
+ *
+ * Writes:
+ * - Firebase Auth user email (when the driver has a login)
+ * - users/{authUid}.email (top-level driver profile)
+ * - users/{callerUid}/drivers/{driverDocId}.email/.loginEmail
+ */
+export const updateDriverEmail = onCall(async (request) => {
+  const callerUid = requireAuthUid(request.auth);
+  const data = (request.data || {}) as UpdateDriverEmailData;
+
+  const driverDocId = (data.driverDocId || "").trim();
+  const newEmail = (data.email || "").toString().trim().toLowerCase();
+
+  if (!driverDocId || !newEmail || !newEmail.includes("@")) {
+    throw new HttpsError(
+      "invalid-argument",
+      "driverDocId and a valid email are required.",
+    );
+  }
+
+  const driverRef = db
+    .collection("users")
+    .doc(callerUid)
+    .collection("drivers")
+    .doc(driverDocId);
+  const driverSnap = await driverRef.get();
+  if (!driverSnap.exists) {
+    throw new HttpsError("not-found", "Driver not found.");
+  }
+
+  const driverData = driverSnap.data() || {};
+  let authUid = (driverData.authUid ?? "").toString().trim();
+  const oldLoginEmail = (
+    driverData.loginEmail ??
+      driverData.email ??
+      (driverData.pendingLogin as Record<string, unknown> | undefined)?.email ??
+      ""
+  ).toString().trim();
+
+  if (!authUid && oldLoginEmail) {
+    try {
+      const u = await auth.getUserByEmail(oldLoginEmail);
+      authUid = u.uid;
+    } catch (err) {
+      logger.info(
+        `updateDriverEmail: no auth user for email=${oldLoginEmail}`,
+      );
+    }
+  }
+
+  if (authUid) {
+    // Multi-tenant safety: the auth user must belong to this DSP.
+    const profileSnap = await db.collection("users").doc(authUid).get();
+    const profile = profileSnap.data() ?? {};
+    const ownerDspUid = (profile.dspUid ?? "").toString().trim();
+    if (ownerDspUid && ownerDspUid !== callerUid) {
+      throw new HttpsError(
+        "permission-denied",
+        "Dieser Fahrer-Login gehört zu einem anderen DSP.",
+      );
+    }
+
+    // New email must not belong to a different auth user.
+    try {
+      const existing = await auth.getUserByEmail(newEmail);
+      if (existing.uid !== authUid) {
+        throw new HttpsError(
+          "already-exists",
+          "Diese Email wird bereits von einem anderen Konto verwendet.",
+        );
+      }
+    } catch (err) {
+      if (err instanceof HttpsError) throw err;
+      // auth/user-not-found → email is free, continue.
+    }
+
+    try {
+      await auth.updateUser(authUid, {
+        email: newEmail,
+        emailVerified: true,
+      });
+    } catch (err) {
+      const e = (typeof err === "object" && err !== null ? err : {}) as AuthLikeError;
+      throw new HttpsError(
+        "internal",
+        `Email-Update fehlgeschlagen: ${e.message || String(err)}`,
+      );
+    }
+
+    await db.collection("users").doc(authUid).set(
+      {
+        email: newEmail,
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      {merge: true},
+    );
+  }
+
+  await driverRef.set(
+    {
+      email: newEmail,
+      ...(authUid ? {loginEmail: newEmail} : {}),
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    {merge: true},
+  );
+
+  logger.info(
+    `updateDriverEmail: driver=${driverDocId} dsp=${callerUid} ` +
+    `authUid=${authUid || "none"} newEmail=${newEmail}`,
+  );
+
+  return {ok: true, hasLogin: !!authUid, email: newEmail};
+});
+
+/**
  * Auto-translates FAQ question/answer from one source language to targets.
  * Caller must be authenticated.
  */
@@ -1617,14 +1846,32 @@ const DISPATCHER_DEFAULT_PERMISSIONS: Record<string, boolean> = {
 };
 
 /**
- * Verify caller is an admin by reading their users/{uid} doc.
+ * Verify the caller is a company "main account" (DSP admin) and may therefore
+ * manage dispatcher sub-accounts.
+ *
+ * Historically this required the exact role "admin". But a company main
+ * account can legitimately carry other roles — e.g. "user" from the older
+ * self-signup flow (signup_request.dart) or "developer" for internal staff —
+ * and the app already treats every non-driver / non-dispatcher account as a
+ * full DSP admin (see auth_gate.dart / admin_shell_page.dart). We mirror that
+ * here so that *every* main account of a company can create dispatchers, and
+ * only true sub-accounts (dispatchers) and drivers are denied.
+ *
  * @param {string} uid caller uid
- * @return {Promise<void>} resolves if admin, throws otherwise
+ * @return {Promise<void>} resolves for main accounts, throws otherwise
  */
 async function requireAdminRole(uid: string): Promise<void> {
   const snap = await db.collection("users").doc(uid).get();
-  const role = (snap.data()?.role ?? "").toString();
-  if (role !== "admin") {
+  if (!snap.exists) {
+    throw new HttpsError(
+      "permission-denied",
+      "Only DSP admins can manage dispatcher sub-accounts.",
+    );
+  }
+  const role = (snap.data()?.role ?? "").toString().trim().toLowerCase();
+  // Sub-accounts (dispatchers) and drivers may never manage dispatchers.
+  // Every other (main / DSP) account is allowed.
+  if (role === "dispatcher" || role === "driver") {
     throw new HttpsError(
       "permission-denied",
       "Only DSP admins can manage dispatcher sub-accounts.",
@@ -1965,6 +2212,85 @@ export const transferDriverToCallerAdmin = onCall(async (request) => {
   };
 });
 
+/**
+ * Synchronisiert das Fahrer-Login nach einem Transporter-ID-Wechsel.
+ *
+ * Hintergrund: Ändert der Admin im Drivers Hub die Transporter-ID,
+ * wird das Fahrer-Dokument auf die neue ID migriert — das Login
+ * (users/{driverUid}.transporterId) und die Auth-Custom-Claims
+ * zeigten aber weiter auf die alte ID. Die Firestore-Rules vergleichen
+ * `driverTransporterId()` mit der vom Client geschriebenen ID, wodurch
+ * Fahrer-Schreibzugriffe (z. B. Vorschussantrag in da_requests) mit
+ * permission-denied scheiterten.
+ *
+ * Aufrufer: der DSP-Admin des Fahrers oder einer seiner Dispatcher.
+ */
+export const syncDriverLoginTransporterId = onCall(async (request) => {
+  const callerUid = request.auth?.uid;
+  if (!callerUid) {
+    throw new HttpsError("unauthenticated", "Login required");
+  }
+  const data = (request.data || {}) as {
+    driverEmail?: string;
+    newTransporterId?: string;
+  };
+  const driverEmail = (data.driverEmail || "").toString().trim();
+  const newTid = (data.newTransporterId || "").toString().trim().toUpperCase();
+  if (!driverEmail || !newTid) {
+    throw new HttpsError(
+      "invalid-argument",
+      "driverEmail and newTransporterId required",
+    );
+  }
+
+  let authUser;
+  try {
+    authUser = await auth.getUserByEmail(driverEmail);
+  } catch (e) {
+    throw new HttpsError("not-found", `No auth user for ${driverEmail}`);
+  }
+
+  const claims = authUser.customClaims ?? {};
+  const loginDoc = await db.collection("users").doc(authUser.uid).get();
+  const dspUid = (claims.dspUid ?? loginDoc.data()?.dspUid ?? "").toString();
+  if (!dspUid) {
+    throw new HttpsError("failed-precondition", "Driver has no dspUid");
+  }
+
+  // Berechtigung: Admin selbst oder ein Dispatcher dieses Admins.
+  let allowed = dspUid === callerUid;
+  if (!allowed) {
+    const callerDoc = await db.collection("users").doc(callerUid).get();
+    const caller = callerDoc.data() ?? {};
+    allowed = caller.role === "dispatcher" && caller.parentAdminUid === dspUid;
+  }
+  if (!allowed) {
+    throw new HttpsError(
+      "permission-denied",
+      "Driver does not belong to caller",
+    );
+  }
+
+  await db.collection("users").doc(authUser.uid).set({
+    transporterId: newTid,
+    updatedAt: FieldValue.serverTimestamp(),
+  }, {merge: true});
+
+  await auth.setCustomUserClaims(authUser.uid, {
+    ...claims,
+    role: "driver",
+    dspUid,
+    transporterId: newTid,
+    driverId: newTid,
+  });
+
+  logger.info(
+    `syncDriverLoginTransporterId: ${driverEmail} -> ${newTid} ` +
+      `(by ${callerUid})`,
+  );
+  return {ok: true, driverAuthUid: authUser.uid};
+});
+
 // ─── Time-Tracking Modul (Add-On) ────────────────────────────────
 // Server-seitig gepunchte Schichten + Pausen + Audit-Log,
 // schreibt gegen die zweite Firestore-Database `time-tracking` (eur3).
@@ -2281,3 +2607,311 @@ export const purgeSoftDeletedVehicles = onSchedule(
     }
   },
 );
+
+// ===========================================================================
+//  Ayvens Wissen — grounded chat assistant (Gemini).
+//  Superadmin-only feature in the Fleet Hub. Answers strictly from the
+//  Ayvens knowledge base below (content of ayvens.com/de-de/amazon).
+// ===========================================================================
+
+const AYVENS_KB = `
+AYVENS — Services für Amazon Delivery Service Partner (DSP)
+Quelle: https://www.ayvens.com/de-de/amazon/
+
+ÜBERSICHT DER SERVICEBEREICHE
+- Onboarding (Aufnahme / Start mit den Fahrzeugen)
+- Panne, Unfall und Schaden
+- Wartung/TÜV und Reparatur
+- Fahrzeugübergabe
+- Fahrzeugrückgabe
+- Weitere Tipps und Informationen
+- Kontakt
+
+MY FLEET LOGIN (Fuhrpark-Portal)
+- Anmeldung mit Zugangsdaten (Benutzername/E-Mail-Adresse und Passwort).
+- Portal: myfleet2international.leaseplan.com
+- Dort werden Fahrzeuge, Verträge und Services verwaltet.
+
+KONTAKT
+- Amazon-Hotline: +49 211 91324771
+- Erreichbarkeit: Montag bis Donnerstag 09:00–17:00 Uhr, Freitag 09:00–15:00 Uhr.
+- Anbieter/Adresse: ALD AutoLeasing D GmbH, Nedderfeld 95, 22529 Hamburg (Ayvens ist die Marke von ALD Automotive/LeasePlan).
+
+PANNE, UNFALL UND SCHADEN
+- Bei Panne, Unfall oder Schaden die Amazon-Hotline kontaktieren (+49 211 91324771) bzw. die im My-Fleet-Portal hinterlegten Prozesse nutzen.
+- Schäden zeitnah melden und dokumentieren (Fotos, Unfallbericht).
+
+WARTUNG/TÜV UND REPARATUR
+- Wartungen, TÜV/HU-Termine und Reparaturen laufen über Ayvens/My Fleet.
+- Termine rechtzeitig planen; Werkstattfreigaben über den Fuhrpark-Service.
+
+FAHRZEUGÜBERGABE
+- Bei Übergabe Fahrzeugzustand prüfen und dokumentieren.
+
+FAHRZEUGRÜCKGABE
+- Bei Rückgabe Zustand, Zubehör und Kilometerstand prüfen; Rückgabeprozess über Ayvens.
+
+HINWEIS
+- Für konkrete, verbindliche Auskünfte (Verträge, Konditionen, individuelle Fälle) immer die Amazon-Hotline bzw. das My-Fleet-Portal nutzen.
+`;
+
+interface AskAyvensData {
+  question?: string;
+  history?: Array<{ role?: string; text?: string }>;
+}
+
+export const askAyvens = onCall(
+  { secrets: [geminiApiKey] },
+  async (request) => {
+    requireAuthUid(request.auth);
+
+    const data = (request.data || {}) as AskAyvensData;
+    const question = (data.question || "").toString().trim();
+    if (!question) {
+      throw new HttpsError("invalid-argument", "question is required.");
+    }
+    const key = geminiApiKey.value();
+    if (!key) {
+      throw new HttpsError(
+        "failed-precondition",
+        "GEMINI_API_KEY ist nicht gesetzt. Bitte per " +
+          "'firebase functions:secrets:set GEMINI_API_KEY' hinterlegen.",
+      );
+    }
+
+    const systemInstruction =
+      "Du bist der \"Ayvens Wissen\"-Assistent für Flotten-/Fuhrpark-Fragen " +
+      "von Amazon Delivery Service Partnern. Beantworte Fragen " +
+      "AUSSCHLIESSLICH auf Basis der folgenden Ayvens-Wissensbasis. Wenn eine " +
+      "Information dort nicht enthalten ist, sage das ehrlich und verweise " +
+      "auf die Amazon-Hotline (+49 211 91324771) bzw. das My-Fleet-Portal. " +
+      "Erfinde nichts. Antworte kurz, freundlich und in der Sprache der " +
+      "Frage (Standard Deutsch).\n\n=== AYVENS WISSENSBASIS ===\n" + AYVENS_KB;
+
+    const history = (Array.isArray(data.history) ? data.history : [])
+      .slice(-8)
+      .map((h) => ({
+        role: h.role === "user" ? "user" : "model",
+        parts: [{ text: (h.text || "").toString() }],
+      }))
+      .filter((h) => h.parts[0].text.trim().length > 0);
+
+    // Gemini requires the history to start with a "user" turn. The client's
+    // opening assistant greeting (role "model") would break this — drop any
+    // leading non-user turns.
+    while (history.length > 0 && history[0].role !== "user") {
+      history.shift();
+    }
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { GoogleGenerativeAI } = require("@google/generative-ai");
+      const genAI = new GoogleGenerativeAI(key);
+      const model = genAI.getGenerativeModel({
+        model: "gemini-1.5-flash",
+        systemInstruction,
+      });
+      const chat = model.startChat({ history });
+      const result = await chat.sendMessage(question);
+      const answer = (result.response.text() || "").trim();
+      return { answer: answer || "(keine Antwort)" };
+    } catch (err) {
+      const e = (typeof err === "object" && err !== null ? err : {}) as {
+        message?: string;
+      };
+      logger.error("askAyvens failed", err);
+      throw new HttpsError(
+        "internal",
+        `Ayvens-Assistent Fehler: ${e.message || String(err)}`,
+      );
+    }
+  },
+);
+
+/**
+ * Sends an automatic e-mail to the feedback author when an entry flips to
+ * status "resolved". Fires only on the transition (open/other -> resolved)
+ * and records `resolvedEmailSentAt` so it never sends twice.
+ */
+export const onFeedbackResolvedEmail = onDocumentUpdated(
+  {
+    document: "feedback/{feedbackId}",
+    secrets: [smtpHost, smtpPort, smtpUser, smtpPass, smtpFrom],
+  },
+  async (event) => {
+    const before = event.data?.before.data();
+    const after = event.data?.after.data();
+    if (!before || !after) return;
+
+    const wasResolved = before.status === "resolved";
+    const isResolved = after.status === "resolved";
+    if (wasResolved || !isResolved) return; // only on the -> resolved switch
+    if (after.resolvedEmailSentAt) return; // already sent
+
+    const to = (after.createdByEmail || "").toString().trim();
+    if (!to || !to.includes("@")) return;
+
+    // "-" is the unconfigured placeholder (Secret Manager rejects empty
+    // payloads, so the secrets are pre-created with "-" until real SMTP
+    // credentials are set via `firebase functions:secrets:set`).
+    const secretValue = (v: string) => {
+      const t = (v || "").trim();
+      return t === "-" ? "" : t;
+    };
+    const host = secretValue(smtpHost.value());
+    const user = secretValue(smtpUser.value());
+    const pass = secretValue(smtpPass.value());
+    if (!host || !user || !pass) {
+      logger.warn("SMTP not configured — skipping feedback e-mail");
+      return;
+    }
+    const port = parseInt(secretValue(smtpPort.value()) || "587", 10);
+    const from = secretValue(smtpFrom.value()) || user;
+
+    const title = (after.title || "Feedback").toString();
+    const note = (after.completionNotes || "").toString().trim();
+
+    const text =
+      "Hallo,\n\n" +
+      `dein Feedback "${title}" wurde bearbeitet.\n\n` +
+      (note ? note + "\n\n" : "") +
+      "Viele Grüße\nDein CoDriver-Team";
+    const html =
+      "<p>Hallo,</p>" +
+      `<p>dein Feedback „<b>${escapeHtml(title)}</b>" wurde bearbeitet.</p>` +
+      (note ? `<p>${escapeHtml(note).replace(/\n/g, "<br>")}</p>` : "") +
+      "<p>Viele Grüße<br>Dein CoDriver-Team</p>";
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const nodemailer = require("nodemailer");
+      const transporter = nodemailer.createTransport({
+        host,
+        port,
+        secure: port === 465,
+        auth: {user, pass},
+      });
+      await transporter.sendMail({
+        from,
+        to,
+        subject: `Dein Feedback wurde bearbeitet: ${title}`,
+        text,
+        html,
+      });
+      await event.data!.after.ref.set(
+        {resolvedEmailSentAt: FieldValue.serverTimestamp()},
+        {merge: true},
+      );
+      logger.info(`Feedback resolved e-mail sent to ${to}`);
+    } catch (err) {
+      logger.error("Feedback resolved e-mail failed", err);
+    }
+  },
+);
+
+// ════════════════════════════════════════════════════════════════════════════
+//  Owner usage dashboard (private) — aggregated CoDriver adoption stats.
+//
+//  Returns ONLY aggregate numbers (counts + per-company signup date), never
+//  raw driver PII. Double-gated: caller must be an owner UID AND pass the
+//  shared passphrase. Used by the password-protected /insights page.
+// ════════════════════════════════════════════════════════════════════════════
+
+// UIDs allowed to view the owner dashboard.
+const OWNER_UIDS = new Set<string>([
+  "MRAfiyoOKVMzH2EchvxYCq9y3qh2", // admin@arion-logistics.de (Arion Logistics)
+]);
+
+// Shared passphrase for the dashboard. Change here to rotate.
+const OWNER_DASHBOARD_PASSPHRASE = "40029867";
+
+export const getOwnerUsageStats = onCall(async (request) => {
+  const ctx = request.auth;
+  if (!ctx || !ctx.uid) {
+    throw new HttpsError("unauthenticated", "Sign in required.");
+  }
+  if (!OWNER_UIDS.has(ctx.uid)) {
+    throw new HttpsError("permission-denied", "Not authorised.");
+  }
+  const pass = ((request.data || {}) as {passphrase?: string}).passphrase || "";
+  if (pass !== OWNER_DASHBOARD_PASSPHRASE) {
+    throw new HttpsError("permission-denied", "Wrong passphrase.");
+  }
+
+  const snap = await db.collection("users").get();
+
+  const roleCounts: Record<string, number> = {};
+  const driversByDsp: Record<string, number> = {};
+  type Company = {
+    uid: string;
+    company: string;
+    email: string;
+    role: string;
+    createdAtMillis: number | null;
+    plan: string;
+    trialEndsAtMillis: number | null;
+    driverCount?: number;
+  };
+  const companies: Company[] = [];
+
+  const toMillis = (v: unknown): number | null => {
+    if (v && typeof (v as {toMillis?: unknown}).toMillis === "function") {
+      return (v as {toMillis: () => number}).toMillis();
+    }
+    return null;
+  };
+
+  // A DSP/company account is any owner-type login: role "admin" OR "user".
+  // (Real DSPs like Nano Log, TBD-moveIT, Last Mile, BR Blue were created
+  // with role "user", so counting only "admin" hid them.) Drivers,
+  // dispatchers and internal developer logins are excluded.
+  const isCompanyRole = (role: string) => role === "admin" || role === "user";
+
+  snap.forEach((doc) => {
+    const x = doc.data();
+    const role = (x.role || "unknown").toString();
+    roleCounts[role] = (roleCounts[role] || 0) + 1;
+
+    if (role === "driver") {
+      const dsp = (x.dspUid || "").toString();
+      if (dsp) driversByDsp[dsp] = (driversByDsp[dsp] || 0) + 1;
+    }
+
+    if (isCompanyRole(role)) {
+      companies.push({
+        uid: doc.id,
+        company: (x.companyName || x.displayName || "").toString(),
+        email: (x.email || "").toString(),
+        role,
+        createdAtMillis: toMillis(x.createdAt),
+        plan: (x.plan || "").toString(),
+        trialEndsAtMillis: toMillis(x.trialEndsAt),
+      });
+    }
+  });
+
+  // Attach each company's driver headcount, then sort by driver count
+  // (busiest DSPs first), falling back to signup date.
+  const companiesOut = companies
+    .map((c) => ({...c, driverCount: driversByDsp[c.uid] || 0}))
+    .sort((a, b) => {
+      if ((b.driverCount || 0) !== (a.driverCount || 0)) {
+        return (b.driverCount || 0) - (a.driverCount || 0);
+      }
+      return (a.createdAtMillis || 0) - (b.createdAtMillis || 0);
+    });
+
+  return {
+    generatedAtMillis: Date.now(),
+    totals: {
+      companies: companiesOut.length,
+      admins: roleCounts["admin"] || 0,
+      users: roleCounts["user"] || 0,
+      dispatchers: roleCounts["dispatcher"] || 0,
+      drivers: roleCounts["driver"] || 0,
+      total: snap.size,
+    },
+    roleCounts,
+    companies: companiesOut,
+  };
+});

@@ -61,7 +61,12 @@ class InventoryRepository {
       (snap) => snap.docs
           .map(InventoryItem.fromDoc)
           .toList()
-        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase())),
+        // Highest stock first; ties fall back to alphabetical by name.
+        ..sort((a, b) {
+          final byStock = b.stock.compareTo(a.stock);
+          if (byStock != 0) return byStock;
+          return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+        }),
     );
   }
 

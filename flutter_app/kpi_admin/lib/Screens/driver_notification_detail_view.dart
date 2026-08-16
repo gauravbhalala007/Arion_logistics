@@ -1,5 +1,6 @@
 // lib/screens/driver_notification_detail_view.dart
 
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:cloud_functions/cloud_functions.dart';
@@ -8,7 +9,6 @@ import 'package:flutter/material.dart';
 import 'package:signature/signature.dart';
 
 import '../localization/app_localizations.dart';
-import '../widgets/notification_pin_dialogs.dart';
 import '../models/driver_notification.dart';
 
 class DriverNotificationDetailView extends StatefulWidget {
@@ -87,12 +87,13 @@ class _DriverNotificationDetailViewState
     try {
       final callable = FirebaseFunctions.instance.httpsCallable(
         'confirmDriverNotification',
+        options: HttpsCallableOptions(timeout: const Duration(seconds: 30)),
       );
       await callable.call({
         'dspUid': widget.dspUid,
         'transporterId': widget.driverTransporterId,
         'notificationId': widget.notification.id,
-      });
+      }).timeout(const Duration(seconds: 35));
 
       if (!mounted) return;
 
@@ -258,42 +259,13 @@ class _DriverNotificationDetailViewState
                     enabled: !_busyConfirm && !confirmedUi,
                     label: l10n.t('driver_notification_reading_confirmation'),
                     onConfirmed: () async {
-                      // If PIN not set (should not happen due to login prompt),
-                      // this fallback handles it gracefully:
-                      final existing = await NotificationPinService.getPin(
-                        dspUid: widget.dspUid,
-                        transporterId: widget.driverTransporterId.toUpperCase(),
-                      );
+                      // PIN step removed — the company-rules confirmation now
+                      // uses the signature ONLY. The PIN setup kept failing for
+                      // NEW drivers: writing the PIN needs the driver's
+                      // identity/claims, which aren't propagated yet, so the
+                      // Firestore rules denied it and the flow got stuck.
 
-                      if (!mounted) return;
-
-                      if (existing == null) {
-                        await showDialog<void>(
-                          context: context,
-                          barrierDismissible: false,
-                          builder: (_) => SetNotificationPinDialog(
-                            dspUid: widget.dspUid,
-                            transporterId: widget.driverTransporterId.toUpperCase(),
-                            force: true,
-                          ),
-                        );
-                      }
-
-                      if (!mounted) return;
-
-                      final ok = await showDialog<bool>(
-                        context: context,
-                        barrierDismissible: true,
-                        builder: (_) => VerifyNotificationPinDialog(
-                          dspUid: widget.dspUid,
-                          transporterId: widget.driverTransporterId.toUpperCase(),
-                        ),
-                      );
-
-                      if (ok != true) return;
-                      if (!mounted) return;
-
-                      // After the PIN, capture the driver's signature.
+                      // Capture the driver's signature.
                       final sigBytes = await showDialog<Uint8List>(
                         context: context,
                         barrierDismissible: false,
@@ -301,8 +273,13 @@ class _DriverNotificationDetailViewState
                       );
                       if (sigBytes == null) return; // cancelled
 
-                      await _uploadSignature(sigBytes);
+                      // Confirm FIRST — that is the actual acknowledgment.
+                      // The signature is best-effort evidence and must never
+                      // block or fail the confirmation.
                       await _confirm();
+                      if (sigBytes.isNotEmpty) {
+                        unawaited(_uploadSignature(sigBytes));
+                      }
                     },
                     busy: _busyConfirm,
                   ),
@@ -327,12 +304,17 @@ class _DriverNotificationDetailViewState
             'notification_signature_${widget.notification.id}_'
             '${DateTime.now().millisecondsSinceEpoch}.png',
           );
-      await ref.putData(
-        bytes,
-        SettableMetadata(contentType: 'image/png'),
-      );
+      // Time-boxed: on web an upload can hang indefinitely (CORS / flaky
+      // connection) without ever throwing. We must never let that block the
+      // confirmation — if it doesn't finish quickly, we give up and move on.
+      await ref
+          .putData(
+            bytes,
+            SettableMetadata(contentType: 'image/png'),
+          )
+          .timeout(const Duration(seconds: 15));
     } catch (_) {
-      // Best effort — never block the confirmation on a storage hiccup.
+      // Best effort — never block the confirmation on a storage hiccup/timeout.
     }
   }
 }
@@ -379,9 +361,19 @@ class _SignatureCaptureDialogState extends State<_SignatureCaptureDialog> {
       return;
     }
     setState(() => _busy = true);
-    final bytes = await _ctrl.toPngBytes();
+    Uint8List? bytes;
+    try {
+      // Rendering the signature to PNG can hang on some web browsers — bound
+      // it so the dialog can never spin forever.
+      bytes = await _ctrl.toPngBytes().timeout(const Duration(seconds: 12));
+    } catch (_) {
+      bytes = null;
+    }
     if (!mounted) return;
-    Navigator.of(context).pop(bytes);
+    // Even if the signature image can't be rendered on this browser, do NOT
+    // block the confirmation — return empty bytes so the caller can still
+    // confirm (the signature upload is best-effort).
+    Navigator.of(context).pop(bytes ?? Uint8List(0));
   }
 
   @override

@@ -630,6 +630,7 @@ class _ItemCardState extends State<_ItemCard> {
 
   Future<void> _handleDrop(DropDoneDetails details) async {
     if (_uploadingPhoto) return;
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final files = details.files;
     if (files.isEmpty) return;
     final XFile file = files.first;
@@ -643,8 +644,10 @@ class _ItemCardState extends State<_ItemCard> {
     if (!ok) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Nur Bilddateien (JPG, PNG, WebP) sind erlaubt.'),
+        SnackBar(
+          content: Text(de
+              ? 'Nur Bilddateien (JPG, PNG, WebP) sind erlaubt.'
+              : 'Only image files (JPG, PNG, WebP) are allowed.'),
         ),
       );
       return;
@@ -671,7 +674,9 @@ class _ItemCardState extends State<_ItemCard> {
           backgroundColor: AppColors.codriverDeep,
           duration: const Duration(seconds: 2),
           content: Text(
-            'Bild aktualisiert · ${(optimized.bytes.length / 1024).toStringAsFixed(0)} KB',
+            de
+                ? 'Bild aktualisiert · ${(optimized.bytes.length / 1024).toStringAsFixed(0)} KB'
+                : 'Image updated · ${(optimized.bytes.length / 1024).toStringAsFixed(0)} KB',
             style: const TextStyle(color: Colors.white),
           ),
         ),

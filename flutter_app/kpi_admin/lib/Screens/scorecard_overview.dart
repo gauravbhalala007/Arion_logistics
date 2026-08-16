@@ -2,6 +2,7 @@
 import 'dart:typed_data';
 
 import '../services/parser_api.dart';
+import '../services/report_section_remover.dart';
 import '../services/report_writer.dart';
 import '../services/driver_csv.dart';
 
@@ -16,6 +17,7 @@ import 'scorecard_week.dart';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import '../localization/app_localizations.dart';
+import '../utils/driver_activity.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_elevation.dart';
 import '../theme/app_typography.dart';
@@ -153,20 +155,9 @@ class ScorecardWeekShellPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = AppLocalizations.of(context);
-    return Scaffold(
-      backgroundColor: _UI.bg,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        foregroundColor: _UI.textPrimary,
-        elevation: 0,
-        title: Text(
-          '${t.t('nav_scorecard').toUpperCase()} ${t.t('dash_week').toUpperCase()}',
-          style: const TextStyle(fontWeight: FontWeight.w800),
-        ),
-      ),
-      body: ScorecardWeekPage(reportRef: reportRef),
-    );
+    // No wrapper AppBar here — ScorecardWeekPage brings its own header
+    // (avoids a duplicated header + double back arrow on mobile).
+    return ScorecardWeekPage(reportRef: reportRef);
   }
 }
 
@@ -209,6 +200,11 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage>
   late Stream<Map<String, String>> _globalNamesStreamCached =
       const Stream<Map<String, String>>.empty();
 
+  /// Cache-Stream für die aktiven Fahrer-TIDs — damit inaktive DAs aus der
+  /// Best-Driver-Rangliste ausgeblendet werden (Feedback-Ticket).
+  late Stream<Set<String>> _activeTidsStreamCached =
+      const Stream<Set<String>>.empty();
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -216,7 +212,30 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage>
     if (next != _currentAdminUid) {
       _currentAdminUid = next;
       _globalNamesStreamCached = _driversNameMapGlobal();
+      _activeTidsStreamCached = _activeTidsStream();
     }
+  }
+
+  /// Streams the set of transporter-IDs of drivers that are currently
+  /// active/working. Used to filter inactive DAs out of the ranking.
+  Stream<Set<String>> _activeTidsStream() {
+    final uid =
+        _currentAdminUid ?? FirebaseAuth.instance.currentUser?.uid ?? '';
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('drivers')
+        .snapshots()
+        .map((snap) {
+      final s = <String>{};
+      for (final d in snap.docs) {
+        final data = d.data();
+        if (!isDriverWorking(data)) continue;
+        final id = _normTid(data['transporterId'] ?? d.id);
+        if (id.isNotEmpty) s.add(id);
+      }
+      return s;
+    });
   }
 
   @override
@@ -256,6 +275,45 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage>
             );
           }).toList(),
         );
+  }
+
+  /// Ticket "Best Driver": Summe ALLER bisher gelieferten Pakete pro
+  /// Fahrer (über alle Wochen/Jahre, unabhängig vom Perioden-Filter).
+  /// Einmal pro Seitenaufruf geladen und gecacht.
+  Map<String, int>? _allTimeDeliveredCache;
+
+  Future<Map<String, int>> _allTimeDeliveredByTid() async {
+    final cached = _allTimeDeliveredCache;
+    if (cached != null) return cached;
+    final uid =
+        _currentAdminUid ?? FirebaseAuth.instance.currentUser?.uid ?? '';
+    final out = <String, int>{};
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('scores')
+          .get();
+      for (final d in snap.docs) {
+        final data = d.data();
+        final tid = _normTid(data['transporterId']);
+        if (tid.isEmpty) continue;
+        final kpis = (data['kpis'] as Map?) ?? const {};
+        final delivered = _numOr0(
+          kpis['Delivered'] ??
+              kpis['DELIVERED'] ??
+              kpis['delivered'] ??
+              data['Delivered'] ??
+              data['delivered'],
+        );
+        if (delivered <= 0) continue;
+        out[tid] = (out[tid] ?? 0) + delivered.round();
+      }
+    } catch (_) {
+      // Ohne Daten einfach keine Paket-Chips anzeigen.
+    }
+    _allTimeDeliveredCache = out;
+    return out;
   }
 
   Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _scoresForPeriod({
@@ -518,9 +576,18 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage>
           builder: (context, namesSnap) {
             final names = namesSnap.data ?? const <String, String>{};
 
-            return StreamBuilder<
-              List<QueryDocumentSnapshot<Map<String, dynamic>>>
-            >(
+            return StreamBuilder<Set<String>>(
+              stream: _activeTidsStreamCached,
+              builder: (context, activeSnap) {
+                // Only filter once we actually have the driver list; an
+                // empty/loading set must NOT hide everybody.
+                final activeTids = activeSnap.data;
+                final filterActive =
+                    activeTids != null && activeTids.isNotEmpty;
+
+                return StreamBuilder<
+                  List<QueryDocumentSnapshot<Map<String, dynamic>>>
+                >(
               stream: scoreStream,
               builder: (context, scoreSnap) {
                 if (scoreSnap.connectionState == ConnectionState.waiting) {
@@ -584,6 +651,8 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage>
                   final data = d.data();
                   final tid = _normTid(data['transporterId']);
                   if (tid.isEmpty) continue;
+                  // Skip inactive DAs (feedback ticket).
+                  if (filterActive && !activeTids.contains(tid)) continue;
 
                   String station = '';
                   final reportPath = _s(data['reportPath']);
@@ -621,49 +690,62 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage>
                     ? _selectedStationCode
                     : null;
 
-                return CoStateSwitcher(
-                  child: Column(
-                  key: const ValueKey('best-loaded'),
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (final station in stationsSorted)
-                      if (activeStation == null ||
-                          station == activeStation) ...[
-                        Padding(
-                          padding: const EdgeInsets.only(
-                              top: 14, bottom: 10, left: 4),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.place_outlined,
-                                size: 14,
-                                color: AppColors.labelSecondaryLight,
+                return FutureBuilder<Map<String, int>>(
+                  future: _allTimeDeliveredByTid(),
+                  builder: (context, deliveredSnap) {
+                    final deliveredTotals =
+                        deliveredSnap.data ?? const <String, int>{};
+                    return CoStateSwitcher(
+                      child: Column(
+                      key: const ValueKey('best-loaded'),
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        for (final station in stationsSorted)
+                          if (activeStation == null ||
+                              station == activeStation) ...[
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                  top: 14, bottom: 10, left: 4),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.place_outlined,
+                                    size: 14,
+                                    color: AppColors.labelSecondaryLight,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    station == 'UNKNOWN'
+                                        ? t
+                                            .t('scorecard_overview_station')
+                                            .toUpperCase()
+                                        : station,
+                                    style:
+                                        AppTypography.caption2.copyWith(
+                                      color:
+                                          AppColors.labelSecondaryLight,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 1.0,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 4),
-                              Text(
-                                station == 'UNKNOWN'
-                                    ? t
-                                        .t('scorecard_overview_station')
-                                        .toUpperCase()
-                                    : station,
-                                style: AppTypography.caption2.copyWith(
-                                  color: AppColors.labelSecondaryLight,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 1.0,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        _buildStationDriverList(
-                          stationAgg[station] ?? const <String, _DriverAgg>{},
-                          names,
-                          t,
-                        ),
+                            ),
+                            _buildStationDriverList(
+                              stationAgg[station] ??
+                                  const <String, _DriverAgg>{},
+                              names,
+                              t,
+                              deliveredTotals,
+                            ),
+                          ],
                       ],
-                  ],
-                  ),
+                      ),
+                    );
+                  },
                 );
+              },
+            );
               },
             );
           },
@@ -676,6 +758,7 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage>
     Map<String, _DriverAgg> aggMap,
     Map<String, String> names,
     AppLocalizations t,
+    Map<String, int> deliveredTotals,
   ) {
     final entries = <_DriverEntry>[];
     aggMap.forEach((tid, agg) {
@@ -709,6 +792,7 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage>
           name: name,
           statusText: statusText,
           statusColor: statusColor,
+          deliveredTotal: deliveredTotals[normalizedTid],
         );
       },
     );
@@ -1131,7 +1215,6 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage>
     required String titleLabel,
   }) async {
     final t = AppLocalizations.of(context);
-    final w = MediaQuery.of(context).size.width;
 
     final ok = await showDialog<bool>(
       context: context,
@@ -1160,49 +1243,18 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage>
     try {
       final uid = _currentAdminUid ?? FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) throw Exception(t.t('admin_home_not_logged_in'));
-      final db = FirebaseFirestore.instance;
-      final scoresCol = db.collection('users').doc(uid).collection('scores');
-      final reportPath = reportRef.path;
-      final reportId = reportRef.id;
 
-      final scoreRefs = <String, DocumentReference<Map<String, dynamic>>>{};
-      Future<void> collect(Query<Map<String, dynamic>> q) async {
-        final snap = await q.get();
-        for (final d in snap.docs) {
-          scoreRefs[d.id] = d.reference;
-        }
-      }
-
-      await collect(scoresCol.where('reportId', isEqualTo: reportId));
-      await collect(scoresCol.where('reportPath', isEqualTo: reportPath));
-
-      if (scoreRefs.isNotEmpty) {
-        final refs = scoreRefs.values.toList(growable: false);
-        for (var i = 0; i < refs.length; i += 450) {
-          final batch = db.batch();
-          final end = i + 450 < refs.length ? i + 450 : refs.length;
-          for (var j = i; j < end; j++) {
-            batch.delete(refs[j]);
-          }
-          await batch.commit();
-        }
-      }
-
-      final driverNamesSnap = await reportRef.collection('driverNames').get();
-      if (driverNamesSnap.docs.isNotEmpty) {
-        for (var i = 0; i < driverNamesSnap.docs.length; i += 450) {
-          final batch = db.batch();
-          final end = i + 450 < driverNamesSnap.docs.length
-              ? i + 450
-              : driverNamesSnap.docs.length;
-          for (var j = i; j < end; j++) {
-            batch.delete(driverNamesSnap.docs[j].reference);
-          }
-          await batch.commit();
-        }
-      }
-
-      await reportRef.delete();
+      // Nur die Scorecard-Sektion entfernen. POD Quality, Concessions,
+      // CDF und DWC derselben Woche liegen im selben Report- und
+      // Score-Dokument und bleiben erhalten; das Wochen-Dokument wird nur
+      // gelöscht, wenn danach nichts mehr übrig ist.
+      await ReportSectionRemover.removeSection(
+        uid: uid,
+        reportRef: reportRef,
+        sectionKey: 'deliveryQualitySwc',
+        alsoRemove: const ['complianceAndSafety'],
+        scoreFields: const ['kpis', 'statusBucket', 'comp'],
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(t.t('scorecard_overview_deleted'))),
@@ -1494,13 +1546,9 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage>
                               points: chart
                                   .map(
                                     (p) => _BarPoint(
-                                      // Auf Desktop „W12", auf Mobile nur
-                                      // „12" — die Skala wird so leichter.
-                                      label: narrow
-                                          ? p.week
-                                              .toString()
-                                              .padLeft(2, '0')
-                                          : 'W${p.week.toString().padLeft(2, '0')}',
+                                      label: p.week
+                                          .toString()
+                                          .padLeft(2, '0'),
                                       value: p.overall ?? 0,
                                       ref: p.ref,
                                       overallStatus: p.overallStatus,
@@ -1949,6 +1997,10 @@ class _BestDriverRow extends StatelessWidget {
   final Color statusColor;
   final Color? backgroundColor;
 
+  /// Summe aller bisher gelieferten Pakete (alle Wochen/Jahre).
+  /// null = unbekannt → Chip wird ausgeblendet.
+  final int? deliveredTotal;
+
   const _BestDriverRow({
     required this.rank,
     required this.score,
@@ -1956,6 +2008,7 @@ class _BestDriverRow extends StatelessWidget {
     required this.statusText,
     required this.statusColor,
     this.backgroundColor,
+    this.deliveredTotal,
   });
 
   /// Olympia-Medaillen-Verlauf für Top-3 als Rank-Badge.
@@ -2036,23 +2089,72 @@ class _BestDriverRow extends StatelessWidget {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                if (statusText.isNotEmpty) ...[
+                if (statusText.isNotEmpty ||
+                    (deliveredTotal ?? 0) > 0) ...[
                   const SizedBox(height: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: statusColor.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      statusText.toUpperCase(),
-                      style: AppTypography.caption2.copyWith(
-                        color: statusColor,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      if (statusText.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            statusText.toUpperCase(),
+                            style: AppTypography.caption2.copyWith(
+                              color: statusColor,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ),
+                      // Ticket: Anzahl aller bisher gelieferten Pakete.
+                      if ((deliveredTotal ?? 0) > 0)
+                        Tooltip(
+                          message: Localizations.localeOf(context)
+                                      .languageCode ==
+                                  'de'
+                              ? 'Bisher gelieferte Pakete (gesamt)'
+                              : 'Total packages delivered so far',
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEFF6FF),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.inventory_2_outlined,
+                                  size: 11,
+                                  color: Color(0xFF1D4ED8),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  NumberFormat.decimalPattern('de')
+                                      .format(deliveredTotal),
+                                  style:
+                                      AppTypography.caption2.copyWith(
+                                    color: const Color(0xFF1D4ED8),
+                                    fontWeight: FontWeight.w800,
+                                    fontFeatures: const [
+                                      FontFeature.tabularFigures(),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ],
               ],
@@ -2251,9 +2353,27 @@ class _BarPoint {
   });
 }
 
-class _MiniBarChart extends StatelessWidget {
+class _MiniBarChart extends StatefulWidget {
   final List<_BarPoint> points;
   const _MiniBarChart({required this.points});
+
+  @override
+  State<_MiniBarChart> createState() => _MiniBarChartState();
+}
+
+class _MiniBarChartState extends State<_MiniBarChart> {
+  // Shared controller so the Scrollbar attaches to (and can drag) the
+  // horizontal scroll view — without it the bar chart cannot be scrolled
+  // with a mouse and no scrollbar is shown.
+  final ScrollController _sc = ScrollController();
+
+  List<_BarPoint> get points => widget.points;
+
+  @override
+  void dispose() {
+    _sc.dispose();
+    super.dispose();
+  }
 
   /// Tier color from the scorecard `overallStatus` code as used elsewhere
   /// in this file. Falls back to neutral when the status is unknown.
@@ -2318,12 +2438,20 @@ class _MiniBarChart extends StatelessWidget {
           final barW = (slotW * 0.7).clamp(16.0, 32.0);
           final contentW = points.length * slotW;
 
+          final scrollable = contentW > visibleW;
           return ClipRect(
             child: Scrollbar(
-              thumbVisibility: false,
+              controller: _sc,
+              thumbVisibility: scrollable,
+              trackVisibility: scrollable,
+              interactive: true,
               child: SingleChildScrollView(
+                controller: _sc,
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
+                // Leave room at the bottom so the horizontal scrollbar does
+                // not cover the KW labels.
+                padding: EdgeInsets.only(bottom: scrollable ? 10 : 0),
                 child: SizedBox(
                   width: contentW > visibleW ? contentW : visibleW,
                   child: Stack(

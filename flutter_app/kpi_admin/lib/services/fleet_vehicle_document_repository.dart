@@ -249,6 +249,7 @@ class FleetVehicleDocumentRepository {
         'documentNumber': draft.documentNumber.trim(),
         'expiryDate': draft.expiryDate.trim(),
         'fileUrl': upload.fileUrl,
+        'storagePath': upload.storagePath,
         'fileName': draft.fileName.trim(),
         'fileType': draft.fileType.trim(),
         'notes': draft.notes.trim(),
@@ -309,6 +310,7 @@ class FleetVehicleDocumentRepository {
             'documentNumber': draft.documentNumber.trim(),
             'expiryDate': draft.expiryDate.trim(),
             'fileUrl': fileUrl,
+            if (upload != null) 'storagePath': upload.storagePath,
             'fileName': draft.fileName.trim(),
             'fileType': draft.fileType.trim(),
             'notes': draft.notes.trim(),
@@ -412,7 +414,10 @@ class FleetVehicleDocumentRepository {
     if (draft.documentType.trim().isEmpty) {
       throw const FleetVehicleDocumentException('Document type is required.');
     }
-    if (!isValidVehicleDate(draft.expiryDate)) {
+    // Empty expiry is allowed — not every document type has an expiry
+    // date (e.g. Fahrzeugschein scans).
+    if (draft.expiryDate.trim().isNotEmpty &&
+        !isValidVehicleDate(draft.expiryDate)) {
       throw const FleetVehicleDocumentException(
         'Expiry date must use YYYY-MM-DD.',
       );

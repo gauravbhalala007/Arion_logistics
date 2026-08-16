@@ -4,148 +4,282 @@
       "collectionGroup": "reports",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "year", "order": "DESCENDING"},
-        {"fieldPath": "weekNumber", "order": "DESCENDING"}
+        {
+          "fieldPath": "year",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "weekNumber",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "scores",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "reportRef", "order": "ASCENDING"},
-        {"fieldPath": "rank", "order": "ASCENDING"}
+        {
+          "fieldPath": "reportRef",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "rank",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "scores",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "reportRef", "order": "ASCENDING"},
-        {"fieldPath": "comp.FinalScore", "order": "DESCENDING"}
+        {
+          "fieldPath": "reportRef",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "comp.FinalScore",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "notifications",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "type", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
+        {
+          "fieldPath": "type",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "feedback",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "createdByUid", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
+        {
+          "fieldPath": "createdByUid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "feedback",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "resolvedAt", "order": "ASCENDING" }
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "resolvedAt",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "documents",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "isDeleted", "order": "ASCENDING" },
-        { "fieldPath": "updatedAt", "order": "DESCENDING" }
+        {
+          "fieldPath": "isDeleted",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "documents",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "dspUid", "order": "ASCENDING" },
-        { "fieldPath": "isDeleted", "order": "ASCENDING" }
+        {
+          "fieldPath": "dspUid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "isDeleted",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "events",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "isDeleted", "order": "ASCENDING" },
-        { "fieldPath": "eventDate", "order": "DESCENDING" }
+        {
+          "fieldPath": "isDeleted",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "eventDate",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "events",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "isDeleted", "order": "ASCENDING" },
-        { "fieldPath": "eventType", "order": "ASCENDING" },
-        { "fieldPath": "eventDate", "order": "DESCENDING" }
+        {
+          "fieldPath": "isDeleted",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "eventType",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "eventDate",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "shifts",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
-        { "fieldPath": "adminUid", "order": "ASCENDING" },
-        { "fieldPath": "isOpen", "order": "ASCENDING" },
-        { "fieldPath": "startTs", "order": "DESCENDING" }
+        {
+          "fieldPath": "adminUid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "isOpen",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "startTs",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "correction_requests",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
-        { "fieldPath": "adminUid", "order": "ASCENDING" },
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "submittedAt", "order": "DESCENDING" }
+        {
+          "fieldPath": "adminUid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "submittedAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "time_account",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
-        { "fieldPath": "adminUid", "order": "ASCENDING" },
-        { "fieldPath": "month", "order": "ASCENDING" }
+        {
+          "fieldPath": "adminUid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "month",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "shifts",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
-        { "fieldPath": "adminUid", "order": "ASCENDING" },
-        { "fieldPath": "startTs", "order": "DESCENDING" }
+        {
+          "fieldPath": "adminUid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "startTs",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "audit_log",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "dspUid", "order": "ASCENDING" },
-        { "fieldPath": "timestamp", "order": "DESCENDING" }
+        {
+          "fieldPath": "dspUid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "timestamp",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "audit_log",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "collection", "order": "ASCENDING" },
-        { "fieldPath": "documentId", "order": "ASCENDING" },
-        { "fieldPath": "timestamp", "order": "DESCENDING" }
+        {
+          "fieldPath": "collection",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "documentId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "timestamp",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "audit_log",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "actorUid", "order": "ASCENDING" },
-        { "fieldPath": "timestamp", "order": "DESCENDING" }
+        {
+          "fieldPath": "actorUid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "timestamp",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "vehicles",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "isDeleted", "order": "ASCENDING" },
-        { "fieldPath": "updatedAt", "order": "ASCENDING" }
+        {
+          "fieldPath": "isDeleted",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "shifts",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {
+          "fieldPath": "isOpen",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "startTs",
+          "order": "ASCENDING"
+        }
       ]
     }
   ],

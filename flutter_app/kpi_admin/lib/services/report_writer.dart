@@ -84,9 +84,13 @@ class ReportWriter {
   }
 
   static int _isoWeekOfYear(DateTime date) {
-    final thursday = date.add(Duration(days: (4 - (date.weekday == 7 ? 0 : date.weekday))));
-    final firstThursday = DateTime(thursday.year, 1, 4);
-    return ((thursday.difference(firstThursday).inDays) / 7).floor() + 1;
+    // UTC + Jan-4-Regel: DST-sicher und ohne Sonntags-Sonderfall
+    // (weekday ist 1..7, Sonntag = 7).
+    final day = DateTime.utc(date.year, date.month, date.day);
+    final thursday = day.add(Duration(days: 4 - day.weekday));
+    final jan4 = DateTime.utc(thursday.year, 1, 4);
+    final week1Monday = jan4.subtract(Duration(days: jan4.weekday - 1));
+    return thursday.difference(week1Monday).inDays ~/ 7 + 1;
   }
 
   static Future<void> writeReportAndScores({
@@ -128,6 +132,22 @@ class ReportWriter {
     final hasConcessions = concessionsSummary != null ||
         concessionsFocus != null ||
         drivers.any((d) => d.containsKey('CONC_TotalDelivered'));
+
+    // CDF (Customer Delivery Feedback) — weekly HTML report from Amazon.
+    final cdfSummary = (summary['cdfSummary'] as Map?)
+        ?.map((k, v) => MapEntry(k.toString(), v));
+    final cdfDistribution = (summary['cdfL1Distribution'] as Map?)
+        ?.map((k, v) => MapEntry(k.toString(), v));
+    final hasCdf = cdfSummary != null ||
+        cdfDistribution != null ||
+        drivers.any((d) => d.containsKey('CDF_TotalFeedback'));
+
+    // DWC / IADC — weekly HTML report from Amazon (per-driver DWC% / IADC%).
+    final dwcSummary = (summary['dwcSummary'] as Map?)
+        ?.map((k, v) => MapEntry(k.toString(), v));
+    final hasDwc = dwcSummary != null ||
+        drivers.any((d) =>
+            d.containsKey('DWC_DwcPct') || d.containsKey('DWC_IadcPct'));
 
     final now = DateTime.now();
     final reportId = makeReportId(summary);
@@ -172,6 +192,19 @@ class ReportWriter {
       summaryUpdate['concessions'] = {
         if (concessionsSummary != null) 'summary': concessionsSummary,
         if (concessionsFocus != null) 'focusBuckets': concessionsFocus,
+      };
+    }
+
+    if (cdfSummary != null || cdfDistribution != null) {
+      summaryUpdate['cdf'] = {
+        if (cdfSummary != null) 'summary': cdfSummary,
+        if (cdfDistribution != null) 'l1Distribution': cdfDistribution,
+      };
+    }
+
+    if (dwcSummary != null) {
+      summaryUpdate['dwc'] = {
+        'summary': dwcSummary,
       };
     }
 
@@ -299,6 +332,24 @@ class ReportWriter {
         'CONC_Focus_DeliveredOtp',
       ]);
 
+      final hasCdfRow = hasCdf && _hasAnyValue(m, const [
+        'CDF_TotalFeedback',
+        'CDF_NegativeFeedback',
+        'CDF_L1_NeverReceived',
+        'CDF_L1_DriverMishandled',
+        'CDF_L1_NotDeliveredToPreferredLocation',
+        'CDF_L1_DamagedPackage',
+        'CDF_L1_DeliveryWasLate',
+        'CDF_L1_BadDeliveryExperience',
+        'CDF_L1_DriverWasUnprofessional',
+        'CDF_L1_Other',
+      ]);
+
+      final hasDwcRow = hasDwc && _hasAnyValue(m, const [
+        'DWC_DwcPct',
+        'DWC_IadcPct',
+      ]);
+
       final hasDspRow = _hasAnyValue(m, const [
         'FinalScore',
         'POD_Score',
@@ -365,6 +416,7 @@ class ReportWriter {
             'w4': _numFromAny(m, ['CONC_DnrDpmo_W4'])?.toDouble(),
           },
           'focusBuckets': {
+            // Legacy buckets (alte Concessions XLSX-Variante)
             'attendedDnr':
                 _numFromAny(m, ['CONC_Focus_AttendedDnr'])?.toDouble(),
             'photoOnDelivery':
@@ -379,6 +431,15 @@ class ReportWriter {
             'deliveredOtp':
                 _numFromAny(m, ['CONC_Focus_DeliveredOtp'])?.toDouble(),
           },
+          // NEW: DSC Concession format fields (Amazon 2026)
+          // dnrCountByYearWeek: {"2026-16": 4, "2026-17": 3, ...}
+          'dnrCountByYearWeek':
+              (m['CONC_DnrCountByWeek'] as Map?)?.cast<String, dynamic>(),
+          // dscBuckets: new buckets mapping {bucketKey: count}
+          'dscBuckets':
+              (m['CONC_DscBuckets'] as Map?)?.cast<String, dynamic>(),
+          // dnrEvents: list of {trackingId, dnrDate, deliveryDateTime, ...}
+          'dnrEvents': m['CONC_DnrEvents'],
         };
 
         batch.set(scoreRef, {
@@ -391,6 +452,78 @@ class ReportWriter {
           'weekNumber': week,
           'reportDate'   : FieldValue.serverTimestamp(),
           'concessions'  : concessions,
+          'computedAt'   : FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+
+      if (hasCdfRow) {
+        final cdfDoc = {
+          'totalFeedback':
+              _numFromAny(m, ['CDF_TotalFeedback'])?.toDouble(),
+          'negativeFeedback':
+              _numFromAny(m, ['CDF_NegativeFeedback'])?.toDouble(),
+          'l1Buckets': {
+            'neverReceived':
+                _numFromAny(m, ['CDF_L1_NeverReceived'])?.toDouble(),
+            'driverMishandled':
+                _numFromAny(m, ['CDF_L1_DriverMishandled'])?.toDouble(),
+            'notDeliveredToPreferredLocation': _numFromAny(
+                m, ['CDF_L1_NotDeliveredToPreferredLocation'])?.toDouble(),
+            'damagedPackage':
+                _numFromAny(m, ['CDF_L1_DamagedPackage'])?.toDouble(),
+            'deliveryWasLate':
+                _numFromAny(m, ['CDF_L1_DeliveryWasLate'])?.toDouble(),
+            'badDeliveryExperience':
+                _numFromAny(m, ['CDF_L1_BadDeliveryExperience'])?.toDouble(),
+            'driverWasUnprofessional': _numFromAny(
+                m, ['CDF_L1_DriverWasUnprofessional'])?.toDouble(),
+            'other': _numFromAny(m, ['CDF_L1_Other'])?.toDouble(),
+          },
+          // event-level rows: list of maps with trackingId, feedbackL1/L2,
+          // feedbackDate, city, postalCode, dnrConcession, ...
+          'events': m['CDF_Events'],
+        };
+
+        batch.set(scoreRef, {
+          'reportRef'    : reportRef,
+          'reportPath'   : reportRef.path,
+          'reportId'     : reportId,
+          'transporterId': transporterId,
+          'driverName'   : driverName,
+          'year': year,
+          'weekNumber': week,
+          'reportDate'   : FieldValue.serverTimestamp(),
+          'cdf'          : cdfDoc,
+          'computedAt'   : FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+
+      if (hasDwcRow) {
+        final rawMisses = m['DWC_Misses'];
+        final misses = <String, dynamic>{
+          if (rawMisses is Map)
+            for (final e in rawMisses.entries)
+              e.key.toString(): e.value is num
+                  ? (e.value as num).toInt()
+                  : int.tryParse('${e.value}') ?? 0,
+        };
+        final dwcDoc = {
+          'dwcPct' : _numFromAny(m, ['DWC_DwcPct'])?.toDouble(),
+          'iadcPct': _numFromAny(m, ['DWC_IadcPct'])?.toDouble(),
+          // Per-category miss counts { "Photo Defect": 3, … }.
+          'misses' : misses,
+        };
+
+        batch.set(scoreRef, {
+          'reportRef'    : reportRef,
+          'reportPath'   : reportRef.path,
+          'reportId'     : reportId,
+          'transporterId': transporterId,
+          'driverName'   : driverName,
+          'year': year,
+          'weekNumber': week,
+          'reportDate'   : FieldValue.serverTimestamp(),
+          'dwc'          : dwcDoc,
           'computedAt'   : FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
       }

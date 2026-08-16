@@ -344,6 +344,28 @@ class ShiftPlanDoc {
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
+  /// Payload for an INTERNAL save (not published to drivers). Written to
+  /// `users/{adminUid}/shift_plan_drafts/{dateKey}` — a collection drivers
+  /// have no read rule for. Used to back-fill past weeks so they show up in
+  /// Payment Check without ever notifying or exposing data to drivers.
+  Map<String, dynamic> toDraftPayload() => <String, dynamic>{
+        'date': dateKey,
+        'station': station.trim(),
+        'company': company.trim(),
+        'dispatchers': dispatchers.map((s) => s.trim()).toList(),
+        'notes': notes.map((n) => n.toMap()).toList(),
+        'meetingTime': meetingTime.trim(),
+        'parkingOffsetMinutes': parkingOffsetMinutes,
+        'dispatcherShifts': dispatcherShifts.map(
+          (k, v) => MapEntry(k, v.map((s) => s.trim()).toList()),
+        ),
+        'entries': entries.map((e) => e.toMap()).toList(),
+        'status': 'draft',
+        'publishedAt': null,
+        'savedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
   factory ShiftPlanDoc.fromDoc(
     DocumentSnapshot<Map<String, dynamic>> doc,
   ) {

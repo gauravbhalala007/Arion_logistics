@@ -36,12 +36,13 @@ class WaveplanRoute {
     bool clearAssignedDsp = false,
     String? menteeTransporterId,
     bool clearMenteeTransporterId = false,
+    String? waitingAreaSpur,
   }) {
     return WaveplanRoute(
       routeCode: routeCode,
       routeId: routeId,
       dispatchArea: dispatchArea,
-      waitingAreaSpur: waitingAreaSpur,
+      waitingAreaSpur: waitingAreaSpur ?? this.waitingAreaSpur,
       dispatchTime: dispatchTime,
       shiftEndTime: shiftEndTime,
       serviceType: serviceType,

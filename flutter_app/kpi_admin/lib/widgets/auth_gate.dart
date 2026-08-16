@@ -7,8 +7,11 @@ import '../Screens/login_page.dart';
 import '../Screens/admin_shell_page.dart';
 import '../widgets/admin_scope.dart';
 import '../widgets/app_side_menu.dart';
+import '../widgets/privacy_notice_gate.dart';
 
 import '../Screens/driver_home_shell.dart';
+import '../Screens/public_plan_page.dart';
+import '../Screens/owner_insights_page.dart';
 import '../localization/app_localizations.dart'; // 🔹 for localeController
 
 String _lastProfileLocaleSyncKey = '';
@@ -36,8 +39,50 @@ String _lastTokenRefreshUid = '';
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 
+  /// Extracts a public plan share ID from the browser URL — supports both
+  /// path URLs (`/plan/<id>`) and hash URLs (`/#/plan/<id>`). Empty when
+  /// the current URL is not a public plan link.
+  static String _publicPlanShareId() {
+    final segs = Uri.base.pathSegments;
+    if (segs.isNotEmpty && segs.first == 'plan' && segs.length >= 2) {
+      return segs[1];
+    }
+    final frag = Uri.base.fragment;
+    if (frag.startsWith('/plan/')) {
+      final rest = frag.substring('/plan/'.length);
+      return rest.split('?').first.split('/').first;
+    }
+    return '';
+  }
+
+  /// True when the current URL targets the private owner dashboard —
+  /// supports both path (`/insights`) and hash (`/#/insights`) forms.
+  /// Matched here (like the plan viewer) because the app resolves path
+  /// deep links through the home widget, not the Navigator router.
+  static bool _isOwnerInsightsUrl() {
+    final segs = Uri.base.pathSegments;
+    if (segs.isNotEmpty && segs.first == 'insights') return true;
+    final frag = Uri.base.fragment;
+    return frag == '/insights' || frag.startsWith('/insights');
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Public, link-only plan viewer — NEVER require auth for /plan/<id>.
+    // Handled here (the app's home) so the link works no matter how the
+    // deep link resolves through the router or URL strategy.
+    final planShareId = _publicPlanShareId();
+    if (planShareId.isNotEmpty) {
+      return PublicPlanPage(shareId: planShareId);
+    }
+
+    // Private owner dashboard. The page itself is password-gated and its
+    // data callable is locked to owner UIDs, so rendering it before the
+    // auth check is safe.
+    if (_isOwnerInsightsUrl()) {
+      return const OwnerInsightsPage();
+    }
+
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (_, authSnap) {
@@ -127,9 +172,16 @@ class AuthGate extends StatelessWidget {
                 final transporterId = (data['transporterId'] ?? '').toString();
 
                 if (dspUid.isNotEmpty && transporterId.isNotEmpty) {
-                  return DriverHomeShell(
+                  // Datenschutzinformation nach Art. 13 DSGVO vor die
+                  // Fahreroberfläche schalten, solange keine Bestätigung
+                  // der aktuellen Fassung vorliegt.
+                  return PrivacyNoticeGate(
                     dspUid: dspUid,
                     driverTransporterId: transporterId,
+                    child: DriverHomeShell(
+                      dspUid: dspUid,
+                      driverTransporterId: transporterId,
+                    ),
                   );
                 }
 
@@ -211,9 +263,15 @@ class _DriverRouteResolver extends StatelessWidget {
         }
         final dspUid = parent.id;
 
-        return DriverHomeShell(
+        // Gleicher Gate wie im direkten Fahrer-Zweig oben — auch dieser
+        // Weg darf nicht an der Datenschutzinformation vorbeiführen.
+        return PrivacyNoticeGate(
           dspUid: dspUid,
           driverTransporterId: transporterId,
+          child: DriverHomeShell(
+            dspUid: dspUid,
+            driverTransporterId: transporterId,
+          ),
         );
       },
     );

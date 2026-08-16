@@ -15,6 +15,11 @@ class AppShell extends StatelessWidget {
   final Color? appBarForegroundColor;
   final double? appBarToolbarHeight;
 
+  /// Blendet den automatischen Drawer-Button (Hamburger) im schmalen
+  /// AppBar aus. Die Admin-Shell erreicht das Seitenmenü mobil über die
+  /// schwebende Bottom-Bar und braucht das Hamburger-Icon nicht mehr.
+  final bool hideDrawerButton;
+
   const AppShell({
     super.key,
     required this.sideMenu,
@@ -26,6 +31,7 @@ class AppShell extends StatelessWidget {
     this.appBarBackgroundColor,
     this.appBarForegroundColor,
     this.appBarToolbarHeight,
+    this.hideDrawerButton = false,
   });
 
   bool _isNarrow(BuildContext c) => MediaQuery.of(c).size.width < 1100;
@@ -47,6 +53,8 @@ class AppShell extends StatelessWidget {
                   ? null
                   : IconThemeData(color: appBarForegroundColor),
               toolbarHeight: appBarToolbarHeight,
+              automaticallyImplyLeading: !hideDrawerButton,
+              titleSpacing: hideDrawerButton ? 16 : null,
               title: title ?? const SizedBox(),
               centerTitle: centerTitle,
               actions: actions,

@@ -602,10 +602,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 spacing: 10,
                 runSpacing: 6,
                 children: [
-                  const Icon(Icons.notifications_none, size: 22),
-                  Text(
-                    l10n.t('notifications_page_title'),
-                    style: const TextStyle(
+                  const Icon(Icons.gavel_rounded, size: 22),
+                  const Text(
+                    'Company Rules',
+                    style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
                     ),
@@ -867,7 +867,11 @@ class _ComposerCard extends StatelessWidget {
                 onContentChanged();
               },
               icon: const Icon(Icons.content_paste_rounded, size: 16),
-              label: const Text('Einfügen'),
+              label: Text(
+                Localizations.localeOf(context).languageCode == 'de'
+                    ? 'Einfügen'
+                    : 'Paste',
+              ),
               style: TextButton.styleFrom(
                 foregroundColor: const Color(0xFF1D7F5A),
                 padding:
@@ -902,8 +906,11 @@ class _ComposerCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Wird beim Veröffentlichen automatisch in alle '
-                    'Fahrer-Sprachen übersetzt.',
+                    Localizations.localeOf(context).languageCode == 'de'
+                        ? 'Wird beim Veröffentlichen automatisch in alle '
+                            'Fahrer-Sprachen übersetzt.'
+                        : 'Translated automatically into all driver '
+                            'languages when published.',
                     style: TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w600,

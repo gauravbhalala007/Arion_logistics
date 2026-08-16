@@ -15,15 +15,15 @@ python3 -m http.server 8080
 
 ### Einmaliger Setup — zweites Hosting-Target im Firebase-Projekt anlegen
 
-Im Firebase-Konsolen-UI:
+Im Firebase-Konsolen-UI (Projekt **codriver-eu**):
 1. **Hosting → Add another site** → Site-ID z. B. `codriver-landing`
 2. Domain `codriver-app.com` und `www.codriver-app.com` der neuen Site zuweisen
-3. Die bestehende Admin-App-Site (`gaurav-arion-001-3d94a`) auf `app.codriver-app.com` umziehen, falls gewünscht
+3. Die bestehende Admin-App-Site (`codriver-eu`, ausgeliefert auf `dsp-codriver.de`) bleibt unverändert
 
 Lokal die Site-IDs als Target-Alias hinterlegen:
 ```bash
 cd landing
-firebase use --add gaurav-arion-001-3d94a   # Projekt wählen
+firebase use --add codriver-eu              # Projekt wählen
 firebase target:apply hosting landing codriver-landing
 ```
 
@@ -52,7 +52,7 @@ landing/
 
 - **Branding-Farben** in `styles.css` unter `:root` (Block ganz oben)
 - **Inhalte** direkt in `index.html` — keine Templates
-- **CTAs** zeigen aktuell auf `https://gaurav-arion-001-3d94a.web.app#/signup`.
+- **CTAs** zeigen aktuell auf `https://dsp-codriver.de#/signup`.
   Sobald die App auf `app.codriver-app.com` liegt, alle Links suchen
   und ersetzen.
 

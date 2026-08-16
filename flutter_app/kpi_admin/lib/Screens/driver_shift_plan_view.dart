@@ -671,7 +671,7 @@ class _ShiftBlockCard extends StatelessWidget {
               Expanded(
                 child: _TimePill(
                   label: 'Dispatch',
-                  value: block.startTime,
+                  value: _germanTime(block.startTime),
                   icon: Icons.directions_car_rounded,
                   accent: AppColors.codriverGreen,
                 ),
@@ -1271,7 +1271,7 @@ class _AllDriversRow extends StatelessWidget {
           const SizedBox(width: 10),
           _MiniTimePair(
             meeting: meeting,
-            dispatch: blocks.first.startTime,
+            dispatch: _germanTime(blocks.first.startTime),
           ),
         ],
       ),
@@ -1393,4 +1393,19 @@ class _EmptyState extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Converts any shift time string ("7:00am", "6:00pm", "16:00", "07:00") to
+/// German 24-hour "HH:MM". Returns the trimmed input when unparseable.
+String _germanTime(String raw) {
+  final m = RegExp(r'(\d{1,2}):(\d{2})\s*(am|pm)?', caseSensitive: false)
+      .firstMatch(raw.trim());
+  if (m == null) return raw.trim();
+  var h = int.tryParse(m.group(1) ?? '0') ?? 0;
+  final min = int.tryParse(m.group(2) ?? '0') ?? 0;
+  final suf = (m.group(3) ?? '').toLowerCase();
+  if (suf == 'pm' && h < 12) h += 12;
+  if (suf == 'am' && h == 12) h = 0;
+  String p(int n) => n.toString().padLeft(2, '0');
+  return '${p(h % 24)}:${p(min)}';
 }

@@ -17,13 +17,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../localization/app_localizations.dart';
+import 'package:excel/excel.dart' as xls;
+import 'package:file_picker/file_picker.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+
 import '../models/shift_plan.dart';
 import '../models/waveplan_route.dart';
+import '../services/public_plan_service.dart';
 import '../services/shift_plan_repository.dart';
+import '../widgets/share_link_dialog.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_elevation.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
+import '../utils/driver_activity.dart';
 import '../widgets/co_button.dart';
 import '../widgets/co_pressable.dart';
 import '../widgets/waveplan_date_strip.dart';
@@ -145,6 +154,26 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
 
   String _generalNotes = '';
 
+  /// Query of the driver search bar above the route list.
+  String _driverSearch = '';
+
+  // Ticket "CTRL+F": Cmd/Ctrl+F fokussiert die Fahrer-Suchleiste
+  // (Browser-Suche greift in Flutter-Web nicht).
+  final FocusNode _driverSearchFocus = FocusNode();
+
+  bool _onGlobalKey(KeyEvent e) {
+    if (e is KeyDownEvent &&
+        e.logicalKey == LogicalKeyboardKey.keyF &&
+        (HardwareKeyboard.instance.isControlPressed ||
+            HardwareKeyboard.instance.isMetaPressed)) {
+      if (_driverSearchFocus.canRequestFocus) {
+        _driverSearchFocus.requestFocus();
+        return true;
+      }
+    }
+    return false;
+  }
+
   /// Atlas confirmation gate. Publish stays disabled until either a
   /// list was imported OR the dispatcher explicitly confirmed
   /// "Keine Atlas-Pakete heute".
@@ -159,6 +188,20 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
   // driver app can show an alert.
   final Map<String, List<String>> _atlasByRoute = {};
 
+  // Manually added drivers that are NOT in the Amazon waveplan (e.g.
+  // "infinities after sequence"). We give each a synthetic transporter-ID
+  // (`MANUAL-<micros>`) and store the typed name here so the existing
+  // name-resolution (list, PDF, share, driver app) works unchanged once
+  // this map is merged into `namesMap`.
+  final Map<String, String> _manualNames = {};
+
+  // Latest merged names map (driver names + manual), captured during build
+  // so bottom sheets / dialogs opened off the main tree can reuse it.
+  Map<String, String> _lastNamesMap = const {};
+
+  static bool _isManualTid(String? tid) =>
+      tid != null && tid.startsWith('MANUAL-');
+
   // Scroll-to-wave anchors. One GlobalKey per wave timestamp,
   // attached to the section header in the list.
   final Map<String, GlobalKey> _waveAnchors = {};
@@ -166,6 +209,10 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
   // transporterId (normalized) → driverName, streamed from Firestore.
   // Mirrors the resolution used in scorecard_overview.dart.
   Stream<Map<String, String>>? _namesStream;
+
+  /// Live list of active drivers (with createdAt) — feeds the "Add from
+  /// Drivers Hub" picker and the Newest/Oldest sort in the pool.
+  Stream<List<_PickableDriver>>? _activeDriversStreamSrc;
 
   /// Published shift plan for the currently-selected date, populated by
   /// [_watchShiftPlan]. Lets us surface Park / Dispatch times that the
@@ -233,9 +280,11 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
   @override
   void initState() {
     super.initState();
+    HardwareKeyboard.instance.addHandler(_onGlobalKey);
     final now = DateTime.now();
     _selectedDate = DateTime(now.year, now.month, now.day);
     _namesStream = _driversNameMapGlobal();
+    _activeDriversStreamSrc = _activeDriversStream();
     _dispatcherNamesStream = _streamDispatcherNames();
     _loadProgram(_activeProgram);
     _watchPublished();
@@ -426,6 +475,24 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
         return r.copyWith(menteeTransporterId: menteeTid.trim());
       }).toList();
     });
+    _scheduleDraftSave();
+  }
+
+  /// Cycles the waiting-area lane for one route: none → left → right → none.
+  /// Lets admins fill in the direction the public link shows as a pill.
+  void _cycleRouteSpur(String routeId) {
+    setState(() {
+      _routes = _routes.map((r) {
+        if (r.routeId != routeId) return r;
+        final next = switch (r.waitingAreaSpur.toLowerCase()) {
+          'links' => 'rechts',
+          'rechts' => '',
+          _ => 'links',
+        };
+        return r.copyWith(waitingAreaSpur: next);
+      }).toList();
+    });
+    _scheduleDraftSave();
   }
 
   /// transporterIds already used in this wave (either as the primary
@@ -470,8 +537,16 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_onGlobalKey);
+    _driverSearchFocus.dispose();
     _publishedSub?.cancel();
     _shiftPlanSub?.cancel();
+    // Flush a pending debounced draft save so the last edit isn't lost.
+    if (_draftSaveTimer?.isActive ?? false) {
+      _draftSaveTimer?.cancel();
+      // ignore: discarded_futures
+      _saveDraft();
+    }
     super.dispose();
   }
 
@@ -488,6 +563,10 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
   /// into today — a new day automatically starts empty.
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _publishedSub;
   final Set<String> _hydratedPrograms = <String>{};
+
+  /// Debounced internal draft save so an imported/edited wave survives a
+  /// reload even BEFORE it is published.
+  Timer? _draftSaveTimer;
 
   void _watchPublished() {
     _publishedSub?.cancel();
@@ -510,7 +589,140 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
           _hydratedPrograms.add(hydrationProgram);
         }
       });
+      // No published doc → restore the internal draft once, so
+      // unpublished work comes back after a reload.
+      if (!exists) {
+        // ignore: discarded_futures
+        _hydrateFromDraftIfAny(hydrationProgram);
+      }
     });
+  }
+
+  DocumentReference<Map<String, dynamic>>? _draftDocRefFor(String program) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return null;
+    final d = _selectedDate;
+    final date =
+        '${d.year.toString().padLeft(4, '0')}-'
+        '${d.month.toString().padLeft(2, '0')}-'
+        '${d.day.toString().padLeft(2, '0')}';
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('waveplan_drafts')
+        .doc('${date}_$program');
+  }
+
+  /// One-time draft hydration for [hydrationProgram] — only when nothing
+  /// is loaded locally and no published doc exists.
+  Future<void> _hydrateFromDraftIfAny(String hydrationProgram) async {
+    if (_hydratedPrograms.contains(hydrationProgram)) return;
+    final ref = _draftDocRefFor(hydrationProgram);
+    if (ref == null) return;
+    DocumentSnapshot<Map<String, dynamic>> snap;
+    try {
+      snap = await ref.get();
+    } catch (_) {
+      return;
+    }
+    if (!mounted) return;
+    if (hydrationProgram != _activeProgram) return;
+    if (_hydratedPrograms.contains(hydrationProgram)) return;
+    if (_routes.isNotEmpty) return; // local edits win
+    final data = snap.data();
+    if (data == null) return;
+    setState(() {
+      _hydrateFromPublishedDoc(data);
+      // Published docs force the atlas gate open — drafts keep the truth.
+      _atlasConfirmed =
+          data['atlasConfirmed'] == true || _atlasByRoute.isNotEmpty;
+      _hydratedPrograms.add(hydrationProgram);
+    });
+  }
+
+  void _scheduleDraftSave() {
+    _draftSaveTimer?.cancel();
+    _draftSaveTimer = Timer(const Duration(seconds: 2), _saveDraft);
+  }
+
+  /// Persists the current editor state to `waveplan_drafts` (best-effort,
+  /// never publishes to drivers). An empty wave deletes the draft.
+  Future<void> _saveDraft() async {
+    final ref = _draftDocRefFor(_activeProgram);
+    if (ref == null) return;
+    // Diensthabende Dispatcher gelten tagesweit — in alle Programme des
+    // Tages spiegeln, damit ein Link aus Nextday oder Sameday C sie
+    // ebenfalls enthält (auch nach einem Neuladen der Seite).
+    unawaited(_mirrorDispatchersToOtherPrograms());
+    if (_routes.isEmpty) {
+      try {
+        await ref.delete();
+      } catch (_) {}
+      return;
+    }
+    final payloadRoutes = _routes.map((r) {
+      return {
+        'routeCode': r.routeCode,
+        'routeId': r.routeId,
+        'dispatchArea': r.dispatchArea,
+        'spur': r.waitingAreaSpur,
+        'dispatchTime': r.dispatchTime,
+        'shiftEnd': r.shiftEndTime,
+        'serviceType': r.serviceType,
+        'transporterId': r.transporterId ?? '',
+        'assignedDsp': r.assignedDsp ?? '',
+        'menteeTransporterId': r.menteeTransporterId ?? '',
+        'atlasTrackingIds': _atlasByRoute[r.routeCode] ?? const <String>[],
+      };
+    }).toList();
+    try {
+      await ref.set({
+        'program': _activeProgram,
+        'routes': payloadRoutes,
+        'manualNames': _manualNames,
+        'dispatchers': [
+          for (final name in _selectedDispatchers)
+            {
+              'name': name,
+              'start': _shiftByDispatcher[name]?.start ?? '',
+              'end': _shiftByDispatcher[name]?.end ?? '',
+            },
+        ],
+        'notes': _generalNotes.trim(),
+        'atlasConfirmed': _atlasConfirmed,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {
+      // Draft save is best-effort — publishing still works without it.
+    }
+  }
+
+  /// Schreibt die Dispatcher-Auswahl in die Entwürfe der übrigen
+  /// Programme desselben Tages. Ohne das steht sie nur im gerade
+  /// bearbeiteten Programm, und ein Link aus einem anderen Programm
+  /// geht ohne Dispatcher raus.
+  Future<void> _mirrorDispatchersToOtherPrograms() async {
+    final payload = [
+      for (final name in _selectedDispatchers)
+        {
+          'name': name,
+          'start': _shiftByDispatcher[name]?.start ?? '',
+          'end': _shiftByDispatcher[name]?.end ?? '',
+        },
+    ];
+    for (final p in const ['sameday_a', 'nextday', 'sameday_c']) {
+      if (p == _activeProgram) continue;
+      final other = _draftDocRefFor(p);
+      if (other == null) continue;
+      try {
+        await other.set({
+          'dispatchers': payload,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      } catch (_) {
+        // Best effort — der eigentliche Entwurf ist bereits gespeichert.
+      }
+    }
   }
 
   /// Restore a published wave back into the editor state. Called once
@@ -551,6 +763,29 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
           if (list.isNotEmpty) _atlasByRoute[code] = list;
         }
       }
+      // Restore manually-typed driver names. Prefer the explicit map
+      // (drafts); fall back to the denormalized `driverName` on each
+      // manual route (published docs don't carry the map).
+      _manualNames.clear();
+      final rawManual = data['manualNames'];
+      if (rawManual is Map) {
+        rawManual.forEach((k, v) {
+          final key = k.toString();
+          final name = (v ?? '').toString();
+          if (key.isNotEmpty && name.isNotEmpty) _manualNames[key] = name;
+        });
+      }
+      for (final r in rawRoutes) {
+        if (r is Map<String, dynamic>) {
+          final tid = (r['transporterId'] ?? '').toString();
+          final name = (r['driverName'] ?? '').toString();
+          if (_isManualTid(tid) &&
+              name.isNotEmpty &&
+              !_manualNames.containsKey(tid)) {
+            _manualNames[tid] = name;
+          }
+        }
+      }
       // If atlas data came back at all, also lift the publish gate.
       _atlasConfirmed = true;
       _waveAnchors.clear();
@@ -559,8 +794,12 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
     final notes = (data['notes'] ?? '').toString();
     _generalNotes = notes;
 
+    // Ticket: Dispatcher fehlten im geteilten Link bei Nextday und
+    // Sameday C. Die diensthabenden Dispatcher gelten für den ganzen
+    // Tag, nicht je Programm — eine leere Liste aus einem Programm darf
+    // eine bereits gesetzte Auswahl deshalb nicht löschen.
     final disp = data['dispatchers'];
-    if (disp is List) {
+    if (disp is List && disp.isNotEmpty) {
       _selectedDispatchers.clear();
       _shiftByDispatcher.clear();
       for (final d in disp) {
@@ -683,6 +922,40 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
         });
   }
 
+  /// All currently-working drivers of this DSP, enriched with the
+  /// metadata needed for the in-app picker (name + createdAt). Used for
+  /// the "Add from Drivers Hub" + sort flow on programs (SD_A/SD_C)
+  /// where Amazon doesn't deliver an email waveplan we could paste.
+  Stream<List<_PickableDriver>> _activeDriversStream() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return const Stream.empty();
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('drivers')
+        .snapshots()
+        .map((snap) {
+          final out = <_PickableDriver>[];
+          for (final d in snap.docs) {
+            final data = d.data();
+            if (!isDriverWorking(data)) continue;
+            final tid = (data['transporterId'] ?? d.id).toString().trim();
+            if (tid.isEmpty) continue;
+            final name = (data['driverName'] ?? data['fullName'] ?? '')
+                .toString()
+                .trim();
+            final created = (data['createdAt'] as Timestamp?)?.toDate()
+                ?? (data['addedAt'] as Timestamp?)?.toDate();
+            out.add(_PickableDriver(
+              tid: tid.toUpperCase(),
+              name: name,
+              createdAt: created,
+            ));
+          }
+          return out;
+        });
+  }
+
   /// Expands an id into the candidate forms a route might carry.
   static Iterable<String> _idKeys(String raw) sync* {
     final upper = raw.toUpperCase();
@@ -711,6 +984,29 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
       return a.dispatchSlot.compareTo(b.dispatchSlot);
     });
     return list;
+  }
+
+  /// Search filter for the route list: matches the assigned driver
+  /// (name or TID), the mentee and the route code. Empty query → all.
+  List<WaveplanRoute> _filterRoutesBySearch(
+    List<WaveplanRoute> routes,
+    Map<String, String> namesMap,
+  ) {
+    final q = _driverSearch.trim().toLowerCase();
+    if (q.isEmpty) return routes;
+    return routes.where((r) {
+      final tid = (r.transporterId ?? '').toLowerCase();
+      final name = _resolveName(namesMap, r.transporterId).toLowerCase();
+      final menteeTid = (r.menteeTransporterId ?? '').toLowerCase();
+      final menteeName =
+          _resolveName(namesMap, r.menteeTransporterId).toLowerCase();
+      final code = r.routeCode.toLowerCase();
+      return tid.contains(q) ||
+          name.contains(q) ||
+          menteeTid.contains(q) ||
+          menteeName.contains(q) ||
+          code.contains(q);
+    }).toList();
   }
 
   // ─── Mutations ──────────────────────────────────────────────────────────
@@ -748,6 +1044,7 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
         if (displaced != null) _unassigned.add(displaced);
       }
     });
+    _scheduleDraftSave();
   }
 
   void _unassign(String routeId) {
@@ -756,9 +1053,22 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
       if (idx == -1) return;
       final tid = _routes[idx].transporterId;
       if (tid == null) return;
+
+      // Bei manuell angelegten Einträgen IST die Transporter-ID die
+      // Identität der Route. Würde man sie nur leeren, bliebe eine Route
+      // zurück, die nicht mehr als manuell erkannt wird — sie tauchte
+      // dann weder in "Einträge bearbeiten" auf noch ließ sie sich
+      // löschen oder neu besetzen. Deshalb entfällt der ganze Eintrag.
+      if (_isManualTid(tid)) {
+        _routes.removeAt(idx);
+        _manualNames.remove(tid);
+        return;
+      }
+
       _routes[idx] = _routes[idx].copyWith(clearTransporterId: true);
       if (!_unassigned.contains(tid)) _unassigned.add(tid);
     });
+    _scheduleDraftSave();
   }
 
   void _dropToPool(String transporterId) {
@@ -766,6 +1076,13 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
       final fromIdx = _routes.indexWhere(
         (r) => r.transporterId == transporterId,
       );
+      // Manuelle Einträge gehören nicht in den Fahrer-Pool — sie
+      // verschwinden mitsamt ihrer Route (siehe _unassign).
+      if (_isManualTid(transporterId)) {
+        if (fromIdx != -1) _routes.removeAt(fromIdx);
+        _manualNames.remove(transporterId);
+        return;
+      }
       if (fromIdx != -1) {
         _routes[fromIdx] = _routes[fromIdx].copyWith(clearTransporterId: true);
       }
@@ -773,6 +1090,7 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
         _unassigned.add(transporterId);
       }
     });
+    _scheduleDraftSave();
   }
 
   // ─── Build ──────────────────────────────────────────────────────────────
@@ -826,7 +1144,13 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
           child: StreamBuilder<Map<String, String>>(
             stream: _namesStream,
             builder: (context, snap) {
-              final namesMap = snap.data ?? const <String, String>{};
+              // Merge live driver names with manually-typed names so every
+              // downstream consumer resolves manual drivers too.
+              final namesMap = <String, String>{
+                ...(snap.data ?? const <String, String>{}),
+                ..._manualNames,
+              };
+              _lastNamesMap = namesMap;
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -908,6 +1232,8 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
                         orElse: () => _programs[0],
                       )['label']!,
                       onPaste: _showPasteDialog,
+                      onAddDriver: () => _showManualDriverDialog(namesMap),
+                      onEditEntries: () => _showManualEntriesSheet(namesMap),
                       onAtlasPaste: _showAtlasPasteDialog,
                       onNotesEdit: _showNotesDialog,
                       onClear: _routes.isEmpty ? null : _clearWaveplan,
@@ -915,6 +1241,12 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
                           (_routes.isEmpty || !_atlasConfirmed) && !_isPublished
                               ? null
                               : () => _togglePublish(namesMap),
+                      onPdf: _routes.isEmpty
+                          ? null
+                          : () => _generateWaveplanPdf(namesMap),
+                      onShare: _routes.isEmpty
+                          ? null
+                          : () => _shareWaveplan(namesMap),
                       isPublished: _isPublished,
                       publishedAt: _publishedAt,
                       routeCount: _routes.length,
@@ -926,36 +1258,117 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
                       notesLength: _generalNotes.trim().length,
                     ),
                   if (!isMobile) const SizedBox(height: AppSpacing.md),
-                  Expanded(
-                    child: isNarrow
-                        ? _StackedLayout(
-                            routes: routes,
-                            unassigned: _unassigned,
-                            namesMap: namesMap,
-                            anchorFor: _anchorFor,
-                            atlasFor: (code) =>
-                                _atlasByRoute[code] ?? const [],
-                            resolveName: (tid) => _resolveName(namesMap, tid),
-                            onAssign: _assignTo,
-                            onUnassign: _unassign,
-                            onDropToPool: _dropToPool,
-                            onMenteeChange: _assignMentee,
-                            inWaveTids: _inWaveTids,
-                          )
-                        : _SideBySideLayout(
-                            routes: routes,
-                            unassigned: _unassigned,
-                            namesMap: namesMap,
-                            anchorFor: _anchorFor,
-                            atlasFor: (code) =>
-                                _atlasByRoute[code] ?? const [],
-                            resolveName: (tid) => _resolveName(namesMap, tid),
-                            onAssign: _assignTo,
-                            onUnassign: _unassign,
-                            onDropToPool: _dropToPool,
-                            onMenteeChange: _assignMentee,
-                            inWaveTids: _inWaveTids,
+                  // Driver search — filters the route list by assigned
+                  // driver (name/TID), mentee or route code.
+                  if (_routes.isNotEmpty) ...[
+                    SizedBox(
+                      // 44px on phones so the field is an easy touch target.
+                      height: isMobile ? 44 : 40,
+                      child: TextField(
+                        focusNode: _driverSearchFocus,
+                        onChanged: (v) =>
+                            setState(() => _driverSearch = v),
+                        style: const TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF1F2937),
+                        ),
+                        decoration: InputDecoration(
+                          prefixIcon: const Icon(
+                            Icons.search_rounded,
+                            color: Color(0xFF9CA3AF),
+                            size: 19,
                           ),
+                          suffixIcon: _driverSearch.isEmpty
+                              ? null
+                              : IconButton(
+                                  icon: const Icon(Icons.close_rounded,
+                                      size: 16,
+                                      color: Color(0xFF9CA3AF)),
+                                  splashRadius: 14,
+                                  onPressed: () => setState(
+                                      () => _driverSearch = ''),
+                                ),
+                          hintText: Localizations.localeOf(context)
+                                      .languageCode ==
+                                  'de'
+                              ? 'Fahrer suchen (Name, TID oder Route) …'
+                              : 'Search driver (name, TID or route) …',
+                          hintStyle: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF9CA3AF),
+                          ),
+                          isDense: true,
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(
+                                color: Color(0xFFE5E5EA), width: 0.6),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(
+                                color: Color(0xFFE5E5EA), width: 0.6),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(
+                                color: Color(0xFF00B287), width: 1.4),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                  ],
+                  Expanded(
+                    child: StreamBuilder<List<_PickableDriver>>(
+                      stream: _activeDriversStreamSrc,
+                      builder: (context, activeSnap) {
+                        final activeDrivers = activeSnap.data ??
+                            const <_PickableDriver>[];
+                        final visibleRoutes =
+                            _filterRoutesBySearch(routes, namesMap);
+                        return isNarrow
+                            ? _StackedLayout(
+                                routes: visibleRoutes,
+                                unassigned: _unassigned,
+                                namesMap: namesMap,
+                                anchorFor: _anchorFor,
+                                atlasFor: (code) =>
+                                    _atlasByRoute[code] ?? const [],
+                                resolveName: (tid) =>
+                                    _resolveName(namesMap, tid),
+                                onAssign: _assignTo,
+                                onUnassign: _unassign,
+                                onDropToPool: _dropToPool,
+                                onMenteeChange: _assignMentee,
+                                onSpurChange: _cycleRouteSpur,
+                                inWaveTids: _inWaveTids,
+                                activeDrivers: activeDrivers,
+                              )
+                            : _SideBySideLayout(
+                                routes: visibleRoutes,
+                                unassigned: _unassigned,
+                                namesMap: namesMap,
+                                anchorFor: _anchorFor,
+                                atlasFor: (code) =>
+                                    _atlasByRoute[code] ?? const [],
+                                resolveName: (tid) =>
+                                    _resolveName(namesMap, tid),
+                                onAssign: _assignTo,
+                                onUnassign: _unassign,
+                                onDropToPool: _dropToPool,
+                                onMenteeChange: _assignMentee,
+                                onSpurChange: _cycleRouteSpur,
+                                inWaveTids: _inWaveTids,
+                                activeDrivers: activeDrivers,
+                              );
+                      },
+                    ),
                   ),
                 ],
               );
@@ -1009,7 +1422,9 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
                   hintText:
                       'DE5457917333 - CA_A143 - A5A6I65TGFZ5R\n'
                       'DE5457919556 - CA_A143 - A5A6I65TGFZ5R\n'
-                      '…',
+                      '…  ·  oder / or:\n'
+                      'CA_A197   DE5638642195\n'
+                      'CA_A202   DE5636853987',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -1044,6 +1459,7 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
         _atlasByRoute.clear();
         _atlasConfirmed = true;
       });
+      _scheduleDraftSave();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1071,6 +1487,7 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
         ..addAll(parsed);
       _atlasConfirmed = true;
     });
+    _scheduleDraftSave();
     final total = parsed.values.fold<int>(0, (s, l) => s + l.length);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1089,98 +1506,1120 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
   /// "the dispatcher confirmed there are no Atlas packages today".
   static const String _kAtlasNoneToday = '__ATLAS_NONE_TODAY__';
 
-  /// Parse `DE… - CA_… - A…` lines (separator: ` - `). Groups
-  /// tracking IDs by routeCode so a single route can carry multiple
-  /// packages.
+  /// Parses pasted Atlas package data into `{ routeCode: [trackingId, …] }`
+  /// (a route can carry multiple packages). Two shapes are recognised:
+  ///
+  ///   1. `DE… - CA_… [- A…]` — the classic dash-separated export
+  ///      (tracking first, routeCode second; further columns ignored).
+  ///   2. Tabular `Route <tab/spaces> Shipment ID` — as pasted from a sheet,
+  ///      in either column order and with an optional header row. Any line
+  ///      where a tour/route number sits next to a package number works,
+  ///      regardless of which station's sheet it came from.
+  ///
+  /// The classic path is untouched; the tabular path is additive.
   Map<String, List<String>> _parseAtlasPaste(String input) {
     final out = <String, List<String>>{};
+
+    // Normalised lookup of already-loaded route codes, so we can tell which
+    // column is the route no matter the order / separator / station sheet.
+    final routeByKey = <String, String>{};
+    for (final r in _routes) {
+      final code = r.routeCode.trim();
+      if (code.isEmpty) continue;
+      for (final k in _idKeys(code)) {
+        routeByKey.putIfAbsent(k, () => code);
+      }
+    }
+    String? routeFor(String token) {
+      for (final k in _idKeys(token.trim())) {
+        final hit = routeByKey[k];
+        if (hit != null) return hit;
+      }
+      return null;
+    }
+
     for (final raw in input.split('\n')) {
       final line = raw.trim();
       if (line.isEmpty) continue;
-      final parts = line.split(RegExp(r'\s+-\s+'));
-      if (parts.length < 2) continue;
-      final tracking = parts[0].trim();
-      final routeCode = parts[1].trim();
-      if (tracking.isEmpty || routeCode.isEmpty) continue;
-      out.putIfAbsent(routeCode, () => []).add(tracking);
+
+      // ── 1) Classic format (unchanged): "tracking - routeCode [- …]" ──
+      // A line containing " - " is always treated as classic format and
+      // never reinterpreted by the tabular path below.
+      final dashParts = line.split(RegExp(r'\s+-\s+'));
+      if (dashParts.length >= 2) {
+        final tracking = dashParts[0].trim();
+        final routeCode = dashParts[1].trim();
+        if (tracking.isNotEmpty && routeCode.isNotEmpty) {
+          out.putIfAbsent(routeCode, () => []).add(tracking);
+        }
+        continue;
+      }
+
+      // ── 2) Tabular format: route + shipment side by side (any order) ──
+      // Split on tab / 2+ spaces / ; / , first; fall back to any whitespace
+      // so a single-space separated pair still works.
+      var tokens = line
+          .split(RegExp(r'\t+|\s{2,}|[;,]'))
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+      if (tokens.length < 2) {
+        tokens = line
+            .split(RegExp(r'\s+'))
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty)
+            .toList();
+      }
+      if (tokens.length < 2) continue;
+
+      // Route: prefer a token that matches an already-loaded route.
+      String? routeCode;
+      String routeToken = '';
+      for (final tk in tokens) {
+        final hit = routeFor(tk);
+        if (hit != null) {
+          routeCode = hit;
+          routeToken = tk;
+          break;
+        }
+      }
+
+      // Shipment: the package-number-looking token that isn't the route.
+      String? shipment;
+      for (final tk in tokens) {
+        if (tk == routeToken) continue;
+        if (_looksLikeAtlasShipment(tk)) {
+          shipment = tk;
+          break;
+        }
+      }
+
+      // Route known but shipment pattern didn't match (unusual id shape) →
+      // the neighbour of a known route is the package (must be alphanumeric).
+      if (routeCode != null && shipment == null) {
+        for (final tk in tokens) {
+          if (tk != routeToken &&
+              tk.length >= 3 &&
+              RegExp(r'[0-9A-Za-z]').hasMatch(tk)) {
+            shipment = tk;
+            break;
+          }
+        }
+      }
+
+      // No known route matched → infer it as the plausible neighbour of the
+      // shipment (routes not yet loaded / unknown station codes).
+      if (routeCode == null && shipment != null) {
+        for (final tk in tokens) {
+          if (tk == shipment) continue;
+          if (_plausibleRouteToken(tk)) {
+            routeCode = tk;
+            break;
+          }
+        }
+      }
+
+      if (routeCode != null && shipment != null && shipment.isNotEmpty) {
+        out.putIfAbsent(routeCode, () => []).add(shipment);
+      }
     }
     return out;
   }
 
+  /// A package / shipment id: optional short letter prefix followed by a long
+  /// run of digits (dashes allowed inside), e.g. `DE5638642195`, `7503578-169`.
+  static bool _looksLikeAtlasShipment(String s) =>
+      RegExp(r'^[A-Za-z]{0,4}[0-9][0-9-]{5,}$').hasMatch(s.trim());
+
+  /// A plausible tour/route token: carries at least one digit (so header
+  /// words like "Route" are excluded) and isn't itself a shipment id.
+  static bool _plausibleRouteToken(String s) {
+    final t = s.trim();
+    if (t.length < 2 || t.length > 20) return false;
+    if (!RegExp(r'[0-9]').hasMatch(t)) return false;
+    return !_looksLikeAtlasShipment(t);
+  }
+
+  /// Sticky note that stays visible for a period of time (independent of
+  /// day/program). Lives as a special doc inside `published_waveplans`,
+  /// so the existing security rules (admin write / driver read) apply.
+  DocumentReference<Map<String, dynamic>>? _stickyNoteRef() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return null;
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('published_waveplans')
+        .doc('sticky_note');
+  }
+
   /// Notes editor for the active program. Each program (Sameday A,
   /// Nextday, Sameday C) carries its own notes line — switching tabs
-  /// swaps the persisted draft.
+  /// swaps the persisted draft. Below it: the time-limited sticky note.
   Future<void> _showNotesDialog() async {
     final t = AppLocalizations.of(context);
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final controller = TextEditingController(text: _generalNotes);
-    final result = await showDialog<String>(
+
+    // Load the current sticky note (if any) before opening the dialog.
+    final stickyRef = _stickyNoteRef();
+    var stickyText = '';
+    DateTime? stickyUntil;
+    if (stickyRef != null) {
+      try {
+        final snap = await stickyRef.get();
+        final data = snap.data();
+        if (data != null) {
+          stickyText = (data['text'] ?? '').toString();
+          final ts = data['validUntil'];
+          if (ts is Timestamp) stickyUntil = ts.toDate();
+        }
+      } catch (_) {}
+    }
+    if (!mounted) return;
+    final stickyController = TextEditingController(text: stickyText);
+    // 0 = bis Ende der Woche, 7/14 = Tage ab heute.
+    var stickyPreset = 7;
+
+    DateTime presetUntil(int preset) {
+      final now = DateTime.now();
+      if (preset == 0) {
+        final monday = DateTime(now.year, now.month, now.day)
+            .subtract(Duration(days: now.weekday - 1));
+        return DateTime(monday.year, monday.month, monday.day + 6, 23, 59, 59);
+      }
+      return DateTime(now.year, now.month, now.day + preset, 23, 59, 59);
+    }
+
+    String fmtDate(DateTime d) =>
+        '${d.day.toString().padLeft(2, '0')}.'
+        '${d.month.toString().padLeft(2, '0')}.${d.year}';
+
+    final result = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            const Icon(
-              Icons.campaign_rounded,
-              color: AppColors.codriverDeep,
-              size: 20,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Row(
+            children: [
+              const Icon(
+                Icons.campaign_rounded,
+                color: AppColors.codriverDeep,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(t.t('waveplan_notes_dialog_title')),
+            ],
+          ),
+          content: SizedBox(
+            width: 520,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    t.t('waveplan_notes_dialog_intro'),
+                    style: AppTypography.footnote.copyWith(
+                      color: AppColors.labelSecondaryLight,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  TextField(
+                    controller: controller,
+                    minLines: 3,
+                    maxLines: 8,
+                    autofocus: true,
+                    style: AppTypography.footnote.copyWith(
+                      color: AppColors.codriverGraphite,
+                      fontWeight: FontWeight.w600,
+                      height: 1.4,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: t.t('waveplan_notes_dialog_hint'),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.push_pin_rounded,
+                        color: AppColors.codriverDeep,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        de ? 'Sticky Note (mehrtägig)' : 'Sticky note (multi-day)',
+                        style: AppTypography.footnote.copyWith(
+                          color: AppColors.codriverGraphite,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    de
+                        ? 'Bleibt für den gewählten Zeitraum jeden Tag im '
+                            'Waveplan sichtbar — unabhängig vom Tages-Plan. '
+                            'Leer speichern entfernt sie.'
+                        : 'Stays visible in the waveplan every day for the '
+                            'selected period — independent of the daily plan. '
+                            'Save empty to remove it.',
+                    style: AppTypography.footnote.copyWith(
+                      color: AppColors.labelSecondaryLight,
+                    ),
+                  ),
+                  if (stickyUntil != null && stickyText.trim().isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      de
+                          ? 'Aktuell gültig bis ${fmtDate(stickyUntil)}'
+                          : 'Currently valid until ${fmtDate(stickyUntil)}',
+                      style: AppTypography.footnote.copyWith(
+                        color: AppColors.codriverDeep,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: AppSpacing.sm),
+                  TextField(
+                    controller: stickyController,
+                    minLines: 2,
+                    maxLines: 6,
+                    style: AppTypography.footnote.copyWith(
+                      color: AppColors.codriverGraphite,
+                      fontWeight: FontWeight.w600,
+                      height: 1.4,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: de
+                          ? 'z. B. Ab Montag neue Parkplatz-Regelung …'
+                          : 'e.g. New parking rules from Monday …',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final (label, preset) in [
+                        (de ? 'Diese Woche' : 'This week', 0),
+                        (de ? '7 Tage' : '7 days', 7),
+                        (de ? '14 Tage' : '14 days', 14),
+                      ])
+                        ChoiceChip(
+                          label: Text(
+                            '$label · ${de ? 'bis' : 'until'} '
+                            '${fmtDate(presetUntil(preset))}',
+                            style: AppTypography.footnote.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          selected: stickyPreset == preset,
+                          onSelected: (_) =>
+                              setLocal(() => stickyPreset = preset),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(width: 8),
-            Text(t.t('waveplan_notes_dialog_title')),
+          ),
+          actions: [
+            CoButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              label: t.t('waveplan_btn_cancel'),
+              variant: CoButtonVariant.quiet,
+            ),
+            CoButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              label: t.t('waveplan_btn_save'),
+            ),
           ],
         ),
-        content: SizedBox(
-          width: 520,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                t.t('waveplan_notes_dialog_intro'),
-                style: AppTypography.footnote.copyWith(
-                  color: AppColors.labelSecondaryLight,
-                ),
+      ),
+    );
+    if (result != true) return;
+
+    // Daily note (unchanged behaviour).
+    setState(() {
+      _generalNotes = controller.text;
+    });
+    _scheduleDraftSave();
+
+    // Sticky note: write / update / delete.
+    final newSticky = stickyController.text.trim();
+    if (stickyRef != null) {
+      try {
+        if (newSticky.isEmpty) {
+          if (stickyText.trim().isNotEmpty) await stickyRef.delete();
+        } else {
+          final now = DateTime.now();
+          await stickyRef.set({
+            'text': newSticky,
+            'validFrom':
+                Timestamp.fromDate(DateTime(now.year, now.month, now.day)),
+            'validUntil': Timestamp.fromDate(presetUntil(stickyPreset)),
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                de
+                    ? 'Sticky Note konnte nicht gespeichert werden: $e'
+                    : 'Could not save sticky note: $e',
               ),
-              const SizedBox(height: AppSpacing.sm),
-              TextField(
-                controller: controller,
-                minLines: 4,
-                maxLines: 10,
-                autofocus: true,
-                style: AppTypography.footnote.copyWith(
-                  color: AppColors.codriverGraphite,
-                  fontWeight: FontWeight.w600,
-                  height: 1.4,
-                ),
-                decoration: InputDecoration(
-                  hintText: t.t('waveplan_notes_dialog_hint'),
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  /// Manually add a driver/route that is NOT in the Amazon waveplan
+  /// (e.g. "infinities after sequence" where names aren't sent). The
+  /// driver gets a synthetic transporter-ID so the rest of the app
+  /// (list, PDF, share, driver app) treats it like any other route.
+  Future<void> _showManualDriverDialog(
+    Map<String, String> namesMap, {
+    WaveplanRoute? existing,
+  }) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final isEdit = existing != null;
+
+    TimeOfDay? parseHhmm(String raw) {
+      final m = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(raw.trim());
+      if (m == null) return null;
+      return TimeOfDay(
+        hour: int.parse(m.group(1)!),
+        minute: int.parse(m.group(2)!),
+      );
+    }
+
+    final nameCtrl = TextEditingController(
+      text: isEdit ? (_manualNames[existing.transporterId] ?? '') : '',
+    );
+    final routeCtrl =
+        TextEditingController(text: isEdit ? existing.routeCode : '');
+    final stagingCtrl =
+        TextEditingController(text: isEdit ? existing.dispatchArea : '');
+    final atlasCtrl = TextEditingController(
+      text: isEdit
+          ? (_atlasByRoute[existing.routeCode] ?? const <String>[]).join('\n')
+          : '',
+    );
+    TimeOfDay? startTime = isEdit ? parseHhmm(existing.dispatchTime) : null;
+    TimeOfDay? endTime = isEdit ? parseHhmm(existing.shiftEndTime) : null;
+    String parkSide = isEdit ? existing.waitingAreaSpur : ''; // '', 'links', 'rechts'
+
+    // Distinct, sorted driver names for the autocomplete suggestions.
+    final suggestions = namesMap.values
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort();
+
+    String fmt(TimeOfDay? t) => t == null
+        ? ''
+        : '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setLocal) {
+            InputDecoration dec(String label, {String? hint}) =>
+                InputDecoration(
+                  labelText: label,
+                  hintText: hint,
+                  isDense: true,
+                  filled: true,
+                  fillColor: const Color(0xFFF9FAFB),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: Color(0xFF111827)),
+                  ),
+                );
+
+            Future<void> pickTime(bool isStart) async {
+              final picked = await showTimePicker(
+                context: ctx,
+                initialTime: (isStart ? startTime : endTime) ??
+                    const TimeOfDay(hour: 11, minute: 0),
+              );
+              if (picked != null) {
+                setLocal(() {
+                  if (isStart) {
+                    startTime = picked;
+                  } else {
+                    endTime = picked;
+                  }
+                });
+              }
+            }
+
+            Widget timeField(String label, TimeOfDay? value, bool isStart) {
+              return InkWell(
+                onTap: () => pickTime(isStart),
+                borderRadius: BorderRadius.circular(10),
+                child: InputDecorator(
+                  decoration: dec(label),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.schedule_rounded,
+                          size: 16, color: Color(0xFF4B5563)),
+                      const SizedBox(width: 6),
+                      Text(
+                        value == null
+                            ? (de ? 'wählen' : 'pick')
+                            : fmt(value),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: value == null
+                              ? const Color(0xFF9CA3AF)
+                              : const Color(0xFF111827),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            Widget sideChip(String value, String label) {
+              final selected = parkSide == value;
+              return Expanded(
+                child: InkWell(
+                  onTap: () => setLocal(() => parkSide = value),
+                  borderRadius: BorderRadius.circular(10),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 120),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? AppColors.codriverGreen.withValues(alpha: 0.12)
+                          : Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: selected
+                            ? AppColors.codriverGreen
+                            : const Color(0xFFE5E7EB),
+                        width: selected ? 1.5 : 1,
+                      ),
+                    ),
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: selected
+                            ? AppColors.codriverDeep
+                            : const Color(0xFF4B5563),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            return Dialog(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 460),
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.person_add_alt_1_rounded,
+                                size: 20, color: AppColors.codriverDeep),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                isEdit
+                                    ? (de
+                                        ? 'Eintrag bearbeiten'
+                                        : 'Edit entry')
+                                    : (de
+                                        ? 'Fahrer manuell hinzufügen'
+                                        : 'Add driver manually'),
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF111827),
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () =>
+                                  Navigator.of(dialogCtx).pop(false),
+                              icon: const Icon(Icons.close_rounded, size: 20),
+                              splashRadius: 18,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          de
+                              ? 'Für Fahrer, die nicht im Amazon-Waveplan '
+                                  'stehen (z. B. Infinities nach Sequence).'
+                              : 'For drivers not included in the Amazon '
+                                  'waveplan (e.g. infinities after sequence).',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF6B7280),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        // Driver name with autocomplete over known names.
+                        Autocomplete<String>(
+                          optionsBuilder: (value) {
+                            final q = value.text.trim().toLowerCase();
+                            if (q.isEmpty) return const Iterable<String>.empty();
+                            return suggestions.where(
+                              (s) => s.toLowerCase().contains(q),
+                            );
+                          },
+                          onSelected: (s) => nameCtrl.text = s,
+                          fieldViewBuilder:
+                              (ctx2, ctrl, focus, onSubmit) {
+                            // Mirror into our own controller for saving.
+                            ctrl.text = nameCtrl.text;
+                            ctrl.selection = TextSelection.collapsed(
+                                offset: ctrl.text.length);
+                            return TextField(
+                              controller: ctrl,
+                              focusNode: focus,
+                              autofocus: true,
+                              onChanged: (v) => nameCtrl.text = v,
+                              decoration: dec(
+                                de ? 'Fahrername *' : 'Driver name *',
+                                hint: de
+                                    ? 'Name eingeben oder wählen'
+                                    : 'Type or pick a name',
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: routeCtrl,
+                          textCapitalization:
+                              TextCapitalization.characters,
+                          decoration: dec(
+                            de ? 'Routennummer *' : 'Route number *',
+                            hint: 'z. B. CA_A169',
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          de
+                              ? 'Zeit-Vorlagen (Startzeit)'
+                              : 'Time templates (start)',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF6B7280),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            for (final tpl in const [
+                              '06:30', '10:30', '11:00', '11:20', '12:30',
+                              '12:50', '13:00', '17:30', '22:00',
+                            ])
+                              InkWell(
+                                onTap: () {
+                                  final parts = tpl.split(':');
+                                  setLocal(() => startTime = TimeOfDay(
+                                        hour: int.parse(parts[0]),
+                                        minute: int.parse(parts[1]),
+                                      ));
+                                },
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: startTime != null &&
+                                            fmt(startTime) == tpl
+                                        ? AppColors.codriverGreen
+                                            .withValues(alpha: 0.14)
+                                        : const Color(0xFFF3F4F6),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: startTime != null &&
+                                              fmt(startTime) == tpl
+                                          ? AppColors.codriverGreen
+                                          : const Color(0xFFE5E7EB),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    tpl,
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                      fontFeatures: const [
+                                        FontFeature.tabularFigures()
+                                      ],
+                                      color: startTime != null &&
+                                              fmt(startTime) == tpl
+                                          ? AppColors.codriverDeep
+                                          : const Color(0xFF4B5563),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: timeField(
+                                de ? 'Startzeit' : 'Start time',
+                                startTime,
+                                true,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: timeField(
+                                de ? 'Endzeit' : 'End time',
+                                endTime,
+                                false,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          de ? 'Park-Seite' : 'Park-side',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF6B7280),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            sideChip('links', de ? 'Links' : 'Left'),
+                            const SizedBox(width: 8),
+                            sideChip('rechts', de ? 'Rechts' : 'Right'),
+                            const SizedBox(width: 8),
+                            sideChip('', de ? 'Keine' : 'None'),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        TextField(
+                          controller: stagingCtrl,
+                          decoration: dec(
+                            de
+                                ? 'Staging-Area (optional)'
+                                : 'Staging area (optional)',
+                            hint: de
+                                ? 'leer lassen, wenn keine Info'
+                                : 'leave empty if no info',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: atlasCtrl,
+                          minLines: 2,
+                          maxLines: 4,
+                          decoration: dec(
+                            de
+                                ? 'ATLAS Tracking-IDs (optional)'
+                                : 'ATLAS tracking IDs (optional)',
+                            hint: de
+                                ? 'IDs mit Komma/Leerzeichen/Zeile trennen'
+                                : 'separate IDs by comma / space / line',
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            CoButton(
+                              onPressed: () =>
+                                  Navigator.of(dialogCtx).pop(false),
+                              label: de ? 'Abbrechen' : 'Cancel',
+                              variant: CoButtonVariant.secondaryOutlined,
+                            ),
+                            const SizedBox(width: 10),
+                            CoButton(
+                              onPressed: () {
+                                if (nameCtrl.text.trim().isEmpty ||
+                                    routeCtrl.text.trim().isEmpty) {
+                                  ScaffoldMessenger.of(ctx).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        de
+                                            ? 'Bitte Fahrername und '
+                                                'Routennummer angeben.'
+                                            : 'Please enter driver name and '
+                                                'route number.',
+                                      ),
+                                    ),
+                                  );
+                                  return;
+                                }
+                                Navigator.of(dialogCtx).pop(true);
+                              },
+                              icon: Icons.add_rounded,
+                              label: isEdit
+                                  ? (de ? 'Speichern' : 'Save')
+                                  : (de ? 'Hinzufügen' : 'Add'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ],
-          ),
+            );
+          },
+        );
+      },
+    );
+
+    if (saved != true) {
+      nameCtrl.dispose();
+      routeCtrl.dispose();
+      stagingCtrl.dispose();
+      atlasCtrl.dispose();
+      return;
+    }
+
+    final name = nameCtrl.text.trim();
+    final routeCode = routeCtrl.text.trim();
+    final staging = stagingCtrl.text.trim();
+    final atlasIds = atlasCtrl.text
+        .split(RegExp(r'[\s,;]+'))
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    // Editing keeps the same synthetic id; adding mints a new one.
+    final tid = isEdit
+        ? existing.routeId
+        : 'MANUAL-${DateTime.now().microsecondsSinceEpoch}';
+    final oldRouteCode = isEdit ? existing.routeCode : '';
+
+    String norm(TimeOfDay? t) => t == null ? '' : '${fmt(t)}:00';
+
+    setState(() {
+      _manualNames[tid] = name;
+      final updated = WaveplanRoute(
+        routeCode: routeCode,
+        routeId: tid,
+        dispatchArea: staging,
+        waitingAreaSpur: parkSide,
+        dispatchTime: norm(startTime),
+        shiftEndTime: norm(endTime),
+        serviceType: '',
+        transporterId: tid,
+      );
+      if (isEdit) {
+        _routes = _routes
+            .map((r) => r.routeId == tid ? updated : r)
+            .toList();
+        // Route code may have changed → move its Atlas IDs.
+        if (oldRouteCode.isNotEmpty && oldRouteCode != routeCode) {
+          _atlasByRoute.remove(oldRouteCode);
+        }
+      } else {
+        _routes = [..._routes, updated];
+      }
+      if (atlasIds.isNotEmpty) {
+        _atlasByRoute[routeCode] = atlasIds;
+        // A manual Atlas entry counts as an explicit atlas decision.
+        _atlasConfirmed = true;
+      } else if (isEdit) {
+        _atlasByRoute.remove(routeCode);
+      }
+    });
+    _scheduleDraftSave();
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          isEdit
+              ? (de
+                  ? '$name ($routeCode) aktualisiert.'
+                  : 'Updated $name ($routeCode).')
+              : (de
+                  ? '$name ($routeCode) hinzugefügt.'
+                  : 'Added $name ($routeCode).'),
         ),
-        actions: [
-          CoButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            label: t.t('waveplan_btn_cancel'),
-            variant: CoButtonVariant.quiet,
-          ),
-          CoButton(
-            onPressed: () => Navigator.of(ctx).pop(controller.text),
-            label: t.t('waveplan_btn_save'),
-          ),
-        ],
       ),
     );
-    if (result == null) return;
-    setState(() {
-      _generalNotes = result;
-    });
+
+    nameCtrl.dispose();
+    routeCtrl.dispose();
+    stagingCtrl.dispose();
+    atlasCtrl.dispose();
+  }
+
+  /// Lists the manually-added entries so they can be edited or removed
+  /// (feedback: "edit already added options").
+  Future<void> _showManualEntriesSheet(Map<String, String> namesMap) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surfaceElevatedLight,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (sheetCtx) {
+        final manual =
+            _routes.where((r) => _isManualTid(r.transporterId)).toList();
+        // Routen ohne Fahrer: entstanden u. a. durch den früheren Fehler,
+        // bei dem manuelle Einträge beim Entfernen des Fahrers ihre
+        // Kennung verloren. Hier lassen sie sich aufräumen.
+        final empty = _routes
+            .where((r) => (r.transporterId ?? '').trim().isEmpty)
+            .toList();
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(
+                    left: 4,
+                    top: 4,
+                    bottom: 8,
+                  ),
+                  child: Text(
+                    de
+                        ? 'Manuelle Einträge bearbeiten'
+                        : 'Edit manual entries',
+                    style: AppTypography.headline.copyWith(
+                      color: AppColors.codriverGraphite,
+                    ),
+                  ),
+                ),
+                if (manual.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      de
+                          ? 'Keine manuell hinzugefügten Einträge.'
+                          : 'No manually added entries.',
+                      style: AppTypography.footnote.copyWith(
+                        color: AppColors.labelSecondaryLight,
+                      ),
+                    ),
+                  )
+                else
+                  Flexible(
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: manual.length,
+                      separatorBuilder: (_, __) =>
+                          const SizedBox(height: 6),
+                      itemBuilder: (_, i) {
+                        final r = manual[i];
+                        final name = _manualNames[r.transporterId] ?? '';
+                        final sub = [
+                          if (r.dispatchTime.isNotEmpty) _hhmm(r.dispatchTime),
+                          if (r.waitingAreaSpur == 'links')
+                            (de ? 'links' : 'left')
+                          else if (r.waitingAreaSpur == 'rechts')
+                            (de ? 'rechts' : 'right'),
+                        ].join(' · ');
+                        return Container(
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceLight,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: AppColors.separatorLight.withValues(
+                                alpha: 0.5,
+                              ),
+                            ),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${r.routeCode} · ${name.isEmpty ? '—' : name}',
+                                      style: AppTypography.subheadline
+                                          .copyWith(
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.codriverGraphite,
+                                      ),
+                                    ),
+                                    if (sub.isNotEmpty)
+                                      Text(
+                                        sub,
+                                        style: AppTypography.caption1
+                                            .copyWith(
+                                          color: AppColors
+                                              .labelSecondaryLight,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: de ? 'Bearbeiten' : 'Edit',
+                                icon: const Icon(Icons.edit_rounded,
+                                    size: 18, color: Color(0xFF2563EB)),
+                                onPressed: () {
+                                  Navigator.of(sheetCtx).pop();
+                                  _showManualDriverDialog(
+                                    namesMap,
+                                    existing: r,
+                                  );
+                                },
+                              ),
+                              IconButton(
+                                tooltip: de ? 'Löschen' : 'Delete',
+                                icon: const Icon(Icons.delete_outline_rounded,
+                                    size: 18, color: Color(0xFFDC2626)),
+                                onPressed: () {
+                                  setState(() {
+                                    _routes = _routes
+                                        .where((x) =>
+                                            x.routeId != r.routeId)
+                                        .toList();
+                                    _manualNames.remove(r.transporterId);
+                                    _atlasByRoute.remove(r.routeCode);
+                                  });
+                                  _scheduleDraftSave();
+                                  Navigator.of(sheetCtx).pop();
+                                },
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                if (empty.isNotEmpty) ...[
+                  const Divider(height: 20),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4, bottom: 6),
+                    child: Text(
+                      de
+                          ? 'Leere Routen (${empty.length})'
+                          : 'Empty routes (${empty.length})',
+                      style: AppTypography.footnote.copyWith(
+                        color: AppColors.labelSecondaryLight,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  Flexible(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: empty.length,
+                      itemBuilder: (ctx, i) {
+                        final r = empty[i];
+                        return ListTile(
+                          dense: true,
+                          contentPadding:
+                              const EdgeInsets.symmetric(horizontal: 4),
+                          leading: const Icon(Icons.link_off_rounded,
+                              size: 18, color: Color(0xFF94A3B8)),
+                          title: Text(
+                            [
+                              r.routeCode,
+                              r.dispatchTime,
+                            ].where((e) => e.trim().isNotEmpty).join('  ·  '),
+                            style: AppTypography.footnote.copyWith(
+                              color: AppColors.codriverGraphite,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          subtitle: Text(
+                            de ? 'Kein Fahrer zugewiesen' : 'No driver assigned',
+                            style: AppTypography.caption1.copyWith(
+                              color: AppColors.labelSecondaryLight,
+                            ),
+                          ),
+                          trailing: IconButton(
+                            tooltip: de ? 'Route löschen' : 'Delete route',
+                            icon: const Icon(Icons.delete_outline_rounded,
+                                size: 18, color: Color(0xFFDC2626)),
+                            onPressed: () {
+                              setState(() {
+                                _routes = _routes
+                                    .where((x) => x.routeId != r.routeId)
+                                    .toList();
+                                _atlasByRoute.remove(r.routeCode);
+                              });
+                              _scheduleDraftSave();
+                              Navigator.of(sheetCtx).pop();
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _showPasteDialog() async {
     final t = AppLocalizations.of(context);
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final controller = TextEditingController();
     final result = await showDialog<String>(
       context: context,
@@ -1222,6 +2661,14 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
             label: t.t('waveplan_btn_cancel'),
             variant: CoButtonVariant.quiet,
           ),
+          // Upload the wave as an XLSX table (e.g. TMGM export) instead
+          // of pasting its content.
+          CoButton(
+            onPressed: () => Navigator.of(ctx).pop('__upload_xlsx__'),
+            label: de ? 'XLSX hochladen' : 'Upload XLSX',
+            icon: Icons.upload_file_rounded,
+            variant: CoButtonVariant.quiet,
+          ),
           CoButton(
             onPressed: () => Navigator.of(ctx).pop(controller.text),
             label: t.t('waveplan_btn_import'),
@@ -1229,6 +2676,10 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
         ],
       ),
     );
+    if (result == '__upload_xlsx__') {
+      await _uploadWaveplanXlsx();
+      return;
+    }
     if (result == null || result.trim().isEmpty) return;
     final parsed = _parsePastedWaveplan(result);
     if (parsed.isEmpty) {
@@ -1243,6 +2694,88 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
       _unassigned.clear();
       _waveAnchors.clear(); // anchors regenerated lazily on next build
     });
+    // Persist immediately — an imported wave must survive a reload even
+    // before it is published.
+    // ignore: discarded_futures
+    _saveDraft();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          t.tf('waveplan_snack_routes_imported', {'count': '${parsed.length}'}),
+        ),
+      ),
+    );
+  }
+
+  /// Uploads a tabular waveplan XLSX (e.g. the TMGM export) and imports it
+  /// through the same parser the paste path uses. Parsing happens fully
+  /// client-side via the `excel` package — no server round-trip.
+  Future<void> _uploadWaveplanXlsx() async {
+    final t = AppLocalizations.of(context);
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['xlsx'],
+      withData: true,
+    );
+    if (picked == null || picked.files.isEmpty) return;
+    final bytes = picked.files.first.bytes;
+    if (bytes == null) return;
+
+    String cellText(xls.Data? c) {
+      final v = c?.value;
+      if (v == null) return '';
+      String p(int n) => n.toString().padLeft(2, '0');
+      if (v is xls.TextCellValue) return v.value.text?.trim() ?? '';
+      if (v is xls.TimeCellValue) {
+        return '${p(v.hour)}:${p(v.minute)}:${p(v.second)}';
+      }
+      if (v is xls.DateTimeCellValue) {
+        return '${p(v.hour)}:${p(v.minute)}:${p(v.second)}';
+      }
+      return v.toString().trim();
+    }
+
+    List<WaveplanRoute> parsed;
+    try {
+      final book = xls.Excel.decodeBytes(bytes);
+      if (book.tables.isEmpty) {
+        throw Exception('Keine Tabelle in der Datei gefunden.');
+      }
+      final sheet = book.tables.values.first;
+      final buf = StringBuffer();
+      for (final row in sheet.rows) {
+        buf.writeln(row.map(cellText).join('\t'));
+      }
+      parsed = _parseTabularWaveplan(buf.toString());
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            de ? 'XLSX-Import fehlgeschlagen: $e' : 'XLSX import failed: $e',
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (parsed.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(t.t('waveplan_snack_routes_invalid'))),
+      );
+      return;
+    }
+    setState(() {
+      _routes = parsed;
+      _unassigned.clear();
+      _waveAnchors.clear();
+    });
+    // Persist immediately, same as the paste path.
+    // ignore: discarded_futures
+    _saveDraft();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -1272,6 +2805,19 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
   ///   • partially-mangled chunks — uses time-anchors at lines i and i+1
   ///     to re-sync rather than blindly chunk by 9.
   List<WaveplanRoute> _parsePastedWaveplan(String input) {
+    // Some stations export a TABULAR waveplan (e.g. TMGM): one route per
+    // row with tab-separated columns
+    //   WAVE ⇥ routeCode ⇥ Stage ⇥ DA NAME ⇥ DSP ⇥ Waiting Area
+    // Try that first — rows without tabs fall through untouched, so the
+    // classic line-per-field format below keeps working.
+    final tabular = _parseTabularWaveplan(input);
+    if (tabular.isNotEmpty) return tabular;
+
+    // SD_A / SD_C column format (no time column), e.g.:
+    //   SC_A10  42  A6SWFJP8GEQ2J  STG-A BLUE .10  :arrow_right: Right
+    final sdColumns = _parseSdColumnWaveplan(input);
+    if (sdColumns.isNotEmpty) return sdColumns;
+
     final raw = input
         .split('\n')
         .map((l) => l.trim())
@@ -1342,6 +2888,136 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
         ),
       );
       i += 9;
+    }
+    return out;
+  }
+
+  /// Parses the tabular (TMGM-style) waveplan paste: one route per row,
+  /// tab-separated columns in the order
+  ///   1. WAVE          (`10:40:00`)
+  ///   2. routeCode     (`CA_A8`)
+  ///   3. Stage         (`STG-A10.1`)
+  ///   4. DA NAME       (`<TID> / <DSP> / <TID>` or just `<TID>`)
+  ///   5. DSP           (`BOYO`)
+  ///   6. Waiting Area  (time, e.g. `10:25:00` — informational, skipped)
+  ///
+  /// Header rows and anything whose first cell isn't a time are ignored.
+  /// Returns an empty list when the paste isn't tabular at all, so the
+  /// caller can fall back to the classic line-per-field parser.
+  List<WaveplanRoute> _parseTabularWaveplan(String input) {
+    final timeRe = RegExp(
+      r'^\d{1,2}:\d{2}(?::\d{2})?\s*(AM|PM)?$',
+      caseSensitive: false,
+    );
+    final out = <WaveplanRoute>[];
+    for (final line in input.split('\n')) {
+      final cells = line.split('\t').map((c) => c.trim()).toList();
+      if (cells.length < 4) continue; // not tabular / header / junk
+      if (!timeRe.hasMatch(cells[0])) continue; // header row etc.
+      final routeCode = cells[1];
+      if (routeCode.isEmpty) continue;
+
+      final assignDa = cells.length > 3 ? cells[3] : '';
+      String? tid = assignDa.split('/').first.trim();
+      if (tid.isEmpty) tid = null;
+      final dsp = cells.length > 4 ? cells[4].trim() : '';
+
+      out.add(
+        WaveplanRoute(
+          routeCode: routeCode,
+          // TMGM has no separate route ID — the route code is unique
+          // within the day, so it doubles as the ID.
+          routeId: routeCode,
+          dispatchArea: cells.length > 2 ? cells[2] : '',
+          waitingAreaSpur: '',
+          dispatchTime: _normaliseClock(cells[0]),
+          shiftEndTime: '',
+          serviceType: '',
+          transporterId: tid,
+          assignedDsp: dsp.isEmpty ? null : dsp,
+        ),
+      );
+    }
+    return out;
+  }
+
+  /// Parses the SD_A / SD_C column format (no time column). Columns are
+  /// separated by tabs or runs of 2+ spaces:
+  ///   routeCode  packages  transporterId  stagingArea  direction
+  /// e.g. `SC_A10  42  A6SWFJP8GEQ2J  STG-A BLUE .10  :arrow_right: Right`
+  /// Direction (`:arrow_right: Right` / `:arrow_left: Left`) maps to the
+  /// waiting-area lane. Returns empty when the paste isn't this format so
+  /// the caller can keep trying other parsers.
+  List<WaveplanRoute> _parseSdColumnWaveplan(String input) {
+    final timeRe = RegExp(r'^\d{1,2}:\d{2}');
+    final tidRe = RegExp(r'^[A-Z0-9]{8,}$');
+    final routeRe = RegExp(r'^[A-Za-z]{1,4}[_-]?[A-Za-z]?\d');
+    final out = <WaveplanRoute>[];
+
+    for (final line in input.split('\n')) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) continue;
+      final cells = trimmed
+          .split(RegExp(r'\t+|\s{2,}'))
+          .map((c) => c.trim())
+          .where((c) => c.isNotEmpty)
+          .toList();
+      if (cells.length < 3) continue;
+      final routeCode = cells[0];
+      if (timeRe.hasMatch(routeCode)) continue; // handled elsewhere
+      if (!routeRe.hasMatch(routeCode)) continue; // header / junk row
+
+      // Transporter-ID = first Amazon-style all-caps/alnum token after the
+      // route code (skips the package count).
+      String? tid;
+      var tidIdx = -1;
+      for (var i = 1; i < cells.length; i++) {
+        if (tidRe.hasMatch(cells[i].toUpperCase()) &&
+            !RegExp(r'^\d+$').hasMatch(cells[i])) {
+          tid = cells[i].toUpperCase();
+          tidIdx = i;
+          break;
+        }
+      }
+
+      // Direction / lane from any cell mentioning left/right (word or
+      // :arrow_left:/:arrow_right: emoji shortcode).
+      var spur = '';
+      for (final c in cells) {
+        final l = c.toLowerCase();
+        if (l.contains('arrow_right') || l.contains('right')) {
+          spur = 'rechts';
+          break;
+        }
+        if (l.contains('arrow_left') || l.contains('left')) {
+          spur = 'links';
+          break;
+        }
+      }
+
+      // Staging area = the cell(s) between the TID and the direction,
+      // typically a single cell like "STG-A BLUE .10".
+      var staging = '';
+      if (tidIdx >= 0 && tidIdx + 1 < cells.length) {
+        final next = cells[tidIdx + 1];
+        final l = next.toLowerCase();
+        if (!l.contains('arrow_') && !(l == 'left' || l == 'right')) {
+          staging = next;
+        }
+      }
+
+      out.add(
+        WaveplanRoute(
+          routeCode: routeCode,
+          routeId: routeCode,
+          dispatchArea: staging,
+          waitingAreaSpur: spur,
+          dispatchTime: '',
+          shiftEndTime: '',
+          serviceType: '',
+          transporterId: tid,
+        ),
+      );
     }
     return out;
   }
@@ -1466,6 +3142,7 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
         'publishedAt': FieldValue.serverTimestamp(),
         'program': _activeProgram,
         'routes': payloadRoutes,
+        'manualNames': _manualNames,
         'dispatchers': dispatchersPayload,
         'notes': _generalNotes.trim(),
       });
@@ -1490,6 +3167,408 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
         content: Text(t.t('waveplan_snack_published')),
       ),
     );
+  }
+
+  // ────────────────────────────────────────────────────────────────
+  //   PDF EXPORT + PUBLIC SHARE LINK
+  // ────────────────────────────────────────────────────────────────
+
+  /// "11:00:00" → "11:00"; keeps unparseable values verbatim.
+  String _hhmm(String s) {
+    final m = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(s.trim());
+    if (m == null) return s.trim();
+    return '${m.group(1)!.padLeft(2, '0')}:${m.group(2)}';
+  }
+
+  /// Routes grouped into waves by dispatch time, waves sorted by time,
+  /// routes inside a wave by their dispatch slot.
+  List<MapEntry<String, List<WaveplanRoute>>> _wavesSorted() {
+    final groups = <String, List<WaveplanRoute>>{};
+    for (final r in _routes) {
+      groups.putIfAbsent(r.dispatchTime, () => []).add(r);
+    }
+    int mins(String s) {
+      final m = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(s.trim());
+      if (m == null) return 99999;
+      return int.parse(m.group(1)!) * 60 + int.parse(m.group(2)!);
+    }
+
+    final keys = groups.keys.toList()
+      ..sort((a, b) => mins(a).compareTo(mins(b)));
+    return [
+      for (final k in keys)
+        MapEntry(
+          k,
+          groups[k]!..sort((a, b) => a.dispatchSlot.compareTo(b.dispatchSlot)),
+        ),
+    ];
+  }
+
+  String _pdfDateLabel(DateTime d) {
+    const wd = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    String p(int n) => n.toString().padLeft(2, '0');
+    return '${wd[d.weekday - 1]}, ${p(d.day)}.${p(d.month)}.${d.year}';
+  }
+
+  /// Compact, branded waveplan PDF: one section per wave with route rows
+  /// (driver, area, lane, shift end) and the Atlas tracking IDs listed
+  /// beneath the affected routes.
+  Future<void> _generateWaveplanPdf(Map<String, String> namesMap) async {
+    if (_routes.isEmpty) return;
+    final programLabel = _programs.firstWhere(
+      (p) => p['key'] == _activeProgram,
+      orElse: () => _programs[0],
+    )['label']!;
+    final brandDeep = PdfColor.fromInt(0xFF006047);
+    final brandGreen = PdfColor.fromInt(0xFF00B287);
+    final zebra = PdfColor.fromInt(0xFFF3F4F6);
+    final atlasTotal =
+        _atlasByRoute.values.fold<int>(0, (s, l) => s + l.length);
+
+    pw.Widget cell(String txt, {bool bold = false, double size = 8.5}) =>
+        pw.Padding(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 3.5),
+          child: pw.Text(
+            txt,
+            style: pw.TextStyle(
+              fontSize: size,
+              fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+            ),
+          ),
+        );
+
+    final doc = pw.Document();
+    doc.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(28),
+        build: (ctx) {
+          final w = <pw.Widget>[
+            pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              children: [
+                pw.Container(
+                  width: 5,
+                  height: 20,
+                  margin: const pw.EdgeInsets.only(right: 8),
+                  color: brandGreen,
+                ),
+                pw.Text('Waveplan',
+                    style: pw.TextStyle(
+                        fontSize: 20,
+                        fontWeight: pw.FontWeight.bold,
+                        color: brandDeep)),
+              ],
+            ),
+            pw.SizedBox(height: 2),
+            pw.Text(
+              [
+                programLabel,
+                _pdfDateLabel(_selectedDate),
+                '${_routes.length} Routes',
+                if (atlasTotal > 0) '$atlasTotal Atlas',
+              ].join('  |  '),
+              style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+            ),
+          ];
+          if (_generalNotes.trim().isNotEmpty) {
+            w.add(pw.SizedBox(height: 8));
+            w.add(pw.Container(
+              width: double.infinity,
+              padding:
+                  const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+              decoration: pw.BoxDecoration(
+                color: PdfColor.fromInt(0xFFFFF7ED),
+                borderRadius: pw.BorderRadius.circular(4),
+              ),
+              child: pw.Text(_generalNotes.trim(),
+                  style: pw.TextStyle(
+                      fontSize: 8.5, color: PdfColor.fromInt(0xFF92400E))),
+            ));
+          }
+          for (final wave in _wavesSorted()) {
+            final routes = wave.value;
+            w.add(pw.SizedBox(height: 10));
+            w.add(pw.Container(
+              width: double.infinity,
+              padding:
+                  const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              decoration: pw.BoxDecoration(
+                color: brandDeep,
+                borderRadius: pw.BorderRadius.circular(3),
+              ),
+              child: pw.Text(
+                'Wave ${_hhmm(wave.key)}  |  ${routes.length} Routes',
+                style: pw.TextStyle(
+                    fontSize: 10,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.white),
+              ),
+            ));
+            w.add(pw.SizedBox(height: 3));
+            w.add(pw.Table(
+              border:
+                  pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+              columnWidths: {
+                0: const pw.FlexColumnWidth(1.3),
+                1: const pw.FlexColumnWidth(2.2),
+                2: const pw.FlexColumnWidth(1.5),
+                3: const pw.FlexColumnWidth(0.8),
+                4: const pw.FlexColumnWidth(0.7),
+                5: const pw.FlexColumnWidth(2.8),
+              },
+              children: [
+                pw.TableRow(
+                  decoration: pw.BoxDecoration(color: zebra),
+                  children: [
+                    cell('Route', bold: true, size: 8),
+                    cell('Driver', bold: true, size: 8),
+                    cell('Area', bold: true, size: 8),
+                    cell('Lane', bold: true, size: 8),
+                    cell('End', bold: true, size: 8),
+                    cell('Atlas', bold: true, size: 8),
+                  ],
+                ),
+                for (var i = 0; i < routes.length; i++)
+                  pw.TableRow(
+                    decoration: pw.BoxDecoration(
+                      color: i.isOdd ? zebra : PdfColors.white,
+                    ),
+                    children: [
+                      cell(routes[i].routeCode, bold: true),
+                      cell(() {
+                        final name =
+                            _resolveName(namesMap, routes[i].transporterId);
+                        final mentee = _resolveName(
+                            namesMap, routes[i].menteeTransporterId);
+                        if (name.isEmpty) return '-';
+                        return mentee.isEmpty ? name : '$name + $mentee';
+                      }()),
+                      cell(routes[i].dispatchArea),
+                      cell(routes[i].waitingAreaSpur),
+                      cell(_hhmm(routes[i].shiftEndTime)),
+                      // Atlas: count + tracking numbers, highlighted yellow.
+                      () {
+                        final ids = _atlasByRoute[routes[i].routeCode] ??
+                            const <String>[];
+                        if (ids.isEmpty) return cell('');
+                        return pw.Container(
+                          color: PdfColor.fromInt(0xFFFDE047), // yellow
+                          padding: const pw.EdgeInsets.symmetric(
+                              horizontal: 5, vertical: 3.5),
+                          child: pw.Text(
+                            '${ids.length}: ${ids.join(', ')}',
+                            style: pw.TextStyle(
+                              fontSize: 7,
+                              fontWeight: pw.FontWeight.bold,
+                            ),
+                          ),
+                        );
+                      }(),
+                    ],
+                  ),
+              ],
+            ));
+          }
+
+          // ── Atlas driver list: ONLY drivers carrying Atlas packages ──
+          final atlasDrivers = <List<String>>[
+            for (final wave in _wavesSorted())
+              for (final r in wave.value)
+                if ((_atlasByRoute[r.routeCode] ?? const []).isNotEmpty)
+                  [
+                    () {
+                      final name = _resolveName(namesMap, r.transporterId);
+                      return name.isEmpty ? 'unassigned' : name;
+                    }(),
+                    r.routeCode,
+                    'Wave ${_hhmm(wave.key)}',
+                    (_atlasByRoute[r.routeCode] ?? const []).join(', '),
+                  ],
+          ];
+          if (atlasDrivers.isNotEmpty) {
+            w.add(pw.SizedBox(height: 14));
+            w.add(pw.Container(
+              width: double.infinity,
+              padding:
+                  const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              decoration: pw.BoxDecoration(
+                color: PdfColor.fromInt(0xFFFDE047),
+                borderRadius: pw.BorderRadius.circular(3),
+              ),
+              child: pw.Text(
+                'Atlas drivers (${atlasDrivers.length})',
+                style: pw.TextStyle(
+                    fontSize: 10, fontWeight: pw.FontWeight.bold),
+              ),
+            ));
+            w.add(pw.SizedBox(height: 3));
+            w.add(pw.Table(
+              border:
+                  pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+              columnWidths: {
+                0: const pw.FlexColumnWidth(2.0),
+                1: const pw.FlexColumnWidth(1.1),
+                2: const pw.FlexColumnWidth(1.1),
+                3: const pw.FlexColumnWidth(4.0),
+              },
+              children: [
+                pw.TableRow(
+                  decoration: pw.BoxDecoration(color: zebra),
+                  children: [
+                    cell('Driver', bold: true, size: 8),
+                    cell('Route', bold: true, size: 8),
+                    cell('Wave', bold: true, size: 8),
+                    cell('Atlas packages', bold: true, size: 8),
+                  ],
+                ),
+                for (var i = 0; i < atlasDrivers.length; i++)
+                  pw.TableRow(
+                    decoration: pw.BoxDecoration(
+                      color: i.isOdd
+                          ? PdfColor.fromInt(0xFFFEF9C3) // light yellow
+                          : PdfColors.white,
+                    ),
+                    children: [
+                      cell(atlasDrivers[i][0], bold: true),
+                      cell(atlasDrivers[i][1]),
+                      cell(atlasDrivers[i][2]),
+                      cell(atlasDrivers[i][3], size: 7),
+                    ],
+                  ),
+              ],
+            ));
+          }
+          return w;
+        },
+      ),
+    );
+    await Printing.layoutPdf(
+      name: 'Waveplan_${_dateKeyOf(_selectedDate)}_$_activeProgram.pdf',
+      onLayout: (format) async => doc.save(),
+    );
+  }
+
+  /// Publishes a read-only snapshot under an unguessable public link
+  /// (viewable without login) and shows the copy dialog.
+  Future<void> _shareWaveplan(Map<String, String> namesMap) async {
+    if (_routes.isEmpty) return;
+    final programLabel = _programs.firstWhere(
+      (p) => p['key'] == _activeProgram,
+      orElse: () => _programs[0],
+    )['label']!;
+    final dateKey = _dateKeyOf(_selectedDate);
+
+    final sections = <Map<String, dynamic>>[
+      for (final wave in _wavesSorted())
+        {
+          'title': 'Wave ${_hhmm(wave.key)} · ${wave.value.length} routes',
+          'rows': [
+            for (final r in wave.value)
+              {
+                'primary': () {
+                  final name = _resolveName(namesMap, r.transporterId);
+                  final mentee =
+                      _resolveName(namesMap, r.menteeTransporterId);
+                  final who = name.isEmpty
+                      ? '—'
+                      : (mentee.isEmpty ? name : '$name + $mentee');
+                  return '${r.routeCode} · $who';
+                }(),
+                'secondary': [
+                  // Start–end time so the public viewer shows both, not just
+                  // the wave header time.
+                  if (r.dispatchTime.trim().isNotEmpty &&
+                      r.shiftEndTime.trim().isNotEmpty)
+                    '${_hhmm(r.dispatchTime)} – ${_hhmm(r.shiftEndTime)}'
+                  else if (r.dispatchTime.trim().isNotEmpty)
+                    'from ${_hhmm(r.dispatchTime)}'
+                  else if (r.shiftEndTime.trim().isNotEmpty)
+                    'until ${_hhmm(r.shiftEndTime)}',
+                  if (r.dispatchArea.trim().isNotEmpty) r.dispatchArea,
+                ].join(' · '),
+                // Lane shown as its own green pill in the public viewer.
+                if (r.waitingAreaSpur.trim().isNotEmpty)
+                  'pills': <String>[
+                    r.waitingAreaSpur.toLowerCase() == 'links'
+                        ? 'Lane left'
+                        : r.waitingAreaSpur.toLowerCase() == 'rechts'
+                            ? 'Lane right'
+                            : 'Lane ${r.waitingAreaSpur}',
+                  ],
+                if ((_atlasByRoute[r.routeCode] ?? const []).isNotEmpty) ...{
+                  'badge':
+                      '${(_atlasByRoute[r.routeCode] ?? const []).length} Atlas',
+                  'badgeItems': _atlasByRoute[r.routeCode],
+                },
+              },
+          ],
+        },
+    ];
+
+    try {
+      // Ticket: Sticky Note und diensthabende Dispatcher fehlten im
+      // geteilten Link — beide gehören zum Tagesbild und werden daher
+      // mitgeschickt.
+      var stickyText = '';
+      final stickyRef = _stickyNoteRef();
+      if (stickyRef != null) {
+        try {
+          final snap = await stickyRef.get();
+          final data = snap.data();
+          if (data != null) {
+            final text = (data['text'] ?? '').toString().trim();
+            final vu = data['validUntil'];
+            final vf = data['validFrom'];
+            final now = DateTime.now();
+            final started = vf is! Timestamp || !now.isBefore(vf.toDate());
+            final running = vu is! Timestamp || !now.isAfter(vu.toDate());
+            if (text.isNotEmpty && started && running) stickyText = text;
+          }
+        } catch (_) {}
+      }
+
+      final dispatcherPayload = [
+        for (final name in _selectedDispatchers)
+          {
+            'name': name,
+            'time': [
+              _shiftByDispatcher[name]?.start ?? '',
+              _shiftByDispatcher[name]?.end ?? '',
+            ].where((e) => e.trim().isNotEmpty).join(' - '),
+            'phone': '',
+          },
+      ];
+
+      final url = await PublicPlanService().share(
+        key: 'waveplan_${dateKey}_$_activeProgram',
+        payload: {
+          'type': 'waveplan',
+          'title': 'Waveplan',
+          'subtitle': programLabel,
+          'date': _pdfDateLabel(_selectedDate),
+          'company': '',
+          'station': '',
+          'notes': _generalNotes.trim(),
+          'stickyNote': stickyText,
+          'dispatchers': dispatcherPayload,
+          'sections': sections,
+        },
+      );
+      if (!mounted) return;
+      await showShareLinkDialog(context, url);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            Localizations.localeOf(context).languageCode == 'de'
+                ? 'Link erstellen fehlgeschlagen: $e'
+                : 'Could not create link: $e',
+          ),
+        ),
+      );
+    }
   }
 
   /// Popover program picker anchored to the trigger button — opens
@@ -1616,7 +3695,7 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
         }
 
         return SafeArea(
-          child: Padding(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -1638,6 +3717,24 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
                   onTap: _showPasteDialog,
                 ),
                 tile(
+                  icon: Icons.person_add_alt_1_rounded,
+                  iconBg: AppColors.green50,
+                  iconFg: AppColors.codriverDeep,
+                  label: Localizations.localeOf(context).languageCode == 'de'
+                      ? 'Fahrer manuell hinzufügen'
+                      : 'Add driver manually',
+                  onTap: () => _showManualDriverDialog(_lastNamesMap),
+                ),
+                tile(
+                  icon: Icons.edit_note_rounded,
+                  iconBg: AppColors.green50,
+                  iconFg: AppColors.codriverDeep,
+                  label: Localizations.localeOf(context).languageCode == 'de'
+                      ? 'Manuelle Einträge bearbeiten'
+                      : 'Edit manual entries',
+                  onTap: () => _showManualEntriesSheet(_lastNamesMap),
+                ),
+                tile(
                   icon: Icons.headset_mic_rounded,
                   iconBg: const Color(0xFFE8F1FF),
                   iconFg: const Color(0xFF0A84FF),
@@ -1657,6 +3754,30 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
                   iconFg: AppColors.codriverDeep,
                   label: t.t('waveplan_btn_notes'),
                   onTap: _showNotesDialog,
+                ),
+                // PDF + share link — on desktop these live in the header
+                // bar; on mobile they are only reachable via this sheet.
+                tile(
+                  icon: Icons.picture_as_pdf_outlined,
+                  iconBg: AppColors.surfaceLight,
+                  iconFg: AppColors.codriverDeep,
+                  label: Localizations.localeOf(context).languageCode == 'de'
+                      ? 'PDF exportieren'
+                      : 'Export PDF',
+                  onTap: hasRoutes
+                      ? () => _generateWaveplanPdf(_lastNamesMap)
+                      : null,
+                ),
+                tile(
+                  icon: Icons.link_rounded,
+                  iconBg: AppColors.surfaceLight,
+                  iconFg: AppColors.codriverDeep,
+                  label: Localizations.localeOf(context).languageCode == 'de'
+                      ? 'Link teilen'
+                      : 'Share link',
+                  onTap: hasRoutes
+                      ? () => _shareWaveplan(_lastNamesMap)
+                      : null,
                 ),
                 if (hasRoutes)
                   tile(
@@ -1787,6 +3908,7 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
       _unassigned.clear();
       _waveAnchors.clear();
       _atlasByRoute.clear();
+      _manualNames.clear();
       _atlasConfirmed = false;
       _selectedDispatchers.clear();
       _shiftByDispatcher.clear();
@@ -1794,6 +3916,9 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
       _isPublished = false;
       _publishedAt = null;
     });
+    // Clearing the wave also removes its internal draft.
+    // ignore: discarded_futures
+    _saveDraft();
   }
 }
 
@@ -1812,7 +3937,9 @@ class _SideBySideLayout extends StatelessWidget {
   final void Function(String routeId) onUnassign;
   final void Function(String transporterId) onDropToPool;
   final void Function(String routeId, String? menteeTid) onMenteeChange;
+  final void Function(String routeId) onSpurChange;
   final Set<String> inWaveTids;
+  final List<_PickableDriver> activeDrivers;
 
   const _SideBySideLayout({
     required this.routes,
@@ -1825,7 +3952,9 @@ class _SideBySideLayout extends StatelessWidget {
     required this.onUnassign,
     required this.onDropToPool,
     required this.onMenteeChange,
+    required this.onSpurChange,
     required this.inWaveTids,
+    this.activeDrivers = const <_PickableDriver>[],
   });
 
   @override
@@ -1843,6 +3972,7 @@ class _SideBySideLayout extends StatelessWidget {
             onAssign: onAssign,
             onUnassign: onUnassign,
             onMenteeChange: onMenteeChange,
+            onSpurChange: onSpurChange,
             namesMap: namesMap,
             inWaveTids: inWaveTids,
           ),
@@ -1854,6 +3984,9 @@ class _SideBySideLayout extends StatelessWidget {
             transporterIds: unassigned,
             resolveName: resolveName,
             onDropToPool: onDropToPool,
+            activeDrivers: activeDrivers,
+            inWaveTids: inWaveTids,
+            routes: routes,
           ),
         ),
       ],
@@ -1872,7 +4005,9 @@ class _StackedLayout extends StatelessWidget {
   final void Function(String routeId) onUnassign;
   final void Function(String transporterId) onDropToPool;
   final void Function(String routeId, String? menteeTid) onMenteeChange;
+  final void Function(String routeId) onSpurChange;
   final Set<String> inWaveTids;
+  final List<_PickableDriver> activeDrivers;
 
   const _StackedLayout({
     required this.routes,
@@ -1885,7 +4020,9 @@ class _StackedLayout extends StatelessWidget {
     required this.onUnassign,
     required this.onDropToPool,
     required this.onMenteeChange,
+    required this.onSpurChange,
     required this.inWaveTids,
+    this.activeDrivers = const <_PickableDriver>[],
   });
 
   @override
@@ -1898,6 +4035,9 @@ class _StackedLayout extends StatelessWidget {
             transporterIds: unassigned,
             resolveName: resolveName,
             onDropToPool: onDropToPool,
+            activeDrivers: activeDrivers,
+            inWaveTids: inWaveTids,
+            routes: routes,
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
@@ -1910,6 +4050,7 @@ class _StackedLayout extends StatelessWidget {
             onAssign: onAssign,
             onUnassign: onUnassign,
             onMenteeChange: onMenteeChange,
+            onSpurChange: onSpurChange,
             namesMap: namesMap,
             inWaveTids: inWaveTids,
           ),
@@ -1926,10 +4067,14 @@ class _StackedLayout extends StatelessWidget {
 class _Header extends StatelessWidget {
   final String programLabel;
   final VoidCallback onPaste;
+  final VoidCallback onAddDriver;
+  final VoidCallback onEditEntries;
   final VoidCallback onAtlasPaste;
   final VoidCallback onNotesEdit;
   final VoidCallback? onClear;
   final VoidCallback? onPublishToggle;
+  final VoidCallback? onPdf;
+  final VoidCallback? onShare;
   final bool isPublished;
   final DateTime? publishedAt;
   final int routeCount;
@@ -1941,10 +4086,14 @@ class _Header extends StatelessWidget {
   const _Header({
     required this.programLabel,
     required this.onPaste,
+    required this.onAddDriver,
+    required this.onEditEntries,
     required this.onAtlasPaste,
     required this.onNotesEdit,
     required this.onClear,
     required this.onPublishToggle,
+    this.onPdf,
+    this.onShare,
     required this.isPublished,
     required this.publishedAt,
     required this.routeCount,
@@ -2009,6 +4158,21 @@ class _Header extends StatelessWidget {
           onTap: onPaste,
         ),
         _SmallActionButton(
+          icon: Icons.person_add_alt_1_rounded,
+          label: Localizations.localeOf(context).languageCode == 'de'
+              ? 'Fahrer hinzufügen'
+              : 'Add driver',
+          onTap: onAddDriver,
+          accent: AppColors.codriverDeep,
+        ),
+        _SmallActionButton(
+          icon: Icons.edit_note_rounded,
+          label: Localizations.localeOf(context).languageCode == 'de'
+              ? 'Einträge bearbeiten'
+              : 'Edit entries',
+          onTap: onEditEntries,
+        ),
+        _SmallActionButton(
           icon: atlasConfirmed && atlasTotal == 0
               ? Icons.check_circle_outline_rounded
               : Icons.inventory_2_rounded,
@@ -2040,6 +4204,18 @@ class _Header extends StatelessWidget {
       runSpacing: AppSpacing.xs,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
+        if (onPdf != null)
+          _SmallActionButton(
+            icon: Icons.picture_as_pdf_outlined,
+            label: 'PDF',
+            onTap: onPdf,
+          ),
+        if (onShare != null)
+          _SmallActionButton(
+            icon: Icons.link_rounded,
+            label: 'Link',
+            onTap: onShare,
+          ),
         _SmallActionButton(
           icon: Icons.delete_outline_rounded,
           label: t.t('waveplan_btn_clear'),
@@ -2148,7 +4324,8 @@ class _PublishButtonState extends State<_PublishButton>
           child: AnimatedContainer(
           duration: const Duration(milliseconds: 240),
           curve: Curves.easeOutCubic,
-          height: compact ? 36 : 42,
+          // Compact (= mobile) keeps a >=44px touch target.
+          height: compact ? 44 : 42,
           padding: EdgeInsets.symmetric(
             horizontal: compact ? AppSpacing.md : AppSpacing.lg,
           ),
@@ -2236,8 +4413,9 @@ class _RoundPlusButton extends StatelessWidget {
       child: CoPressable(
         onTap: onTap,
         child: Container(
-          width: 38,
-          height: 38,
+          // 44px — comfortable touch target on phones (mobile-only widget).
+          width: 44,
+          height: 44,
           decoration: BoxDecoration(
             color: AppColors.codriverGreen,
             shape: BoxShape.circle,
@@ -2269,8 +4447,9 @@ class _RoundDangerButton extends StatelessWidget {
       child: CoPressable(
         onTap: onTap,
         child: Container(
-          width: 38,
-          height: 38,
+          // 44px — comfortable touch target on phones (mobile-only widget).
+          width: 44,
+          height: 44,
           decoration: BoxDecoration(
             color: const Color(0xFFFDECEC),
             shape: BoxShape.circle,
@@ -2383,7 +4562,8 @@ class _ProgramPicker extends StatelessWidget {
       child: GestureDetector(
         onTap: () => onTap(context),
         child: Container(
-          height: 36,
+          // Mobile-only pill — 44px for a comfortable touch target.
+          height: 44,
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.sm,
           ),
@@ -2507,6 +4687,7 @@ class _RouteList extends StatelessWidget {
   final void Function(String routeId, String transporterId) onAssign;
   final void Function(String routeId) onUnassign;
   final void Function(String routeId, String? menteeTid) onMenteeChange;
+  final void Function(String routeId) onSpurChange;
   final Map<String, String> namesMap;
   final Set<String> inWaveTids;
 
@@ -2518,6 +4699,7 @@ class _RouteList extends StatelessWidget {
     required this.onAssign,
     required this.onUnassign,
     required this.onMenteeChange,
+    required this.onSpurChange,
     required this.namesMap,
     required this.inWaveTids,
   });
@@ -2568,6 +4750,7 @@ class _RouteList extends StatelessWidget {
           onUnassign: () => onUnassign(routeItem.route.routeId),
           onMenteeChange: (mTid) =>
               onMenteeChange(routeItem.route.routeId, mTid),
+          onSpurChange: () => onSpurChange(routeItem.route.routeId),
           namesMap: namesMap,
           inWaveTids: inWaveTids,
           isAlternate: routeItem.isAlternate,
@@ -2719,11 +4902,17 @@ class _AddDispatcherChip extends StatelessWidget {
                 color: AppColors.codriverDeep,
               ),
               const SizedBox(width: 4),
-              Text(
-                name,
-                style: AppTypography.footnote.copyWith(
-                  color: AppColors.codriverGraphite,
-                  fontWeight: FontWeight.w600,
+              // Ellipsis instead of overflowing narrow (mobile) rows.
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 160),
+                child: Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.footnote.copyWith(
+                    color: AppColors.codriverGraphite,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
@@ -2751,8 +4940,11 @@ class _DispatcherRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
+    // Wrap instead of Row: on narrow (mobile bottom-sheet) widths the
+    // time dropdowns flow onto the next line instead of overflowing.
+    return Wrap(
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         // Selected pill — name + inline X. Clicking the X (or the
         // whole pill) removes the dispatcher from the selection.
@@ -2777,11 +4969,18 @@ class _DispatcherRow extends StatelessWidget {
                     color: Colors.white,
                   ),
                   const SizedBox(width: 4),
-                  Text(
-                    name,
-                    style: AppTypography.footnote.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
+                  // Cap the name so pill + time dropdowns never exceed a
+                  // narrow (mobile bottom-sheet) row width.
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 120),
+                    child: Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.footnote.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 6),
@@ -2917,18 +5116,22 @@ class _WaveSectionHeader extends StatelessWidget {
         ),
         const SizedBox(width: AppSpacing.xs),
         Text(
-          'Wave ${wave.substring(0, 5)}',
+          'Wave ${_shortClock(wave)}',
           style: AppTypography.title3.copyWith(
             fontWeight: FontWeight.w700,
             color: AppColors.codriverGraphite,
           ),
         ),
         const SizedBox(width: AppSpacing.xs),
-        Text(
-          t.tf('waveplan_wave_routes_count', {'count': '$count'}),
-          style: AppTypography.subheadline.copyWith(
-            color: AppColors.labelSecondaryLight,
-            fontWeight: FontWeight.w500,
+        Flexible(
+          child: Text(
+            t.tf('waveplan_wave_routes_count', {'count': '$count'}),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTypography.subheadline.copyWith(
+              color: AppColors.labelSecondaryLight,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
       ],
@@ -2946,6 +5149,7 @@ class _RouteCard extends StatelessWidget {
   final ValueChanged<String> onAssign;
   final VoidCallback onUnassign;
   final ValueChanged<String?> onMenteeChange;
+  final VoidCallback onSpurChange;
   final Map<String, String> namesMap;
   final Set<String> inWaveTids;
   final bool isAlternate;
@@ -2957,19 +5161,24 @@ class _RouteCard extends StatelessWidget {
     required this.onAssign,
     required this.onUnassign,
     required this.onMenteeChange,
+    required this.onSpurChange,
     required this.namesMap,
     required this.inWaveTids,
     required this.isAlternate,
   });
 
   bool _isLeft() => route.waitingAreaSpur.toLowerCase() == 'links';
+  bool _hasSpur() => route.waitingAreaSpur.trim().isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
     final left = _isLeft();
-    final spurColor = left
-        ? const Color(0xFF0A84FF) // iOS blue — links
-        : AppColors.codriverGreen; // brand green — rechts
+    final hasSpur = _hasSpur();
+    final spurColor = !hasSpur
+        ? const Color(0xFF9CA3AF) // neutral grey — lane not set yet
+        : left
+            ? const Color(0xFF0A84FF) // iOS blue — links
+            : AppColors.codriverGreen; // brand green — rechts
 
     return DragTarget<String>(
       onWillAcceptWithDetails: (d) => d.data != route.transporterId,
@@ -3022,6 +5231,7 @@ class _RouteCard extends StatelessWidget {
                                     : '',
                                 onRemove: onUnassign,
                                 onMenteeChange: onMenteeChange,
+                                onReplaceDriver: onAssign,
                                 namesMap: namesMap,
                                 inWaveTids: inWaveTids,
                                 compact: true,
@@ -3046,6 +5256,7 @@ class _RouteCard extends StatelessWidget {
                                     : '',
                                 onRemove: onUnassign,
                                 onMenteeChange: onMenteeChange,
+                                onReplaceDriver: onAssign,
                                 namesMap: namesMap,
                                 inWaveTids: inWaveTids,
                               )
@@ -3053,7 +5264,13 @@ class _RouteCard extends StatelessWidget {
                       ),
                     ),
                   const SizedBox(width: AppSpacing.sm),
-                  _SpurIndicator(left: left, color: spurColor),
+                  _SpurIndicator(
+                    left: left,
+                    color: spurColor,
+                    hasSpur: hasSpur,
+                    onTap: onSpurChange,
+                    expandTouchTarget: isCompact,
+                  ),
                   const SizedBox(width: AppSpacing.sm),
                   // Route metadata — compact, one column. Atlas chip
                   // is placed BEFORE the route code so the parcel
@@ -3116,9 +5333,19 @@ class _RouteCard extends StatelessWidget {
                           ],
                         ),
                         Text(
-                          '${_normalizeServiceType(route.serviceType)}  ·  '
-                          '${route.dispatchTime.substring(0, 5)}–'
-                          '${route.shiftEndTime.substring(0, 5)}',
+                          () {
+                            // TMGM imports carry no service type / shift
+                            // end — build the line only from what exists.
+                            final parts = <String>[
+                              if (route.serviceType.trim().isNotEmpty)
+                                _normalizeServiceType(route.serviceType),
+                              route.shiftEndTime.trim().isEmpty
+                                  ? _shortClock(route.dispatchTime)
+                                  : '${_shortClock(route.dispatchTime)}–'
+                                      '${_shortClock(route.shiftEndTime)}',
+                            ];
+                            return parts.join('  ·  ');
+                          }(),
                           style: AppTypography.caption1.copyWith(
                             color: AppColors.labelSecondaryLight,
                           ),
@@ -3332,11 +5559,24 @@ Future<void> _showAtlasTrackingPopup(
 class _SpurIndicator extends StatelessWidget {
   final bool left;
   final Color color;
-  const _SpurIndicator({required this.left, required this.color});
+  final bool hasSpur;
+  final VoidCallback? onTap;
+  /// Adds invisible vertical hit-padding so the tap target reaches
+  /// ~44px on touch devices (visuals stay identical). Only enabled in
+  /// the compact/mobile route-card layout.
+  final bool expandTouchTarget;
+  const _SpurIndicator({
+    required this.left,
+    required this.color,
+    this.hasSpur = true,
+    this.onTap,
+    this.expandTouchTarget = false,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final indicator = Container(
       width: 46,
       padding: const EdgeInsets.symmetric(vertical: 3),
       decoration: BoxDecoration(
@@ -3348,13 +5588,17 @@ class _SpurIndicator extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            left ? Icons.arrow_back_rounded : Icons.arrow_forward_rounded,
+            !hasSpur
+                ? Icons.swap_horiz_rounded
+                : (left
+                    ? Icons.arrow_back_rounded
+                    : Icons.arrow_forward_rounded),
             size: 14,
             color: color,
           ),
           const SizedBox(height: 1),
           Text(
-            left ? 'links' : 'rechts',
+            !hasSpur ? (de ? 'Spur' : 'lane') : (left ? 'links' : 'rechts'),
             style: TextStyle(
               fontSize: 9.5,
               color: color,
@@ -3363,6 +5607,24 @@ class _SpurIndicator extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+    if (onTap == null) return indicator;
+    return Tooltip(
+      message: de
+          ? 'Spur ändern (links / rechts / keine)'
+          : 'Change lane (left / right / none)',
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: expandTouchTarget
+            // Invisible padding inside the InkWell grows the tap area
+            // to ~44px without changing the drawn indicator.
+            ? Padding(
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                child: indicator,
+              )
+            : indicator,
       ),
     );
   }
@@ -3422,6 +5684,10 @@ class _DriverChip extends StatelessWidget {
   final ValueChanged<String?> onMenteeChange;
   final Map<String, String> namesMap;
   final Set<String> inWaveTids;
+  /// Called when the admin uses "Fahrer ersetzen" in the chip menu.
+  /// `null` disables the menu entry (used in the unassigned pool where
+  /// replacement doesn't make sense).
+  final ValueChanged<String>? onReplaceDriver;
   /// Compact (mobile) variant: drops the person avatar + close
   /// button so the chip fits next to the spur indicator on a phone.
   /// Long press still triggers the drag handle.
@@ -3437,6 +5703,7 @@ class _DriverChip extends StatelessWidget {
     this.menteeTransporterId,
     this.menteeName = '',
     this.dsp,
+    this.onReplaceDriver,
     this.compact = false,
   });
 
@@ -3450,6 +5717,7 @@ class _DriverChip extends StatelessWidget {
       menteeName: menteeName,
       onRemove: onRemove,
       onMenteeChange: onMenteeChange,
+      onReplaceDriver: onReplaceDriver,
       namesMap: namesMap,
       inWaveTids: inWaveTids,
       compact: compact,
@@ -3491,6 +5759,7 @@ class _ChipBody extends StatelessWidget {
   final String? menteeTransporterId;
   final String menteeName;
   final ValueChanged<String?> onMenteeChange;
+  final ValueChanged<String>? onReplaceDriver;
   final Map<String, String> namesMap;
   final Set<String> inWaveTids;
   final bool elevated;
@@ -3506,6 +5775,7 @@ class _ChipBody extends StatelessWidget {
     this.menteeTransporterId,
     this.menteeName = '',
     this.dsp,
+    this.onReplaceDriver,
     this.elevated = false,
     this.compact = false,
   });
@@ -3516,6 +5786,7 @@ class _ChipBody extends StatelessWidget {
   static const Color _kMenteeBlue = Color(0xFF0A84FF);
 
   Future<void> _openMenu(BuildContext context) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final box = context.findRenderObject() as RenderBox?;
     final overlay =
         Overlay.of(context).context.findRenderObject() as RenderBox?;
@@ -3537,6 +5808,30 @@ class _ChipBody extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
       ),
       items: [
+        PopupMenuItem<String>(
+          value: 'open_profile',
+          height: 44,
+          child: Row(
+            children: [
+              const Icon(
+                Icons.person_outline_rounded,
+                size: 18,
+                color: AppColors.codriverGreen,
+              ),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Text(
+                  de ? 'Fahrerprofil öffnen' : 'Open driver profile',
+                  style: AppTypography.subheadline.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.codriverGreen,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(),
         PopupMenuItem<String>(
           value: 'copy_tid',
           height: 44,
@@ -3575,6 +5870,33 @@ class _ChipBody extends StatelessWidget {
             ],
           ),
         ),
+        if (onReplaceDriver != null) const PopupMenuDivider(),
+        if (onReplaceDriver != null)
+          PopupMenuItem<String>(
+            value: 'replace_driver',
+            height: 44,
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.swap_horiz_rounded,
+                  size: 18,
+                  color: Color(0xFFC2410C),
+                ),
+                const SizedBox(width: 10),
+                Flexible(
+                  child: Text(
+                    de ? 'Fahrer ersetzen' : 'Replace driver',
+                    style: AppTypography.subheadline.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFFC2410C),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
         const PopupMenuDivider(),
         PopupMenuItem<String>(
           value: 'mentee',
@@ -3616,7 +5938,7 @@ class _ChipBody extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 Text(
-                  'Mentee entfernen',
+                  de ? 'Mentee entfernen' : 'Remove mentee',
                   style: AppTypography.subheadline.copyWith(
                     fontWeight: FontWeight.w700,
                     color: const Color(0xFFB91C1C),
@@ -3630,6 +5952,25 @@ class _ChipBody extends StatelessWidget {
 
     if (!context.mounted) return;
     switch (picked) {
+      case 'open_profile':
+        // Copy TID to clipboard so the user can paste it into the
+        // Drivers Hub search bar immediately, then route them there.
+        await Clipboard.setData(ClipboardData(text: transporterId));
+        if (!context.mounted) return;
+        Navigator.of(context).pushNamed('/drivers');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              de
+                  ? 'TID kopiert ($transporterId) — füge sie in die '
+                      'Drivers-Hub-Suche ein, um $driverName zu öffnen.'
+                  : 'TID copied ($transporterId) — paste it into the '
+                      'Drivers Hub search to open $driverName.',
+            ),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        break;
       case 'copy_tid':
         await Clipboard.setData(ClipboardData(text: transporterId));
         if (!context.mounted) return;
@@ -3659,11 +6000,42 @@ class _ChipBody extends StatelessWidget {
       case 'mentee_remove':
         onMenteeChange(null);
         break;
+      case 'replace_driver':
+        if (onReplaceDriver == null) break;
+        final namedDrivers = <String, String>{};
+        for (final entry in namesMap.entries) {
+          final tid = entry.key.trim().toUpperCase();
+          if (tid.isEmpty || tid.length < 4) continue;
+          if (namedDrivers.containsKey(tid)) continue;
+          namedDrivers[tid] = entry.value.trim();
+        }
+        final drivers = namedDrivers.entries
+            .map((e) => _PickableDriver(tid: e.key, name: e.value))
+            .toList();
+        final newTid = await showDialog<String>(
+          context: context,
+          builder: (ctx) => _WaveplanDriverPickerDialog(
+            drivers: drivers,
+            title: de ? 'Fahrer ersetzen' : 'Replace driver',
+            subtitle: de
+                ? 'Aktuell: ${driverName.isEmpty ? transporterId : driverName}'
+                : 'Current: ${driverName.isEmpty ? transporterId : driverName}',
+            currentTid: transporterId,
+            disabledTids: inWaveTids,
+            icon: Icons.swap_horiz_rounded,
+            accent: const Color(0xFFC2410C),
+          ),
+        );
+        if (newTid != null && newTid.trim().isNotEmpty) {
+          onReplaceDriver!(newTid.trim());
+        }
+        break;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final hasName = driverName.trim().isNotEmpty;
     final borderColor =
         _hasMentee ? _kMenteeBlue : AppColors.codriverGreen;
@@ -3718,7 +6090,9 @@ class _ChipBody extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        hasName ? driverName : '— kein Name —',
+                        hasName
+                            ? driverName
+                            : (de ? '— kein Name —' : '— no name —'),
                         style: TextStyle(
                           fontSize: compact ? 12 : 13,
                           height: 1.15,
@@ -3838,6 +6212,7 @@ class _AddMenteeDialogState extends State<_AddMenteeDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final allEntries = widget.namesMap.entries.toList()
       ..sort((a, b) =>
           a.value.toLowerCase().compareTo(b.value.toLowerCase()));
@@ -3889,13 +6264,15 @@ class _AddMenteeDialogState extends State<_AddMenteeDialog> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'Mentee hinzufügen',
+                          de ? 'Mentee hinzufügen' : 'Add mentee',
                           style: AppTypography.title3.copyWith(
                             color: AppColors.codriverGraphite,
                           ),
                         ),
                         Text(
-                          'Nur Fahrer, die noch nicht in der Wave sind.',
+                          de
+                              ? 'Nur Fahrer, die noch nicht in der Wave sind.'
+                              : 'Only drivers not yet in the wave.',
                           style: AppTypography.footnote.copyWith(
                             color: AppColors.labelSecondaryLight,
                           ),
@@ -3916,7 +6293,8 @@ class _AddMenteeDialogState extends State<_AddMenteeDialog> {
                 autofocus: true,
                 onChanged: (v) => setState(() => _query = v),
                 decoration: InputDecoration(
-                  hintText: 'Name oder TID suchen…',
+                  hintText:
+                      de ? 'Name oder TID suchen…' : 'Search name or TID…',
                   prefixIcon: const Icon(Icons.search, size: 20),
                   filled: true,
                   fillColor: const Color(0xFFF9FAFB),
@@ -3949,7 +6327,9 @@ class _AddMenteeDialogState extends State<_AddMenteeDialog> {
                         padding: const EdgeInsets.symmetric(vertical: 32),
                         child: Center(
                           child: Text(
-                            'Keine passenden Fahrer gefunden.',
+                            de
+                                ? 'Keine passenden Fahrer gefunden.'
+                                : 'No matching drivers found.',
                             style: AppTypography.body.copyWith(
                               color: AppColors.labelSecondaryLight,
                             ),
@@ -4002,7 +6382,9 @@ class _AddMenteeDialogState extends State<_AddMenteeDialog> {
                                         Text(
                                           name.isNotEmpty
                                               ? name
-                                              : '— kein Name —',
+                                              : (de
+                                                  ? '— kein Name —'
+                                                  : '— no name —'),
                                           style: AppTypography.subheadline
                                               .copyWith(
                                             color:
@@ -4136,23 +6518,190 @@ class _CopyableIdState extends State<_CopyableId> {
 //  Unassigned pool (right column)
 // ════════════════════════════════════════════════════════════════════════════
 
-class _UnassignedPool extends StatelessWidget {
+class _UnassignedPool extends StatefulWidget {
   final List<String> transporterIds;
   final String Function(String? transporterId) resolveName;
   final void Function(String transporterId) onDropToPool;
+  /// All currently-working drivers of the DSP — used for the "Add from
+  /// Drivers Hub" picker (with sort by Name/Newest/Oldest) and to power
+  /// Newest/Oldest sort on the pool itself.
+  final List<_PickableDriver> activeDrivers;
+  final Set<String> inWaveTids;
+  /// All routes of the day — the pool search also surfaces drivers who
+  /// are ALREADY assigned (ticket: "search option is not working" when
+  /// the searched driver sits on a route and the pool is empty).
+  final List<WaveplanRoute> routes;
 
   const _UnassignedPool({
     required this.transporterIds,
     required this.resolveName,
     required this.onDropToPool,
+    this.activeDrivers = const <_PickableDriver>[],
+    this.inWaveTids = const <String>{},
+    this.routes = const <WaveplanRoute>[],
   });
+
+  @override
+  State<_UnassignedPool> createState() => _UnassignedPoolState();
+}
+
+class _UnassignedPoolState extends State<_UnassignedPool> {
+  final TextEditingController _q = TextEditingController();
+  String _query = '';
+  _DriverPickerSort _sort = _DriverPickerSort.name;
+
+  @override
+  void dispose() {
+    _q.dispose();
+    super.dispose();
+  }
+
+  Future<void> _addFromHub() async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final disabled = <String>{
+      ...widget.inWaveTids.map((t) => t.toUpperCase()),
+      ...widget.transporterIds.map((t) => t.toUpperCase()),
+    };
+    final picked = await showDialog<String>(
+      context: context,
+      builder: (ctx) => _WaveplanDriverPickerDialog(
+        drivers: widget.activeDrivers,
+        title: de
+            ? 'Fahrer aus Drivers Hub hinzufügen'
+            : 'Add driver from Drivers Hub',
+        subtitle: de
+            ? 'Alle aktiven Fahrer · sortierbar nach Name / Neueste / Älteste'
+            : 'All active drivers · sort by name / newest / oldest',
+        disabledTids: disabled,
+        icon: Icons.person_add_alt_1_rounded,
+        accent: AppColors.codriverGreen,
+        initialSort: _sort,
+      ),
+    );
+    if (picked != null && picked.trim().isNotEmpty) {
+      widget.onDropToPool(picked.trim());
+    }
+  }
+
+  List<String> _displayedTids() {
+    // Build TID → _PickableDriver lookup so we can sort by createdAt.
+    final byTid = <String, _PickableDriver>{};
+    for (final d in widget.activeDrivers) {
+      byTid[d.tid.toUpperCase()] = d;
+    }
+
+    final cleanQ = _query.trim().toLowerCase();
+    final filtered = widget.transporterIds.where((tid) {
+      if (cleanQ.isEmpty) return true;
+      if (tid.toLowerCase().contains(cleanQ)) return true;
+      final name = widget.resolveName(tid).toLowerCase();
+      return name.contains(cleanQ);
+    }).toList();
+
+    int byName(String a, String b) {
+      final na = widget.resolveName(a).toLowerCase();
+      final nb = widget.resolveName(b).toLowerCase();
+      if (na.isEmpty && nb.isEmpty) return a.compareTo(b);
+      if (na.isEmpty) return 1;
+      if (nb.isEmpty) return -1;
+      return na.compareTo(nb);
+    }
+
+    int byCreated(String a, String b, {required bool asc}) {
+      final ta = byTid[a.toUpperCase()]?.createdAt;
+      final tb = byTid[b.toUpperCase()]?.createdAt;
+      if (ta == null && tb == null) return byName(a, b);
+      if (ta == null) return 1;
+      if (tb == null) return -1;
+      return asc ? ta.compareTo(tb) : tb.compareTo(ta);
+    }
+
+    switch (_sort) {
+      case _DriverPickerSort.name:
+        filtered.sort(byName);
+      case _DriverPickerSort.newest:
+        filtered.sort((a, b) => byCreated(a, b, asc: false));
+      case _DriverPickerSort.oldest:
+        filtered.sort((a, b) => byCreated(a, b, asc: true));
+    }
+    return filtered;
+  }
+
+  /// Zugewiesene Fahrer, die zur Suche passen — als Info-Zeilen mit
+  /// Route und Welle unter den Pool-Treffern.
+  List<Widget> _assignedMatches() {
+    final q = _query.trim().toLowerCase();
+    if (q.isEmpty) return const [];
+    final hits = widget.routes.where((r) {
+      final tid = (r.transporterId ?? '').toLowerCase();
+      if (tid.isEmpty) return false;
+      final name = widget.resolveName(r.transporterId).toLowerCase();
+      return tid.contains(q) || name.contains(q);
+    }).toList();
+    if (hits.isEmpty) return const [];
+    return [
+      Padding(
+        padding: const EdgeInsets.only(top: AppSpacing.sm, bottom: 4),
+        child: Text(
+          'Bereits zugewiesen',
+          style: AppTypography.caption2.copyWith(
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.4,
+            color: AppColors.labelSecondaryLight,
+          ),
+        ),
+      ),
+      for (final r in hits)
+        Container(
+          margin: const EdgeInsets.only(bottom: 6),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF9FAFB),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded,
+                  size: 15, color: Color(0xFF00B287)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.resolveName(r.transporterId),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.footnote.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.codriverGraphite,
+                      ),
+                    ),
+                    Text(
+                      '${r.routeCode} · Wave ${r.dispatchTime}',
+                      style: AppTypography.caption2.copyWith(
+                        color: AppColors.labelSecondaryLight,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final displayed = _displayedTids();
     return DragTarget<String>(
-      onWillAcceptWithDetails: (d) => !transporterIds.contains(d.data),
-      onAcceptWithDetails: (d) => onDropToPool(d.data),
+      onWillAcceptWithDetails: (d) => !widget.transporterIds.contains(d.data),
+      onAcceptWithDetails: (d) => widget.onDropToPool(d.data),
       builder: (context, candidate, _) {
         final hovered = candidate.isNotEmpty;
         return AnimatedContainer(
@@ -4163,9 +6712,7 @@ class _UnassignedPool extends StatelessWidget {
             borderRadius: BorderRadius.circular(18),
             boxShadow: AppElevation.level1,
             border: Border.all(
-              color: hovered
-                  ? AppColors.codriverGreen
-                  : Colors.transparent,
+              color: hovered ? AppColors.codriverGreen : Colors.transparent,
               width: 1.5,
             ),
           ),
@@ -4181,7 +6728,7 @@ class _UnassignedPool extends StatelessWidget {
                   ),
                   const SizedBox(width: AppSpacing.xs),
                   Text(
-                    'Noch nicht zugewiesen',
+                    de ? 'Noch nicht zugewiesen' : 'Not assigned yet',
                     style: AppTypography.headline.copyWith(
                       color: AppColors.codriverGraphite,
                     ),
@@ -4197,7 +6744,7 @@ class _UnassignedPool extends StatelessWidget {
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
-                      '${transporterIds.length}',
+                      '${displayed.length}/${widget.transporterIds.length}',
                       style: AppTypography.caption1.copyWith(
                         fontWeight: FontWeight.w700,
                         color: AppColors.labelSecondaryLight,
@@ -4206,40 +6753,134 @@ class _UnassignedPool extends StatelessWidget {
                   ),
                 ],
               ),
+              const SizedBox(height: AppSpacing.xs),
+              if (widget.activeDrivers.isNotEmpty)
+                SizedBox(
+                  width: double.infinity,
+                  child: CoButton(
+                    onPressed: _addFromHub,
+                    icon: Icons.person_add_alt_1_rounded,
+                    label: de ? 'Fahrer aus Hub hinzufügen' : 'Add from Hub',
+                    variant: CoButtonVariant.secondaryOutlined,
+                  ),
+                ),
+              const SizedBox(height: AppSpacing.xs),
+              TextField(
+                controller: _q,
+                onChanged: (v) => setState(() => _query = v),
+                decoration: InputDecoration(
+                  hintText: de ? 'Suchen…' : 'Search…',
+                  isDense: true,
+                  prefixIcon: const Icon(Icons.search, size: 18),
+                  suffixIcon: _query.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear_rounded, size: 16),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 28,
+                            minHeight: 28,
+                          ),
+                          onPressed: () {
+                            _q.clear();
+                            setState(() => _query = '');
+                          },
+                        )
+                      : null,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _SortChip(
+                      label: 'Name',
+                      selected: _sort == _DriverPickerSort.name,
+                      accent: AppColors.codriverGreen,
+                      onTap: () => setState(
+                        () => _sort = _DriverPickerSort.name,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    _SortChip(
+                      label: de ? 'Neueste' : 'Newest',
+                      selected: _sort == _DriverPickerSort.newest,
+                      accent: AppColors.codriverGreen,
+                      onTap: () => setState(
+                        () => _sort = _DriverPickerSort.newest,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    _SortChip(
+                      label: de ? 'Älteste' : 'Oldest',
+                      selected: _sort == _DriverPickerSort.oldest,
+                      accent: AppColors.codriverGreen,
+                      onTap: () => setState(
+                        () => _sort = _DriverPickerSort.oldest,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: AppSpacing.sm),
               Expanded(
-                child: transporterIds.isEmpty
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(AppSpacing.md),
-                          child: Text(
-                            t.t('waveplan_pool_empty'),
-                            textAlign: TextAlign.center,
-                            style: AppTypography.footnote.copyWith(
-                              color: AppColors.labelTertiaryLight,
-                            ),
+                child: ListView(
+                  children: [
+                    if (displayed.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        child: Text(
+                          widget.transporterIds.isEmpty
+                              ? (_query.trim().isEmpty
+                                  ? t.t('waveplan_pool_empty')
+                                  : '')
+                              : (de
+                                  ? 'Keine Treffer im Pool für „$_query".'
+                                  : 'No matches in the pool for "$_query".'),
+                          textAlign: TextAlign.center,
+                          style: AppTypography.footnote.copyWith(
+                            color: AppColors.labelTertiaryLight,
                           ),
                         ),
                       )
-                    : ListView.separated(
-                        itemCount: transporterIds.length,
-                        separatorBuilder: (_, __) =>
-                            const SizedBox(height: AppSpacing.xs),
-                        itemBuilder: (_, i) => Align(
-                          alignment: Alignment.centerLeft,
-                          child: _DriverChip(
-                            transporterId: transporterIds[i],
-                            driverName: resolveName(transporterIds[i]),
-                            dsp: 'AION',
-                            // Pool drivers stay where they are; tap is no-op.
-                            onRemove: () {},
-                            // Mentee picker not applicable in the pool.
-                            onMenteeChange: (_) {},
-                            namesMap: const <String, String>{},
-                            inWaveTids: const <String>{},
+                    else
+                      for (final tid in displayed)
+                        Padding(
+                          padding: const EdgeInsets.only(
+                              bottom: AppSpacing.xs),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: _DriverChip(
+                              transporterId: tid,
+                              driverName: widget.resolveName(tid),
+                              dsp: 'AION',
+                              // Pool drivers stay where they are; tap is no-op.
+                              onRemove: () {},
+                              // Mentee picker not applicable in the pool.
+                              onMenteeChange: (_) {},
+                              namesMap: const <String, String>{},
+                              inWaveTids: const <String>{},
+                            ),
                           ),
                         ),
-                      ),
+                    // Suche findet auch bereits zugewiesene Fahrer —
+                    // mit Route + Welle, damit die Suche immer eine
+                    // Antwort liefert.
+                    ..._assignedMatches(),
+                  ],
+                ),
               ),
             ],
           ),
@@ -4367,4 +7008,398 @@ class _ShiftPlanTimePill extends StatelessWidget {
       ),
     );
   }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  Generic driver picker (Search + Sort) — used for Replace Driver,
+//  "Add from Drivers Hub", and global driver search.
+// ════════════════════════════════════════════════════════════════════════════
+
+class _PickableDriver {
+  final String tid;
+  final String name;
+  final DateTime? createdAt;
+  const _PickableDriver({
+    required this.tid,
+    required this.name,
+    this.createdAt,
+  });
+}
+
+enum _DriverPickerSort { name, newest, oldest }
+
+class _WaveplanDriverPickerDialog extends StatefulWidget {
+  const _WaveplanDriverPickerDialog({
+    required this.drivers,
+    required this.title,
+    this.subtitle,
+    this.disabledTids = const <String>{},
+    this.currentTid,
+    this.icon = Icons.person_search_rounded,
+    this.accent = const Color(0xFF0A84FF),
+    this.initialSort = _DriverPickerSort.name,
+  });
+
+  final List<_PickableDriver> drivers;
+  final String title;
+  final String? subtitle;
+  final Set<String> disabledTids;
+  final String? currentTid;
+  final IconData icon;
+  final Color accent;
+  final _DriverPickerSort initialSort;
+
+  @override
+  State<_WaveplanDriverPickerDialog> createState() =>
+      _WaveplanDriverPickerDialogState();
+}
+
+class _WaveplanDriverPickerDialogState
+    extends State<_WaveplanDriverPickerDialog> {
+  final TextEditingController _q = TextEditingController();
+  String _query = '';
+  late _DriverPickerSort _sort = widget.initialSort;
+
+  @override
+  void dispose() {
+    _q.dispose();
+    super.dispose();
+  }
+
+  List<_PickableDriver> _filteredAndSorted() {
+    final cleanQ = _query.trim().toLowerCase();
+    final currentUpper = (widget.currentTid ?? '').trim().toUpperCase();
+    final list = widget.drivers.where((d) {
+      final isCurrent = d.tid.toUpperCase() == currentUpper;
+      final taken =
+          widget.disabledTids.contains(d.tid.toUpperCase()) && !isCurrent;
+      if (taken) return false;
+      if (cleanQ.isEmpty) return true;
+      return d.name.toLowerCase().contains(cleanQ) ||
+          d.tid.toLowerCase().contains(cleanQ);
+    }).toList();
+
+    int byName(_PickableDriver a, _PickableDriver b) {
+      final na = a.name.toLowerCase();
+      final nb = b.name.toLowerCase();
+      if (na.isEmpty && nb.isEmpty) return a.tid.compareTo(b.tid);
+      if (na.isEmpty) return 1;
+      if (nb.isEmpty) return -1;
+      return na.compareTo(nb);
+    }
+
+    int byCreated(_PickableDriver a, _PickableDriver b, {required bool asc}) {
+      final ta = a.createdAt;
+      final tb = b.createdAt;
+      if (ta == null && tb == null) return byName(a, b);
+      if (ta == null) return 1;
+      if (tb == null) return -1;
+      return asc ? ta.compareTo(tb) : tb.compareTo(ta);
+    }
+
+    switch (_sort) {
+      case _DriverPickerSort.name:
+        list.sort(byName);
+      case _DriverPickerSort.newest:
+        list.sort((a, b) => byCreated(a, b, asc: false));
+      case _DriverPickerSort.oldest:
+        list.sort((a, b) => byCreated(a, b, asc: true));
+    }
+    return list;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final filtered = _filteredAndSorted();
+    final accent = widget.accent;
+    return Dialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      insetPadding: const EdgeInsets.all(20),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560, maxHeight: 680),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: accent.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(widget.icon, color: accent, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          widget.title,
+                          style: AppTypography.title3.copyWith(
+                            color: AppColors.codriverGraphite,
+                          ),
+                        ),
+                        if (widget.subtitle != null)
+                          Text(
+                            widget.subtitle!,
+                            style: AppTypography.footnote.copyWith(
+                              color: AppColors.labelSecondaryLight,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                    color: AppColors.labelSecondaryLight,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _q,
+                autofocus: true,
+                onChanged: (v) => setState(() => _query = v),
+                decoration: InputDecoration(
+                  hintText:
+                      de ? 'Name oder TID suchen…' : 'Search name or TID…',
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  filled: true,
+                  fillColor: const Color(0xFFF9FAFB),
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 14,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: accent, width: 1.4),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Text(
+                    de ? 'Sortieren:' : 'Sort:',
+                    style: AppTypography.caption1.copyWith(
+                      color: AppColors.labelSecondaryLight,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _SortChip(
+                            label: 'Name',
+                            selected: _sort == _DriverPickerSort.name,
+                            accent: accent,
+                            onTap: () => setState(
+                              () => _sort = _DriverPickerSort.name,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          _SortChip(
+                            label: de ? 'Neueste' : 'Newest',
+                            selected: _sort == _DriverPickerSort.newest,
+                            accent: accent,
+                            onTap: () => setState(
+                              () => _sort = _DriverPickerSort.newest,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          _SortChip(
+                            label: de ? 'Älteste' : 'Oldest',
+                            selected: _sort == _DriverPickerSort.oldest,
+                            accent: accent,
+                            onTap: () => setState(
+                              () => _sort = _DriverPickerSort.oldest,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '${filtered.length}',
+                    style: AppTypography.caption1.copyWith(
+                      color: AppColors.labelTertiaryLight,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Flexible(
+                child: filtered.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 32),
+                        child: Center(
+                          child: Text(
+                            de
+                                ? 'Keine passenden Fahrer gefunden.'
+                                : 'No matching drivers found.',
+                            style: AppTypography.body.copyWith(
+                              color: AppColors.labelSecondaryLight,
+                            ),
+                          ),
+                        ),
+                      )
+                    : ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, __) => const Divider(
+                          height: 1,
+                          color: Color(0xFFE5E7EB),
+                        ),
+                        itemBuilder: (ctx, i) {
+                          final d = filtered[i];
+                          final isCurrent = (widget.currentTid ?? '')
+                                  .trim()
+                                  .toUpperCase() ==
+                              d.tid.toUpperCase();
+                          return CoPressable(
+                            onTap: () => Navigator.of(context).pop(d.tid),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 12,
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 36,
+                                    height: 36,
+                                    decoration: BoxDecoration(
+                                      color: accent.withOpacity(0.12),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Icon(
+                                      Icons.person_rounded,
+                                      size: 18,
+                                      color: accent,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          d.name.isNotEmpty
+                                              ? d.name
+                                              : (de
+                                                  ? '— kein Name —'
+                                                  : '— no name —'),
+                                          style: AppTypography.subheadline
+                                              .copyWith(
+                                            color:
+                                                AppColors.codriverGraphite,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        Text(
+                                          d.tid,
+                                          style: AppTypography.caption2
+                                              .copyWith(
+                                            fontFamily: 'monospace',
+                                            color:
+                                                AppColors.labelSecondaryLight,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (isCurrent)
+                                    Icon(
+                                      Icons.check_circle_rounded,
+                                      size: 18,
+                                      color: accent,
+                                    ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SortChip extends StatelessWidget {
+  const _SortChip({
+    required this.label,
+    required this.selected,
+    required this.accent,
+    required this.onTap,
+  });
+  final String label;
+  final bool selected;
+  final Color accent;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return CoPressable(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: selected ? accent.withOpacity(0.14) : Colors.transparent,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected ? accent : const Color(0xFFE5E7EB),
+            width: selected ? 1.4 : 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: AppTypography.caption1.copyWith(
+            color: selected ? accent : AppColors.codriverGraphite,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// First 5 chars of a clock string ("10:40:00" → "10:40") — safe for short
+/// or empty values (TMGM imports have no shift end).
+String _shortClock(String s) {
+  final t = s.trim();
+  return t.length >= 5 ? t.substring(0, 5) : t;
 }

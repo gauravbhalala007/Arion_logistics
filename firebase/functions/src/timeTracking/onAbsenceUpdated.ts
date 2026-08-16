@@ -40,24 +40,36 @@ export const onAbsenceUpdated = onDocumentWritten(
     if (!adminUid || !fromDate || !toDate) return;
 
     // Alle Monate die der Antrag berührt neu berechnen (Anträge können
-    // monatsübergreifend sein, z.B. 28.Mai–3.Juni).
+    // monatsübergreifend sein, z.B. 28.Mai–3.Juni). WICHTIG: auch die
+    // ALTEN Monate (before) einbeziehen — wird ein genehmigter Urlaub
+    // per Edit in einen anderen Monat verschoben, muss der bisherige
+    // Monat ebenfalls zurückgerechnet werden, sonst bleibt sein
+    // time_account veraltet.
     const months = new Set<string>();
-    const cursor = new Date(Date.UTC(
-      fromDate.getUTCFullYear(),
-      fromDate.getUTCMonth(),
-      1,
-    ));
-    const stop = new Date(Date.UTC(
-      toDate.getUTCFullYear(),
-      toDate.getUTCMonth(),
-      1,
-    ));
-    while (cursor.getTime() <= stop.getTime()) {
-      const y = cursor.getUTCFullYear();
-      const m = String(cursor.getUTCMonth() + 1).padStart(2, "0");
-      months.add(`${y}-${m}`);
-      cursor.setUTCMonth(cursor.getUTCMonth() + 1);
-    }
+    const addRange = (from?: Date, to?: Date) => {
+      if (!from || !to) return;
+      const cursor = new Date(Date.UTC(
+        from.getUTCFullYear(),
+        from.getUTCMonth(),
+        1,
+      ));
+      const stop = new Date(Date.UTC(
+        to.getUTCFullYear(),
+        to.getUTCMonth(),
+        1,
+      ));
+      while (cursor.getTime() <= stop.getTime()) {
+        const y = cursor.getUTCFullYear();
+        const m = String(cursor.getUTCMonth() + 1).padStart(2, "0");
+        months.add(`${y}-${m}`);
+        cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+      }
+    };
+    addRange(fromDate, toDate);
+    addRange(
+      before?.fromDate?.toDate?.() as Date | undefined,
+      before?.toDate?.toDate?.() as Date | undefined,
+    );
 
     for (const month of months) {
       try {

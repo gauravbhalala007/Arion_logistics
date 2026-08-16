@@ -103,6 +103,7 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
   }
 
   Widget _buildBetaCard() {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     return Container(
       padding: const EdgeInsets.all(_spXl),
       decoration: const BoxDecoration(
@@ -140,26 +141,32 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
             ),
           ),
           const SizedBox(height: _spLg),
-          const Text(
-            'Beta-Phase',
+          Text(
+            de ? 'Beta-Phase' : 'Beta phase',
             textAlign: TextAlign.center,
             style: _title1,
           ),
           const SizedBox(height: _spXs),
           Text(
-            'Vielen Dank für dein Interesse an CODRIVER.',
+            de
+                ? 'Vielen Dank für dein Interesse an CODRIVER.'
+                : 'Thank you for your interest in CODRIVER.',
             textAlign: TextAlign.center,
             style: _headline.copyWith(color: _codriverDeep),
           ),
           const SizedBox(height: _spLg),
           Text(
-            'Aktuell befinden wir uns in der Beta-Phase.',
+            de
+                ? 'Aktuell befinden wir uns in der Beta-Phase.'
+                : 'We are currently in the beta phase.',
             textAlign: TextAlign.center,
             style: _body.copyWith(color: _labelSecondary, height: 1.45),
           ),
           const SizedBox(height: _spSm),
           Text(
-            'Wenn du die Codriver App testen möchtest, melde dich bitte per E-Mail bei uns:',
+            de
+                ? 'Wenn du die Codriver App testen möchtest, melde dich bitte per E-Mail bei uns:'
+                : 'If you would like to test the CoDriver app, please get in touch with us by email:',
             textAlign: TextAlign.center,
             style: _body.copyWith(color: _labelSecondary, height: 1.45),
           ),
@@ -195,7 +202,9 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
           ),
           const SizedBox(height: _spLg),
           Text(
-            'Vielen Dank für dein Verständnis!',
+            de
+                ? 'Vielen Dank für dein Verständnis!'
+                : 'Thank you for your understanding!',
             textAlign: TextAlign.center,
             style: _body.copyWith(color: _labelSecondary, height: 1.45),
           ),
@@ -215,10 +224,13 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
-                children: const [
-                  Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-                  SizedBox(width: _spXs),
-                  Text('Zurück zum Login', style: _headline),
+                children: [
+                  const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+                  const SizedBox(width: _spXs),
+                  Text(
+                    de ? 'Zurück zum Login' : 'Back to login',
+                    style: _headline,
+                  ),
                 ],
               ),
             ),

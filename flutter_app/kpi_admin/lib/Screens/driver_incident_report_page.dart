@@ -1,25 +1,29 @@
-import 'dart:typed_data';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart' as fb;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:geocoding/geocoding.dart' as geocoding;
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../services/incident_reports.dart';
+import 'work_accident_form.dart';
+
 class DriverIncidentReportPage extends StatefulWidget {
   final String dspUid;
   final String driverTransporterId;
   final VoidCallback onBack;
+  final bool isAdminMode;
 
   const DriverIncidentReportPage({
     super.key,
     required this.dspUid,
     required this.driverTransporterId,
     required this.onBack,
+    this.isAdminMode = false,
   });
 
   @override
@@ -32,16 +36,27 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
   static const _settingsDoc = 'incident_report';
   static const _reportsCollection = 'incident_reports';
 
-  static const Color _kGreen = Color(0xFF1D9E75);
+  // Ein Akzent (Produktgrün), ein Hairline-Grau, eine gefüllte Feldfarbe —
+  // identisch zum Admin-Incident-Center, damit beide Formulare gleich wirken.
+  static const Color _kGreen = Color(0xFF067647);
   static const Color _kPageBg = Color(0xFFF1F3F2);
   static const Color _kText = Color(0xFF1F2937);
   static const Color _kMuted = Color(0xFF6B7280);
-  static const Color _kCardBorder = Color(0xFFD9DFE3);
-  static const Color _kInputBg = Color(0xFFF0F2F1);
+  static const Color _kCardBorder = Color(0xFFE5E7EB);
+  static const Color _kInputBg = Color(0xFFF7F8F8);
   static const Color _kOrange = Color(0xFFFF7A18);
+
+  // Radius-Skala: Felder/Controls 12, CTA-Buttons 16, Karten 20.
+  static const double _kRadiusField = 12;
+  static const double _kRadiusCta = 16;
+  static const double _kRadiusCard = 20;
 
   final _locationCtrl = TextEditingController();
   final _descriptionCtrl = TextEditingController();
+  // Kennzeichen als Freitext, nicht als Picker: die Firestore-Rules geben
+  // `users/{dspUid}/vehicles` nur an isVehicleManager frei (admin/user/
+  // developer) — ein Fahrer darf die Fahrzeugliste nicht lesen.
+  final _plateCtrl = TextEditingController();
 
   bool _loadingSettings = true;
   bool _submitting = false;
@@ -69,6 +84,7 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
   void dispose() {
     _locationCtrl.dispose();
     _descriptionCtrl.dispose();
+    _plateCtrl.dispose();
     super.dispose();
   }
 
@@ -341,7 +357,21 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
         .child(reportId)
         .child(bucket)
         .child(fileName);
-    await ref.putData(photo.bytes);
+    // contentType MUSS gesetzt sein — die Storage-Rule isImage()
+    // lehnt Uploads ohne Bild-MIME-Type ab (Flutter Web lädt sonst
+    // als application/octet-stream hoch).
+    final lower = photo.name.toLowerCase();
+    final contentType = lower.endsWith('.png')
+        ? 'image/png'
+        : lower.endsWith('.webp')
+            ? 'image/webp'
+            : lower.endsWith('.heic') || lower.endsWith('.heif')
+                ? 'image/heic'
+                : 'image/jpeg';
+    await ref.putData(
+      photo.bytes,
+      fb.SettableMetadata(contentType: contentType),
+    );
     return ref.getDownloadURL();
   }
 
@@ -457,6 +487,7 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
       _showSnack(_t('driver_incident_snack_missing_scope'), error: true);
       return;
     }
+    final isAdminMode = widget.isAdminMode;
 
     if (_locationCtrl.text.trim().isEmpty) {
       _showSnack(_t('driver_incident_snack_provide_location'), error: true);
@@ -464,6 +495,10 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
     }
     if (_descriptionCtrl.text.trim().isEmpty) {
       _showSnack(_t('driver_incident_snack_provide_description'), error: true);
+      return;
+    }
+    if (plateKeyOf(_plateCtrl.text).isEmpty) {
+      _showSnack(_t('driver_incident_snack_provide_plate'), error: true);
       return;
     }
 
@@ -506,10 +541,25 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
           ? DateTime.now()
           : (_selectedAccidentTime ?? DateTime.now());
 
+      final driverAuthUid = isAdminMode
+          ? _stringOf(driverData['uid'])
+          : auth.uid;
+
+      final plateRaw = _plateCtrl.text.trim();
       final payload = <String, dynamic>{
         'reportId': reportId,
+        'type': 'vehicle',
+        // Kanonische Felder des Incident-Schemas — ohne sie taucht die
+        // Meldung weder im Fleet-Zähler (plateKey) noch in der nach
+        // `occurredAt` sortierten Admin-Liste auf.
+        'category': 'vehicle',
+        'plate': plateRaw,
+        'plateRaw': plateRaw,
+        'plateKey': plateKeyOf(plateRaw),
+        'occurredAt': Timestamp.fromDate(accidentAt),
+        'timeText': DateFormat('HH:mm').format(accidentAt),
         'dspUid': widget.dspUid,
-        'driverUid': auth.uid,
+        'driverUid': driverAuthUid,
         'driverTransporterId': driverId,
         'driverName': driverName,
         'location': _locationCtrl.text.trim(),
@@ -521,6 +571,8 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
         'submittedAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
         'status': 'submitted',
+        'createdByAdmin': isAdminMode,
+        if (isAdminMode) 'createdByAdminUid': auth.uid,
         'platePhotoUrl': plateUrl,
         'damagePhotoUrls': damageUrls,
         'company': <String, dynamic>{
@@ -552,6 +604,7 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
       setState(() {
         _locationCtrl.clear();
         _descriptionCtrl.clear();
+        _plateCtrl.clear();
         _faultOpinion = 'self';
         _policeInvolved = false;
         _damageType = 'vehicle';
@@ -575,6 +628,59 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
 
   @override
   Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 2,
+      child: Container(
+        color: _kPageBg,
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 780),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(),
+                const Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: Color(0xFFDDE2E4),
+                ),
+                Material(
+                  color: _kPageBg,
+                  child: TabBar(
+                    labelColor: _kGreen,
+                    unselectedLabelColor: const Color(0xFF94A3B8),
+                    indicatorColor: _kGreen,
+                    labelStyle: const TextStyle(
+                        fontWeight: FontWeight.w800, fontSize: 13.5),
+                    tabs: const [
+                      Tab(text: 'Fahrzeug'),
+                      Tab(text: 'Mitarbeiter'),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: TabBarView(
+                    children: [
+                      _vehicleBody(),
+                      WorkAccidentForm(
+                        dspUid: widget.dspUid,
+                        driverTransporterId: widget.driverTransporterId,
+                        isAdminMode: widget.isAdminMode,
+                        onSubmitted: widget.onBack,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _vehicleBody() {
     if (_loadingSettings) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -591,12 +697,6 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildHeader(),
-                const Divider(
-                  height: 1,
-                  thickness: 1,
-                  color: Color(0xFFDDE2E4),
-                ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(18, 14, 18, 0),
                   child: Column(
@@ -680,6 +780,39 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
                         onPressed: _shareByEmail,
                       ),
                       const SizedBox(height: 18),
+                      _sectionCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _sectionTitle(
+                              Icons.local_shipping_outlined,
+                              _t(
+                                'driver_incident_plate_number_section_title',
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              _t('driver_incident_plate_number_help'),
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: _kMuted,
+                                height: 1.4,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            _softTextField(
+                              controller: _plateCtrl,
+                              hintText: _t(
+                                'driver_incident_plate_number_hint',
+                              ),
+                              inputFormatters: _plateFormatters,
+                              textCapitalization:
+                                  TextCapitalization.characters,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
                       _sectionCard(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -931,7 +1064,7 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
                             elevation: 0,
                             padding: const EdgeInsets.symmetric(vertical: 18),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(18),
+                              borderRadius: BorderRadius.circular(_kRadiusCta),
                             ),
                           ),
                           icon: _submitting
@@ -996,8 +1129,8 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: _kCardBorder, width: 1.1),
+        borderRadius: BorderRadius.circular(_kRadiusCard),
+        border: Border.all(color: _kCardBorder),
         boxShadow: const [
           BoxShadow(
             color: Color(0x0D000000),
@@ -1071,9 +1204,9 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(_kRadiusField),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 1),
+        padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(
           children: [
             Icon(icon, size: 20, color: _kMuted),
@@ -1106,11 +1239,11 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
           foregroundColor: _kGreen,
-          side: const BorderSide(color: _kGreen, width: 1.4),
+          side: const BorderSide(color: _kGreen, width: 1.5),
           elevation: 0,
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(_kRadiusCta),
           ),
         ),
         icon: Icon(icon, size: 20),
@@ -1134,9 +1267,9 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
         style: TextButton.styleFrom(
           backgroundColor: _kInputBg,
           foregroundColor: _kText,
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(_kRadiusField),
             side: const BorderSide(color: _kCardBorder),
           ),
         ),
@@ -1149,40 +1282,61 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
     );
   }
 
+  /// Einheitliche Feld-Optik für die ganze Datei: gefüllt hellgrau,
+  /// Radius 12, Hairline-Border, Focus in Produktgrün 1.5 px.
+  /// Keine Underlines, keine Theme-Akzentfarbe.
+  InputDecoration _inputDecoration({String? hintText}) {
+    OutlineInputBorder side(Color color, double width) => OutlineInputBorder(
+          borderRadius: BorderRadius.circular(_kRadiusField),
+          borderSide: BorderSide(color: color, width: width),
+        );
+
+    return InputDecoration(
+      hintText: hintText,
+      hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 15),
+      filled: true,
+      fillColor: _kInputBg,
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 12,
+      ),
+      border: side(_kCardBorder, 1),
+      enabledBorder: side(_kCardBorder, 1),
+      focusedBorder: side(_kGreen, 1.5),
+      errorBorder: side(const Color(0xFFB42318), 1),
+      focusedErrorBorder: side(const Color(0xFFB42318), 1.5),
+      disabledBorder: side(_kCardBorder, 1),
+    );
+  }
+
   Widget _softTextField({
     required TextEditingController controller,
     required String hintText,
     int minLines = 1,
     int maxLines = 1,
+    List<TextInputFormatter>? inputFormatters,
+    TextCapitalization textCapitalization = TextCapitalization.sentences,
   }) {
     return TextField(
       controller: controller,
       minLines: minLines,
       maxLines: maxLines,
-      decoration: InputDecoration(
-        hintText: hintText,
-        hintStyle: const TextStyle(color: Color(0xFF8B95A7), fontSize: 15),
-        filled: true,
-        fillColor: _kInputBg,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: const BorderSide(color: _kCardBorder),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: const BorderSide(color: _kCardBorder),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: const BorderSide(color: _kGreen, width: 1.4),
-        ),
-      ),
+      inputFormatters: inputFormatters,
+      textCapitalization: textCapitalization,
+      style: const TextStyle(fontSize: 15, color: _kText, height: 1.4),
+      decoration: _inputDecoration(hintText: hintText),
     );
   }
+
+  /// Kennzeichen wird beim Tippen in Großbuchstaben geführt — so sieht der
+  /// Fahrer sofort die Form, in der das Kennzeichen gespeichert wird.
+  static final List<TextInputFormatter> _plateFormatters =
+      <TextInputFormatter>[
+    TextInputFormatter.withFunction(
+      (oldValue, newValue) =>
+          newValue.copyWith(text: newValue.text.toUpperCase()),
+    ),
+  ];
 
   Widget _uploadSelectButton({
     required VoidCallback onPressed,
@@ -1195,10 +1349,10 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
         style: TextButton.styleFrom(
           backgroundColor: _kInputBg,
           foregroundColor: const Color(0xFF7D8799),
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-            side: BorderSide(color: _kCardBorder.withValues(alpha: 0.9)),
+            borderRadius: BorderRadius.circular(_kRadiusField),
+            side: const BorderSide(color: _kCardBorder),
           ),
         ),
         icon: const Icon(Icons.photo_camera_outlined, size: 20),
@@ -1218,9 +1372,11 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
   }) {
     final selected = value == groupValue;
     return InkWell(
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(_kRadiusField),
       onTap: () => onChanged(value),
-      child: Padding(
+      child: Container(
+        // Tap-Ziel >= 44 pt, auch wenn der Radio-Punkt kleiner wirkt.
+        constraints: const BoxConstraints(minHeight: 44),
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(
           children: [
@@ -1258,7 +1414,7 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
       height: compact ? 80 : 110,
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(_kRadiusField),
         border: Border.all(color: _kCardBorder),
       ),
       child: Stack(
@@ -1296,8 +1452,9 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
     final messenger = ScaffoldMessenger.maybeOf(context);
     messenger?.showSnackBar(
       SnackBar(
+        behavior: SnackBarBehavior.floating,
         content: Text(message),
-        backgroundColor: error ? const Color(0xFFB91C1C) : null,
+        backgroundColor: error ? const Color(0xFFB42318) : null,
       ),
     );
   }
@@ -1359,6 +1516,14 @@ class _PickedPhoto {
 
 const Map<String, Map<String, String>> _driverIncidentReportTranslations = {
   'en': {
+    'driver_incident_plate_number_section_title':
+        'Vehicle registration plate',
+    'driver_incident_plate_number_hint':
+        'e.g. FÜ-DE 314',
+    'driver_incident_plate_number_help':
+        'Enter the plate exactly as it appears on the vehicle. Spaces and dashes do not matter.',
+    'driver_incident_snack_provide_plate':
+        'Enter the vehicle registration plate.',
     'driver_incident_company_not_configured': 'Company not configured',
     'driver_incident_insurance_not_configured': 'Insurance not configured',
     'driver_incident_snack_could_not_read_image_bytes':
@@ -1427,6 +1592,14 @@ const Map<String, Map<String, String>> _driverIncidentReportTranslations = {
     'driver_incident_select_date_time': 'Select date / time',
   },
   'de': {
+    'driver_incident_plate_number_section_title':
+        'Kennzeichen des Fahrzeugs',
+    'driver_incident_plate_number_hint':
+        'z. B. FÜ-DE 314',
+    'driver_incident_plate_number_help':
+        'Trage das Kennzeichen genau so ein, wie es am Fahrzeug steht. Leerzeichen und Bindestriche sind egal.',
+    'driver_incident_snack_provide_plate':
+        'Bitte trage das Kennzeichen ein.',
     'driver_incident_company_not_configured': 'Firmendaten nicht konfiguriert',
     'driver_incident_insurance_not_configured':
         'Versicherungsdaten nicht konfiguriert',
@@ -1498,6 +1671,14 @@ const Map<String, Map<String, String>> _driverIncidentReportTranslations = {
     'driver_incident_select_date_time': 'Datum / Uhrzeit auswählen',
   },
   'sq': {
+    'driver_incident_plate_number_section_title':
+        'Targa e automjetit',
+    'driver_incident_plate_number_hint':
+        'p.sh. FÜ-DE 314',
+    'driver_incident_plate_number_help':
+        'Shkruaj targën saktësisht siç është në automjet. Hapësirat dhe vizat nuk kanë rëndësi.',
+    'driver_incident_snack_provide_plate':
+        'Ju lutem shkruani targën e automjetit.',
     'driver_incident_company_not_configured':
         'Te dhenat e kompanise nuk jane konfiguruar',
     'driver_incident_insurance_not_configured':
@@ -1572,6 +1753,14 @@ const Map<String, Map<String, String>> _driverIncidentReportTranslations = {
     'driver_incident_select_date_time': 'Zgjidh daten / oren',
   },
   'hu': {
+    'driver_incident_plate_number_section_title':
+        'A jármű rendszáma',
+    'driver_incident_plate_number_hint':
+        'pl. FÜ-DE 314',
+    'driver_incident_plate_number_help':
+        'Írd be a rendszámot pontosan úgy, ahogy a járművön szerepel. A szóközök és kötőjelek nem számítanak.',
+    'driver_incident_snack_provide_plate':
+        'Kérjük, add meg a jármű rendszámát.',
     'driver_incident_company_not_configured': 'Cegadatok nincsenek beallitva',
     'driver_incident_insurance_not_configured':
         'Biztositas adatai nincsenek beallitva',
@@ -1645,6 +1834,14 @@ const Map<String, Map<String, String>> _driverIncidentReportTranslations = {
     'driver_incident_select_date_time': 'Datum / ido kivalasztasa',
   },
   'ro': {
+    'driver_incident_plate_number_section_title':
+        'Numărul de înmatriculare',
+    'driver_incident_plate_number_hint':
+        'ex. FÜ-DE 314',
+    'driver_incident_plate_number_help':
+        'Introdu numărul exact cum apare pe vehicul. Spațiile și liniuțele nu contează.',
+    'driver_incident_snack_provide_plate':
+        'Introdu numărul de înmatriculare.',
     'driver_incident_company_not_configured':
         'Datele companiei nu sunt configurate',
     'driver_incident_insurance_not_configured':
@@ -1719,6 +1916,14 @@ const Map<String, Map<String, String>> _driverIncidentReportTranslations = {
     'driver_incident_select_date_time': 'Selecteaza data / ora',
   },
   'hr': {
+    'driver_incident_plate_number_section_title':
+        'Registarska oznaka vozila',
+    'driver_incident_plate_number_hint':
+        'npr. FÜ-DE 314',
+    'driver_incident_plate_number_help':
+        'Upiši registarsku oznaku točno kako piše na vozilu. Razmaci i crtice nisu važni.',
+    'driver_incident_snack_provide_plate':
+        'Molimo upiši registarsku oznaku vozila.',
     'driver_incident_company_not_configured':
         'Podaci tvrtke nisu konfigurirani',
     'driver_incident_insurance_not_configured':
@@ -1790,6 +1995,14 @@ const Map<String, Map<String, String>> _driverIncidentReportTranslations = {
     'driver_incident_select_date_time': 'Odaberi datum / vrijeme',
   },
   'ar': {
+    'driver_incident_plate_number_section_title':
+        'رقم لوحة المركبة',
+    'driver_incident_plate_number_hint':
+        'مثال: FÜ-DE 314',
+    'driver_incident_plate_number_help':
+        'أدخل رقم اللوحة تمامًا كما هو على المركبة. المسافات والشرطات غير مهمة.',
+    'driver_incident_snack_provide_plate':
+        'يرجى إدخال رقم لوحة المركبة.',
     'driver_incident_company_not_configured': 'بيانات الشركة غير مهيأة',
     'driver_incident_insurance_not_configured': 'بيانات التأمين غير مهيأة',
     'driver_incident_snack_could_not_read_image_bytes':
@@ -1856,6 +2069,14 @@ const Map<String, Map<String, String>> _driverIncidentReportTranslations = {
     'driver_incident_select_date_time': 'اختر التاريخ / الوقت',
   },
   'tr': {
+    'driver_incident_plate_number_section_title':
+        'Aracın plakası',
+    'driver_incident_plate_number_hint':
+        'örn. FÜ-DE 314',
+    'driver_incident_plate_number_help':
+        'Plakayı araçta yazdığı gibi tam olarak gir. Boşluklar ve tireler önemli değil.',
+    'driver_incident_snack_provide_plate':
+        'Lütfen aracın plakasını gir.',
     'driver_incident_company_not_configured': 'Sirket bilgileri ayarlanmamis',
     'driver_incident_insurance_not_configured':
         'Sigorta bilgileri ayarlanmamis',
@@ -1926,6 +2147,14 @@ const Map<String, Map<String, String>> _driverIncidentReportTranslations = {
     'driver_incident_select_date_time': 'Tarih / saat secin',
   },
   'ru': {
+    'driver_incident_plate_number_section_title':
+        'Номерной знак автомобиля',
+    'driver_incident_plate_number_hint':
+        'напр. FÜ-DE 314',
+    'driver_incident_plate_number_help':
+        'Введите номер точно так, как он указан на автомобиле. Пробелы и дефисы не важны.',
+    'driver_incident_snack_provide_plate':
+        'Пожалуйста, введите номерной знак.',
     'driver_incident_company_not_configured': 'Данные компании не настроены',
     'driver_incident_insurance_not_configured': 'Данные страховки не настроены',
     'driver_incident_snack_could_not_read_image_bytes':
@@ -1994,5 +2223,133 @@ const Map<String, Map<String, String>> _driverIncidentReportTranslations = {
     'driver_incident_submit': 'Отправить отчет об аварии',
     'driver_incident_header_title': 'Отчет об аварии',
     'driver_incident_select_date_time': 'Выберите дату / время',
+  },
+  'bg': {
+    'driver_incident_plate_number_section_title':
+        'Регистрационен номер на автомобила',
+    'driver_incident_plate_number_hint':
+        'напр. FÜ-DE 314',
+    'driver_incident_plate_number_help':
+        'Въведете номера точно както е изписан на автомобила. Интервалите и тиретата нямат значение.',
+    'driver_incident_snack_provide_plate':
+        'Моля, въведете регистрационния номер.',
+    'driver_incident_company_not_configured': 'Фирмата не е конфигурирана',
+    'driver_incident_insurance_not_configured': 'Застраховката не е конфигурирана',
+    'driver_incident_email_intro': 'Подробности за докладван инцидент от шофьор',
+    'driver_incident_email_driver': 'Шофьор: {value}',
+    'driver_incident_email_location': 'Местоположение: {value}',
+    'driver_incident_email_fault_opinion': 'Мнение за вината: {value}',
+    'driver_incident_email_police_involved': 'Намесена полиция: {value}',
+    'driver_incident_email_damage_type': 'Вид щета: {value}',
+    'driver_incident_email_accident_time': 'Час на инцидента: {value}',
+    'driver_incident_email_description': 'Описание: {value}',
+    'driver_incident_email_subject': 'Подробности за инцидента',
+    'driver_incident_snack_could_not_open_email': 'Имейл приложението не може да се отвори.',
+    'driver_incident_snack_could_not_open_phone': 'Телефонното приложение не може да се отвори.',
+    'driver_incident_snack_missing_scope': 'Липсва обхват за DSP или шофьор.',
+    'driver_incident_snack_submitted': 'Докладът за инцидент е изпратен.',
+    'driver_incident_snack_submit_failed': 'Изпращането на доклада е неуспешно: {error}',
+    'driver_incident_company_section_title': 'Данни за фирмата',
+    'driver_incident_insurance_section_title': 'Данни за застраховката',
+    'driver_incident_insurance_policy_number': 'Полица №: {value}',
+    'driver_incident_share_by_email': 'Сподели данните по имейл',
+    'driver_incident_location_section_title': 'Място на инцидента',
+    'driver_incident_scan_location': 'Сканирай местоположение',
+    'driver_incident_or_enter_manually': 'Или въведи ръчно',
+    'driver_incident_location_hint': 'Улица, пощенски код, град',
+    'driver_incident_fault_question': 'Кой мислиш, че е виновен?',
+    'driver_incident_fault_self': 'Аз',
+    'driver_incident_fault_other': 'Другата страна',
+    'driver_incident_fault_both': 'И двете страни',
+    'driver_incident_fault_unclear': 'Неясно / Не съм сигурен',
+    'driver_incident_police_question': 'Намеси ли се полиция?',
+    'driver_incident_yes': 'Да',
+    'driver_incident_no': 'Не',
+    'driver_incident_plate_section_title': 'Снимай регистрационния номер',
+    'driver_incident_plate_take': 'Снимай номера',
+    'driver_incident_plate_replace': 'Смени снимката на номера',
+    'driver_incident_damage_section_title': 'Снимки на щетите',
+    'driver_incident_damage_type_label': 'Вид на щетата',
+    'driver_incident_damage_vehicle': 'Щета по превозното средство',
+    'driver_incident_damage_property': 'Имуществена щета',
+    'driver_incident_damage_both': 'И двете',
+    'driver_incident_damage_take_photos': 'Снимай щетите',
+    'driver_incident_damage_replace_photos': 'Смени снимките на щетите',
+    'driver_incident_time_section_title': 'Час на инцидента',
+    'driver_incident_time_now': 'Инцидентът се случи сега',
+    'driver_incident_time_other': 'Друга дата / час',
+    'driver_incident_description_title': 'Описание на инцидента',
+    'driver_incident_submit_sending': 'Изпращане...',
+    'driver_incident_submit': 'Изпрати доклад за инцидент',
+    'driver_incident_header_title': 'Доклад за инцидент',
+    'driver_incident_select_date_time': 'Избери дата / час',
+  },
+  'es': {
+    'driver_incident_plate_number_section_title':
+        'Matrícula del vehículo',
+    'driver_incident_plate_number_hint':
+        'p. ej. FÜ-DE 314',
+    'driver_incident_plate_number_help':
+        'Introduce la matrícula tal y como aparece en el vehículo. Los espacios y guiones no importan.',
+    'driver_incident_snack_provide_plate':
+        'Introduce la matrícula del vehículo.',
+    'driver_incident_company_not_configured': 'Empresa no configurada',
+    'driver_incident_insurance_not_configured': 'Seguro no configurado',
+    'driver_incident_snack_could_not_read_image_bytes': 'No se pudo leer la imagen.',
+    'driver_incident_snack_could_not_read_selected_image_bytes': 'No se pudo leer la imagen seleccionada.',
+    'driver_incident_snack_no_company_or_insurance_email': 'No hay correo de la empresa o del seguro configurado.',
+    'driver_incident_email_intro': 'Detalles del parte de accidente del conductor',
+    'driver_incident_email_driver': 'Conductor: {value}',
+    'driver_incident_email_location': 'Lugar: {value}',
+    'driver_incident_email_fault_opinion': 'Opinión sobre la culpa: {value}',
+    'driver_incident_email_police_involved': 'Policía implicada: {value}',
+    'driver_incident_email_damage_type': 'Tipo de daño: {value}',
+    'driver_incident_email_accident_time': 'Hora del accidente: {value}',
+    'driver_incident_email_description': 'Descripción: {value}',
+    'driver_incident_email_subject': 'Detalles del parte de accidente',
+    'driver_incident_snack_could_not_open_email': 'No se pudo abrir la app de correo.',
+    'driver_incident_snack_could_not_open_phone': 'No se pudo abrir la app de teléfono.',
+    'driver_incident_snack_must_be_logged_in_driver': 'Debes iniciar sesión como conductor.',
+    'driver_incident_snack_missing_scope': 'Falta la asignación de DSP o conductor.',
+    'driver_incident_snack_provide_location': 'Indica el lugar del accidente.',
+    'driver_incident_snack_provide_description': 'Añade una breve descripción.',
+    'driver_incident_snack_submitted': 'Parte de accidente enviado.',
+    'driver_incident_snack_submit_failed': 'Error al enviar el parte: {error}',
+    'driver_incident_company_section_title': 'Datos de la empresa',
+    'driver_incident_insurance_section_title': 'Datos del seguro',
+    'driver_incident_insurance_policy_number': 'Póliza n.º: {value}',
+    'driver_incident_share_by_email': 'Compartir por correo',
+    'driver_incident_location_section_title': 'Lugar del accidente',
+    'driver_incident_scan_location': 'Escanear ubicación',
+    'driver_incident_snack_enter_location_manually': 'Introduce la ubicación manualmente.',
+    'driver_incident_or_enter_manually': 'O introdúcela manualmente',
+    'driver_incident_location_hint': 'Calle, CP, ciudad',
+    'driver_incident_fault_question': '¿Quién crees que tuvo la culpa?',
+    'driver_incident_fault_self': 'Yo',
+    'driver_incident_fault_other': 'La otra parte',
+    'driver_incident_fault_both': 'Ambas partes',
+    'driver_incident_fault_unclear': 'No está claro / No lo sé',
+    'driver_incident_police_question': '¿Intervino la policía?',
+    'driver_incident_yes': 'Sí',
+    'driver_incident_no': 'No',
+    'driver_incident_plate_section_title': 'Fotografía la matrícula',
+    'driver_incident_plate_take': 'Foto de la matrícula',
+    'driver_incident_plate_replace': 'Repetir foto de la matrícula',
+    'driver_incident_damage_section_title': 'Fotos de los daños',
+    'driver_incident_damage_type_label': 'Tipo de daño',
+    'driver_incident_damage_vehicle': 'Daños en el vehículo',
+    'driver_incident_damage_property': 'Daños materiales',
+    'driver_incident_damage_both': 'Ambos',
+    'driver_incident_damage_take_photos': 'Hacer fotos de los daños',
+    'driver_incident_damage_replace_photos': 'Repetir fotos de los daños',
+    'driver_incident_time_section_title': 'Hora del accidente',
+    'driver_incident_time_now': 'El accidente acaba de ocurrir',
+    'driver_incident_time_other': 'Otra fecha / hora',
+    'driver_incident_description_title': 'Descripción del accidente',
+    'driver_incident_description_hint': 'Describe el accidente con la mayor precisión posible...',
+    'driver_incident_submit_sending': 'Enviando...',
+    'driver_incident_submit': 'Enviar parte de accidente',
+    'driver_incident_header_title': 'Parte de accidente',
+    'driver_incident_select_date_time': 'Selecciona fecha / hora',
   },
 };

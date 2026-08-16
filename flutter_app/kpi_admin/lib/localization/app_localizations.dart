@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
+import 'bg_strings.dart';
+import 'es_strings.dart';
+
 /// Global locale controller used by the whole app.
 /// main.dart listens to this and rebuilds MaterialApp when locale changes.
 class LocaleController extends ChangeNotifier {
@@ -39,6 +42,8 @@ class AppLocalizations {
     Locale('ar'), // Arabic
     Locale('tr'), // Turkish
     Locale('ru'), // Russian
+    Locale('bg'), // Bulgarian
+    Locale('es'), // Spanish
   ];
 
   // ---- Simple key/value translation table ----
@@ -76,6 +81,7 @@ class AppLocalizations {
       'nav_profile': 'Profile',
       'nav_tasks': 'Tasks',
       'driver_home_dispatcher': 'Dispatcher',
+      'driver_home_dispatcher_no_shift_today': 'No shift set for today',
       'driver_home_shift_plan_title': 'Shift Plan',
       'driver_home_shift_plan_subtitle': 'Your shifts',
       'driver_home_scorecard_subtitle': 'Your performance overview',
@@ -108,30 +114,38 @@ class AppLocalizations {
       'driver_green_book_video_subtitle': 'Tap to play',
       'driver_green_book_start_test': 'Start Green Book Test',
       'driver_green_book_test_required': 'Test required',
-      'driver_green_book_section1_title': 'Green Book Daily Inspection Sheet',
+      'driver_green_book_section1_title':
+          'Green Book - Driving Log (Fahrtenkontrollbuch)',
       'driver_green_book_section1_text':
-          'The daily inspection sheet (Green Book) is a mandatory document that must be completed before each shift. It helps verify vehicle condition and documents safety-relevant points.',
-      'driver_green_book_section1_b1': 'Complete it fully before every shift.',
-      'driver_green_book_section1_b2': 'Report vehicle defects immediately.',
-      'driver_green_book_section1_b3': 'Do not forget your signature.',
-      'driver_green_book_section2_title': 'Consequences of Non-Compliance',
+          'The Green Book is your driving log: the daily control sheets required by § 1 Abs. 6 Fahrpersonalverordnung (FPersV, the German driving personnel regulation). They prove your driving times, breaks, working and rest periods. The duty applies in commercial goods transport to vehicles over 2.8 t up to 3.5 t maximum permissible mass.',
+      'driver_green_book_section1_b1':
+          'One sheet per driving day: name and address, licence plate, date, odometer reading and place at the start and the end of the journey.',
+      'driver_green_book_section1_b2':
+          'Record driving times, breaks and rest periods with the exact time straight away - in ballpoint pen, never filled in afterwards.',
+      'driver_green_book_section1_b3':
+          'Sign the sheet, carry the records of the last 28 days with you and hand older sheets in at the company.',
+      'driver_green_book_section2_title':
+          'Consequences of Non-Compliance',
       'driver_green_book_section2_text':
-          'Violations are handled in escalating steps:',
+          'If the driving log is not kept or is incomplete, the company applies escalating steps:',
       'driver_green_book_section2_b1':
           'First warning: Verbal warning from dispatcher.',
-      'driver_green_book_section2_b2': 'Second warning: Written warning.',
+      'driver_green_book_section2_b2':
+          'Second warning: Written warning.',
       'driver_green_book_section2_b3':
           'Repeated violations: Employment-law consequences up to termination.',
-      'driver_green_book_section3_title': 'Legal Penalties',
+      'driver_green_book_section3_title':
+          'Legal Consequences',
       'driver_green_book_section3_text':
-          'Driving without a properly completed inspection sheet can lead to serious legal consequences:',
+          'Missing or incomplete daily control sheets breach the FPersV and are prosecuted as an administrative offence:',
       'driver_green_book_section3_b1':
-          'Fine: up to €5,000 for driver, up to €15,000 for company.',
+          'Fine: from 100 euros, higher depending on the severity and frequency of the violations.',
       'driver_green_book_section3_b2':
-          'Driving ban: possible license withdrawal for repeated violations.',
-      'driver_green_book_section3_b3': 'Points in Flensburg may be recorded.',
+          'Responsibility: not only the driver - the company is liable for the records too and must keep them for one year.',
+      'driver_green_book_section3_b3':
+          'Enforcement: BAG (Bundesamt für Logistik und Mobilität, the German federal logistics authority) and the police check at the roadside and on company premises.',
       'driver_green_book_section3_b4':
-          'Insurance coverage can be reduced/void in case of accident.',
+          'Serious or repeated violations can trigger proceedings on the reliability of the company.',
       'driver_green_book_test_title': 'Green Book Test',
       'driver_green_book_test_progress': 'Question {current} of {total}',
       'driver_green_book_test_true': 'True',
@@ -139,15 +153,15 @@ class AppLocalizations {
       'driver_green_book_test_next': 'Next',
       'driver_green_book_test_submit': 'Submit test',
       'driver_green_book_test_statement1':
-          'The Green Book must be completed before every shift.',
+          'The driving log must be kept for every driving day.',
       'driver_green_book_test_statement2':
-          'Vehicle defects can be reported at the end of the week.',
+          'The sheets may be filled in from memory at the end of the week.',
       'driver_green_book_test_statement3':
           'The first non-compliance consequence is a verbal warning.',
       'driver_green_book_test_statement4':
-          'Legal penalties can include a fine up to €5,000 for the driver.',
+          'Missing or incomplete sheets can result in a fine starting from 100 euros.',
       'driver_green_book_test_statement5':
-          'Insurance coverage is always unaffected if the Green Book is missing.',
+          'The records of the last 28 days do not have to be carried in the vehicle.',
       'driver_green_book_test_result_pass_title': 'Test passed',
       'driver_green_book_test_result_fail_title': 'Test not passed',
       'driver_green_book_test_result_pass_body':
@@ -984,6 +998,8 @@ class AppLocalizations {
       'nav_profile': 'Profil',
       'nav_tasks': 'Aufgaben',
       'driver_home_dispatcher': 'Dispatcher',
+      'driver_home_dispatcher_no_shift_today':
+          'Für heute nichts hinterlegt',
       'driver_home_shift_plan_title': 'Arbeitsplan',
       'driver_home_shift_plan_subtitle': 'Deine Schichten',
       'driver_home_scorecard_subtitle': 'Deine Leistungsübersicht',
@@ -1017,33 +1033,38 @@ class AppLocalizations {
       'driver_green_book_video_subtitle': 'Tippen zum Abspielen',
       'driver_green_book_start_test': 'Green Book Test starten',
       'driver_green_book_test_required': 'Test erforderlich',
-      'driver_green_book_section1_title': 'Tageskontrollblatt - Green Book',
+      'driver_green_book_section1_title':
+          'Green Book - Fahrtenkontrollbuch',
       'driver_green_book_section1_text':
-          'Das Tageskontrollblatt (Green Book) ist ein verpflichtendes Dokument, das täglich vor Fahrtantritt ausgefüllt werden muss. Es dient der Überprüfung des Fahrzeugzustands und der Dokumentation sicherheitsrelevanter Punkte.',
+          'Das Green Book ist dein Fahrtenkontrollbuch: die Tageskontrollblätter nach § 1 Abs. 6 Fahrpersonalverordnung (FPersV). Damit weist du Lenkzeiten, Fahrtunterbrechungen sowie Arbeits- und Ruhezeiten nach. Die Pflicht gilt im gewerblichen Güterverkehr für Fahrzeuge über 2,8 t bis 3,5 t zulässiger Gesamtmasse.',
       'driver_green_book_section1_b1':
-          'Vor jeder Schicht vollständig ausfüllen.',
-      'driver_green_book_section1_b2': 'Fahrzeugmängel sofort melden.',
-      'driver_green_book_section1_b3': 'Unterschrift nicht vergessen.',
-      'driver_green_book_section2_title': 'Konsequenzen bei Nichteinhaltung',
+          'Für jeden Fahrtag ein Blatt: Name und Anschrift, Kennzeichen, Datum, Kilometerstand sowie Ort bei Fahrtbeginn und Fahrtende.',
+      'driver_green_book_section1_b2':
+          'Lenkzeiten, Fahrtunterbrechungen und Ruhezeiten mit Uhrzeit sofort eintragen - dokumentenecht mit Kugelschreiber, nicht nachträglich.',
+      'driver_green_book_section1_b3':
+          'Blatt unterschreiben, die Aufzeichnungen der letzten 28 Tage mitführen und ältere Blätter im Betrieb abgeben.',
+      'driver_green_book_section2_title':
+          'Konsequenzen bei Nichteinhaltung',
       'driver_green_book_section2_text':
-          'Bei Verstößen gelten folgende Eskalationsstufen:',
+          'Wird das Fahrtenkontrollbuch nicht oder unvollständig geführt, gelten im Betrieb folgende Eskalationsstufen:',
       'driver_green_book_section2_b1':
           'Erste Verwarnung: Mündliche Ermahnung durch den Disponenten.',
       'driver_green_book_section2_b2':
           'Zweite Verwarnung: Schriftliche Abmahnung.',
       'driver_green_book_section2_b3':
           'Wiederholte Verstöße: Arbeitsrechtliche Konsequenzen bis zur Kündigung.',
-      'driver_green_book_section3_title': 'Rechtliche Strafen',
+      'driver_green_book_section3_title':
+          'Rechtliche Folgen',
       'driver_green_book_section3_text':
-          'Das Führen eines Fahrzeugs ohne ordnungsgemäß ausgefülltes Tageskontrollblatt kann zu erheblichen rechtlichen Konsequenzen führen:',
+          'Fehlende oder unvollständige Tageskontrollblätter sind ein Verstoß gegen die FPersV und werden als Ordnungswidrigkeit geahndet:',
       'driver_green_book_section3_b1':
-          'Bußgeld: Bis zu 5.000 EUR für den Fahrer, bis zu 15.000 EUR für das Unternehmen.',
+          'Bußgeld: ab 100 Euro, je nach Schwere und Häufigkeit der Verstöße auch höher.',
       'driver_green_book_section3_b2':
-          'Fahrverbot: Möglicher Entzug der Fahrerlaubnis bei wiederholten Verstößen.',
+          'Verantwortung: Nicht nur der Fahrer, auch das Unternehmen haftet für die Aufzeichnungen und muss sie ein Jahr lang aufbewahren.',
       'driver_green_book_section3_b3':
-          'Punkte in Flensburg: Eintragung im Fahreignungsregister möglich.',
+          'Kontrolle: BAG (Bundesamt für Logistik und Mobilität) und Polizei prüfen bei Straßenkontrollen und im Betrieb.',
       'driver_green_book_section3_b4':
-          'Versicherungsschutz: Bei Unfall kann der Schutz entfallen.',
+          'Bei schweren oder wiederholten Verstößen droht ein Verfahren zur Zuverlässigkeit des Unternehmens.',
       'driver_green_book_test_title': 'Green Book Test',
       'driver_green_book_test_progress': 'Frage {current} von {total}',
       'driver_green_book_test_true': 'Richtig',
@@ -1051,15 +1072,15 @@ class AppLocalizations {
       'driver_green_book_test_next': 'Weiter',
       'driver_green_book_test_submit': 'Test absenden',
       'driver_green_book_test_statement1':
-          'Das Green Book muss vor jeder Schicht ausgefullt werden.',
+          'Das Fahrtenkontrollbuch muss für jeden Fahrtag geführt werden.',
       'driver_green_book_test_statement2':
-          'Fahrzeugmangel konnen erst am Ende der Woche gemeldet werden.',
+          'Die Blätter dürfen am Ende der Woche aus dem Gedächtnis nachgetragen werden.',
       'driver_green_book_test_statement3':
-          'Die erste Konsequenz bei Nichteinhaltung ist eine mundliche Verwarnung.',
+          'Die erste Konsequenz bei Nichteinhaltung ist eine mündliche Verwarnung.',
       'driver_green_book_test_statement4':
-          'Zu den rechtlichen Strafen kann ein Bußgeld von bis zu 5.000 EUR fur den Fahrer gehoren.',
+          'Bei fehlenden oder unvollständigen Blättern droht ein Bußgeld ab 100 Euro.',
       'driver_green_book_test_statement5':
-          'Der Versicherungsschutz bleibt immer unbeeinflusst, wenn das Green Book fehlt.',
+          'Die Aufzeichnungen der letzten 28 Tage müssen nicht mitgeführt werden.',
       'driver_green_book_test_result_pass_title': 'Test bestanden',
       'driver_green_book_test_result_fail_title': 'Test nicht bestanden',
       'driver_green_book_test_result_pass_body':
@@ -1746,6 +1767,7 @@ class AppLocalizations {
       'nav_profile': 'Profil',
       'nav_tasks': 'Detyrat',
       'driver_home_dispatcher': 'Dispecer',
+      'driver_home_dispatcher_no_shift_today': 'Asnjë turn i caktuar sot',
       'driver_home_shift_plan_title': 'Plani i turnit',
       'driver_home_shift_plan_subtitle': 'Turnet e tua',
       'driver_home_scorecard_subtitle': 'Permbledhja e performances tende',
@@ -1780,30 +1802,37 @@ class AppLocalizations {
       'driver_green_book_start_test': 'Fillo testin Green Book',
       'driver_green_book_test_required': 'Test i detyrueshem',
       'driver_green_book_section1_title':
-          'Fleta ditore e kontrollit Green Book',
+          'Green Book - libri i kontrollit të udhëtimeve',
       'driver_green_book_section1_text':
-          'Fleta ditore e kontrollit (Green Book) eshte dokument i detyrueshem qe plotesohet para çdo turni. Ajo verifikon gjendjen e automjetit dhe dokumenton pikat e sigurise.',
-      'driver_green_book_section1_b1': 'Plotesoje plotesisht para çdo turni.',
+          'Green Book është libri yt i kontrollit të udhëtimeve: fletët ditore të kontrollit sipas § 1 Abs. 6 Fahrpersonalverordnung (FPersV, rregullorja gjermane për personelin drejtues). Me to dëshmohen kohët e drejtimit, ndërprerjet e drejtimit, koha e punës dhe e pushimit. Detyrimi vlen në transportin tregtar të mallrave për automjete mbi 2,8 t deri në 3,5 t masë maksimale të lejuar.',
+      'driver_green_book_section1_b1':
+          'Një fletë për çdo ditë udhëtimi: emri dhe adresa, targa, data, kilometrazhi si dhe vendi në fillim e në fund të udhëtimit.',
       'driver_green_book_section1_b2':
-          'Raporto menjehere defektet e automjetit.',
-      'driver_green_book_section1_b3': 'Mos harro nenshkrimin.',
-      'driver_green_book_section2_title': 'Pasojat e mosrespektimit',
+          'Shënoji menjëherë kohët e drejtimit, ndërprerjet dhe pushimet me orën e saktë - me stilolaps, kurrë më vonë.',
+      'driver_green_book_section1_b3':
+          'Nënshkruaj fletën, mbaj me vete shënimet e 28 ditëve të fundit dhe dorëzo fletët e vjetra në kompani.',
+      'driver_green_book_section2_title':
+          'Pasojat e mosrespektimit',
       'driver_green_book_section2_text':
-          'Shkeljet trajtohen me hapa ne rritje:',
+          'Nëse libri i kontrollit nuk mbahet ose është i paplotë, në kompani zbatohen këto hapa:',
       'driver_green_book_section2_b1':
-          'Paralajmerimi i pare: verbal nga dispeceri.',
-      'driver_green_book_section2_b2': 'Paralajmerimi i dyte: me shkrim.',
+          'Paralajmërimi i parë: verbal nga dispeçeri.',
+      'driver_green_book_section2_b2':
+          'Paralajmërimi i dytë: me shkrim.',
       'driver_green_book_section2_b3':
-          'Shkelje te perseritura: veprime disiplinore.',
-      'driver_green_book_section3_title': 'Ndeshkime ligjore',
+          'Shkelje të përsëritura: pasoja sipas së drejtës së punës deri në shkëputje të kontratës.',
+      'driver_green_book_section3_title':
+          'Pasojat ligjore',
       'driver_green_book_section3_text':
-          'Nese Green Book mungon ose eshte i paplotesuar ne kontroll:',
-      'driver_green_book_section3_b1': 'Deri ne 5000 EUR gjobe per shoferin.',
-      'driver_green_book_section3_b2': 'Deri ne 30000 EUR gjobe per kompanine.',
+          'Fletët që mungojnë ose janë të paplota janë shkelje e FPersV dhe ndëshkohen si kundërvajtje administrative:',
+      'driver_green_book_section3_b1':
+          'Gjobë: nga 100 euro, më e lartë sipas rëndësisë dhe përsëritjes së shkeljeve.',
+      'driver_green_book_section3_b2':
+          'Përgjegjësia: jo vetëm shoferi - edhe kompania përgjigjet për shënimet dhe duhet të ruajë ato për një vit.',
       'driver_green_book_section3_b3':
-          'Mund te regjistrohen pike ne Flensburg.',
+          'Kontrolli: BAG (Bundesamt für Logistik und Mobilität, autoriteti federal gjerman) dhe policia kontrollojnë në rrugë dhe në kompani.',
       'driver_green_book_section3_b4':
-          'Mund te kete ndikim negativ ne siguracion.',
+          'Në rast shkeljesh të rënda ose të përsëritura mund të nisë një procedurë për besueshmërinë e kompanisë.',
       'driver_green_book_test_title': 'Testi Green Book',
       'driver_green_book_test_progress': 'Pyetja {current} nga {total}',
       'driver_green_book_test_next': 'Tjetra',
@@ -2467,6 +2496,7 @@ class AppLocalizations {
       'nav_profile': 'Profil',
       'nav_tasks': 'Feladatok',
       'driver_home_dispatcher': 'Diszpecser',
+      'driver_home_dispatcher_no_shift_today': 'Mára nincs beosztás',
       'driver_home_shift_plan_title': 'Muszakterv',
       'driver_home_shift_plan_subtitle': 'Muszakjaid',
       'driver_home_scorecard_subtitle': 'Teljesitmenyed attekintese',
@@ -2499,31 +2529,38 @@ class AppLocalizations {
       'driver_green_book_video_subtitle': 'Erintsd meg a lejatszashoz',
       'driver_green_book_start_test': 'Green Book teszt inditasa',
       'driver_green_book_test_required': 'A teszt kotelezo',
-      'driver_green_book_section1_title': 'Green Book napi ellenorzolap',
+      'driver_green_book_section1_title':
+          'Green Book - menetlevél (Fahrtenkontrollbuch)',
       'driver_green_book_section1_text':
-          'A napi ellenorzolap (Green Book) kotelezo dokumentum, amelyet minden muszak elott ki kell tolteni. Segit ellenorizni a jarmu allapotat es dokumentalja a biztonsagi pontokat.',
+          'A Green Book a menetleveled: a napi ellenőrző lapok a § 1 Abs. 6 Fahrpersonalverordnung (FPersV, a német gépjárművezetői rendelet) szerint. Ezekkel igazolod a vezetési időt, a vezetési szüneteket, valamint a munka- és pihenőidőt. A kötelezettség az árufuvarozásban a 2,8 t feletti, 3,5 t-ig terjedő megengedett össztömegű járművekre vonatkozik.',
       'driver_green_book_section1_b1':
-          'Minden muszak elott teljesen toltsd ki.',
-      'driver_green_book_section1_b2': 'A jarmuhibakat azonnal jelentsd.',
-      'driver_green_book_section1_b3': 'Ne felejtsd el az alairast.',
-      'driver_green_book_section2_title': 'A szabalysertes kovetkezmenyei',
+          'Minden vezetési napra egy lap: név és lakcím, rendszám, dátum, kilométeróra-állás és helyszín az indulásnál és az érkezésnél.',
+      'driver_green_book_section1_b2':
+          'A vezetési időt, a szüneteket és a pihenőidőt pontos időponttal azonnal vezesd be - golyóstollal, soha nem utólag.',
+      'driver_green_book_section1_b3':
+          'Írd alá a lapot, az utolsó 28 nap feljegyzéseit tartsd magadnál, a régebbi lapokat pedig add le a cégnél.',
+      'driver_green_book_section2_title':
+          'A szabálysértés következményei',
       'driver_green_book_section2_text':
-          'A jogsertesek fokozatos lepesek szerint kezeltek:',
+          'Ha a menetlevelet nem vagy hiányosan vezeted, a cégnél a következő fokozatok érvényesek:',
       'driver_green_book_section2_b1':
-          'Elso figyelmeztetes: szobeli figyelmeztetes a diszpecsertol.',
+          'Első figyelmeztetés: szóbeli figyelmeztetés a diszpécsertől.',
       'driver_green_book_section2_b2':
-          'Masodik figyelmeztetes: irasbeli figyelmeztetes.',
+          'Második figyelmeztetés: írásbeli figyelmeztetés.',
       'driver_green_book_section2_b3':
-          'Ismetelt jogsertes: fegyelmi intezkedesek.',
-      'driver_green_book_section3_title': 'Jogi buntetesek',
+          'Ismételt szabálysértés: munkajogi következmények a felmondásig.',
+      'driver_green_book_section3_title':
+          'Jogi következmények',
       'driver_green_book_section3_text':
-          'Ha a Green Book hianyzik vagy ellenorzeskor hianyosan van kitoltve:',
+          'A hiányzó vagy hiányos napi ellenőrző lapok sértik a FPersV előírásait és szabálysértésként büntetendők:',
       'driver_green_book_section3_b1':
-          'A soforre akar 5000 EUR birsag is kiszabhato.',
+          'Bírság: 100 eurótól, a szabálysértés súlyosságától és gyakoriságától függően magasabb is lehet.',
       'driver_green_book_section3_b2':
-          'A cegre akar 30000 EUR birsag is kiszabhato.',
-      'driver_green_book_section3_b3': 'Flensburg pontok rogzithetok.',
-      'driver_green_book_section3_b4': 'A biztositasra negativ hatassal lehet.',
+          'Felelősség: nemcsak a sofőr - a cég is felel a feljegyzésekért, és egy évig meg kell őriznie azokat.',
+      'driver_green_book_section3_b3':
+          'Ellenőrzés: a BAG (Bundesamt für Logistik und Mobilität, német szövetségi hatóság) és a rendőrség ellenőriz az úton és a telephelyen.',
+      'driver_green_book_section3_b4':
+          'Súlyos vagy ismételt szabálysértés esetén a cég megbízhatóságának vizsgálata indulhat.',
       'driver_green_book_test_title': 'Green Book teszt',
       'driver_green_book_test_progress': '{current}. kerdes / {total}',
       'driver_green_book_test_next': 'Kovetkezo',
@@ -3185,6 +3222,7 @@ class AppLocalizations {
       'nav_profile': 'Profil',
       'nav_tasks': 'Sarcini',
       'driver_home_dispatcher': 'Dispecer',
+      'driver_home_dispatcher_no_shift_today': 'Nimic setat pentru azi',
       'driver_home_shift_plan_title': 'Plan tura',
       'driver_home_shift_plan_subtitle': 'Turele tale',
       'driver_home_scorecard_subtitle': 'Prezentarea performantei tale',
@@ -3219,31 +3257,37 @@ class AppLocalizations {
       'driver_green_book_start_test': 'Porneste testul Green Book',
       'driver_green_book_test_required': 'Test obligatoriu',
       'driver_green_book_section1_title':
-          'Fisa zilnica de inspectie Green Book',
+          'Green Book - registrul de control al curselor',
       'driver_green_book_section1_text':
-          'Fisa zilnica de inspectie (Green Book) este un document obligatoriu care trebuie completat inainte de fiecare tura. Ajuta la verificarea starii vehiculului si documenteaza punctele de siguranta.',
+          'Green Book este registrul tău de control al curselor: fișele zilnice de control conform § 1 Abs. 6 Fahrpersonalverordnung (FPersV, regulamentul german privind personalul de conducere). Cu ele dovedești timpii de conducere, pauzele, timpul de lucru și de odihnă. Obligația se aplică în transportul comercial de mărfuri pentru vehicule de peste 2,8 t până la 3,5 t masă maximă autorizată.',
       'driver_green_book_section1_b1':
-          'Completeaz-o integral inainte de fiecare tura.',
+          'O fișă pentru fiecare zi de conducere: nume și adresă, numărul de înmatriculare, data, kilometrajul și locul la începutul și la sfârșitul cursei.',
       'driver_green_book_section1_b2':
-          'Raporteaza imediat defectele vehiculului.',
-      'driver_green_book_section1_b3': 'Nu uita semnatura.',
-      'driver_green_book_section2_title': 'Consecinte ale nerespectarii',
+          'Notează imediat timpii de conducere, pauzele și perioadele de odihnă cu ora exactă - cu pixul, niciodată ulterior.',
+      'driver_green_book_section1_b3':
+          'Semnează fișa, poartă cu tine înregistrările din ultimele 28 de zile și predă fișele mai vechi la firmă.',
+      'driver_green_book_section2_title':
+          'Consecințele nerespectării',
       'driver_green_book_section2_text':
-          'Abaterile sunt tratate in pasi progresivi:',
+          'Dacă registrul nu este completat sau este incomplet, în firmă se aplică următoarele trepte:',
       'driver_green_book_section2_b1':
-          'Primul avertisment: avertisment verbal de la dispecer.',
+          'Primul avertisment: avertisment verbal din partea dispecerului.',
       'driver_green_book_section2_b2':
           'Al doilea avertisment: avertisment scris.',
-      'driver_green_book_section2_b3': 'Abateri repetate: masuri disciplinare.',
-      'driver_green_book_section3_title': 'Sanctiuni legale',
+      'driver_green_book_section2_b3':
+          'Încălcări repetate: consecințe de dreptul muncii, până la concediere.',
+      'driver_green_book_section3_title':
+          'Consecințe legale',
       'driver_green_book_section3_text':
-          'Daca Green Book lipseste sau este incomplet la control:',
+          'Fișele lipsă sau incomplete încalcă FPersV și sunt sancționate ca abatere administrativă:',
       'driver_green_book_section3_b1':
-          'Amenda de pana la 5000 EUR pentru sofer.',
+          'Amendă: de la 100 de euro, mai mare în funcție de gravitatea și frecvența încălcărilor.',
       'driver_green_book_section3_b2':
-          'Amenda de pana la 30000 EUR pentru companie.',
-      'driver_green_book_section3_b3': 'Se pot inregistra puncte in Flensburg.',
-      'driver_green_book_section3_b4': 'Poate afecta negativ asigurarea.',
+          'Responsabilitate: nu doar șoferul - și firma răspunde pentru înregistrări și trebuie să le păstreze un an.',
+      'driver_green_book_section3_b3':
+          'Control: BAG (Bundesamt für Logistik und Mobilität, autoritatea federală germană) și poliția verifică în trafic și la sediul firmei.',
+      'driver_green_book_section3_b4':
+          'În cazul încălcărilor grave sau repetate poate fi deschisă o procedură privind fiabilitatea firmei.',
       'driver_green_book_test_title': 'Test Green Book',
       'driver_green_book_test_progress': 'Intrebarea {current} din {total}',
       'driver_green_book_test_next': 'Urmatorul',
@@ -3901,6 +3945,7 @@ class AppLocalizations {
       'nav_profile': 'Profil',
       'nav_tasks': 'Zadaci',
       'driver_home_dispatcher': 'Dispecer',
+      'driver_home_dispatcher_no_shift_today': 'Za danas nije uneseno',
       'driver_home_shift_plan_title': 'Plan smjene',
       'driver_home_shift_plan_subtitle': 'Tvoje smjene',
       'driver_home_scorecard_subtitle': 'Pregled tvoje izvedbe',
@@ -3934,29 +3979,38 @@ class AppLocalizations {
       'driver_green_book_video_subtitle': 'Dodirni za reprodukciju',
       'driver_green_book_start_test': 'Pokreni Green Book test',
       'driver_green_book_test_required': 'Test je obavezan',
-      'driver_green_book_section1_title': 'Green Book dnevni kontrolni list',
+      'driver_green_book_section1_title':
+          'Green Book - knjiga kontrole vožnje',
       'driver_green_book_section1_text':
-          'Dnevni kontrolni list (Green Book) je obavezan dokument koji se mora ispuniti prije svake smjene. Pomaze provjeri stanja vozila i biljezi sigurnosno vazne stavke.',
+          'Green Book je tvoja knjiga kontrole vožnje: dnevni kontrolni listovi prema § 1 Abs. 6 Fahrpersonalverordnung (FPersV, njemačka uredba o vozačkom osoblju). Njima dokazuješ vrijeme vožnje, prekide vožnje te radno vrijeme i odmore. Obveza vrijedi u gospodarskom prijevozu tereta za vozila iznad 2,8 t do 3,5 t najveće dopuštene mase.',
       'driver_green_book_section1_b1':
-          'Popuni ga u potpunosti prije svake smjene.',
-      'driver_green_book_section1_b2': 'Odmah prijavi nedostatke na vozilu.',
-      'driver_green_book_section1_b3': 'Ne zaboravi potpis.',
-      'driver_green_book_section2_title': 'Posljedice nepostivanja',
+          'Jedan list za svaki dan vožnje: ime i adresa, registarska oznaka, datum, stanje kilometara te mjesto početka i završetka vožnje.',
+      'driver_green_book_section1_b2':
+          'Vrijeme vožnje, prekide i odmore upiši odmah s točnim vremenom - kemijskom olovkom, nikada naknadno.',
+      'driver_green_book_section1_b3':
+          'Potpiši list, nosi sa sobom zapise zadnjih 28 dana, a starije listove predaj u tvrtki.',
+      'driver_green_book_section2_title':
+          'Posljedice nepridržavanja',
       'driver_green_book_section2_text':
-          'Krsenja se tretiraju kroz postupne korake:',
+          'Ako se knjiga kontrole ne vodi ili je nepotpuna, u tvrtki vrijede sljedeći stupnjevi:',
       'driver_green_book_section2_b1':
-          'Prvo upozorenje: usmeno upozorenje dispecera.',
-      'driver_green_book_section2_b2': 'Drugo upozorenje: pismeno upozorenje.',
+          'Prvo upozorenje: usmena opomena dispečera.',
+      'driver_green_book_section2_b2':
+          'Drugo upozorenje: pisana opomena.',
       'driver_green_book_section2_b3':
-          'Ponovljena krsenja: disciplinske mjere.',
-      'driver_green_book_section3_title': 'Zakonske kazne',
+          'Ponovljene povrede: radnopravne posljedice do otkaza.',
+      'driver_green_book_section3_title':
+          'Pravne posljedice',
       'driver_green_book_section3_text':
-          'Ako Green Book nedostaje ili je nepotpuno popunjen tokom kontrole:',
-      'driver_green_book_section3_b1': 'Kazna do 5000 EUR za vozaca.',
-      'driver_green_book_section3_b2': 'Kazna do 30000 EUR za kompaniju.',
+          'Listovi koji nedostaju ili su nepotpuni povreda su FPersV-a i kažnjavaju se kao prekršaj:',
+      'driver_green_book_section3_b1':
+          'Novčana kazna: od 100 eura, viša ovisno o težini i učestalosti povreda.',
+      'driver_green_book_section3_b2':
+          'Odgovornost: ne samo vozač - i tvrtka odgovara za zapise i mora ih čuvati godinu dana.',
       'driver_green_book_section3_b3':
-          'Moguce evidentiranje bodova u Flensburgu.',
-      'driver_green_book_section3_b4': 'Moguci negativan uticaj na osiguranje.',
+          'Nadzor: BAG (Bundesamt für Logistik und Mobilität, njemačko savezno tijelo) i policija provjeravaju na cesti i u tvrtki.',
+      'driver_green_book_section3_b4':
+          'Kod teških ili ponovljenih povreda može se pokrenuti postupak o pouzdanosti tvrtke.',
       'driver_green_book_test_title': 'Green Book test',
       'driver_green_book_test_progress': 'Pitanje {current} od {total}',
       'driver_green_book_test_next': 'Dalje',
@@ -4609,6 +4663,7 @@ class AppLocalizations {
       'nav_profile': 'الملف الشخصي',
       'nav_tasks': 'المهام',
       'driver_home_dispatcher': 'الديسباتشر',
+      'driver_home_dispatcher_no_shift_today': 'لا توجد وردية اليوم',
       'driver_home_shift_plan_title': 'خطة الشفت',
       'driver_home_shift_plan_subtitle': 'شفتاتك',
       'driver_home_scorecard_subtitle': 'نظرة عامة على ادائك',
@@ -4641,26 +4696,38 @@ class AppLocalizations {
       'driver_green_book_video_subtitle': 'اضغط للتشغيل',
       'driver_green_book_start_test': 'ابدأ اختبار Green Book',
       'driver_green_book_test_required': 'الاختبار مطلوب',
-      'driver_green_book_section1_title': 'ورقة الفحص اليومية Green Book',
+      'driver_green_book_section1_title':
+          'Green Book - دفتر مراقبة الرحلات',
       'driver_green_book_section1_text':
-          'ورقة الفحص اليومية (Green Book) مستند إلزامي يجب تعبئته قبل كل وردية. تساعد في التحقق من حالة المركبة وتوثيق نقاط السلامة.',
-      'driver_green_book_section1_b1': 'قم بتعبئتها بالكامل قبل كل وردية.',
-      'driver_green_book_section1_b2': 'ابلغ عن اعطال المركبة فوراً.',
-      'driver_green_book_section1_b3': 'لا تنس التوقيع.',
-      'driver_green_book_section2_title': 'عواقب عدم الالتزام',
+          'الـ Green Book هو دفتر مراقبة الرحلات الخاص بك: أوراق المراقبة اليومية وفق § 1 Abs. 6 Fahrpersonalverordnung (FPersV، لائحة العاملين في القيادة الألمانية). بها تُثبت أوقات القيادة وفترات انقطاع القيادة وأوقات العمل والراحة. يسري الالتزام في النقل التجاري للبضائع على المركبات التي يزيد وزنها الإجمالي المسموح به عن 2,8 طن حتى 3,5 طن.',
+      'driver_green_book_section1_b1':
+          'ورقة واحدة لكل يوم قيادة: الاسم والعنوان، رقم اللوحة، التاريخ، قراءة العداد ومكان بداية الرحلة ونهايتها.',
+      'driver_green_book_section1_b2':
+          'سجّل أوقات القيادة والاستراحات وأوقات الراحة فوراً مع التوقيت الدقيق - بقلم حبر جاف، وليس لاحقاً.',
+      'driver_green_book_section1_b3':
+          'وقّع الورقة، واحتفظ معك بسجلات آخر 28 يوماً، وسلّم الأوراق الأقدم إلى الشركة.',
+      'driver_green_book_section2_title':
+          'عواقب عدم الالتزام',
       'driver_green_book_section2_text':
-          'يتم التعامل مع المخالفات على مراحل تصاعدية:',
+          'إذا لم يُمسك دفتر المراقبة أو كان ناقصاً، تُطبق في الشركة الدرجات التالية:',
       'driver_green_book_section2_b1':
-          'التحذير الاول: تحذير شفهي من الديسباتشر.',
-      'driver_green_book_section2_b2': 'التحذير الثاني: تحذير خطي.',
-      'driver_green_book_section2_b3': 'المخالفات المتكررة: اجراءات تأديبية.',
-      'driver_green_book_section3_title': 'العقوبات القانونية',
+          'الإنذار الأول: تنبيه شفهي من المشرف.',
+      'driver_green_book_section2_b2':
+          'الإنذار الثاني: إنذار كتابي.',
+      'driver_green_book_section2_b3':
+          'المخالفات المتكررة: عواقب وفق قانون العمل تصل إلى إنهاء العقد.',
+      'driver_green_book_section3_title':
+          'العواقب القانونية',
       'driver_green_book_section3_text':
-          'إذا كان Green Book مفقوداً او غير مكتمل عند الفحص:',
-      'driver_green_book_section3_b1': 'غرامة تصل الى 5000 يورو على السائق.',
-      'driver_green_book_section3_b2': 'غرامة تصل الى 30000 يورو على الشركة.',
-      'driver_green_book_section3_b3': 'قد يتم تسجيل نقاط في فلنسبورغ.',
-      'driver_green_book_section3_b4': 'قد يؤثر ذلك سلباً على التأمين.',
+          'الأوراق المفقودة أو الناقصة تُعد مخالفة للـ FPersV ويُعاقب عليها كمخالفة إدارية:',
+      'driver_green_book_section3_b1':
+          'غرامة: ابتداءً من 100 يورو، وأعلى بحسب شدة المخالفات وتكرارها.',
+      'driver_green_book_section3_b2':
+          'المسؤولية: ليست على السائق وحده - الشركة مسؤولة أيضاً عن السجلات وعليها حفظها لمدة سنة.',
+      'driver_green_book_section3_b3':
+          'الرقابة: BAG (Bundesamt für Logistik und Mobilität، الهيئة الاتحادية الألمانية) والشرطة تفحصان على الطريق وداخل الشركة.',
+      'driver_green_book_section3_b4':
+          'عند المخالفات الجسيمة أو المتكررة قد تُفتح إجراءات بشأن موثوقية الشركة.',
       'driver_green_book_test_title': 'اختبار Green Book',
       'driver_green_book_test_progress': 'السؤال {current} من {total}',
       'driver_green_book_test_next': 'التالي',
@@ -5293,6 +5360,7 @@ class AppLocalizations {
       'nav_profile': 'Profil',
       'nav_tasks': 'Gorevler',
       'driver_home_dispatcher': 'Dispatcher',
+      'driver_home_dispatcher_no_shift_today': 'Bugün için vardiya yok',
       'driver_home_shift_plan_title': 'Vardiya Plani',
       'driver_home_shift_plan_subtitle': 'Vardiyalarin',
       'driver_home_scorecard_subtitle': 'Performansina genel bakis',
@@ -5325,27 +5393,38 @@ class AppLocalizations {
       'driver_green_book_video_subtitle': 'Oynatmak icin dokun',
       'driver_green_book_start_test': 'Green Book testini baslat',
       'driver_green_book_test_required': 'Test zorunlu',
-      'driver_green_book_section1_title': 'Green Book gunluk kontrol formu',
+      'driver_green_book_section1_title':
+          'Green Book - sefer kontrol defteri',
       'driver_green_book_section1_text':
-          'Gunluk kontrol formu (Green Book), her vardiyadan once doldurulmasi gereken zorunlu bir belgedir. Arac durumunu kontrol etmeye ve guvenlikle ilgili noktalarin kaydina yardim eder.',
-      'driver_green_book_section1_b1': 'Her vardiyadan once eksiksiz doldurun.',
-      'driver_green_book_section1_b2': 'Arac arizalarini hemen bildirin.',
-      'driver_green_book_section1_b3': 'Imzayi unutmayin.',
-      'driver_green_book_section2_title': 'Uyumsuzlugun sonuclari',
-      'driver_green_book_section2_text': 'Ihlaller artan adimlarla ele alinir:',
+          'Green Book senin sefer kontrol defterindir: § 1 Abs. 6 Fahrpersonalverordnung (FPersV, Alman sürücü personeli yönetmeliği) uyarınca tutulan günlük kontrol formları. Bunlarla sürüş sürelerini, sürüş molalarını, çalışma ve dinlenme sürelerini belgelendirirsin. Yükümlülük, ticari yük taşımacılığında 2,8 t üzeri 3,5 t azami yüklü ağırlığa kadar olan araçlar için geçerlidir.',
+      'driver_green_book_section1_b1':
+          'Her sürüş günü için bir form: ad ve adres, plaka, tarih, sefer başındaki ve sonundaki kilometre ile yer bilgisi.',
+      'driver_green_book_section1_b2':
+          'Sürüş sürelerini, molaları ve dinlenme sürelerini saatiyle hemen yaz - tükenmez kalemle, asla sonradan.',
+      'driver_green_book_section1_b3':
+          'Formu imzala, son 28 günün kayıtlarını yanında bulundur ve eski formları firmaya teslim et.',
+      'driver_green_book_section2_title':
+          'Uymamanın sonuçları',
+      'driver_green_book_section2_text':
+          'Sefer kontrol defteri tutulmazsa veya eksik tutulursa firmada şu kademeler uygulanır:',
       'driver_green_book_section2_b1':
-          'Ilk uyari: dispatcher tarafindan sozlu uyari.',
-      'driver_green_book_section2_b2': 'Ikinci uyari: yazili uyari.',
-      'driver_green_book_section2_b3': 'Tekrarlanan ihlal: disiplin islemleri.',
-      'driver_green_book_section3_title': 'Yasal cezalar',
+          'İlk uyarı: sevkiyat sorumlusundan sözlü ihtar.',
+      'driver_green_book_section2_b2':
+          'İkinci uyarı: yazılı ihtar.',
+      'driver_green_book_section2_b3':
+          'Tekrarlanan ihlaller: iş hukuku sonuçları, fesihe kadar.',
+      'driver_green_book_section3_title':
+          'Hukuki sonuçlar',
       'driver_green_book_section3_text':
-          'Kontrolde Green Book eksik veya eksik doldurulmussa:',
+          'Eksik veya hiç doldurulmamış günlük kontrol formları FPersV ihlalidir ve idari kabahat olarak cezalandırılır:',
       'driver_green_book_section3_b1':
-          'Surucu icin 5000 EUR\'ya kadar para cezasi.',
+          'Para cezası: 100 Avrodan başlar, ihlalin ağırlığına ve sıklığına göre daha yüksek olabilir.',
       'driver_green_book_section3_b2':
-          'Sirket icin 30000 EUR\'ya kadar para cezasi.',
-      'driver_green_book_section3_b3': 'Flensburg puanlari kaydedilebilir.',
-      'driver_green_book_section3_b4': 'Sigortayi olumsuz etkileyebilir.',
+          'Sorumluluk: yalnızca sürücü değil - firma da kayıtlardan sorumludur ve bunları bir yıl saklamak zorundadır.',
+      'driver_green_book_section3_b3':
+          'Denetim: BAG (Bundesamt für Logistik und Mobilität, Alman federal kurumu) ve polis hem yolda hem işletmede denetler.',
+      'driver_green_book_section3_b4':
+          'Ağır veya tekrarlanan ihlallerde firmanın güvenilirliğine ilişkin işlem başlatılabilir.',
       'driver_green_book_test_title': 'Green Book testi',
       'driver_green_book_test_progress': '{total} sorudan {current}. soru',
       'driver_green_book_test_next': 'Ileri',
@@ -5908,6 +5987,7 @@ class AppLocalizations {
       'nav_profile': 'Профиль',
       'nav_tasks': 'Задачи',
       'driver_home_dispatcher': 'Диспетчер',
+      'driver_home_dispatcher_no_shift_today': 'На сегодня не задано',
       'driver_home_shift_plan_title': 'План смен',
       'driver_home_shift_plan_subtitle': 'Ваши смены',
       'driver_home_scorecard_subtitle': 'Обзор вашей эффективности',
@@ -5941,32 +6021,38 @@ class AppLocalizations {
       'driver_green_book_video_subtitle': 'Нажмите, чтобы воспроизвести',
       'driver_green_book_start_test': 'Начать тест Green Book',
       'driver_green_book_test_required': 'Тест обязателен',
-      'driver_green_book_section1_title': 'Ежедневный лист проверки Green Book',
+      'driver_green_book_section1_title':
+          'Green Book - книга учёта поездок',
       'driver_green_book_section1_text':
-          'Ежедневный лист проверки (Green Book) - обязательный документ, который нужно заполнять перед каждой сменой. Он помогает проверять состояние автомобиля и фиксировать пункты безопасности.',
+          'Green Book - это твоя книга учёта поездок: ежедневные контрольные листы по § 1 Abs. 6 Fahrpersonalverordnung (FPersV, немецкое постановление о водительском персонале). Ими подтверждаются время управления, перерывы в вождении, рабочее время и время отдыха. Обязанность действует в коммерческих грузоперевозках для автомобилей свыше 2,8 т и до 3,5 т разрешённой максимальной массы.',
       'driver_green_book_section1_b1':
-          'Полностью заполняйте его перед каждой сменой.',
+          'Один лист на каждый день поездки: имя и адрес, госномер, дата, показания одометра, а также место начала и окончания поездки.',
       'driver_green_book_section1_b2':
-          'Сразу сообщайте о неисправностях автомобиля.',
-      'driver_green_book_section1_b3': 'Не забывайте подпись.',
-      'driver_green_book_section2_title': 'Последствия несоблюдения',
+          'Время управления, перерывы и отдых записывай сразу с точным временем - шариковой ручкой, никогда задним числом.',
+      'driver_green_book_section1_b3':
+          'Подпиши лист, вози с собой записи за последние 28 дней, а более старые листы сдавай на предприятии.',
+      'driver_green_book_section2_title':
+          'Последствия несоблюдения',
       'driver_green_book_section2_text':
-          'Нарушения обрабатываются по нарастающим этапам:',
+          'Если книга учёта не ведётся или заполнена не полностью, на предприятии применяются следующие ступени:',
       'driver_green_book_section2_b1':
-          'Первое предупреждение: устное предупреждение от диспетчера.',
+          'Первое предупреждение: устное замечание от диспетчера.',
       'driver_green_book_section2_b2':
           'Второе предупреждение: письменное предупреждение.',
       'driver_green_book_section2_b3':
-          'Повторные нарушения: дисциплинарные меры.',
-      'driver_green_book_section3_title': 'Юридические штрафы',
+          'Повторные нарушения: последствия по трудовому праву вплоть до увольнения.',
+      'driver_green_book_section3_title':
+          'Правовые последствия',
       'driver_green_book_section3_text':
-          'Если Green Book отсутствует или заполнен не полностью при проверке:',
-      'driver_green_book_section3_b1': 'Штраф для водителя до 5000 EUR.',
-      'driver_green_book_section3_b2': 'Штраф для компании до 30000 EUR.',
+          'Отсутствующие или неполные контрольные листы являются нарушением FPersV и наказываются как административное правонарушение:',
+      'driver_green_book_section3_b1':
+          'Штраф: от 100 евро, выше в зависимости от тяжести и повторности нарушений.',
+      'driver_green_book_section3_b2':
+          'Ответственность: не только водитель - предприятие также отвечает за записи и обязано хранить их один год.',
       'driver_green_book_section3_b3':
-          'Могут быть начислены баллы во Фленсбурге.',
+          'Контроль: BAG (Bundesamt für Logistik und Mobilität, федеральное ведомство Германии) и полиция проверяют на дороге и на предприятии.',
       'driver_green_book_section3_b4':
-          'Это может негативно повлиять на страховку.',
+          'При тяжёлых или повторных нарушениях возможна процедура проверки надёжности предприятия.',
       'driver_green_book_test_title': 'Тест Green Book',
       'driver_green_book_test_progress': 'Вопрос {current} из {total}',
       'driver_green_book_test_next': 'Далее',
@@ -6667,6 +6753,7 @@ class AppLocalizations {
       'driver_absence_start_label': 'Start',
       'driver_absence_end_label': 'End',
       'driver_absence_days_label': 'Days',
+      'driver_absence_unpaid': 'Unpaid',
       'driver_absence_day_label': 'day',
       'driver_absence_days_per_year': 'days / year',
       'driver_absence_of_word': 'of',
@@ -6705,6 +6792,7 @@ class AppLocalizations {
       'driver_absence_start_label': 'Start',
       'driver_absence_end_label': 'Ende',
       'driver_absence_days_label': 'Tage',
+      'driver_absence_unpaid': 'Unbezahlt',
       'driver_absence_day_label': 'Tag',
       'driver_absence_days_per_year': 'Tage / Jahr',
       'driver_absence_of_word': 'von',
@@ -6743,6 +6831,7 @@ class AppLocalizations {
       'driver_absence_start_label': 'Fillimi',
       'driver_absence_end_label': 'Fundi',
       'driver_absence_days_label': 'Dite',
+      'driver_absence_unpaid': 'E papaguar',
       'driver_absence_day_label': 'dite',
       'driver_absence_days_per_year': 'dite / vit',
       'driver_absence_of_word': 'nga',
@@ -6781,6 +6870,7 @@ class AppLocalizations {
       'driver_absence_start_label': 'Kezdet',
       'driver_absence_end_label': 'Vege',
       'driver_absence_days_label': 'Napok',
+      'driver_absence_unpaid': 'Fizetes nelkuli',
       'driver_absence_day_label': 'nap',
       'driver_absence_days_per_year': 'nap / ev',
       'driver_absence_of_word': 'bol',
@@ -6820,6 +6910,7 @@ class AppLocalizations {
       'driver_absence_start_label': 'Inceput',
       'driver_absence_end_label': 'Sfarsit',
       'driver_absence_days_label': 'Zile',
+      'driver_absence_unpaid': 'Neplatit',
       'driver_absence_day_label': 'zi',
       'driver_absence_days_per_year': 'zile / an',
       'driver_absence_of_word': 'din',
@@ -6858,6 +6949,7 @@ class AppLocalizations {
       'driver_absence_start_label': 'Pocetak',
       'driver_absence_end_label': 'Kraj',
       'driver_absence_days_label': 'Dani',
+      'driver_absence_unpaid': 'Neplaceno',
       'driver_absence_day_label': 'dan',
       'driver_absence_days_per_year': 'dana / godina',
       'driver_absence_of_word': 'od',
@@ -6896,6 +6988,7 @@ class AppLocalizations {
       'driver_absence_start_label': 'البداية',
       'driver_absence_end_label': 'النهاية',
       'driver_absence_days_label': 'الأيام',
+      'driver_absence_unpaid': 'غير مدفوع',
       'driver_absence_day_label': 'يوم',
       'driver_absence_days_per_year': 'يوم / سنة',
       'driver_absence_of_word': 'من',
@@ -6933,6 +7026,7 @@ class AppLocalizations {
       'driver_absence_start_label': 'Baslangic',
       'driver_absence_end_label': 'Bitis',
       'driver_absence_days_label': 'Gunler',
+      'driver_absence_unpaid': 'Ucretsiz izin',
       'driver_absence_day_label': 'gun',
       'driver_absence_days_per_year': 'gun / yil',
       'driver_absence_of_word': 'den',
@@ -6971,6 +7065,7 @@ class AppLocalizations {
       'driver_absence_start_label': 'Начало',
       'driver_absence_end_label': 'Конец',
       'driver_absence_days_label': 'Дни',
+      'driver_absence_unpaid': 'Без оплаты',
       'driver_absence_day_label': 'день',
       'driver_absence_days_per_year': 'дней / год',
       'driver_absence_of_word': 'из',
@@ -9900,7 +9995,7 @@ class AppLocalizations {
     'drivers_hub_title': 'Drivers Hub',
     'drivers_hub_tooltip_create_login': 'Create login',
     'drivers_hub_tooltip_delete_driver': 'Delete driver',
-    'drivers_hub_tooltip_reset_login': 'Reset login',
+    'drivers_hub_tooltip_reset_login': 'Reset password',
     'drivers_hub_tooltip_view_details': 'View details',
     'drivers_hub_transporter_id': 'Transporter ID',
     'drivers_hub_transporter_id_line': 'Transporter ID: {id}',
@@ -10089,7 +10184,7 @@ class AppLocalizations {
       'drivers_hub_title': 'Fahrer Hub',
       'drivers_hub_tooltip_create_login': 'Login erstellen',
       'drivers_hub_tooltip_delete_driver': 'Fahrer loeschen',
-      'drivers_hub_tooltip_reset_login': 'Login zuruecksetzen',
+      'drivers_hub_tooltip_reset_login': 'Passwort zuruecksetzen',
       'drivers_hub_tooltip_view_details': 'Details anzeigen',
       'drivers_hub_transporter_id': 'Transporter-ID',
       'drivers_hub_transporter_id_line': 'Transporter-ID: {id}',
@@ -14828,6 +14923,18 @@ class AppLocalizations {
 
   String t(String key) {
     final lang = _lang();
+    // Bulgarian lives in a single flat override map (bg_strings.dart) instead
+    // of inside every per-module map. Consult it first; missing keys fall
+    // through to the English fallback chain below.
+    if (lang == 'bg') {
+      final bg = kBgLocalizedValues[key];
+      if (bg != null) return _normalizeScorecardTerms(bg);
+    }
+    // Spanish uses the same flat-override mechanism as Bulgarian.
+    if (lang == 'es') {
+      final es = kEsLocalizedValues[key];
+      if (es != null) return _normalizeScorecardTerms(es);
+    }
     final langMap = _localizedValues[lang] ?? _localizedValues['en']!;
     final fleetHubMap =
         _fleetHubLocalizedValues[lang] ?? _fleetHubLocalizedValues['en']!;
@@ -14957,6 +15064,8 @@ String languageLabel(String code) {
       return '🇹🇷 Turkce';
     case 'ru':
       return '🇷🇺 Русский';
+    case 'bg':
+      return '🇧🇬 Български';
     default:
       return code;
   }

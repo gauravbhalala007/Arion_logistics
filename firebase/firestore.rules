@@ -31,6 +31,14 @@ service cloud.firestore {
         || (signedIn() && request.auth.token.email == 'admin@arion-logistics.de');
     }
 
+    // CoDriver operator superadmin(s): may author global product updates.
+    function isSuperadmin() {
+      return signedIn() && (
+        request.auth.token.email == 'admin@arion-logistics.de'
+        || request.auth.token.email == 'test@arion-logistics.de'
+      );
+    }
+
     function isApproved(userId) {
       return get(/databases/$(database)/documents/users/$(userId)).data.approved == true;
     }
@@ -122,6 +130,8 @@ service cloud.firestore {
     function isVehicleCategory(value) {
       return value in [
         'ARMADA',
+        'LMR',
+        'SESO_RENTAL',
         'AMAZON_PAID_RENTAL',
         'SELF_SOURCED_RENTAL',
         'SELF_OWNED_RENTAL',
@@ -140,8 +150,15 @@ service cloud.firestore {
     function isVehicleStatusValue(value) {
       return value in [
         'ACTIVE',
+        'OPERATIONAL',
         'GROUNDED',
+        'GROUNDED_DEFECT',
+        'GROUNDED_SELF_REPORTED',
+        'GROUNDED_TUV_OVERDUE',
         'IN_SERVICE',
+        'VOR_CONTROLLABLE',
+        'VOR_UNCONTROLLABLE',
+        'INACTIVE',
         'DEFLEETED',
       ];
     }
@@ -154,7 +171,10 @@ service cloud.firestore {
     function validVehicleMetadata(data) {
       return data.metadata is map
         && (
-          data.category == 'ARMADA'
+          // Empty metadata is allowed (e.g. Cortex import, LMR / SESO Rental).
+          data.metadata.keys().hasOnly([])
+          || (
+            data.category == 'ARMADA'
             ? data.metadata.keys().hasOnly([
                 'armadaId',
                 'armadaCompanyName',
@@ -205,6 +225,7 @@ service cloud.firestore {
               && data.metadata.ownershipType != ''
               && isVehicleDateString(data.metadata.purchaseDate)
             : false
+          )
         );
     }
 
@@ -215,6 +236,8 @@ service cloud.firestore {
           'category',
           'brand',
           'model',
+          'submodel',
+          'fleetName',
           'manufacturingYear',
           'vinNumber',
           'fuelType',
@@ -223,6 +246,7 @@ service cloud.firestore {
           'metadata',
           'notes',
           'isDeleted',
+          'cortex',
           'createdAt',
           'updatedAt',
         ])
@@ -484,6 +508,15 @@ service cloud.firestore {
 
       // Only developers can update/delete feedback.
       allow update, delete: if isFeedbackStaff() && isApproved(request.auth.uid);
+    }
+
+    // ---------- App-Updates / Changelog (global) ----------
+    // Superadmin-authored product updates shown as a post-login popup and
+    // in the "Updates" menu. Readable by any signed-in user (admins and
+    // drivers); only the operator superadmin may create/edit/delete.
+    match /appUpdates/{updateId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if isSuperadmin();
     }
 
     // ---------- co:timer holiday cache (global) ----------
@@ -851,6 +884,39 @@ service cloud.firestore {
           && resource.data.driverTransporterId == driverTransporterId();
       }
 
+      // ---------- DA Requests ----------
+      // users/{userId}/da_requests/{requestId}
+      // Fahrer-Anträge/Tickets inkl. Gehaltsvorschuss (mit PDF).
+      match /da_requests/{requestId} {
+        // DSP/admin full access for own account
+        allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
+
+        // Driver can create and read only own requests
+        allow create: if isDriverForUser(userId)
+          && isApproved(userId)
+          && request.resource.data.driverTransporterId == driverTransporterId()
+          && request.resource.data.status == 'open';
+
+        allow read: if isDriverForUser(userId)
+          && isApproved(userId)
+          && resource.data.driverTransporterId == driverTransporterId();
+      }
+
+      // ---------- Fahrerbewertungen (Dispatcher) ----------
+      // users/{userId}/driver_reviews/{period}_{transporterId}
+      match /driver_reviews/{reviewId} {
+        allow read, write: if isSelf(userId) && isApproved(userId);
+
+        // Schreiben über einen gültigen, aktiven Bewertungslink.
+        allow create, update: if request.resource.data.linkToken is string
+          && exists(/databases/$(database)/documents/dispatcher_review_links/$(request.resource.data.linkToken))
+          && get(/databases/$(database)/documents/dispatcher_review_links/$(request.resource.data.linkToken)).data.adminUid == userId
+          && get(/databases/$(database)/documents/dispatcher_review_links/$(request.resource.data.linkToken)).data.active == true
+          && request.resource.data.comment is string
+          && request.resource.data.comment.size() > 0
+          && request.resource.data.comment.size() <= 2000;
+      }
+
       // ---------- Incident Reports ----------
       // users/{userId}/incident_reports/{reportId}
       match /incident_reports/{reportId} {
@@ -1077,10 +1143,58 @@ service cloud.firestore {
     }
 
     // ============================================================
+    //  PUBLIC PLANS — link-only read-only snapshots of wave/shift
+    //  plans. The share ID is an unguessable random doc ID; `get`
+    //  is public (view without login) but `list` stays forbidden so
+    //  links cannot be enumerated. Only the creating admin may
+    //  write/refresh/delete their own share.
+    // ============================================================
+    match /public_plans/{shareId} {
+      allow get: if true;
+      allow list: if false;
+
+      allow create: if signedIn()
+        && request.resource.data.createdBy == request.auth.uid;
+
+      allow update: if signedIn()
+        && resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdBy == request.auth.uid;
+
+      allow delete: if signedIn()
+        && resource.data.createdBy == request.auth.uid;
+    }
+
+    // ============================================================
     //  PUBLIC REVIEWS — link-only rating page (Sterne + Text).
     //  Anyone with the link may submit one review (no auth). Reads
     //  are public ONLY for approved reviews (Landingpage-Testimonials).
     //  Moderation (approved=true) happens via Admin SDK / Console.
+    // ============================================================
+    //  dispatcher_review_links/{token}
+    //  Monatliche Fahrerbewertung durch Dispatcher über einen Link
+    //  ohne Login. Der Token ist 28 Zeichen lang und nicht erratbar;
+    //  das Dokument enthält bereits die Fahrerliste, damit die
+    //  öffentliche Seite NICHT auf die Fahrerstammdaten zugreift.
+    // ============================================================
+    match /dispatcher_review_links/{token} {
+      // Gezielter Zugriff nur mit Kenntnis des Tokens — kein Auflisten.
+      allow get: if true;
+      // Auflisten nur mit Filter auf die eigenen Links.
+      allow list: if signedIn()
+        && resource.data.adminUid == request.auth.uid;
+
+      // Anlegen/Verwalten nur durch den eigenen Admin.
+      allow create: if signedIn()
+        && request.resource.data.adminUid == request.auth.uid;
+      allow update, delete: if signedIn()
+        && resource.data.adminUid == request.auth.uid;
+
+      // Der Dispatcher darf ausschließlich seinen Fortschritt vermerken.
+      allow update: if resource.data.active == true
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['completed', 'lastActivityAt']);
+    }
+
     // ============================================================
     match /public_reviews/{reviewId} {
       allow read: if resource.data.approved == true;

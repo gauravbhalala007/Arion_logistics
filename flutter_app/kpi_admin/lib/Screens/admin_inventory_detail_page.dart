@@ -72,7 +72,9 @@ class _NotFound extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Text(
-          'Artikel nicht gefunden.',
+          Localizations.localeOf(context).languageCode == 'de'
+              ? 'Artikel nicht gefunden.'
+              : 'Item not found.',
           style: AppTypography.body.copyWith(color: InvTokens.muted),
         ),
       ),
@@ -233,7 +235,9 @@ class _ProductColumn extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                isOut ? 'Nicht verfügbar' : 'Verfügbar',
+                Localizations.localeOf(context).languageCode == 'de'
+                    ? (isOut ? 'Nicht verfügbar' : 'Verfügbar')
+                    : (isOut ? 'Out of stock' : 'Available'),
                 style: AppTypography.caption1.copyWith(
                   color: badgeFg,
                   fontWeight: FontWeight.w700,
@@ -280,14 +284,19 @@ class _SizesColumn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final hasSizes = item.sizeOptions.isNotEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _SectionHeader(
-          title: hasSizes ? 'Größen' : 'Bestand',
+          title: hasSizes
+              ? (de ? 'Größen' : 'Sizes')
+              : (de ? 'Bestand' : 'Stock'),
           trailing: hasSizes
-              ? '${item.sizeOptions.length} Optionen'
+              ? (de
+                  ? '${item.sizeOptions.length} Optionen'
+                  : '${item.sizeOptions.length} options')
               : null,
         ),
         const SizedBox(height: 12),
@@ -320,7 +329,9 @@ class _Header extends StatelessWidget {
               onPressed: () => Navigator.of(context).maybePop(),
               icon: const Icon(Icons.arrow_back_rounded),
               color: InvTokens.text,
-              tooltip: 'Zurück',
+              tooltip: Localizations.localeOf(context).languageCode == 'de'
+                  ? 'Zurück'
+                  : 'Back',
             )
           else
             const SizedBox(height: 48, width: 8),
@@ -531,12 +542,15 @@ class _SizeStockGrid extends StatelessWidget {
     required String itemName,
     required Future<void> Function() apply,
   }) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final isAdd = delta > 0;
     final after = currentCount + delta;
     if (after < 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Bestand kann nicht negativ werden.'),
+        SnackBar(
+          content: Text(de
+              ? 'Bestand kann nicht negativ werden.'
+              : 'Stock cannot go negative.'),
         ),
       );
       return;
@@ -544,29 +558,35 @@ class _SizeStockGrid extends StatelessWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(isAdd ? 'Bestand erhöhen' : 'Bestand reduzieren'),
+        title: Text(de
+            ? (isAdd ? 'Bestand erhöhen' : 'Bestand reduzieren')
+            : (isAdd ? 'Increase stock' : 'Reduce stock')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(itemName, style: const TextStyle(fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
-            Text('Aktuell: $currentCount'),
-            Text('Änderung: ${delta > 0 ? '+' : ''}$delta'),
+            Text(de ? 'Aktuell: $currentCount' : 'Current: $currentCount'),
+            Text(de
+                ? 'Änderung: ${delta > 0 ? '+' : ''}$delta'
+                : 'Change: ${delta > 0 ? '+' : ''}$delta'),
             const Divider(height: 16),
-            Text('Neu: $after',
+            Text(de ? 'Neu: $after' : 'New: $after',
                 style: const TextStyle(fontWeight: FontWeight.w800)),
           ],
         ),
         actions: [
           CoButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            label: 'Abbrechen',
+            label: de ? 'Abbrechen' : 'Cancel',
             variant: CoButtonVariant.quiet,
           ),
           CoButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            label: isAdd ? 'Erhöhen' : 'Reduzieren',
+            label: de
+                ? (isAdd ? 'Erhöhen' : 'Reduzieren')
+                : (isAdd ? 'Increase' : 'Reduce'),
             variant: isAdd
                 ? CoButtonVariant.primary
                 : CoButtonVariant.destructive,
@@ -873,7 +893,9 @@ class _BottomActionBar extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Gesamt-Bestand',
+                    Localizations.localeOf(context).languageCode == 'de'
+                        ? 'Gesamt-Bestand'
+                        : 'Total stock',
                     style: AppTypography.caption2.copyWith(
                       color: InvTokens.muted,
                       fontWeight: FontWeight.w700,
@@ -973,6 +995,7 @@ class _OrderSheetState extends State<_OrderSheet> {
 
   Future<void> _addToCart() async {
     if (_total <= 0) return;
+    final de = Localizations.localeOf(context).languageCode == 'de';
     setState(() => _adding = true);
     try {
       for (final entry in _qty.entries) {
@@ -998,7 +1021,9 @@ class _OrderSheetState extends State<_OrderSheet> {
         SnackBar(
           backgroundColor: AppColors.codriverDeep,
           content: Text(
-            '$_total Position(en) zum Warenkorb hinzugefügt.',
+            de
+                ? '$_total Position(en) zum Warenkorb hinzugefügt.'
+                : '$_total item(s) added to the cart.',
             style: const TextStyle(color: Colors.white),
           ),
         ),

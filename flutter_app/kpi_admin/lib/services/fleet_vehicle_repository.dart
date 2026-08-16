@@ -237,6 +237,10 @@ class FleetVehicleRepository {
           );
         }
         break;
+      case VehicleCategory.lmr:
+      case VehicleCategory.sesoRental:
+        // Generic categories carry no extra metadata to validate.
+        break;
     }
   }
 }

@@ -1,10 +1,24 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
-import '../localization/app_localizations.dart';
+import '../data/safety_training/academy_texts.dart';
+import '../data/safety_training/operating_instructions.dart';
+import '../data/safety_training/privacy_data.dart';
+import '../data/safety_training/safety_training_data.dart';
+import 'driver_driving_safety_page.dart';
 import 'driver_green_book_page.dart';
+import 'driver_green_book_training_page.dart';
+import 'driver_operating_instructions_page.dart';
+import 'driver_privacy_training_page.dart';
+import 'driver_ride_along_page.dart';
+import 'driver_safety_training_page.dart';
 
-class DriverAcademyPage extends StatelessWidget {
+/// Vorwarnzeit: so viele Tage vor Ablauf gilt eine Schulung als
+/// „bald fällig" (gelbe Statuszeile statt grüner).
+const int kAcademyDueSoonDays = 30;
+
+class DriverAcademyPage extends StatefulWidget {
   final String dspUid;
   final String driverTransporterId;
   final VoidCallback onBack;
@@ -17,13 +31,183 @@ class DriverAcademyPage extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final t = AppLocalizations.of(context);
+  State<DriverAcademyPage> createState() => _DriverAcademyPageState();
+}
 
+class _DriverAcademyPageState extends State<DriverAcademyPage> {
+  /// Alle Ergebnis-Dokumente, die für die Statuszeilen gebraucht werden.
+  ///
+  /// Bewusst EIN gebündelter Ladevorgang (`Future.wait`) statt eines
+  /// Streams je Kachel: die Dokumente ändern sich nur, wenn der Fahrer
+  /// selbst eine Schulung abschließt — dann wird nach der Rückkehr aus
+  /// der Schulungsseite neu geladen (siehe [_open]).
+  static const List<String> _statusTestIds = <String>[
+    kGreenBookTestId,
+    kRideAlongTestId,
+    kSafetyTrainingTestId,
+    kPrivacyTestId,
+    kDrivingSafetyTrainingId,
+    kOperatingInstructionsTestId,
+  ];
+
+  /// testId -> Ergebnisdokument. `null` = noch nicht geladen bzw. Ladefehler;
+  /// dann bleiben die Statuszeilen aus, statt „Noch offen" zu behaupten.
+  Map<String, Map<String, dynamic>>? _results;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStatuses();
+  }
+
+  @override
+  void didUpdateWidget(covariant DriverAcademyPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.dspUid != widget.dspUid ||
+        oldWidget.driverTransporterId != widget.driverTransporterId) {
+      _loadStatuses();
+    }
+  }
+
+  Future<void> _loadStatuses() async {
+    final uid = widget.dspUid.trim();
+    final tid = widget.driverTransporterId.trim();
+    if (uid.isEmpty || tid.isEmpty) {
+      if (mounted) setState(() => _results = const {});
+      return;
+    }
+    final base = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('academy_test_results');
+    try {
+      final snaps = await Future.wait(
+        _statusTestIds.map(
+          (testId) => base.doc(testId).collection('drivers').doc(tid).get(),
+        ),
+      );
+      final out = <String, Map<String, dynamic>>{};
+      for (var i = 0; i < _statusTestIds.length; i++) {
+        final data = snaps[i].data();
+        if (data != null) out[_statusTestIds[i]] = data;
+      }
+      if (!mounted) return;
+      setState(() => _results = out);
+    } catch (_) {
+      // Ohne Daten lieber gar keine Statuszeile als eine falsche.
+    }
+  }
+
+  /// Öffnet eine Schulungsseite und aktualisiert danach die Statuszeilen.
+  Future<void> _open(Widget Function(BuildContext) builder) async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: builder));
+    if (!mounted) return;
+    await _loadStatuses();
+  }
+
+  // ── Statusermittlung ──────────────────────────────────────────────
+
+  static DateTime? _toDate(Object? value) =>
+      value is Timestamp ? value.toDate() : null;
+
+  static String _fmt(DateTime at) => DateFormat('dd.MM.yyyy').format(at);
+
+  /// Status einer Schulung mit Abschlusstest.
+  ///
+  /// [validity] / [validMonths] werden nur als Rückfallebene benutzt, wenn
+  /// das Ergebnisdokument kein `validUntil` mitschreibt. Sind beide `null`,
+  /// gilt die Schulung als Schulung ohne Ablauf.
+  _StatusInfo? _testStatus(
+    String locale,
+    String testId, {
+    Duration? validity,
+    int? validMonths,
+  }) {
+    final results = _results;
+    if (results == null) return null;
+
+    final data = results[testId];
+    final passedAt = _toDate(data?['passedAt']);
+    if (passedAt == null) {
+      return _StatusInfo.neutral(academyText(locale, 'status_open'));
+    }
+
+    var due = _toDate(data?['validUntil']);
+    if (due == null && validity != null) due = passedAt.add(validity);
+    if (due == null && validMonths != null) {
+      due = DateTime(
+        passedAt.year,
+        passedAt.month + validMonths,
+        passedAt.day,
+        passedAt.hour,
+        passedAt.minute,
+      );
+    }
+
+    final done = _fmt(passedAt);
+    if (due == null) {
+      return _StatusInfo.ok(
+        academyText(locale, 'status_done', vars: {'done': done}),
+      );
+    }
+
+    final now = DateTime.now();
+    final dueStr = _fmt(due);
+    if (!due.isAfter(now)) {
+      return _StatusInfo.alert(
+        academyText(locale, 'status_expired', vars: {'due': dueStr}),
+      );
+    }
+    if (due.difference(now).inDays <= kAcademyDueSoonDays) {
+      return _StatusInfo.warn(
+        academyText(
+          locale,
+          'status_due_soon',
+          vars: {'done': done, 'due': dueStr},
+        ),
+      );
+    }
+    return _StatusInfo.ok(
+      academyText(
+        locale,
+        'status_done_due',
+        vars: {'done': done, 'due': dueStr},
+      ),
+    );
+  }
+
+  /// Betriebsanweisungen kennen keinen Test, sondern Lesebestätigungen —
+  /// deshalb „x von y bestätigt" statt eines Fälligkeitsdatums.
+  _StatusInfo? _opsStatus(String locale) {
+    final results = _results;
+    if (results == null) return null;
+
+    final ids = operatingInstructionsFor(
+      locale,
+    ).map((i) => i.id).toSet();
+    if (ids.isEmpty) return null;
+
+    final raw = results[kOperatingInstructionsTestId]?['acknowledged'];
+    final acknowledged = raw is Map ? raw : const {};
+    final done = ids.where((id) => acknowledged[id] != null).length;
+
+    if (done >= ids.length) {
+      return _StatusInfo.ok(academyText(locale, 'status_ack_all'));
+    }
+    final label = academyText(
+      locale,
+      'status_ack_progress',
+      vars: {'n': '$done', 'total': '${ids.length}'},
+    );
+    return done == 0 ? _StatusInfo.neutral(label) : _StatusInfo.warn(label);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance
           .collection('users')
-          .doc(dspUid.trim())
+          .doc(widget.dspUid.trim())
           .collection('academy_tests')
           .orderBy('order')
           .snapshots(),
@@ -57,11 +241,11 @@ class DriverAcademyPage extends StatelessWidget {
                 children: [
                   _RoundIconButton(
                     icon: Icons.arrow_back_ios_new_rounded,
-                    onTap: onBack,
+                    onTap: widget.onBack,
                   ),
                   const SizedBox(width: 12),
                   Text(
-                    t.t('driver_academy_title'),
+                    academyText(locale, 'page_title'),
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
@@ -81,22 +265,135 @@ class DriverAcademyPage extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: _AcademyTile(
-                      title: t.t('driver_academy_green_book_title'),
-                      subtitle: t.t('driver_academy_green_book_subtitle'),
+                      title: academyText(locale, 'green_book_title'),
+                      subtitle: academyText(locale, 'green_book_subtitle'),
                       icon: Icons.menu_book_rounded,
                       iconColor: const Color(0xFF22AF66),
                       iconBg: const Color(0xFFE9F7EF),
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => DriverGreenBookPage(
-                              dspUid: dspUid,
-                              driverTransporterId: driverTransporterId,
-                              onBack: () => Navigator.of(context).pop(),
-                            ),
-                          ),
-                        );
-                      },
+                      // Green Book: nur `passedAt`, keine Gültigkeitsdauer
+                      // im Code hinterlegt → Schulung ohne Ablauf.
+                      status: _testStatus(locale, kGreenBookTestId),
+                      onTap: () => _open(
+                        (_) => DriverGreenBookPage(
+                          dspUid: widget.dspUid,
+                          driverTransporterId: widget.driverTransporterId,
+                          onBack: () => Navigator.of(context).pop(),
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Ride Along — Vorbereitung auf die zweitägige
+                  // Begleitfahrt mit einem Trainer, mit Abschlusstest.
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _AcademyTile(
+                      title: academyText(locale, 'ride_along_title'),
+                      subtitle: academyText(locale, 'ride_along_subtitle'),
+                      icon: Icons.supervisor_account_rounded,
+                      iconColor: const Color(0xFF2A5FB0),
+                      iconBg: const Color(0xFFEAF1FB),
+                      // Ride Along: nur `passedAt`, keine Gültigkeitsdauer
+                      // im Code hinterlegt → Schulung ohne Ablauf.
+                      status: _testStatus(locale, kRideAlongTestId),
+                      onTap: () => _open(
+                        (_) => DriverRideAlongPage(
+                          dspUid: widget.dspUid,
+                          driverTransporterId: widget.driverTransporterId,
+                          onBack: () => Navigator.of(context).pop(),
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Sicherheitsunterweisung — jährliche Arbeitsschutz-
+                  // Unterweisung mit Test + Nachweis-PDF.
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _AcademyTile(
+                      title: safetyText(locale, 'training_title'),
+                      subtitle: safetyText(locale, 'training_subtitle'),
+                      icon: Icons.health_and_safety_rounded,
+                      iconColor: const Color(0xFF1D7F5A),
+                      iconBg: const Color(0xFFE4F5EC),
+                      status: _testStatus(
+                        locale,
+                        kSafetyTrainingTestId,
+                        validity: kSafetyTrainingValidity,
+                      ),
+                      onTap: () => _open(
+                        (_) => DriverSafetyTrainingPage(
+                          dspUid: widget.dspUid,
+                          driverTransporterId: widget.driverTransporterId,
+                          onBack: () => Navigator.of(context).pop(),
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Datenschutz — DSGVO-Grundschulung mit Abschlusstest
+                  // und Unterschrift, jährlich zu wiederholen.
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _AcademyTile(
+                      title: academyText(locale, 'privacy_title'),
+                      subtitle: academyText(locale, 'privacy_subtitle'),
+                      icon: Icons.privacy_tip_rounded,
+                      iconColor: const Color(0xFF5C4B99),
+                      iconBg: const Color(0xFFEFECF9),
+                      status: _testStatus(
+                        locale,
+                        kPrivacyTestId,
+                        validity: kPrivacyValidity,
+                      ),
+                      onTap: () => _open(
+                        (_) => DriverPrivacyTrainingPage(
+                          dspUid: widget.dspUid,
+                          driverTransporterId: widget.driverTransporterId,
+                          onBack: () => Navigator.of(context).pop(),
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Fahrsicherheitstraining — eigenständige Schulung mit
+                  // Modul-Quiz, Abschlusstest und Zertifikat.
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _AcademyTile(
+                      title: academyText(locale, 'driving_title'),
+                      subtitle: academyText(locale, 'driving_subtitle'),
+                      icon: Icons.drive_eta_rounded,
+                      iconColor: const Color(0xFF1D7F5A),
+                      iconBg: const Color(0xFFE4F5EC),
+                      status: _testStatus(
+                        locale,
+                        kDrivingSafetyTrainingId,
+                        validMonths: kDrivingCertificateMonths,
+                      ),
+                      onTap: () => _open(
+                        (_) => DriverDrivingSafetyPage(
+                          dspUid: widget.dspUid,
+                          driverTransporterId: widget.driverTransporterId,
+                          onBack: () => Navigator.of(context).pop(),
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Betriebsanweisungen — Sammelordner aller BAWs,
+                  // zusätzlich aus den Schulungskapiteln verlinkt.
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _AcademyTile(
+                      title: academyText(locale, 'ops_title'),
+                      subtitle: academyText(locale, 'ops_subtitle'),
+                      icon: Icons.menu_book_outlined,
+                      iconColor: const Color(0xFF3B5A80),
+                      iconBg: const Color(0xFFEFF4FA),
+                      status: _opsStatus(locale),
+                      onTap: () => _open(
+                        (_) => DriverOperatingInstructionsPage(
+                          dspUid: widget.dspUid,
+                          driverTransporterId: widget.driverTransporterId,
+                          onBack: () => Navigator.of(context).pop(),
+                        ),
+                      ),
                     ),
                   ),
                   // FAQ Training — quiz built on top of the existing
@@ -105,13 +402,13 @@ class DriverAcademyPage extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: _AcademyTile(
-                      title: t.t('faq_training_title'),
-                      subtitle: t.t('faq_training_subtitle'),
+                      title: academyText(locale, 'faq_title'),
+                      subtitle: academyText(locale, 'faq_subtitle'),
                       icon: Icons.fact_check_rounded,
                       iconColor: const Color(0xFFFF8A1F),
                       iconBg: const Color(0xFFFFF0E4),
                       disabled: true,
-                      badge: t.t('coming_soon'),
+                      badge: academyText(locale, 'badge_coming_soon'),
                       onTap: null,
                     ),
                   ),
@@ -127,7 +424,7 @@ class DriverAcademyPage extends StatelessWidget {
                       iconColor: const Color(0xFF3E82F7),
                       iconBg: const Color(0xFFE9F1FE),
                       disabled: true,
-                      badge: t.t('coming_soon'),
+                      badge: academyText(locale, 'badge_coming_soon'),
                       onTap: null,
                     ),
                   );
@@ -144,9 +441,9 @@ class DriverAcademyPage extends StatelessWidget {
                           width: 1.2,
                         ),
                       ),
-                      child: const Text(
-                        'No academy categories are available yet. Please contact your admin.',
-                        style: TextStyle(
+                      child: Text(
+                        academyText(locale, 'empty_categories'),
+                        style: const TextStyle(
                           color: Color(0xFF6B7280),
                           fontWeight: FontWeight.w600,
                         ),
@@ -170,6 +467,54 @@ class DriverAcademyPage extends StatelessWidget {
     if (id.contains('app')) return Icons.phone_android_rounded;
     return Icons.school_outlined;
   }
+}
+
+/// Fertig formatierte Statuszeile einer Kachel (Text + Farbwelt + Icon).
+@immutable
+class _StatusInfo {
+  final String label;
+  final Color fg;
+  final Color bg;
+  final IconData icon;
+
+  const _StatusInfo({
+    required this.label,
+    required this.fg,
+    required this.bg,
+    required this.icon,
+  });
+
+  /// Noch offen — bewusst zurückhaltend, kein Alarm.
+  factory _StatusInfo.neutral(String label) => _StatusInfo(
+    label: label,
+    fg: const Color(0xFF6B7280),
+    bg: const Color(0xFFF1F3F5),
+    icon: Icons.radio_button_unchecked_rounded,
+  );
+
+  /// Erledigt und gültig.
+  factory _StatusInfo.ok(String label) => _StatusInfo(
+    label: label,
+    fg: const Color(0xFF16704F),
+    bg: const Color(0xFFE4F5EC),
+    icon: Icons.check_circle_rounded,
+  );
+
+  /// Läuft demnächst ab bzw. noch nicht vollständig bestätigt.
+  factory _StatusInfo.warn(String label) => _StatusInfo(
+    label: label,
+    fg: const Color(0xFF9A5B00),
+    bg: const Color(0xFFFFF3E0),
+    icon: Icons.schedule_rounded,
+  );
+
+  /// Abgelaufen.
+  factory _StatusInfo.alert(String label) => _StatusInfo(
+    label: label,
+    fg: const Color(0xFFB3261E),
+    bg: const Color(0xFFFDECEA),
+    icon: Icons.error_outline_rounded,
+  );
 }
 
 class _AcademyCategory {
@@ -248,6 +593,10 @@ class _AcademyTile extends StatelessWidget {
   final bool disabled;
   final String? badge;
 
+  /// Erledigt-/Fälligkeitszeile unter dem Untertitel. `null` = keine Zeile
+  /// (noch nicht geladen oder Kachel ohne Nachweis).
+  final _StatusInfo? status;
+
   const _AcademyTile({
     required this.title,
     required this.subtitle,
@@ -257,17 +606,19 @@ class _AcademyTile extends StatelessWidget {
     required this.onTap,
     this.disabled = false,
     this.badge,
+    this.status,
   });
 
   @override
   Widget build(BuildContext context) {
+    final st = status;
     final tile = Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: disabled ? null : onTap,
         child: Container(
-          height: 76,
+          constraints: const BoxConstraints(minHeight: 76),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(14),
@@ -282,7 +633,7 @@ class _AcademyTile extends StatelessWidget {
                     ),
                   ],
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           child: Row(
             children: [
               Container(
@@ -299,6 +650,7 @@ class _AcademyTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       title,
@@ -322,9 +674,47 @@ class _AcademyTile extends StatelessWidget {
                         ),
                       ),
                     ],
+                    if (st != null) ...[
+                      const SizedBox(height: 6),
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: st.bg,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(st.icon, size: 13, color: st.fg),
+                              const SizedBox(width: 5),
+                              Flexible(
+                                child: Text(
+                                  st.label,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    height: 1.25,
+                                    fontWeight: FontWeight.w700,
+                                    color: st.fg,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
+              const SizedBox(width: 8),
               if (disabled)
                 Container(
                   padding: const EdgeInsets.symmetric(

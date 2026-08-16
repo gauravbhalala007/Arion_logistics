@@ -7,9 +7,11 @@
 // Berechnet Soll-Stunden anhand:
 //   • dailyContractHours × Anzahl Werktage des Monats
 //   • abzüglich Feiertage des Driver-Bundeslandes
-//   • abzüglich Urlaubs- und Krankheitstage
 //
 // Ist-Stunden = Summe `workDuration` aller geschlossenen Schichten
+//   + Gutschrift für BEZAHLTE Urlaubstage und Krankentage
+//     (unbezahlter Urlaub wird nicht gutgeschrieben und senkt damit
+//      das Überstundenkonto um die Soll-Stunden des Tages)
 
 import {onSchedule} from "firebase-functions/v2/scheduler";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
@@ -180,6 +182,14 @@ export async function runMonthlyCompute(opts: {
       // und zähle die abgedeckten Werktage (nach workingDays, ohne
       // Feiertage). Pro Tag werden dailyContractHours dem Ist gutge-
       // schrieben — bezahlte Freistellung in DE-Standard.
+      //
+      // Ticket „bezahlter/unbezahlter Urlaub": nur BEZAHLTE Urlaubstage
+      // werden gutgeschrieben. Unbezahlte Tage bleiben ohne Gutschrift,
+      // das Soll bleibt aber bestehen → das Überstundenkonto sinkt um
+      // die Soll-Stunden des Tages (Kundenbeispiel: 40 h Überstunden,
+      // 5 unbezahlte Tage à 8 h → 0 h).
+      // Abwärtskompatibel: fehlt `paid` am Antrag (alle Bestandsdaten),
+      // gilt der Urlaub als bezahlt — Verhalten unverändert.
       const absSnap = await db
         .collection(
           `users/${adminUid}/drivers/${driverId}/absence_requests`,
@@ -194,11 +204,14 @@ export async function runMonthlyCompute(opts: {
           return map[d.toUpperCase()];
         }),
       );
-      let vacationDays = 0;
+      let vacationDaysPaid = 0;
+      let vacationDaysUnpaid = 0;
       let sickDays = 0;
       for (const aDoc of absSnap.docs) {
         const ad = aDoc.data();
         const type = (ad.type ?? "").toString();
+        // Nur explizit `paid === false` gilt als unbezahlt.
+        const isPaid = ad.paid !== false;
         const fromTs = ad.fromDate as FirebaseFirestore.Timestamp | null;
         const toTs = ad.toDate as FirebaseFirestore.Timestamp | null;
         if (!fromTs || !toTs) continue;
@@ -227,14 +240,25 @@ export async function runMonthlyCompute(opts: {
           const isWorkday =
             workingWeekdaySet.has(cursor.getUTCDay());
           if (isWorkday && !isHoliday) {
-            if (type === "vacation") vacationDays++;
-            else if (type === "sick") sickDays++;
+            if (type === "vacation") {
+              if (isPaid) vacationDaysPaid++;
+              else vacationDaysUnpaid++;
+            } else if (type === "sick" || type === "sick_leave") {
+              // Die App schreibt "sick_leave"; "sick" bleibt für
+              // etwaige Alt-Dokumente erhalten.
+              sickDays++;
+            }
           }
           cursor.setUTCDate(cursor.getUTCDate() + 1);
         }
       }
+      // Gesamtzahl der Urlaubstage — Feldbedeutung wie bisher.
+      const vacationDays = vacationDaysPaid + vacationDaysUnpaid;
+      // Gutschrift NUR für bezahlte Urlaubstage (+ Krankentage).
+      // Unbezahlte Tage erzeugen bewusst keine Gutschrift, damit das
+      // bestehen bleibende Soll das Konto entsprechend belastet.
       const creditedSeconds =
-        (vacationDays + sickDays) * dailyHours * 3600;
+        (vacationDaysPaid + sickDays) * dailyHours * 3600;
       const istSeconds = stampedSeconds + creditedSeconds;
       const saldoSeconds = istSeconds - sollSeconds;
 
@@ -256,6 +280,8 @@ export async function runMonthlyCompute(opts: {
             workingDays: effectiveDays.length,
             holidayDays: days.length - effectiveDays.length,
             vacationDays,
+            vacationDaysPaid,
+            vacationDaysUnpaid,
             sickDays,
             spesenDays,
             spesenAmount,

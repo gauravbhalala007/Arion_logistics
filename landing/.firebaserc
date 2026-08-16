@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "codriver-eu"
+  },
+  "targets": {
+    "codriver-eu": {
+      "hosting": {
+        "landing": [
+          "codriver-landing"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

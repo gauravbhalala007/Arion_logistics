@@ -39,7 +39,23 @@ bool isDriverWorking(Map<String, dynamic> driverData) {
   }
 
   final status = (driverData['status'] ?? '').toString().trim().toLowerCase();
-  if (status == 'off' || status == 'inactive' || status == 'suspended') {
+  const inactiveStatuses = <String>{
+    'off',
+    'inactive',
+    'suspended',
+    'deleted',
+    'archived',
+    'left',
+    'terminated',
+    'fired',
+    'quit',
+    'rejected',
+  };
+  if (inactiveStatuses.contains(status)) return false;
+  // Also exclude soft-deleted drivers and onboarding-only ones.
+  if (driverData['isDeleted'] == true ||
+      driverData['deleted'] == true ||
+      driverData['archived'] == true) {
     return false;
   }
 

@@ -4,25 +4,24 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../widgets/admin_scope.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../localization/app_localizations.dart';
 import '../models/fleet_vehicle.dart';
 import '../models/fleet_vehicle_document.dart';
-import '../models/fleet_vehicle_event.dart';
-import '../services/fleet_vehicle_document_repository.dart';
 import '../services/fleet_vehicle_document_service.dart';
-import '../services/fleet_vehicle_event_repository.dart';
-import '../services/fleet_vehicle_event_service.dart';
 import '../services/fleet_vehicle_repository.dart';
 import '../services/cortex_vehicle_importer.dart';
 import '../theme/app_colors.dart';
 import '../widgets/co_button.dart';
+import '../widgets/license_plate.dart';
+import '../widgets/mobile_filter_controls.dart';
 import '../widgets/co_pressable.dart';
-import '../widgets/pill_tab_bar.dart';
-import 'seso_overview_page.dart';
+import 'fleet_vehicle_detail_page.dart';
 
 class FleetStatusPage extends StatefulWidget {
   const FleetStatusPage({super.key});
@@ -33,22 +32,41 @@ class FleetStatusPage extends StatefulWidget {
 
 class _FleetStatusPageState extends State<FleetStatusPage> {
   static const Color _kGreen = Color(0xFF1D7F5A);
-  static const Color _kBlue = Color(0xFF1D4ED8);
   static const Color _kRed = Color(0xFFB91C1C);
   static const Color _kOrange = Color(0xFFD97706);
   static const Color _kText = Color(0xFF111827);
   static const Color _kMuted = Color(0xFF6B7280);
   static const Color _kBorder = Color(0xFFE5E7EB);
-  static const Color _kCardBg = Color(0xFFFFFFFF);
   static const Color _kPageBg = Color(0xFFF3F6F7);
 
-  static const String _statusAllValue = '__all_status__';
+  // ── Handoff-Tokens (design_handoff_fleet_hub) ────────────────────────────
+  static const Color _kInk = Color(0xFF1A212B);
+  static const Color _kSubtle = Color(0xFF5B6572);
+  static const Color _kFaint = Color(0xFF8A93A0);
+  static const Color _kLine = Color(0xFFE5E9EE);
+  static const Color _kRowLine = Color(0xFFEEF1F4);
+  static const Color _kAccentGreen = Color(0xFF0D8A60);
+  static const Color _kAccentGreenTint = Color(0xFFE7F6EF);
+  static const Color _kAccentRed = Color(0xFFB32F2F);
+  static const Color _kAccentRedTint = Color(0xFFFDF0F0);
+  static const Color _kAccentAmber = Color(0xFFB0731C);
+  static const Color _kAccentAmberTint = Color(0xFFFDF6EC);
+  static const Color _kAccentBlue = Color(0xFF2A5FA8);
+  static const Color _kAccentBlueTint = Color(0xFFE9F0FA);
+  static const Color _kAccentViolet = Color(0xFF7A4BB0);
+  static const Color _kAccentVioletTint = Color(0xFFF3ECFA);
+
   static const String _tuvAllValue = '__all_tuv__';
 
   final FleetVehicleRepository _repository = FleetVehicleRepository();
   final FleetVehicleDocumentService _documentService =
       FleetVehicleDocumentService();
   final TextEditingController _searchCtrl = TextEditingController();
+  // Horizontal scroller for the references chips row — a named controller
+  // so a visible/draggable Scrollbar and a mouse-wheel handler can both
+  // target it (plain SingleChildScrollView isn't mouse-draggable on
+  // Flutter web desktop by default).
+  final ScrollController _referencesScrollCtrl = ScrollController();
 
   String? get _uid {
     final scoped = AdminScope.maybeOf(context)?.adminUid;
@@ -62,9 +80,39 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
   bool _loadingScope = true;
   bool _busyCortex = false;
   String _search = '';
-  String _statusFilter = _statusAllValue;
+  // Status filter pill: ALL | OPERATIV | GROUNDED | INAKTIV. GROUNDED
+  // bundles all grounded reasons; the exact reason stays visible on
+  // each vehicle row.
+  String _statusPill = 'ALL';
+  // Category filter driven by the hero counter tiles:
+  // ALL | ARMADA | SESO | LMR | SELF_OWNED.
+  String _categoryFilter = 'ALL';
   String _tuvFilter = _tuvAllValue;
+  // Column sorting: null = default order (createdAt). Keys:
+  // vehicle | model | status | serviceEnd | tuv.
+  String? _sortColumn;
+  bool _sortAsc = true;
   final Set<String> _updatingVehicleStatuses = <String>{};
+
+  // Latest per-plate side data, refreshed on every stream build. Used to
+  // seed dialogs (edit vehicle) and render workshop / TÜV info.
+  Map<String, String> _workshopByPlate = <String, String>{};
+  // Free-text "Bemerkungen / Remarks" per vehicle — same admin subtree as
+  // the workshop field (fleet_vehicle_extras), not the vehicle doc itself.
+  Map<String, String> _remarksByPlate = <String, String>{};
+  // Leasing provider per plate (fleet_vehicle_extras.leasingProvider) — shown
+  // as the handshake line inside each fleet row.
+  Map<String, String> _leasingByPlate = <String, String>{};
+  Map<String, FleetVehicleDocument> _tuvDocByPlate =
+      <String, FleetVehicleDocument>{};
+  // Plates with an uploaded vehicle registration ("Fahrzeugschein") — drives
+  // the green/red chip in the fleet rows.
+  Set<String> _registrationPlates = <String>{};
+
+  /// Plate of the vehicle whose detail page is currently shown *inside* the
+  /// shell content (no Navigator.push, so the side menu stays visible).
+  /// `null` = the fleet list is visible.
+  String? _detailPlate;
 
   @override
   void initState() {
@@ -75,6 +123,7 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
   @override
   void dispose() {
     _searchCtrl.dispose();
+    _referencesScrollCtrl.dispose();
     super.dispose();
   }
 
@@ -125,6 +174,153 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
     }
   }
 
+  // ─── Per-vehicle extras (workshop) — admin subtree, no rules change ───
+  //
+  // The vehicle documents themselves have a strict field whitelist in the
+  // Firestore rules, so the workshop of a "Grounded (Service)" vehicle is
+  // stored in a sibling subcollection under the admin's own user doc
+  // (users/{dspUid}/fleet_vehicle_extras/{plate}) — same pattern as the
+  // maintenance section, which also works without a rules deploy.
+
+  CollectionReference<Map<String, dynamic>> _extrasCollection(String scope) {
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(scope)
+        .collection('fleet_vehicle_extras');
+  }
+
+  CollectionReference<Map<String, dynamic>> _referencesCollection(
+    String scope,
+  ) {
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(scope)
+        .collection('fleet_references');
+  }
+
+  Future<void> _saveVehicleWorkshop(
+    String scope,
+    String plateNumber,
+    String workshop,
+  ) async {
+    await _extrasCollection(
+      scope,
+    ).doc(normalizePlateNumber(plateNumber)).set(<String, dynamic>{
+      'plateNumber': normalizePlateNumber(plateNumber),
+      'workshop': workshop.trim(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  /// Free-text remarks for a vehicle, stored the same way as the workshop
+  /// field (users/{dspUid}/fleet_vehicle_extras/{plate}) because the
+  /// Firestore rules only allow a fixed field whitelist on the vehicle
+  /// document itself.
+  Future<void> _saveVehicleRemarks(
+    String scope,
+    String plateNumber,
+    String remarks,
+  ) async {
+    await _extrasCollection(
+      scope,
+    ).doc(normalizePlateNumber(plateNumber)).set(<String, dynamic>{
+      'plateNumber': normalizePlateNumber(plateNumber),
+      'remarks': remarks.trim(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  /// Reads the current HU/TÜV certificate of a plate **straight from
+  /// Firestore** instead of the list cache.
+  ///
+  /// [_tuvDocByPlate] is only filled while the fleet list's document stream
+  /// runs — on the embedded detail page it doesn't, so a cache lookup came
+  /// back empty and every save created *another* HU_TUV_CERTIFICATE document.
+  Future<FleetVehicleDocument?> _loadTuvDocument(
+    String scope,
+    String normalizedPlate,
+  ) async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(scope)
+        .collection('vehicles')
+        .doc(normalizedPlate)
+        .collection('documents')
+        .where('isDeleted', isEqualTo: false)
+        .get();
+
+    FleetVehicleDocument? newest;
+    for (final doc in snapshot.docs) {
+      final document = FleetVehicleDocument.fromDoc(doc);
+      if (_canonicalVehicleDocumentType(document.documentType) !=
+          'HU_TUV_CERTIFICATE') {
+        continue;
+      }
+      if (newest == null || _isDocumentNewer(document, newest)) {
+        newest = document;
+      }
+    }
+    return newest;
+  }
+
+  /// Creates or updates the HU/TÜV date of a vehicle. The date lives on the
+  /// existing HU_TUV_CERTIFICATE document (expiryDate); if no certificate
+  /// has been uploaded yet, a date-only document (without file) is created.
+  Future<void> _saveTuvDate(
+    String scope,
+    String plateNumber,
+    String tuvDate,
+  ) async {
+    final normalizedPlate = normalizePlateNumber(plateNumber);
+    final existing = await _loadTuvDocument(scope, normalizedPlate);
+    final trimmed = tuvDate.trim();
+
+    final docsCollection = FirebaseFirestore.instance
+        .collection('users')
+        .doc(scope)
+        .collection('vehicles')
+        .doc(normalizedPlate)
+        .collection('documents');
+
+    if (trimmed.isEmpty) {
+      // Clearing the date only removes date-only records; an uploaded
+      // certificate is never deleted here.
+      if (existing != null && existing.fileUrl.trim().isEmpty) {
+        await docsCollection.doc(existing.documentId).update(<String, dynamic>{
+          'isDeleted': true,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+      return;
+    }
+
+    if (existing != null) {
+      if (existing.expiryDate.trim() == trimmed) return;
+      await docsCollection.doc(existing.documentId).update(<String, dynamic>{
+        'expiryDate': trimmed,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      return;
+    }
+
+    final docRef = docsCollection.doc();
+    await docRef.set(<String, dynamic>{
+      'documentId': docRef.id,
+      'dspUid': scope,
+      'plateNumber': normalizedPlate,
+      'documentType': 'HU_TUV_CERTIFICATE',
+      'documentNumber': '',
+      'expiryDate': trimmed,
+      'fileUrl': '',
+      'fileName': 'TÜV-Termin',
+      'fileType': 'DATE',
+      'notes': '',
+      'isDeleted': false,
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   List<FleetVehicle> _filteredVehicles(
     List<FleetVehicle> vehicles,
     Map<String, _VehicleListComplianceSummary> complianceByPlate,
@@ -132,10 +328,8 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
     final query = _search.trim().toLowerCase();
     final filtered = vehicles.where((vehicle) {
       if (vehicle.isDeleted) return false;
-      if (_statusFilter != _statusAllValue &&
-          vehicle.status.value != _statusFilter) {
-        return false;
-      }
+      if (!_matchesStatusPill(vehicle.status)) return false;
+      if (!_matchesCategoryFilter(vehicle)) return false;
       final compliance =
           complianceByPlate[vehicle.plateNumber] ?? _defaultComplianceSummary();
       if (_tuvFilter != _tuvAllValue &&
@@ -149,34 +343,233 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
           vehicle.model.toLowerCase().contains(query);
     }).toList();
 
-    filtered.sort((a, b) {
-      final aDate = a.createdAt;
-      final bDate = b.createdAt;
-      if (aDate == null && bDate == null) {
+    final sortColumn = _sortColumn;
+    if (sortColumn == null) {
+      filtered.sort((a, b) {
+        final aDate = a.createdAt;
+        final bDate = b.createdAt;
+        if (aDate == null && bDate == null) {
+          return a.plateNumber.compareTo(b.plateNumber);
+        }
+        if (aDate == null) return 1;
+        if (bDate == null) return -1;
+        final byCreatedAt = aDate.compareTo(bDate);
+        if (byCreatedAt != 0) return byCreatedAt;
         return a.plateNumber.compareTo(b.plateNumber);
+      });
+      return filtered;
+    }
+
+    int compare(FleetVehicle a, FleetVehicle b) {
+      switch (sortColumn) {
+        case 'model':
+          return '${a.brand} ${a.model}'.trim().toLowerCase().compareTo(
+            '${b.brand} ${b.model}'.trim().toLowerCase(),
+          );
+        case 'status':
+          return a.status.index.compareTo(b.status.index);
+        case 'serviceEnd':
+          // ISO dates (YYYY-MM-DD) sort correctly as strings; vehicles
+          // without a date always go last.
+          final aDate = a.serviceEndDate.trim();
+          final bDate = b.serviceEndDate.trim();
+          if (aDate.isEmpty && bDate.isEmpty) return 0;
+          if (aDate.isEmpty) return _sortAsc ? 1 : -1;
+          if (bDate.isEmpty) return _sortAsc ? -1 : 1;
+          return aDate.compareTo(bDate);
+        case 'tuv':
+          FleetVehicleDocumentStatus tuvOf(FleetVehicle v) =>
+              (complianceByPlate[v.plateNumber] ?? _defaultComplianceSummary())
+                  .tuvStatus;
+          return tuvOf(a).index.compareTo(tuvOf(b).index);
+        case 'vehicle':
+        default:
+          return a.plateNumber.compareTo(b.plateNumber);
       }
-      if (aDate == null) return 1;
-      if (bDate == null) return -1;
-      final byCreatedAt = aDate.compareTo(bDate);
-      if (byCreatedAt != 0) return byCreatedAt;
+    }
+
+    filtered.sort((a, b) {
+      final result = _sortAsc ? compare(a, b) : compare(b, a);
+      if (result != 0) return result;
       return a.plateNumber.compareTo(b.plateNumber);
     });
     return filtered;
+  }
+
+  bool _matchesCategoryFilter(FleetVehicle vehicle) {
+    switch (_categoryFilter) {
+      case 'ARMADA':
+        return vehicle.category == VehicleCategory.armada;
+      case 'SESO':
+        return vehicle.category == VehicleCategory.sesoRental;
+      case 'LMR':
+        return vehicle.category == VehicleCategory.lmr;
+      case 'SELF_OWNED':
+        // Legacy self-sourced counts into Self-Owned (same as hero tiles).
+        return vehicle.category == VehicleCategory.selfOwnedRental ||
+            vehicle.category == VehicleCategory.selfSourcedRental;
+      case 'ALL':
+      default:
+        return true;
+    }
+  }
+
+  /// Handles taps on the hero counter tiles: Total resets all filters,
+  /// Inaktiv toggles the status pill, every category tile toggles the
+  /// category filter.
+  void _onHeroTileTap(String key) {
+    setState(() {
+      switch (key) {
+        case 'TOTAL':
+          _categoryFilter = 'ALL';
+          _statusPill = 'ALL';
+          break;
+        case 'INACTIVE':
+          _statusPill = _statusPill == 'INAKTIV' ? 'ALL' : 'INAKTIV';
+          break;
+        default:
+          _categoryFilter = _categoryFilter == key ? 'ALL' : key;
+      }
+    });
+  }
+
+  void _onSortTapped(String column) {
+    setState(() {
+      if (_sortColumn == column) {
+        if (_sortAsc) {
+          _sortAsc = false;
+        } else {
+          // Third tap resets to default order.
+          _sortColumn = null;
+          _sortAsc = true;
+        }
+      } else {
+        _sortColumn = column;
+        _sortAsc = true;
+      }
+    });
+  }
+
+  /// Secondary line under the service-end date: the workshop of a vehicle
+  /// that is Grounded (Service). Empty for every other status.
+  String? _workshopRowLabel(BuildContext context, FleetVehicle vehicle) {
+    if (vehicle.status != VehicleStatus.groundedService) return null;
+    final workshop =
+        _workshopByPlate[normalizePlateNumber(vehicle.plateNumber)] ?? '';
+    if (workshop.isEmpty) return null;
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    return de ? 'Werkstatt: $workshop' : 'Workshop: $workshop';
+  }
+
+  /// True when [status] matches the active status pill. "Operativ" covers
+  /// active + operational, "Grounded" covers all grounded reasons.
+  bool _matchesStatusPill(VehicleStatus status) {
+    switch (_statusPill) {
+      case 'OPERATIV':
+        return status == VehicleStatus.active ||
+            status == VehicleStatus.operational;
+      case 'GROUNDED':
+        return status.isGrounded;
+      case 'INAKTIV':
+        return status == VehicleStatus.inactive;
+      case 'ALL':
+      default:
+        return true;
+    }
+  }
+
+  /// Status filter pills below the counter tiles: Alle · Operativ ·
+  /// Grounded (all three reasons combined) · Inaktiv. Tapping the active
+  /// pill again resets to "Alle".
+  Widget _statusPillsRow(List<FleetVehicle> vehicles) {
+    final operativ = vehicles
+        .where(
+          (v) =>
+              v.status == VehicleStatus.active ||
+              v.status == VehicleStatus.operational,
+        )
+        .length;
+    final grounded = vehicles.where((v) => v.status.isGrounded).length;
+    final inactive = vehicles
+        .where((v) => v.status == VehicleStatus.inactive)
+        .length;
+    final de = Localizations.localeOf(context).languageCode == 'de';
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _statusPillChip('ALL', de ? 'Alle' : 'All', vehicles.length, _kInk),
+          const SizedBox(width: 8),
+          _statusPillChip(
+            'OPERATIV',
+            de ? 'Operativ' : 'Operational',
+            operativ,
+            _kAccentGreen,
+          ),
+          const SizedBox(width: 8),
+          _statusPillChip('GROUNDED', 'Grounded', grounded, _kAccentRed),
+          const SizedBox(width: 8),
+          _statusPillChip(
+            'INAKTIV',
+            de ? 'Inaktiv' : 'Inactive',
+            inactive,
+            _kSubtle,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Filter-Pill nach Handoff: aktiv = dunkle Fläche mit weißer Schrift,
+  /// inaktiv = weiße Fläche, Zahl im Akzentton des jeweiligen Status.
+  Widget _statusPillChip(String key, String label, int count, Color color) {
+    final active = _statusPill == key;
+    return Material(
+      color: active ? _kInk : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(999),
+        side: BorderSide(color: active ? _kInk : _kLine),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () =>
+            setState(() => _statusPill = active && key != 'ALL' ? 'ALL' : key),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: active ? Colors.white : _kSubtle,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12.5,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '$count',
+                style: TextStyle(
+                  color: active ? Colors.white : color,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12.5,
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   String _formatDateString(BuildContext context, String value) {
     final parsed = DateTime.tryParse(value);
     if (parsed == null) return value;
     return MaterialLocalizations.of(context).formatShortDate(parsed);
-  }
-
-  String _formatDateTime(BuildContext context, DateTime? value) {
-    if (value == null) {
-      return AppLocalizations.of(context).t('fleet_status_updated_fallback');
-    }
-    final material = MaterialLocalizations.of(context);
-    return '${material.formatShortDate(value)} '
-        '${material.formatTimeOfDay(TimeOfDay.fromDateTime(value))}';
   }
 
   String _friendlyLoadError(AppLocalizations t, Object? error) {
@@ -199,52 +592,213 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
       );
       return;
     }
-    setState(() => _busyCortex = true);
-    try {
-      final picked = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['xlsx', 'xls'],
-        withData: true,
+
+    // Pick the file first (interactive), then show a blocking progress popup.
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['xlsx', 'xls'],
+      withData: true,
+    );
+    if (picked == null || picked.files.isEmpty) return;
+    final f = picked.files.first;
+    final bytes = f.bytes;
+    if (!mounted) return;
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    if (bytes == null) {
+      _showSnack(
+        de
+            ? 'Datei konnte nicht gelesen werden. Bitte erneut versuchen '
+                  '(ggf. kleinere Datei oder anderer Browser).'
+            : 'Could not read the file. Please try again '
+                  '(possibly a smaller file or a different browser).',
+        error: true,
       );
-      if (picked == null || picked.files.isEmpty) {
-        setState(() => _busyCortex = false);
-        return;
-      }
-      final f = picked.files.first;
-      final bytes = f.bytes;
-      if (bytes == null) {
-        setState(() => _busyCortex = false);
-        return;
-      }
-      final report = await CortexVehicleImporter().importFromXlsx(
+      return;
+    }
+
+    final phase = ValueNotifier<String>(
+      de ? 'Datei wird gelesen …' : 'Reading file …',
+    );
+    final prog = ValueNotifier<double?>(null);
+    setState(() => _busyCortex = true);
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        content: SizedBox(
+          width: 300,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              ValueListenableBuilder<double?>(
+                valueListenable: prog,
+                builder: (_, p, __) => SizedBox(
+                  height: 48,
+                  width: 48,
+                  child: CircularProgressIndicator(value: p, strokeWidth: 4),
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'Cortex-Fleet-Import',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+              ),
+              const SizedBox(height: 6),
+              ValueListenableBuilder<String>(
+                valueListenable: phase,
+                builder: (_, s, __) => Text(
+                  s,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF6B7280),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    CortexImportReport? report;
+    Object? error;
+    try {
+      report = await CortexVehicleImporter().importFromXlsx(
         dspUid: scope,
         bytes: bytes,
         filename: f.name,
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: report.added > 0
-              ? const Color(0xFF067647)
-              : const Color(0xFFB45309),
-          content: Text(
-            'Cortex-Import: ${report.added} neu hinzugefügt, '
-            '${report.skippedDuplicate} bereits vorhanden '
-            '(${report.total} Zeilen gelesen).',
-          ),
-        ),
+        onPhase: (s) => phase.value = s,
+        onProgress: (done, total) {
+          prog.value = total == 0 ? null : done / total;
+          phase.value = de
+              ? 'Fahrzeuge werden gespeichert … ($done/$total)'
+              : 'Saving vehicles … ($done/$total)';
+        },
       );
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: const Color(0xFFB42318),
-          content: Text('Cortex-Import fehlgeschlagen: $e'),
-        ),
-      );
+      error = e;
     } finally {
-      if (mounted) setState(() => _busyCortex = false);
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop(); // close progress
+        setState(() => _busyCortex = false);
+      }
+      phase.dispose();
+      prog.dispose();
     }
+
+    if (!mounted) return;
+    if (error != null) {
+      _showCortexResult(
+        title: de ? 'Import fehlgeschlagen' : 'Import failed',
+        color: const Color(0xFFB42318),
+        lines: ['$error'],
+      );
+      return;
+    }
+    final r = report!;
+    _showCortexResult(
+      title: r.failed > 0
+          ? (de
+                ? 'Import mit Fehlern abgeschlossen'
+                : 'Import finished with errors')
+          : (de ? 'Import abgeschlossen' : 'Import finished'),
+      color: r.failed > 0 ? const Color(0xFFB45309) : const Color(0xFF067647),
+      lines: [
+        de ? '✓ ${r.added} neu hinzugefügt' : '✓ ${r.added} newly added',
+        de
+            ? '• ${r.skippedDuplicate} bereits vorhanden'
+            : '• ${r.skippedDuplicate} already present',
+        if (r.failed > 0)
+          de ? '✗ ${r.failed} fehlgeschlagen' : '✗ ${r.failed} failed',
+        de ? '${r.total} Zeilen gelesen' : '${r.total} rows read',
+      ],
+      failures: r.failures,
+    );
+  }
+
+  void _showCortexResult({
+    required String title,
+    required Color color,
+    required List<String> lines,
+    List<String> failures = const [],
+  }) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Text(
+          title,
+          style: TextStyle(
+            color: color,
+            fontWeight: FontWeight.w800,
+            fontSize: 17,
+          ),
+        ),
+        content: SizedBox(
+          width: 380,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final l in lines)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Text(l, style: const TextStyle(fontSize: 14)),
+                ),
+              if (failures.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text(
+                  de ? 'Fehlgeschlagene Fahrzeuge:' : 'Failed vehicles:',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        for (final fmsg in failures.take(15))
+                          Text(
+                            '• $fmsg',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFFB42318),
+                            ),
+                          ),
+                        if (failures.length > 15)
+                          Text(
+                            de
+                                ? '… und ${failures.length - 15} weitere'
+                                : '… and ${failures.length - 15} more',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF6B7280),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _showVehicleEditor({FleetVehicle? vehicle}) async {
@@ -260,11 +814,20 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
       return;
     }
 
-    final draft = await showDialog<FleetVehicleDraft>(
+    final normalizedPlate = vehicle == null
+        ? ''
+        : normalizePlateNumber(vehicle.plateNumber);
+    final result = await showDialog<_VehicleEditorResult>(
       context: context,
-      builder: (_) => _VehicleEditorDialog(vehicle: vehicle),
+      builder: (_) => _VehicleEditorDialog(
+        vehicle: vehicle,
+        initialWorkshop: _workshopByPlate[normalizedPlate] ?? '',
+        initialTuvDate: _tuvDocByPlate[normalizedPlate]?.expiryDate ?? '',
+        initialRemarks: _remarksByPlate[normalizedPlate] ?? '',
+      ),
     );
-    if (draft == null) return;
+    if (result == null) return;
+    final draft = result.draft;
 
     try {
       if (vehicle == null) {
@@ -287,6 +850,15 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
             'vehicleNumber': draft.plateNumber,
           }),
         );
+      }
+      // Side data (workshop + TÜV date) lives outside the vehicle doc —
+      // save it best-effort after the main record went through.
+      try {
+        await _saveVehicleWorkshop(scope, draft.plateNumber, result.workshop);
+        await _saveTuvDate(scope, draft.plateNumber, result.tuvDate);
+        await _saveVehicleRemarks(scope, draft.plateNumber, result.remarks);
+      } catch (_) {
+        // Non-fatal: the vehicle itself was saved successfully.
       }
       if (!mounted) return;
       setState(() {
@@ -314,7 +886,10 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
     }
   }
 
-  Future<void> _showVehicleDetails(FleetVehicle vehicle) async {
+  /// Opens the vehicle detail page **embedded** in the shell content — a
+  /// state switch instead of a full-screen route, so the side menu stays
+  /// visible (same pattern as the Drivers Hub detail page).
+  void _showVehicleDetails(FleetVehicle vehicle) {
     final scope = _scopeUid;
     if (scope == null) {
       _showSnack(
@@ -323,15 +898,7 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
       );
       return;
     }
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => _VehicleDetailsPage(
-          vehicle: vehicle,
-          dspUid: scope,
-          canManageDocuments: _canManageVehicles,
-        ),
-      ),
-    );
+    setState(() => _detailPlate = normalizePlateNumber(vehicle.plateNumber));
   }
 
   Future<void> _deleteVehicle(FleetVehicle vehicle) async {
@@ -393,6 +960,126 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
     }
   }
 
+  /// Deletes the ENTIRE fleet for the current DSP. Destructive — guarded by
+  /// a type-to-confirm dialog. Each vehicle goes through the normal
+  /// softDeleteVehicle path so documents/history are archived consistently.
+  Future<void> _deleteAllVehicles() async {
+    final t = AppLocalizations.of(context);
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final scope = _scopeUid;
+    if (scope == null) {
+      _showSnack(t.t('fleet_status_empty_scope'), error: true);
+      return;
+    }
+    List<FleetVehicle> vehicles;
+    try {
+      vehicles = await _repository.watchVehicles(dspUid: scope).first;
+    } catch (e) {
+      _showSnack(
+        de ? 'Konnte Fahrzeuge nicht laden: $e' : 'Could not load vehicles: $e',
+        error: true,
+      );
+      return;
+    }
+    if (vehicles.isEmpty) {
+      _showSnack(
+        de
+            ? 'Keine Fahrzeuge zum Löschen vorhanden.'
+            : 'There are no vehicles to delete.',
+      );
+      return;
+    }
+
+    final confirmWord = de ? 'LÖSCHEN' : 'DELETE';
+    final ctrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) {
+          final match = ctrl.text.trim().toUpperCase() == confirmWord;
+          return AlertDialog(
+            title: Text(
+              de ? 'Gesamten Fuhrpark löschen?' : 'Delete the entire fleet?',
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  de
+                      ? 'Dies löscht ALLE ${vehicles.length} Fahrzeuge dieses DSP '
+                            '(inkl. Dokumente & Historie). Diese Aktion kann nicht '
+                            'einfach rückgängig gemacht werden.\n\n'
+                            'Tippe zum Bestätigen LÖSCHEN ein:'
+                      : 'This deletes ALL ${vehicles.length} vehicles of this DSP '
+                            '(including documents & history). This action cannot '
+                            'easily be undone.\n\n'
+                            'Type DELETE to confirm:',
+                  style: const TextStyle(height: 1.4),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: ctrl,
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: InputDecoration(
+                    hintText: confirmWord,
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  onChanged: (_) => setLocal(() {}),
+                ),
+              ],
+            ),
+            actions: [
+              CoButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                label: t.t('button_close'),
+                variant: CoButtonVariant.quiet,
+              ),
+              CoButton(
+                onPressed: match ? () => Navigator.of(ctx).pop(true) : null,
+                label: de
+                    ? 'Alle ${vehicles.length} löschen'
+                    : 'Delete all ${vehicles.length}',
+                variant: CoButtonVariant.destructive,
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    if (confirmed != true) return;
+
+    _showSnack(
+      de
+          ? 'Lösche ${vehicles.length} Fahrzeuge…'
+          : 'Deleting ${vehicles.length} vehicles…',
+    );
+    var done = 0;
+    var failed = 0;
+    for (final v in vehicles) {
+      try {
+        await _repository.softDeleteVehicle(
+          dspUid: scope,
+          plateNumber: v.plateNumber,
+        );
+        done++;
+      } catch (_) {
+        failed++;
+      }
+    }
+    if (!mounted) return;
+    _showSnack(
+      failed == 0
+          ? (de ? '$done Fahrzeuge gelöscht.' : '$done vehicles deleted.')
+          : (de
+                ? '$done gelöscht, $failed fehlgeschlagen.'
+                : '$done deleted, $failed failed.'),
+      error: failed > 0,
+    );
+  }
+
   Future<void> _updateVehicleStatus(
     FleetVehicle vehicle,
     VehicleStatus status, {
@@ -444,23 +1131,43 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
   ) async {
     if (vehicle.status == status) return;
 
-    String? serviceEndDate;
-    if (status == VehicleStatus.inService) {
-      serviceEndDate = await showDialog<String>(
+    _GroundingDialogResult? grounding;
+    if (status.isGrounded) {
+      final normalizedPlate = normalizePlateNumber(vehicle.plateNumber);
+      grounding = await showDialog<_GroundingDialogResult>(
         context: context,
         builder: (_) => _ServiceEndDateDialog(
           initialValue: vehicle.serviceEndDate,
           requiredValue: false,
+          // Grounded (Service): additionally ask for the workshop the
+          // vehicle was sent to.
+          askWorkshop: status == VehicleStatus.groundedService,
+          initialWorkshop: _workshopByPlate[normalizedPlate] ?? '',
         ),
       );
-      if (!mounted || serviceEndDate == null) return;
+      if (!mounted || grounding == null) return;
     }
 
     await _updateVehicleStatus(
       vehicle,
       status,
-      serviceEndDate: status == VehicleStatus.inService ? serviceEndDate : null,
+      serviceEndDate: status.isGrounded ? grounding?.serviceEndDate : null,
     );
+
+    if (status == VehicleStatus.groundedService && grounding != null) {
+      final scope = _scopeUid;
+      if (scope != null) {
+        try {
+          await _saveVehicleWorkshop(
+            scope,
+            vehicle.plateNumber,
+            grounding.workshop,
+          );
+        } catch (_) {
+          // Non-fatal: the status change itself already went through.
+        }
+      }
+    }
   }
 
   void _showSnack(String message, {bool error = false}) {
@@ -493,30 +1200,201 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
       return Center(child: Text(t.t('fleet_status_empty_scope')));
     }
 
-    return DefaultTabController(
-      length: 2,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-            child: Builder(
-              builder: (ctx) => PillTabBar(
-                controller: DefaultTabController.of(ctx),
-                tabs: const ['Fahrzeuge', 'SESO'],
-              ),
-            ),
+    // Vehicle detail page rendered *inside* the shell content so the side
+    // menu stays visible; the back arrow clears the state again.
+    final detailPlate = _detailPlate;
+    if (detailPlate != null) {
+      return FleetVehicleDetailPage(
+        key: ValueKey('fleet-detail-$scope-$detailPlate'),
+        dspUid: scope,
+        plateNumber: detailPlate,
+        canManage: _canManageVehicles,
+        actions: _detailActions(scope),
+        onBack: () => setState(() => _detailPlate = null),
+      );
+    }
+
+    // Tab bar + SESO temporarily hidden — show the vehicles view directly.
+    // (SESO code kept in the tree for when it's re-enabled.)
+    return _buildVehiclesTab(context, scope);
+  }
+
+  // ─── Brücke: Detailseite → bestehende Editor-Flows ────────────────────
+  //
+  // Die Detailseite (`fleet_vehicle_detail_page.dart`) enthält keine eigenen
+  // Schreibpfade auf das Fahrzeug-Dokument — sie ruft die hier bereits
+  // vorhandenen Dialoge über diese Closures auf.
+  FleetVehicleDetailActions _detailActions(String scope) {
+    return FleetVehicleDetailActions(
+      editVehicle: (vehicle) => _showVehicleEditor(vehicle: vehicle),
+      changeStatus: _handleVehicleStatusSelection,
+      editTuvDate: (vehicle) => _editTuvDate(scope, vehicle),
+      editNotes: _editVehicleNotes,
+      editRemarks: (vehicle, current) =>
+          _editVehicleRemarks(scope, vehicle, current),
+      saveExtras: (plateNumber, data) =>
+          _saveVehicleExtras(scope, plateNumber, data),
+      statusLabel: _statusLabel,
+      statusColor: _statusColor,
+      categoryLabel: _categoryLabel,
+      fuelLabel: _fuelTypeLabel,
+      documentTypeLabel: _documentTypeLabel,
+    );
+  }
+
+  /// Datepicker für das HU/TÜV-Datum — schreibt über den bestehenden
+  /// [_saveTuvDate]-Pfad (Datum lebt auf dem HU_TUV_CERTIFICATE-Dokument).
+  Future<void> _editTuvDate(String scope, FleetVehicle vehicle) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final plate = normalizePlateNumber(vehicle.plateNumber);
+    // Direkt aus Firestore lesen — der Listen-Cache läuft auf der
+    // Detailseite nicht (siehe [_loadTuvDocument]).
+    final existing = await _loadTuvDocument(scope, plate);
+    if (!mounted) return;
+    final current = DateTime.tryParse((existing?.expiryDate ?? '').trim());
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: current ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(DateTime.now().year + 15),
+      helpText: de ? 'TÜV / HU gültig bis' : 'TÜV / inspection valid until',
+    );
+    if (picked == null || !mounted) return;
+    final iso =
+        '${picked.year.toString().padLeft(4, '0')}-'
+        '${picked.month.toString().padLeft(2, '0')}-'
+        '${picked.day.toString().padLeft(2, '0')}';
+    try {
+      await _saveTuvDate(scope, vehicle.plateNumber, iso);
+      _showSnack(de ? 'TÜV-Datum gespeichert.' : 'TÜV date saved.');
+    } catch (e) {
+      _showSnack(
+        de ? 'Speichern fehlgeschlagen: $e' : 'Could not save: $e',
+        error: true,
+      );
+    }
+  }
+
+  /// Notizen des Fahrzeug-Dokuments (`notes`) — geht über den bestehenden
+  /// Repository-Update-Pfad, damit die Rules-Validierung greift.
+  Future<void> _editVehicleNotes(FleetVehicle vehicle) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final scope = _scopeUid;
+    if (scope == null) return;
+    final text = await _showMultilineEditor(
+      title: de ? 'Notizen' : 'Notes',
+      initialValue: vehicle.notes,
+    );
+    if (text == null) return;
+    try {
+      await _repository.updateVehicle(
+        dspUid: scope,
+        originalPlateNumber: vehicle.plateNumber,
+        draft: FleetVehicleDraft(
+          plateNumber: vehicle.plateNumber,
+          category: vehicle.category,
+          brand: vehicle.brand,
+          model: vehicle.model,
+          manufacturingYear: vehicle.manufacturingYear,
+          vinNumber: vehicle.vinNumber,
+          fuelType: vehicle.fuelType,
+          status: vehicle.status,
+          serviceEndDate: vehicle.serviceEndDate,
+          metadata: vehicle.metadata,
+          notes: text,
+        ),
+      );
+      if (!mounted) return;
+      _showSnack(de ? 'Notizen gespeichert.' : 'Notes saved.');
+    } catch (e) {
+      _showSnack(
+        de ? 'Speichern fehlgeschlagen: $e' : 'Could not save: $e',
+        error: true,
+      );
+    }
+  }
+
+  Future<void> _editVehicleRemarks(
+    String scope,
+    FleetVehicle vehicle,
+    String current,
+  ) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final text = await _showMultilineEditor(
+      title: de ? 'Bemerkungen' : 'Remarks',
+      initialValue: current,
+    );
+    if (text == null) return;
+    try {
+      await _saveVehicleRemarks(scope, vehicle.plateNumber, text);
+      if (!mounted) return;
+      _showSnack(de ? 'Bemerkungen gespeichert.' : 'Remarks saved.');
+    } catch (e) {
+      _showSnack(
+        de ? 'Speichern fehlgeschlagen: $e' : 'Could not save: $e',
+        error: true,
+      );
+    }
+  }
+
+  /// Merge-Write in `users/{scope}/fleet_vehicle_extras/{plate}` — genutzt für
+  /// die Detailseiten-Felder, die es auf dem Fahrzeug-Dokument (Rules-
+  /// Whitelist!) nicht gibt: Leasinggeber, Bremsen-/Reifen-Spezifikation,
+  /// Full-Maintenance-Kennzeichen.
+  Future<void> _saveVehicleExtras(
+    String scope,
+    String plateNumber,
+    Map<String, dynamic> data,
+  ) async {
+    await _extrasCollection(
+      scope,
+    ).doc(normalizePlateNumber(plateNumber)).set(<String, dynamic>{
+      'plateNumber': normalizePlateNumber(plateNumber),
+      ...data,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  Future<String?> _showMultilineEditor({
+    required String title,
+    required String initialValue,
+  }) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final controller = TextEditingController(text: initialValue);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+        ),
+        content: SizedBox(
+          width: 440,
+          child: TextField(
+            controller: controller,
+            autofocus: true,
+            minLines: 3,
+            maxLines: 8,
+            decoration: _referenceInputDecoration(title),
           ),
-          Expanded(
-            child: TabBarView(
-              children: [
-                _buildVehiclesTab(context, scope),
-                SesoOverviewPage(dspUid: scope),
-              ],
-            ),
+        ),
+        actions: [
+          CoButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            label: de ? 'Abbrechen' : 'Cancel',
+            variant: CoButtonVariant.quiet,
+          ),
+          CoButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+            label: de ? 'Speichern' : 'Save',
           ),
         ],
       ),
     );
+    controller.dispose();
+    return result;
   }
 
   Widget _buildVehiclesTab(BuildContext context, String scope) {
@@ -537,69 +1415,148 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
               return StreamBuilder<List<FleetVehicleDocument>>(
                 stream: _documentService.watchScopeDocuments(dspUid: scope),
                 builder: (context, docsSnapshot) {
+                  final scopeDocuments =
+                      docsSnapshot.data ?? const <FleetVehicleDocument>[];
                   final complianceByPlate = _buildComplianceByPlate(
-                    docsSnapshot.data ?? const <FleetVehicleDocument>[],
+                    scopeDocuments,
                   );
-                  final vehicles = _filteredVehicles(
-                    snapshot.data ?? const [],
-                    complianceByPlate,
-                  );
+                  _tuvDocByPlate = _latestTuvDocsByPlate(scopeDocuments);
+                  _registrationPlates = <String>{
+                    for (final doc in scopeDocuments)
+                      if (!doc.isDeleted &&
+                          doc.fileUrl.trim().isNotEmpty &&
+                          _canonicalVehicleDocumentType(doc.documentType) ==
+                              'FAHRZEUGSCHEIN')
+                        normalizePlateNumber(doc.plateNumber),
+                  };
 
-                  return Padding(
-                    padding: EdgeInsets.all(isMobile ? 12 : 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (!isMobile) ...[
-                          _buildHeader(context, isNarrow: isNarrow),
-                          const SizedBox(height: 16),
-                        ],
-                        _FleetHero(
-                          vehicles: snapshot.data ?? const [],
-                          compliance: complianceByPlate,
-                          isMobile: isMobile,
-                        ),
-                        const SizedBox(height: 16),
-                        _buildToolbar(context, isNarrow: isNarrow),
-                        const SizedBox(height: 16),
-                        Expanded(
-                          child: CoStateSwitcher(
-                            child:
-                                snapshot.connectionState ==
-                                        ConnectionState.waiting &&
-                                    !snapshot.hasData
-                                ? const Center(
-                                    key: ValueKey('fleet-loading'),
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 3,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        AppColors.codriverGreen,
+                  return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                    stream: _extrasCollection(scope).snapshots(),
+                    builder: (context, extrasSnapshot) {
+                      // Errors (e.g. exotic roles without access) degrade to
+                      // "no workshop data" instead of breaking the page.
+                      final workshopByPlate = <String, String>{};
+                      final remarksByPlate = <String, String>{};
+                      final leasingByPlate = <String, String>{};
+                      if (extrasSnapshot.hasData) {
+                        for (final doc in extrasSnapshot.data!.docs) {
+                          final workshop = (doc.data()['workshop'] ?? '')
+                              .toString()
+                              .trim();
+                          if (workshop.isNotEmpty) {
+                            workshopByPlate[normalizePlateNumber(doc.id)] =
+                                workshop;
+                          }
+                          final remarks = (doc.data()['remarks'] ?? '')
+                              .toString()
+                              .trim();
+                          if (remarks.isNotEmpty) {
+                            remarksByPlate[normalizePlateNumber(doc.id)] =
+                                remarks;
+                          }
+                          final leasing = (doc.data()['leasingProvider'] ?? '')
+                              .toString()
+                              .trim();
+                          if (leasing.isNotEmpty) {
+                            leasingByPlate[normalizePlateNumber(doc.id)] =
+                                leasing;
+                          }
+                        }
+                      }
+                      _workshopByPlate = workshopByPlate;
+                      _remarksByPlate = remarksByPlate;
+                      _leasingByPlate = leasingByPlate;
+
+                      final vehicles = _filteredVehicles(
+                        snapshot.data ?? const [],
+                        complianceByPlate,
+                      );
+
+                      return Padding(
+                        padding: EdgeInsets.all(isMobile ? 12 : 24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (!isMobile) ...[
+                              _buildHeader(context, isNarrow: isNarrow),
+                              const SizedBox(height: 16),
+                            ],
+                            _FleetHero(
+                              vehicles:
+                                  (snapshot.data ?? const <FleetVehicle>[])
+                                      .where((v) => !v.isDeleted)
+                                      .toList(),
+                              compliance: complianceByPlate,
+                              isMobile: isMobile,
+                              activeKeys: {
+                                if (_categoryFilter == 'ALL' &&
+                                    _statusPill == 'ALL')
+                                  'TOTAL',
+                                if (_categoryFilter != 'ALL') _categoryFilter,
+                                if (_statusPill == 'INAKTIV') 'INACTIVE',
+                              },
+                              onTileTap: _onHeroTileTap,
+                            ),
+                            const SizedBox(height: 12),
+                            _buildFilterBar(
+                              context,
+                              (snapshot.data ?? const <FleetVehicle>[])
+                                  .where((v) => !v.isDeleted)
+                                  .toList(),
+                              scope,
+                              isNarrow: isNarrow,
+                              isMobile: isMobile,
+                            ),
+                            const SizedBox(height: 12),
+                            // Mobil sitzen die Referenz-Links im Bottom-Sheet
+                            // hinter dem Lesezeichen-Button — die horizontale
+                            // Chip-Zeile entfällt dort.
+                            if (!isMobile)
+                              _buildReferencesSection(context, scope),
+                            const SizedBox(height: 4),
+                            Expanded(
+                              child: CoStateSwitcher(
+                                child:
+                                    snapshot.connectionState ==
+                                            ConnectionState.waiting &&
+                                        !snapshot.hasData
+                                    ? const Center(
+                                        key: ValueKey('fleet-loading'),
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 3,
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                AppColors.codriverGreen,
+                                              ),
+                                        ),
+                                      )
+                                    : errorMessage != null
+                                    ? KeyedSubtree(
+                                        key: const ValueKey('fleet-error'),
+                                        child: _buildErrorState(
+                                          context,
+                                          errorMessage,
+                                        ),
+                                      )
+                                    : vehicles.isEmpty
+                                    ? KeyedSubtree(
+                                        key: const ValueKey('fleet-empty'),
+                                        child: _buildEmptyState(context),
+                                      )
+                                    : KeyedSubtree(
+                                        key: const ValueKey('fleet-table'),
+                                        child: _buildVehicleTable(
+                                          context,
+                                          vehicles,
+                                          complianceByPlate: complianceByPlate,
+                                        ),
                                       ),
-                                    ),
-                                  )
-                                : errorMessage != null
-                                ? KeyedSubtree(
-                                    key: const ValueKey('fleet-error'),
-                                    child: _buildErrorState(
-                                        context, errorMessage),
-                                  )
-                                : vehicles.isEmpty
-                                ? KeyedSubtree(
-                                    key: const ValueKey('fleet-empty'),
-                                    child: _buildEmptyState(context),
-                                  )
-                                : KeyedSubtree(
-                                    key: const ValueKey('fleet-table'),
-                                    child: _buildVehicleTable(
-                                      context,
-                                      vehicles,
-                                      complianceByPlate: complianceByPlate,
-                                    ),
-                                  ),
-                          ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      );
+                    },
                   );
                 },
               );
@@ -607,7 +1564,7 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
           ),
         );
 
-        if (isMobile && _canManageVehicles) {
+        if (_canManageVehicles) {
           return Stack(
             children: [
               body,
@@ -643,6 +1600,7 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
 
   Future<void> _showMobileAddSheet() async {
     final t = AppLocalizations.of(context);
+    final de = Localizations.localeOf(context).languageCode == 'de';
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.white,
@@ -680,8 +1638,10 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                     'Cortex-Import',
                     style: TextStyle(fontWeight: FontWeight.w700),
                   ),
-                  subtitle: const Text(
-                    'Aktuelle Flotte aus Cortex synchronisieren',
+                  subtitle: Text(
+                    de
+                        ? 'Aktuelle Flotte aus Cortex synchronisieren'
+                        : 'Sync the current fleet from Cortex',
                   ),
                   onTap: () {
                     Navigator.of(ctx).pop();
@@ -701,8 +1661,10 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                     t.t('fleet_status_add_vehicle'),
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
-                  subtitle: const Text(
-                    'Neues Fahrzeug manuell anlegen',
+                  subtitle: Text(
+                    de
+                        ? 'Neues Fahrzeug manuell anlegen'
+                        : 'Add a new vehicle manually',
                   ),
                   onTap: () {
                     Navigator.of(ctx).pop();
@@ -719,61 +1681,72 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
 
   Widget _buildHeader(BuildContext context, {required bool isNarrow}) {
     final t = AppLocalizations.of(context);
-    return Wrap(
-      alignment: WrapAlignment.spaceBetween,
-      runSpacing: 12,
-      crossAxisAlignment: WrapCrossAlignment.center,
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final isSuperadmin = const {
+      'info@arion-logistics.de',
+      'admin@arion-logistics.de',
+    }.contains(FirebaseAuth.instance.currentUser?.email?.toLowerCase() ?? '');
+    // Title/subtitle removed. Compact action row, right-aligned: Ayvens Wissen
+    // (superadmin) + an overflow (3-dot) menu that hides "Alle löschen".
+    // Add-vehicle and Cortex-Import moved to the floating "+" button.
+    return Row(
       children: [
-        SizedBox(
-          width: isNarrow ? double.infinity : 620,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                t.t('fleet_status_title'),
-                style: const TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w900,
-                  color: _kText,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                t.t('fleet_status_subtitle'),
-                style: const TextStyle(fontSize: 14, color: _kMuted),
-              ),
-            ],
+        Text(
+          'Fleethub',
+          style: GoogleFonts.montserrat(
+            fontSize: 22,
+            fontWeight: FontWeight.w600,
+            color: _kInk,
           ),
         ),
-        if (_canManageVehicles) ...[
-          OutlinedButton.icon(
-            onPressed: _busyCortex ? null : _importFromCortex,
-            icon: _busyCortex
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.cloud_download_outlined, size: 18),
-            label: Text(_busyCortex
-                ? 'Importiere…'
-                : 'Cortex-Import'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF1D7F5A),
-              side: const BorderSide(color: Color(0xFF1D7F5A)),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
+        const Spacer(),
+        if (isSuperadmin) ...[
+          // Ayvens Wissen temporarily disabled — shown as "coming soon".
           CoButton(
-            onPressed: () => _showVehicleEditor(),
-            icon: Icons.add_rounded,
-            label: t.t('fleet_status_add_vehicle'),
+            onPressed: null,
+            icon: Icons.auto_awesome,
+            label: 'Ayvens Wissen · Coming soon',
+            variant: CoButtonVariant.quiet,
           ),
-        ] else
+          const SizedBox(width: 8),
+        ],
+        if (_canManageVehicles)
+          PopupMenuButton<String>(
+            tooltip: de ? 'Mehr' : 'More',
+            icon: const Icon(Icons.more_vert_rounded, color: _kMuted),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            onSelected: (value) {
+              if (value == 'deleteAll') _deleteAllVehicles();
+            },
+            // Cortex-Import und „Manuell anlegen" leben jetzt im grünen
+            // „+ Neu"-Menü der Filterleiste (Handoff) — hier bleibt nur die
+            // destruktive Aktion.
+            itemBuilder: (ctx) => [
+              PopupMenuItem<String>(
+                value: 'deleteAll',
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.delete_forever_outlined,
+                      size: 18,
+                      color: Color(0xFFB91C1C),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      de ? 'Alle löschen' : 'Delete all',
+                      style: const TextStyle(
+                        color: Color(0xFFB91C1C),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          )
+        else
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
@@ -793,94 +1766,1028 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
     );
   }
 
-  Widget _buildToolbar(BuildContext context, {required bool isNarrow}) {
-    final t = AppLocalizations.of(context);
+  // ─── Referenzen — named links (workshops, rental partners, …) ─────────
+  //
+  // Stored under users/{dspUid}/fleet_references/{autoId} with
+  // {name, url, createdAt, updatedAt}; the admin's own subtree, so the
+  // existing rules already allow admin + dispatcher access.
 
-    final searchField = TextField(
-      controller: _searchCtrl,
-      onChanged: (value) => setState(() => _search = value),
-      decoration: InputDecoration(
-        hintText: t.t('fleet_status_search_hint'),
-        prefixIcon: const Icon(Icons.search),
-        isDense: isNarrow,
-        filled: true,
-        fillColor: const Color(0xFFF9FAFB),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(999),
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(999),
-          borderSide: BorderSide.none,
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(999),
-          borderSide: const BorderSide(color: _kGreen, width: 1.4),
+  /// Chips row with all saved reference links; tapping a chip opens the URL
+  /// in a new tab. Admins get a manage button (add / edit / delete).
+  Widget _buildReferencesSection(BuildContext context, String scope) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: _referencesCollection(scope).orderBy('name').snapshots(),
+      builder: (context, snapshot) {
+        final docs = snapshot.hasData
+            ? snapshot.data!.docs
+            : const <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+        if (docs.isEmpty && !_canManageVehicles) {
+          return const SizedBox.shrink();
+        }
+        // Plain SingleChildScrollView isn't mouse-draggable on Flutter web
+        // desktop and the mouse wheel scrolls the page, not this row — so
+        // the chips ran off-screen with no way to reach them (customer
+        // report). Fix: a visible/draggable Scrollbar bound to a named
+        // controller, a ScrollConfiguration that allows mouse-drag, and a
+        // wheel handler that maps vertical wheel delta onto this axis.
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: ScrollConfiguration(
+            behavior: _HorizontalDragScrollBehavior(),
+            child: Listener(
+              onPointerSignal: (event) {
+                if (event is PointerScrollEvent &&
+                    _referencesScrollCtrl.hasClients) {
+                  final max = _referencesScrollCtrl.position.maxScrollExtent;
+                  final target =
+                      (_referencesScrollCtrl.offset + event.scrollDelta.dy)
+                          .clamp(0.0, max);
+                  _referencesScrollCtrl.jumpTo(target);
+                }
+              },
+              child: Scrollbar(
+                controller: _referencesScrollCtrl,
+                thumbVisibility: true,
+                trackVisibility: true,
+                child: SingleChildScrollView(
+                  controller: _referencesScrollCtrl,
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.bookmarks_outlined,
+                        size: 15,
+                        color: _kMuted.withValues(alpha: 0.9),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        de ? 'Referenzen:' : 'References:',
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: _kMuted,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      if (docs.isEmpty)
+                        Text(
+                          de
+                              ? 'Noch keine Links (z. B. Werkstätten, Vermieter)'
+                              : 'No links yet (e.g. workshops, rental partners)',
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            color: _kMuted,
+                          ),
+                        ),
+                      for (final doc in docs) ...[
+                        _referenceChip(context, doc),
+                        const SizedBox(width: 8),
+                      ],
+                      if (_canManageVehicles) ...[
+                        const SizedBox(width: 4),
+                        Tooltip(
+                          message: de
+                              ? 'Referenzen verwalten'
+                              : 'Manage references',
+                          child: InkWell(
+                            onTap: () => _showReferencesManager(scope),
+                            borderRadius: BorderRadius.circular(999),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(999),
+                                border: Border.all(color: _kBorder),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.edit_outlined,
+                                    size: 14,
+                                    color: Color(0xFF1D7F5A),
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    docs.isEmpty
+                                        ? (de ? 'Hinzufügen' : 'Add')
+                                        : (de ? 'Verwalten' : 'Manage'),
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF1D7F5A),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _referenceChip(
+    BuildContext context,
+    QueryDocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    final data = doc.data();
+    final name = (data['name'] ?? '').toString().trim();
+    final url = (data['url'] ?? '').toString().trim();
+    return InkWell(
+      onTap: () => _openReferenceUrl(url),
+      borderRadius: BorderRadius.circular(999),
+      child: Tooltip(
+        message: url,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: _kBorder),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.open_in_new_rounded,
+                size: 13,
+                color: Color(0xFF2563EB),
+              ),
+              const SizedBox(width: 5),
+              Text(
+                name.isEmpty ? url : name,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF1F2937),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
 
-    final statusFilter = _ToolbarDropdown(
-      value: _statusFilter,
-      onChanged: (value) {
-        if (value == null) return;
-        setState(() => _statusFilter = value);
-      },
-      items: [
-        DropdownMenuItem(
-          value: _statusAllValue,
-          child: Text(t.t('fleet_status_filter_all')),
+  Future<void> _openReferenceUrl(String url) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    var normalized = url.trim();
+    if (normalized.isEmpty) return;
+    if (!normalized.startsWith('http://') &&
+        !normalized.startsWith('https://')) {
+      normalized = 'https://$normalized';
+    }
+    final uri = Uri.tryParse(normalized);
+    if (uri == null) {
+      _showSnack(de ? 'Ungültiger Link.' : 'Invalid link.', error: true);
+      return;
+    }
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched && mounted) {
+      _showSnack(
+        de ? 'Link konnte nicht geöffnet werden.' : 'Could not open the link.',
+        error: true,
+      );
+    }
+  }
+
+  Future<void> _showReferencesManager(String scope) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: const BorderSide(color: _kBorder),
         ),
-        ...VehicleStatus.values.map(
-          (status) => DropdownMenuItem<String>(
-            value: status.value,
-            child: Text(_statusLabel(context, status)),
+        insetPadding: const EdgeInsets.all(20),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520, maxHeight: 640),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        de ? 'Referenzen' : 'References',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: _kText,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: de ? 'Schließen' : 'Close',
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      icon: const Icon(Icons.close, color: _kMuted),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  de
+                      ? 'Benannte Links, z. B. Werkstätten oder Vermieter '
+                            '(gerne Google-Maps-Links).'
+                      : 'Named links, e.g. workshops or rental partners '
+                            '(Google Maps links work great).',
+                  style: const TextStyle(fontSize: 12.5, color: _kMuted),
+                ),
+                const SizedBox(height: 14),
+                Flexible(
+                  child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                    stream: _referencesCollection(
+                      scope,
+                    ).orderBy('name').snapshots(),
+                    builder: (ctx2, snapshot) {
+                      final docs = snapshot.hasData
+                          ? snapshot.data!.docs
+                          : const <
+                              QueryDocumentSnapshot<Map<String, dynamic>>
+                            >[];
+                      if (docs.isEmpty) {
+                        return Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF9FAFB),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: _kBorder),
+                          ),
+                          child: Text(
+                            de
+                                ? 'Noch keine Referenzen angelegt.'
+                                : 'No references yet.',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: _kMuted,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        );
+                      }
+                      return ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: docs.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (ctx3, index) {
+                          final doc = docs[index];
+                          final data = doc.data();
+                          final name = (data['name'] ?? '').toString().trim();
+                          final url = (data['url'] ?? '').toString().trim();
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF9FAFB),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: _kBorder),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        name.isEmpty ? url : name,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          color: _kText,
+                                          fontSize: 13.5,
+                                        ),
+                                      ),
+                                      Text(
+                                        url,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: _kMuted,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                IconButton(
+                                  tooltip: de ? 'Öffnen' : 'Open',
+                                  onPressed: () => _openReferenceUrl(url),
+                                  visualDensity: VisualDensity.compact,
+                                  icon: const Icon(
+                                    Icons.open_in_new_rounded,
+                                    size: 18,
+                                    color: Color(0xFF2563EB),
+                                  ),
+                                ),
+                                IconButton(
+                                  tooltip: de ? 'Bearbeiten' : 'Edit',
+                                  onPressed: () => _showReferenceEditor(
+                                    scope,
+                                    documentId: doc.id,
+                                    initialName: name,
+                                    initialUrl: url,
+                                  ),
+                                  visualDensity: VisualDensity.compact,
+                                  icon: const Icon(
+                                    Icons.edit_outlined,
+                                    size: 18,
+                                    color: Color(0xFF6B7280),
+                                  ),
+                                ),
+                                IconButton(
+                                  tooltip: de ? 'Löschen' : 'Delete',
+                                  onPressed: () =>
+                                      _deleteReference(scope, doc.id, name),
+                                  visualDensity: VisualDensity.compact,
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    size: 18,
+                                    color: Color(0xFFDC2626),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: CoButton(
+                    onPressed: () => _showReferenceEditor(scope),
+                    icon: Icons.add,
+                    label: de ? 'Referenz hinzufügen' : 'Add reference',
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-      ],
+      ),
     );
+  }
 
-    final tuvFilter = _ToolbarDropdown(
-      value: _tuvFilter,
-      onChanged: (value) {
-        if (value == null) return;
-        setState(() => _tuvFilter = value);
-      },
-      items: [
-        DropdownMenuItem(
-          value: _tuvAllValue,
-          child: Text(t.t('fleet_status_tuv_filter_all')),
+  Future<void> _showReferenceEditor(
+    String scope, {
+    String? documentId,
+    String initialName = '',
+    String initialUrl = '',
+  }) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final nameCtrl = TextEditingController(text: initialName);
+    final urlCtrl = TextEditingController(text: initialUrl);
+    final formKey = GlobalKey<FormState>();
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Text(
+          documentId == null
+              ? (de ? 'Referenz hinzufügen' : 'Add reference')
+              : (de ? 'Referenz bearbeiten' : 'Edit reference'),
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
         ),
-        ...FleetVehicleDocumentStatus.values.map(
-          (status) => DropdownMenuItem<String>(
-            value: status.value,
-            child: Text(_tuvStatusPresentationFor(context, status).label),
+        content: SizedBox(
+          width: 400,
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: nameCtrl,
+                  autofocus: true,
+                  decoration: _referenceInputDecoration(
+                    de
+                        ? 'Name (z. B. Werkstatt Müller)'
+                        : 'Name (e.g. workshop)',
+                  ),
+                  validator: (value) => (value ?? '').trim().isEmpty
+                      ? (de ? 'Name ist erforderlich.' : 'Name is required.')
+                      : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: urlCtrl,
+                  decoration: _referenceInputDecoration(
+                    de ? 'Link / URL (z. B. Google Maps)' : 'Link / URL',
+                  ),
+                  validator: (value) {
+                    final trimmed = (value ?? '').trim();
+                    if (trimmed.isEmpty) {
+                      return de
+                          ? 'Link ist erforderlich.'
+                          : 'Link is required.';
+                    }
+                    final withScheme =
+                        trimmed.startsWith('http://') ||
+                            trimmed.startsWith('https://')
+                        ? trimmed
+                        : 'https://$trimmed';
+                    final uri = Uri.tryParse(withScheme);
+                    if (uri == null || uri.host.trim().isEmpty) {
+                      return de ? 'Ungültiger Link.' : 'Invalid link.';
+                    }
+                    return null;
+                  },
+                ),
+              ],
+            ),
           ),
         ),
-      ],
+        actions: [
+          CoButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            label: de ? 'Abbrechen' : 'Cancel',
+            variant: CoButtonVariant.quiet,
+          ),
+          CoButton(
+            onPressed: () {
+              if (!(formKey.currentState?.validate() ?? false)) return;
+              Navigator.of(ctx).pop(true);
+            },
+            label: de ? 'Speichern' : 'Save',
+          ),
+        ],
+      ),
     );
+
+    if (saved == true) {
+      var url = urlCtrl.text.trim();
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'https://$url';
+      }
+      try {
+        if (documentId == null) {
+          await _referencesCollection(scope).add(<String, dynamic>{
+            'name': nameCtrl.text.trim(),
+            'url': url,
+            'createdAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        } else {
+          await _referencesCollection(
+            scope,
+          ).doc(documentId).update(<String, dynamic>{
+            'name': nameCtrl.text.trim(),
+            'url': url,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        }
+      } catch (e) {
+        _showSnack(
+          de ? 'Speichern fehlgeschlagen: $e' : 'Could not save: $e',
+          error: true,
+        );
+      }
+    }
+    nameCtrl.dispose();
+    urlCtrl.dispose();
+  }
+
+  InputDecoration _referenceInputDecoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      filled: true,
+      fillColor: const Color(0xFFF9FAFB),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: _kBorder),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: _kBorder),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: _kGreen),
+      ),
+    );
+  }
+
+  Future<void> _deleteReference(
+    String scope,
+    String documentId,
+    String name,
+  ) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(de ? 'Referenz löschen?' : 'Delete reference?'),
+        content: Text(
+          de
+              ? '„$name" wird dauerhaft entfernt.'
+              : '"$name" will be removed permanently.',
+        ),
+        actions: [
+          CoButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            label: de ? 'Abbrechen' : 'Cancel',
+            variant: CoButtonVariant.quiet,
+          ),
+          CoButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            label: de ? 'Löschen' : 'Delete',
+            variant: CoButtonVariant.destructive,
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await _referencesCollection(scope).doc(documentId).delete();
+    } catch (e) {
+      _showSnack(
+        de ? 'Löschen fehlgeschlagen: $e' : 'Could not delete: $e',
+        error: true,
+      );
+    }
+  }
+
+  /// Filterleiste nach Handoff: Status-Pills links, rechts Suche,
+  /// TÜV-Status, Sortierung und der grüne „+ Neu"-Button mit Klick-Menü
+  /// (CSV-Upload (Cortex) · Manuell anlegen).
+  Widget _buildFilterBar(
+    BuildContext context,
+    List<FleetVehicle> vehicles,
+    String scope, {
+    required bool isNarrow,
+    required bool isMobile,
+  }) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final pills = _statusPillsRow(vehicles);
+    final search = _buildSearchField(context, isMobile: isMobile);
+
+    if (isMobile) {
+      // Eine Zeile: Suchfeld füllt die Breite, daneben drei quadratische
+      // 48er-Buttons (Filter · Sortierung · Referenzen). Der „+ Neu"-Button
+      // entfällt hier — dafür gibt es den schwebenden FAB unten rechts.
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(child: search),
+              const SizedBox(width: 8),
+              MobileIconButton(
+                icon: Icons.tune,
+                tooltip: de ? 'Filter' : 'Filters',
+                active: _tuvFilter != _tuvAllValue,
+                onTap: _showMobileFilterSheet,
+              ),
+              const SizedBox(width: 8),
+              MobileIconButton(
+                icon: Icons.swap_vert,
+                tooltip: de ? 'Sortieren' : 'Sort',
+                active: _sortColumn != null,
+                onTap: _showMobileSortSheet,
+              ),
+              const SizedBox(width: 8),
+              MobileIconButton(
+                icon: Icons.contacts_outlined,
+                tooltip: de ? 'Referenzen' : 'References',
+                active: false,
+                onTap: () => _showMobileReferencesSheet(scope),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          pills,
+        ],
+      );
+    }
+
+    // Desktop / Tablet: Pills, Suche, TÜV-Filter, Sortierung und „+ Neu".
+    final tuvFilter = _buildTuvFilterPill(context);
+    final sort = _buildSortPill(context);
+    final addButton = _canManageVehicles ? _buildAddMenu(context) : null;
 
     if (isNarrow) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          searchField,
-          const SizedBox(height: 12),
-          statusFilter,
-          const SizedBox(height: 12),
-          tuvFilter,
+          pills,
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(child: search),
+              const SizedBox(width: 8),
+              tuvFilter,
+              const SizedBox(width: 8),
+              sort,
+              if (addButton != null) ...[const SizedBox(width: 8), addButton],
+            ],
+          ),
         ],
       );
     }
 
     return Row(
       children: [
-        Expanded(flex: 5, child: searchField),
+        Flexible(child: pills),
         const SizedBox(width: 12),
-        Expanded(flex: 2, child: statusFilter),
-        const SizedBox(width: 12),
-        Expanded(flex: 2, child: tuvFilter),
+        SizedBox(width: 280, child: search),
+        const SizedBox(width: 8),
+        tuvFilter,
+        const SizedBox(width: 8),
+        sort,
+        if (addButton != null) ...[const SizedBox(width: 8), addButton],
       ],
+    );
+  }
+
+  Widget _buildSearchField(BuildContext context, {bool isMobile = false}) {
+    final t = AppLocalizations.of(context);
+    return SizedBox(
+      height: isMobile ? 48 : 38,
+      child: TextField(
+        controller: _searchCtrl,
+        onChanged: (value) => setState(() => _search = value),
+        style: TextStyle(fontSize: isMobile ? 14 : 12.5, color: _kInk),
+        decoration: InputDecoration(
+          hintText: t.t('fleet_status_search_hint'),
+          hintStyle: TextStyle(fontSize: isMobile ? 14 : 12.5, color: _kFaint),
+          prefixIcon: Icon(
+            Icons.search,
+            size: isMobile ? 20 : 16,
+            color: _kFaint,
+          ),
+          prefixIconConstraints: BoxConstraints(
+            minWidth: isMobile ? 46 : 38,
+            minHeight: isMobile ? 48 : 38,
+          ),
+          isDense: true,
+          contentPadding: const EdgeInsets.fromLTRB(0, 0, 16, 0),
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(999),
+            borderSide: const BorderSide(color: _kLine),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(999),
+            borderSide: const BorderSide(color: _kLine),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(999),
+            borderSide: const BorderSide(color: _kAccentGreen, width: 1.4),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ─── Mobile Bottom-Sheets (Filter · Sortierung · Referenzen) ──────────
+  //
+  // Auf schmalen Bildschirmen sitzen TÜV-Filter, Sortierung und die
+  // Referenz-Links nicht mehr als Pills bzw. Chip-Zeile in der Leiste,
+  // sondern hinter je einem 48er-Icon-Button (siehe
+  // `widgets/mobile_filter_controls.dart`).
+
+  /// TÜV-Status-Filter (Platz für weitere Filter ist bewusst vorgesehen).
+  Future<void> _showMobileFilterSheet() async {
+    final t = AppLocalizations.of(context);
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    await showMobileSheet<void>(
+      context: context,
+      title: de ? 'Filter' : 'Filters',
+      builder: (ctx) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+            child: Text(
+              (de ? 'TÜV-Status' : 'TÜV status').toUpperCase(),
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+                color: _kFaint,
+              ),
+            ),
+          ),
+          MobileSheetOption(
+            label: t.t('fleet_status_tuv_filter_all'),
+            selected: _tuvFilter == _tuvAllValue,
+            onTap: () {
+              setState(() => _tuvFilter = _tuvAllValue);
+              Navigator.of(ctx).pop();
+            },
+          ),
+          for (final status in FleetVehicleDocumentStatus.values)
+            MobileSheetOption(
+              label: _tuvStatusPresentationFor(context, status).label,
+              selected: _tuvFilter == status.value,
+              onTap: () {
+                setState(() => _tuvFilter = status.value);
+                Navigator.of(ctx).pop();
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Sortierung — dieselbe [_onSortTapped]-Logik wie am Desktop: erneutes
+  /// Wählen dreht die Richtung, ein dritter Tipp setzt zurück.
+  Future<void> _showMobileSortSheet() async {
+    final t = AppLocalizations.of(context);
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final labels = <String, String>{
+      'vehicle': t.t('fleet_status_column_vehicle_number'),
+      'model': t.t('fleet_status_column_model'),
+      'status': t.t('fleet_status_column_status'),
+      'serviceEnd': t.t('fleet_status_column_service_end'),
+      'tuv': t.t('fleet_status_column_tuv_status'),
+    };
+    await showMobileSheet<void>(
+      context: context,
+      title: de ? 'Sortieren nach' : 'Sort by',
+      builder: (ctx) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final entry in labels.entries)
+            MobileSheetOption(
+              label: entry.value,
+              selected: _sortColumn == entry.key,
+              trailing: _sortColumn == entry.key
+                  ? Icon(
+                      _sortAsc
+                          ? Icons.arrow_upward_rounded
+                          : Icons.arrow_downward_rounded,
+                      size: 18,
+                      color: _kAccentGreen,
+                    )
+                  : null,
+              onTap: () {
+                _onSortTapped(entry.key);
+                Navigator.of(ctx).pop();
+              },
+            ),
+          if (_sortColumn != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+              child: TextButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _sortColumn = null;
+                    _sortAsc = true;
+                  });
+                  Navigator.of(ctx).pop();
+                },
+                icon: const Icon(Icons.restart_alt, size: 18),
+                style: TextButton.styleFrom(foregroundColor: _kSubtle),
+                label: Text(
+                  de ? 'Standard-Reihenfolge' : 'Default order',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Referenz-Links (am Desktop die Chip-Zeile über der Liste).
+  Future<void> _showMobileReferencesSheet(String scope) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    await showMobileSheet<void>(
+      context: context,
+      title: de ? 'Referenzen' : 'References',
+      builder: (ctx) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: _referencesCollection(scope).orderBy('name').snapshots(),
+        builder: (ctx2, snapshot) {
+          final docs = snapshot.hasData
+              ? snapshot.data!.docs
+              : const <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (docs.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                  child: Text(
+                    de
+                        ? 'Noch keine Links (z. B. Werkstätten, Vermieter).'
+                        : 'No links yet (e.g. workshops, rental partners).',
+                    style: const TextStyle(fontSize: 13, color: _kSubtle),
+                  ),
+                ),
+              for (final doc in docs)
+                MobileSheetOption(
+                  icon: Icons.open_in_new_rounded,
+                  label: (doc.data()['name'] ?? '').toString().trim().isEmpty
+                      ? (doc.data()['url'] ?? '').toString().trim()
+                      : (doc.data()['name'] ?? '').toString().trim(),
+                  selected: false,
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    _openReferenceUrl((doc.data()['url'] ?? '').toString());
+                  },
+                ),
+              if (_canManageVehicles)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                  child: CoButton(
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      _showReferencesManager(scope);
+                    },
+                    icon: Icons.edit_outlined,
+                    label: docs.isEmpty
+                        ? (de ? 'Referenz hinzufügen' : 'Add reference')
+                        : (de ? 'Referenzen verwalten' : 'Manage references'),
+                    variant: CoButtonVariant.quiet,
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildTuvFilterPill(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final label = _tuvFilter == _tuvAllValue
+        ? t.t('fleet_status_tuv_filter_all')
+        : _tuvStatusPresentationFor(
+            context,
+            FleetVehicleDocumentStatus.values.firstWhere(
+              (s) => s.value == _tuvFilter,
+              orElse: () => FleetVehicleDocumentStatus.missing,
+            ),
+          ).label;
+
+    return _FilterPill(
+      label: label,
+      active: _tuvFilter != _tuvAllValue,
+      onSelected: (value) => setState(() => _tuvFilter = value),
+      items: [
+        PopupMenuItem<String>(
+          value: _tuvAllValue,
+          child: Text(t.t('fleet_status_tuv_filter_all')),
+        ),
+        ...FleetVehicleDocumentStatus.values.map(
+          (status) => PopupMenuItem<String>(
+            value: status.value,
+            child: Text(_tuvStatusPresentationFor(context, status).label),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Sortierung als Pill — ersetzt die klickbaren Tabellenköpfe der alten
+  /// Liste, ohne die Funktion zu verlieren: dieselbe [_onSortTapped]-Logik
+  /// (erneute Auswahl dreht die Richtung, dritte setzt zurück).
+  Widget _buildSortPill(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final t = AppLocalizations.of(context);
+    final labels = <String, String>{
+      'vehicle': t.t('fleet_status_column_vehicle_number'),
+      'model': t.t('fleet_status_column_model'),
+      'status': t.t('fleet_status_column_status'),
+      'serviceEnd': t.t('fleet_status_column_service_end'),
+      'tuv': t.t('fleet_status_column_tuv_status'),
+    };
+    final column = _sortColumn;
+    final label = column == null
+        ? (de ? 'Sortierung' : 'Sort')
+        : '${labels[column] ?? column} ${_sortAsc ? '↑' : '↓'}';
+
+    return _FilterPill(
+      label: label,
+      active: column != null,
+      leading: Icons.swap_vert_rounded,
+      onSelected: _onSortTapped,
+      items: [
+        for (final entry in labels.entries)
+          PopupMenuItem<String>(
+            value: entry.key,
+            child: Row(
+              children: [
+                Expanded(child: Text(entry.value)),
+                if (column == entry.key)
+                  Icon(
+                    _sortAsc
+                        ? Icons.arrow_upward_rounded
+                        : Icons.arrow_downward_rounded,
+                    size: 15,
+                    color: _kAccentGreen,
+                  ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// Grüner „+ Neu"-Button mit Klick-Menü (Handoff): CSV-Upload (Cortex) und
+  /// Manuell anlegen — beide Flows existieren bereits, hier nur neu verpackt.
+  Widget _buildAddMenu(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    return PopupMenuButton<String>(
+      tooltip: de ? 'Neues Fahrzeug' : 'New vehicle',
+      position: PopupMenuPosition.under,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      onSelected: (value) {
+        if (value == 'cortex') _importFromCortex();
+        if (value == 'manual') _showVehicleEditor();
+      },
+      itemBuilder: (ctx) => [
+        PopupMenuItem<String>(
+          value: 'cortex',
+          child: Row(
+            children: [
+              const Icon(
+                Icons.upload_file_outlined,
+                size: 18,
+                color: _kAccentGreen,
+              ),
+              const SizedBox(width: 9),
+              Text(
+                de ? 'CSV-Upload (Cortex)' : 'CSV upload (Cortex)',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
+        PopupMenuItem<String>(
+          value: 'manual',
+          child: Row(
+            children: [
+              const Icon(
+                Icons.edit_note_rounded,
+                size: 20,
+                color: _kAccentGreen,
+              ),
+              const SizedBox(width: 9),
+              Text(
+                de ? 'Manuell anlegen' : 'Add manually',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
+      ],
+      child: Container(
+        height: 38,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: _busyCortex ? _kFaint : _kAccentGreen,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.add, size: 17, color: Colors.white),
+            const SizedBox(width: 6),
+            Text(
+              de ? 'Neu' : 'New',
+              style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+                height: 1.3,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -922,360 +2829,876 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
     );
   }
 
+  /// Fahrzeugliste im Handoff-Design: eine weiße Karte je Fahrzeug mit
+  /// VIN-QR, Kennzeichen-Schild, Besitz-Badge, Leasingzeile, Modell,
+  /// Status-Pill, Service-Ende, TÜV- und Fahrzeugschein-Chip.
   Widget _buildVehicleTable(
     BuildContext context,
     List<FleetVehicle> vehicles, {
     required Map<String, _VehicleListComplianceSummary> complianceByPlate,
   }) {
-    final t = AppLocalizations.of(context);
     return LayoutBuilder(
       builder: (context, constraints) {
-        final table = Column(
-          children: [
-            // header row
-            Container(
-              height: 44,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF9FAFB),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  _VehicleTableHeaderCell(
-                    label: t.t('fleet_status_column_vehicle_number'),
-                    flex: 4,
-                  ),
-                  _VehicleTableHeaderCell(
-                    label: t.t('fleet_status_column_model'),
-                    flex: 4,
-                  ),
-                  _VehicleTableHeaderCell(
-                    label: t.t('fleet_status_column_status'),
-                    flex: 3,
-                  ),
-                  _VehicleTableHeaderCell(
-                    label: t.t('fleet_status_column_service_end'),
-                    flex: 3,
-                  ),
-                  _VehicleTableHeaderCell(
-                    label: t.t('fleet_status_column_tuv_status'),
-                    flex: 3,
-                  ),
-                  _VehicleTableHeaderCell(
-                    label: t.t('fleet_status_column_actions'),
-                    flex: 3,
-                    alignment: Alignment.centerRight,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: ListView.separated(
-                itemCount: vehicles.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 6),
-                itemBuilder: (context, index) {
-                  final vehicle = vehicles[index];
-                  final isUpdatingStatus = _updatingVehicleStatuses.contains(
-                    vehicle.plateNumber,
-                  );
-                  final compliance =
-                      complianceByPlate[vehicle.plateNumber] ??
-                      _defaultComplianceSummary();
-                  final tuvStatus = _tuvStatusPresentationFor(
-                    context,
-                    compliance.tuvStatus,
-                  );
-                  final modelName = '${vehicle.brand} ${vehicle.model}'.trim();
-                  final modelLabel = modelName.isEmpty
-                      ? t.t('fleet_status_vehicle_details_not_set')
-                      : modelName;
-                  return Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFE5E7EB)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.02),
-                          blurRadius: 6,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          flex: 4,
-                          child: CoPressable(
-                            onTap: () => _showVehicleDetails(vehicle),
-                            borderRadius: BorderRadius.circular(12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                SelectableText(
-                                  vehicle.plateNumber,
-                                  maxLines: 1,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFF111827),
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  _categoryLabel(context, vehicle.category),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Color(0xFF6B7280),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          flex: 4,
-                          child: _buildTableTextBlock(
-                            primary: modelLabel,
-                            secondary: _vehicleModelMeta(context, vehicle),
-                          ),
-                        ),
-                        Expanded(
-                          flex: 3,
-                          child: _canManageVehicles
-                              ? _buildTableStatusDropdown(
-                                  context,
-                                  vehicle: vehicle,
-                                  isBusy: isUpdatingStatus,
-                                )
-                              : Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: _SoftPill(
-                                    label: _statusLabel(context, vehicle.status),
-                                    textColor: _statusColor(vehicle.status),
-                                    backgroundColor: _statusColor(
-                                      vehicle.status,
-                                    ).withOpacity(0.14),
-                                  ),
-                                ),
-                        ),
-                        Expanded(
-                          flex: 3,
-                          child: _buildTableTextBlock(
-                            primary: _serviceEndLabel(context, vehicle),
-                          ),
-                        ),
-                        Expanded(
-                          flex: 3,
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: _SoftPill(
-                              label: tuvStatus.label,
-                              textColor: tuvStatus.color,
-                              backgroundColor: tuvStatus.color.withOpacity(
-                                0.14,
-                              ),
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          flex: 3,
-                          child: _canManageVehicles
-                              ? Row(
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: [
-                                    _buildTableActionButton(
-                                      tooltip: t.t(
-                                        'fleet_status_action_view_details',
-                                      ),
-                                      icon: Icons.visibility_outlined,
-                                      color: const Color(0xFF6B7280),
-                                      onPressed: () =>
-                                          _showVehicleDetails(vehicle),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    _buildTableActionButton(
-                                      tooltip: t.t('button_edit'),
-                                      icon: Icons.edit_outlined,
-                                      color: const Color(0xFF2563EB),
-                                      onPressed: () =>
-                                          _showVehicleEditor(vehicle: vehicle),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    _buildTableActionButton(
-                                      tooltip: t.t(
-                                        'fleet_status_action_delete',
-                                      ),
-                                      icon: Icons.delete_outline,
-                                      color: const Color(0xFFDC2626),
-                                      onPressed: () => _deleteVehicle(vehicle),
-                                    ),
-                                  ],
-                                )
-                              : Align(
-                                  alignment: Alignment.centerRight,
-                                  child: Text(
-                                    t.t('fleet_status_read_only'),
-                                    style: const TextStyle(
-                                      color: _kMuted,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
+        // Unterhalb dieser Breite stapeln sich die Spalten innerhalb der
+        // Karte, statt horizontal zu scrollen; unter 700px greift die
+        // aufgeräumte Mobile-Karte.
+        final wide = constraints.maxWidth >= 1140;
+        final mobile = constraints.maxWidth < 700;
+        return ListView.separated(
+          // Platz für den schwebenden „+"-Button.
+          padding: const EdgeInsets.only(bottom: 84),
+          itemCount: vehicles.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 8),
+          itemBuilder: (context, index) {
+            final vehicle = vehicles[index];
+            final compliance =
+                complianceByPlate[vehicle.plateNumber] ??
+                _defaultComplianceSummary();
+            if (mobile) {
+              return _buildVehicleCardMobile(
+                context,
+                vehicle,
+                compliance: compliance,
+              );
+            }
+            return _buildVehicleRow(
+              context,
+              vehicle,
+              compliance: compliance,
+              wide: wide,
+            );
+          },
         );
-
-        // If screen is very narrow, allow horizontal scroll so layout stays same.
-        if (constraints.maxWidth < 980) {
-          return SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: SizedBox(width: 980, child: table),
-          );
-        }
-
-        return table;
       },
     );
   }
 
-  Widget _buildTableTextBlock({required String primary, String? secondary}) {
-    final secondaryText = (secondary ?? '').trim();
+  /// Aufgeräumte Mobile-Karte: links der VIN-QR über die volle Kartenhöhe,
+  /// rechts Kennzeichen-Schild, Status-Pill und Besitz-/Leasing-Info, darunter
+  /// eine Trennlinie mit der TÜV-/Service-Zeile — ganz rechts ein Chevron.
+  /// Ansehen/Bearbeiten/Löschen entfallen hier; alles läuft über die
+  /// Detailseite, die durch einen Tipp auf die Karte aufgeht.
+  Widget _buildVehicleCardMobile(
+    BuildContext context,
+    FleetVehicle vehicle, {
+    required _VehicleListComplianceSummary compliance,
+  }) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final plate = normalizePlateNumber(vehicle.plateNumber);
+    final leasing = _leasingByPlate[plate] ?? '';
+    final (badgeBg, badgeFg) = _ownerBadgeColors(vehicle.category);
+    final modelName = '${vehicle.brand} ${vehicle.model}'.trim();
+    final meta = <String>[
+      if (modelName.isNotEmpty) modelName,
+      _vehicleModelMeta(context, vehicle).replaceAll(' | ', ' · '),
+    ].where((part) => part.trim().isNotEmpty).join(' · ');
+
+    final status = _canManageVehicles
+        ? _buildTableStatusDropdown(
+            context,
+            vehicle: vehicle,
+            isBusy: _updatingVehicleStatuses.contains(vehicle.plateNumber),
+            compact: true,
+          )
+        : _fleetChip(
+            label: _statusLabel(context, vehicle.status),
+            foreground: _statusColor(vehicle.status),
+            background: _statusColor(vehicle.status).withValues(alpha: 0.12),
+          );
+
+    return _HoverRow(
+      onTap: () => _showVehicleDetails(vehicle),
+      builder: (hovered) => AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOut,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: hovered ? const Color(0xFFC6D9D1) : _kLine),
+        ),
+        clipBehavior: Clip.antiAlias,
+        // Die Karte steht in einer ListView, hat also keine vorgegebene Höhe.
+        // `IntrinsicHeight` leitet sie aus dem Inhalt ab — erst dadurch darf
+        // die Zeile `stretch` benutzen und der QR-Block die volle Kartenhöhe
+        // einnehmen.
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // QR-Block: quadratisch über die volle Kartenhöhe. `AspectRatio`
+              // leitet die Breite aus der Höhe ab, `FittedBox` skaliert den
+              // Code passgenau hinein (nach oben wie nach unten).
+              // QR-Block: Tippen öffnet das große QR-Popup (Karte darunter
+              // bleibt über den restlichen Bereich klickbar).
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => _showQrPopup(context, vehicle),
+                child: Container(
+                  width: 112,
+                  padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    border: Border(right: BorderSide(color: _kRowLine)),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      VinQrTile(
+                        size: 84,
+                        bordered: false,
+                        data: vehicle.vinNumber,
+                        tooltip: vehicle.vinNumber.trim().isEmpty
+                            ? (de ? 'Keine VIN hinterlegt' : 'No VIN on file')
+                            : 'VIN ${vehicle.vinNumber.trim()}',
+                      ),
+                      const SizedBox(height: 3),
+                      const Text(
+                        'VIN',
+                        maxLines: 1,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.8,
+                          color: _kFaint,
+                          height: 1.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 8, 18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Kennzeichen + Badge-Zeile teilen sich exakt dieselbe
+                      // Breite: das Schild gibt sie vor (Höhe 40 → 520:110),
+                      // auf sehr schmalen Geräten deckelt der LayoutBuilder.
+                      LayoutBuilder(
+                        builder: (context, c) {
+                          final plateW = (40.0 * 520 / 110).clamp(
+                            0.0,
+                            c.maxWidth,
+                          );
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: plateW,
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerLeft,
+                                  child: LicensePlate.compact(
+                                    plate: vehicle.plateNumber,
+                                    height: 40,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              SizedBox(
+                                width: plateW,
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: SizedBox(
+                                        height: 22,
+                                        child: status,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Container(
+                                        height: 22,
+                                        alignment: Alignment.center,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: badgeBg,
+                                          borderRadius: BorderRadius.circular(
+                                            999,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          leasing.isEmpty
+                                              ? _categoryLabel(
+                                                  context,
+                                                  vehicle.category,
+                                                ).toUpperCase()
+                                              : leasing.toUpperCase(),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w700,
+                                            letterSpacing: 0.3,
+                                            color: badgeFg,
+                                            height: 1.35,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      const Divider(height: 1, thickness: 1, color: _kRowLine),
+                      const SizedBox(height: 8),
+                      _mobileComplianceLine(context, vehicle, compliance),
+                      if (meta.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          meta,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: _kFaint,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.only(right: 6),
+                  child: Icon(Icons.chevron_right, size: 30, color: _kFaint),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Großes QR-Popup: abgedunkelter Hintergrund, QR groß, darunter
+  /// Kennzeichen-Schild und VIN.
+  void _showQrPopup(BuildContext context, FleetVehicle vehicle) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final vin = vehicle.vinNumber.trim();
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black54,
+      builder: (ctx) {
+        final qrSize = (MediaQuery.of(ctx).size.width - 96).clamp(180.0, 320.0);
+        return Dialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                VinQrTile(size: qrSize, data: vehicle.vinNumber),
+                const SizedBox(height: 18),
+                LicensePlate.detail(
+                  plate: vehicle.plateNumber,
+                  width: qrSize.clamp(180.0, 260.0),
+                ),
+                const SizedBox(height: 14),
+                SelectableText(
+                  vin.isEmpty
+                      ? (de ? 'Keine VIN hinterlegt' : 'No VIN on file')
+                      : vin,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: vin.isEmpty ? null : 'monospace',
+                    letterSpacing: vin.isEmpty ? 0 : 0.5,
+                    color: vin.isEmpty ? _kFaint : _kInk,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// „TÜV 12/10/2026 · Service 01/09/2026" — fehlende Termine amber,
+  /// abgelaufene rot, identisch zur Chip-Logik der Desktop-Liste.
+  Widget _mobileComplianceLine(
+    BuildContext context,
+    FleetVehicle vehicle,
+    _VehicleListComplianceSummary compliance,
+  ) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final expiry =
+        (_tuvDocByPlate[normalizePlateNumber(vehicle.plateNumber)]
+                    ?.expiryDate ??
+                '')
+            .trim();
+    final expired = compliance.tuvStatus == FleetVehicleDocumentStatus.expired;
+
+    final String tuvValue;
+    final Color tuvColor;
+    if (expiry.isEmpty) {
+      tuvValue = de ? 'fehlt' : 'missing';
+      tuvColor = _kAccentAmber;
+    } else {
+      tuvValue = _formatDateString(context, expiry);
+      tuvColor = expired
+          ? _kAccentRed
+          : compliance.tuvStatus == FleetVehicleDocumentStatus.active
+          ? _kAccentGreen
+          : _kAccentAmber;
+    }
+
+    final serviceRaw = vehicle.serviceEndDate.trim();
+    final serviceValue = serviceRaw.isEmpty
+        ? '—'
+        : _formatDateString(context, serviceRaw);
+
+    const labelStyle = TextStyle(
+      fontSize: 11.5,
+      fontWeight: FontWeight.w600,
+      color: _kFaint,
+      height: 1.35,
+    );
+
+    return Text.rich(
+      TextSpan(
+        children: [
+          const TextSpan(text: 'TÜV ', style: labelStyle),
+          TextSpan(
+            text: tuvValue,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: tuvColor,
+              height: 1.35,
+            ),
+          ),
+          const TextSpan(text: '  ·  ', style: labelStyle),
+          TextSpan(text: de ? 'Service ' : 'Service ', style: labelStyle),
+          TextSpan(
+            text: serviceValue,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: serviceRaw.isEmpty ? _kFaint : _kInk,
+              height: 1.35,
+            ),
+          ),
+        ],
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+
+  Widget _buildVehicleRow(
+    BuildContext context,
+    FleetVehicle vehicle, {
+    required _VehicleListComplianceSummary compliance,
+    required bool wide,
+  }) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final isUpdatingStatus = _updatingVehicleStatuses.contains(
+      vehicle.plateNumber,
+    );
+
+    final status = _canManageVehicles
+        ? _buildTableStatusDropdown(
+            context,
+            vehicle: vehicle,
+            isBusy: isUpdatingStatus,
+          )
+        : Align(
+            alignment: Alignment.centerLeft,
+            child: _fleetChip(
+              label: _statusLabel(context, vehicle.status),
+              foreground: _statusColor(vehicle.status),
+              background: _statusColor(vehicle.status).withValues(alpha: 0.12),
+            ),
+          );
+
+    final workshopLabel = _workshopRowLabel(context, vehicle);
+    final serviceBlock = _rowCaptioned(
+      caption: de ? 'Nächster Service' : 'Next service',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            _serviceEndLabel(context, vehicle),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: vehicle.serviceEndDate.trim().isEmpty ? _kFaint : _kInk,
+              height: 1.3,
+            ),
+          ),
+          if (workshopLabel != null)
+            Text(
+              workshopLabel,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 11,
+                color: _kFaint,
+                height: 1.35,
+              ),
+            ),
+        ],
+      ),
+    );
+    final tuvBlock = _rowCaptioned(
+      caption: 'TÜV',
+      child: _tuvChip(context, vehicle, compliance),
+    );
+    final registrationBlock = _rowCaptioned(
+      caption: 'Fahrzeugschein',
+      child: _registrationChip(context, vehicle),
+    );
+
+    final Widget content;
+    if (wide) {
+      content = Row(
+        children: [
+          VinQrTile(
+            data: vehicle.vinNumber,
+            tooltip: vehicle.vinNumber.trim().isEmpty
+                ? (de ? 'Keine VIN hinterlegt' : 'No VIN on file')
+                : 'VIN ${vehicle.vinNumber.trim()}',
+          ),
+          const SizedBox(width: 12),
+          SizedBox(width: 176, child: _rowPlateBlock(context, vehicle)),
+          const SizedBox(width: 12),
+          Expanded(child: _rowModelBlock(context, vehicle)),
+          const SizedBox(width: 12),
+          SizedBox(width: 150, child: status),
+          const SizedBox(width: 12),
+          SizedBox(width: 126, child: serviceBlock),
+          const SizedBox(width: 12),
+          SizedBox(width: 104, child: tuvBlock),
+          const SizedBox(width: 12),
+          SizedBox(width: 120, child: registrationBlock),
+          const SizedBox(width: 12),
+          _rowActions(context, vehicle),
+        ],
+      );
+    } else {
+      content = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              VinQrTile(size: 60, data: vehicle.vinNumber),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _rowPlateBlock(context, vehicle),
+                    const SizedBox(height: 8),
+                    _rowModelBlock(context, vehicle),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              _rowActions(context, vehicle),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 16,
+            runSpacing: 12,
+            crossAxisAlignment: WrapCrossAlignment.end,
+            children: [
+              SizedBox(width: 150, child: status),
+              SizedBox(width: 126, child: serviceBlock),
+              SizedBox(width: 104, child: tuvBlock),
+              SizedBox(width: 120, child: registrationBlock),
+            ],
+          ),
+        ],
+      );
+    }
+
+    return _HoverRow(
+      onTap: () => _showVehicleDetails(vehicle),
+      builder: (hovered) => AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          // Handoff: Hover färbt den Rand grünlich ein.
+          border: Border.all(color: hovered ? const Color(0xFFC6D9D1) : _kLine),
+        ),
+        child: content,
+      ),
+    );
+  }
+
+  /// Kennzeichen-Schild + Besitz-Badge + Leasingzeile.
+  Widget _rowPlateBlock(BuildContext context, FleetVehicle vehicle) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final leasing =
+        _leasingByPlate[normalizePlateNumber(vehicle.plateNumber)] ?? '';
+    final (badgeBg, badgeFg) = _ownerBadgeColors(vehicle.category);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        LicensePlate.compact(plate: vehicle.plateNumber),
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 2),
+          decoration: BoxDecoration(
+            color: badgeBg,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            _categoryLabel(context, vehicle.category).toUpperCase(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.4,
+              color: badgeFg,
+              height: 1.35,
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            const Icon(Icons.handshake_outlined, size: 13, color: _kFaint),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Text(
+                leasing.isEmpty
+                    ? (de ? 'Kein Leasinggeber' : 'No lessor')
+                    : leasing,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: leasing.isEmpty ? _kFaint : _kSubtle,
+                  height: 1.35,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _rowModelBlock(BuildContext context, FleetVehicle vehicle) {
+    final t = AppLocalizations.of(context);
+    final modelName = '${vehicle.brand} ${vehicle.model}'.trim();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          primary,
+          modelName.isEmpty
+              ? t.t('fleet_status_vehicle_details_not_set')
+              : modelName,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w600,
+            color: _kInk,
+            height: 1.3,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          _vehicleModelMeta(context, vehicle),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 14, color: Color(0xFF111827)),
+          style: const TextStyle(fontSize: 12, color: _kFaint, height: 1.3),
         ),
-        if (secondaryText.isNotEmpty) ...[
-          const SizedBox(height: 4),
-          Text(
-            secondaryText,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
-          ),
-        ],
       ],
     );
   }
 
+  Widget _rowCaptioned({required String caption, required Widget child}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          caption.toUpperCase(),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.4,
+            color: _kFaint,
+            height: 1.3,
+          ),
+        ),
+        const SizedBox(height: 3),
+        child,
+      ],
+    );
+  }
+
+  Widget _rowActions(BuildContext context, FleetVehicle vehicle) {
+    final t = AppLocalizations.of(context);
+    if (!_canManageVehicles) {
+      return _buildTableActionButton(
+        tooltip: t.t('fleet_status_action_view_details'),
+        icon: Icons.visibility_outlined,
+        color: _kFaint,
+        onPressed: () => _showVehicleDetails(vehicle),
+      );
+    }
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildTableActionButton(
+          tooltip: t.t('fleet_status_action_view_details'),
+          icon: Icons.visibility_outlined,
+          color: _kFaint,
+          onPressed: () => _showVehicleDetails(vehicle),
+        ),
+        const SizedBox(width: 6),
+        _buildTableActionButton(
+          tooltip: t.t('button_edit'),
+          icon: Icons.edit_outlined,
+          color: _kFaint,
+          onPressed: () => _showVehicleEditor(vehicle: vehicle),
+        ),
+        const SizedBox(width: 6),
+        _buildTableActionButton(
+          tooltip: t.t('fleet_status_action_delete'),
+          icon: Icons.delete_outline,
+          color: const Color(0xFFC9A0A0),
+          onPressed: () => _deleteVehicle(vehicle),
+        ),
+      ],
+    );
+  }
+
+  /// TÜV-Chip: Datum in Grün/Amber/Rot je nach Gültigkeit, „fehlt" in Amber,
+  /// wenn kein Termin hinterlegt ist.
+  Widget _tuvChip(
+    BuildContext context,
+    FleetVehicle vehicle,
+    _VehicleListComplianceSummary compliance,
+  ) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final expiry =
+        (_tuvDocByPlate[normalizePlateNumber(vehicle.plateNumber)]
+                    ?.expiryDate ??
+                '')
+            .trim();
+    if (expiry.isEmpty) {
+      return _fleetChip(
+        label: de ? 'fehlt' : 'missing',
+        foreground: _kAccentAmber,
+        background: _kAccentAmberTint,
+      );
+    }
+    final presentation = _tuvStatusPresentationFor(
+      context,
+      compliance.tuvStatus,
+    );
+    final expired = compliance.tuvStatus == FleetVehicleDocumentStatus.expired;
+    return Tooltip(
+      message: presentation.label,
+      waitDuration: const Duration(milliseconds: 500),
+      child: _fleetChip(
+        label: _formatDateString(context, expiry),
+        foreground: expired ? _kAccentRed : presentation.color,
+        background: expired
+            ? _kAccentRedTint
+            : compliance.tuvStatus == FleetVehicleDocumentStatus.active
+            ? _kAccentGreenTint
+            : _kAccentAmberTint,
+      ),
+    );
+  }
+
+  Widget _registrationChip(BuildContext context, FleetVehicle vehicle) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final present = _registrationPlates.contains(
+      normalizePlateNumber(vehicle.plateNumber),
+    );
+    return _fleetChip(
+      label: present
+          ? (de ? 'vorhanden' : 'available')
+          : (de ? 'fehlt' : 'missing'),
+      icon: present ? Icons.check_circle_outline : Icons.error_outline,
+      foreground: present ? _kAccentGreen : _kAccentRed,
+      background: present ? _kAccentGreenTint : _kAccentRedTint,
+    );
+  }
+
+  Widget _fleetChip({
+    required String label,
+    required Color foreground,
+    required Color background,
+    IconData? icon,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 13, color: foreground),
+            const SizedBox(width: 3),
+          ],
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                color: foreground,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Farbpaar des Besitz-Badges (Handoff): Armada grün, SESO Rental blau,
+  /// LMR violett, alles Weitere grau.
+  (Color, Color) _ownerBadgeColors(VehicleCategory category) {
+    switch (category) {
+      case VehicleCategory.armada:
+        return (_kAccentGreenTint, _kAccentGreen);
+      case VehicleCategory.sesoRental:
+        return (_kAccentBlueTint, _kAccentBlue);
+      case VehicleCategory.lmr:
+        return (_kAccentVioletTint, _kAccentViolet);
+      case VehicleCategory.amazonPaidRental:
+      case VehicleCategory.selfSourcedRental:
+      case VehicleCategory.selfOwnedRental:
+        return (const Color(0xFFEEF1F4), _kSubtle);
+    }
+  }
+
+  /// Status-Pill mit Dropdown (Handoff) — dieselbe Auswahl-Logik wie zuvor,
+  /// nur im neuen Chip-Design.
   Widget _buildTableStatusDropdown(
     BuildContext context, {
     required FleetVehicle vehicle,
     required bool isBusy,
+    bool compact = false,
   }) {
     final statusColor = _statusColor(vehicle.status);
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: SizedBox(
-        width: 132,
-        child: Container(
-          height: 36,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          decoration: BoxDecoration(
-            color: statusColor.withOpacity(0.14),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: statusColor.withOpacity(0.22)),
-          ),
-          child: isBusy
-              ? Center(
+    final double fontSize = compact ? 9 : 12.5;
+    return Container(
+      height: compact ? 22 : 32,
+      padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 12),
+      decoration: BoxDecoration(
+        color: statusColor.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: statusColor.withValues(alpha: 0.22)),
+      ),
+      child: isBusy
+          ? Row(
+              children: [
+                Expanded(
                   child: Text(
                     AppLocalizations.of(context).t('fleet_status_loading'),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: statusColor,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      fontSize: fontSize,
                     ),
-                  ),
-                )
-              : DropdownButtonHideUnderline(
-                  child: DropdownButton<VehicleStatus>(
-                    value: vehicle.status,
-                    isDense: true,
-                    isExpanded: true,
-                    icon: Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      color: statusColor,
-                      size: 18,
-                    ),
-                    style: TextStyle(
-                      color: statusColor,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                    ),
-                    dropdownColor: Colors.white,
-                    elevation: 8,
-                    borderRadius: BorderRadius.circular(14),
-                    onChanged: (value) {
-                      if (value == null) return;
-                      _handleVehicleStatusSelection(vehicle, value);
-                    },
-                    items: VehicleStatus.values
-                        .map(
-                          (status) => DropdownMenuItem<VehicleStatus>(
-                            value: status,
-                            child: Text(
-                              _statusLabel(context, status),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        )
-                        .toList(),
                   ),
                 ),
-        ),
-      ),
+              ],
+            )
+          : DropdownButtonHideUnderline(
+              child: DropdownButton<VehicleStatus>(
+                value: vehicle.status,
+                isDense: true,
+                isExpanded: true,
+                icon: Icon(
+                  Icons.keyboard_arrow_down,
+                  color: statusColor,
+                  size: compact ? 13 : 16,
+                ),
+                style: TextStyle(
+                  color: statusColor,
+                  fontWeight: compact ? FontWeight.w700 : FontWeight.w600,
+                  fontSize: fontSize,
+                  letterSpacing: compact ? 0.3 : 0,
+                ),
+                // Kompakt (Mobile): Anzeige wie die Kategorie-Pille —
+                // uppercase, zentriert, bei Überlänge abgekürzt.
+                selectedItemBuilder: !compact
+                    ? null
+                    : (ctx) => VehicleStatus.values
+                          .map(
+                            (status) => Center(
+                              child: Text(
+                                _statusLabel(ctx, status).toUpperCase(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          )
+                          .toList(),
+                dropdownColor: Colors.white,
+                elevation: 8,
+                borderRadius: BorderRadius.circular(14),
+                onChanged: (value) {
+                  if (value == null) return;
+                  _handleVehicleStatusSelection(vehicle, value);
+                },
+                items: VehicleStatus.values
+                    .map(
+                      (status) => DropdownMenuItem<VehicleStatus>(
+                        value: status,
+                        child: Text(
+                          _statusLabel(context, status),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
     );
-  }
-
-  Widget _buildTablePillBlock({required Widget primary, Widget? secondary}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        primary,
-        if (secondary != null) ...[const SizedBox(height: 6), secondary],
-      ],
-    );
-  }
-
-  Widget? _buildSecondaryLabel(String value) {
-    final trimmed = value.trim();
-    if (trimmed.isEmpty) return null;
-    return Text(
-      trimmed,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
-    );
-  }
-
-  String _vehicleAvatarLabel(FleetVehicle vehicle) {
-    final compact = vehicle.plateNumber.replaceAll(RegExp(r'[^A-Za-z0-9]'), '');
-    if (compact.isEmpty) return '?';
-    return compact.substring(0, compact.length >= 2 ? 2 : 1).toUpperCase();
   }
 
   String _vehicleModelMeta(BuildContext context, FleetVehicle vehicle) {
@@ -1288,263 +3711,8 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
     return parts.join(' | ');
   }
 
-  String _vehicleVinSummary(FleetVehicle vehicle) {
-    final vin = vehicle.vinNumber.trim();
-    if (vin.isEmpty) return '';
-    if (vin.length <= 10) return 'VIN $vin';
-    return 'VIN ${vin.substring(0, 4)}...${vin.substring(vin.length - 4)}';
-  }
-
-  String _serviceMetaSummary(FleetVehicle vehicle) {
-    switch (vehicle.category) {
-      case VehicleCategory.armada:
-        final metadata = vehicle.metadata as ArmadaVehicleMetadata;
-        return metadata.armadaCompanyName.trim().isNotEmpty
-            ? metadata.armadaCompanyName.trim()
-            : metadata.armadaId.trim();
-      case VehicleCategory.amazonPaidRental:
-        final metadata = vehicle.metadata as AmazonPaidRentalMetadata;
-        return metadata.rentalCompanyName.trim().isNotEmpty
-            ? metadata.rentalCompanyName.trim()
-            : metadata.contractNumber.trim();
-      case VehicleCategory.selfSourcedRental:
-        final metadata = vehicle.metadata as SelfSourcedRentalMetadata;
-        return metadata.ownerName.trim().isNotEmpty
-            ? metadata.ownerName.trim()
-            : metadata.rentalAgreementNumber.trim();
-      case VehicleCategory.selfOwnedRental:
-        final metadata = vehicle.metadata as SelfOwnedRentalMetadata;
-        return metadata.ownershipType.trim();
-    }
-  }
-
-  String _serviceStartSecondary(FleetVehicle vehicle) {
-    switch (vehicle.category) {
-      case VehicleCategory.armada:
-        final metadata = vehicle.metadata as ArmadaVehicleMetadata;
-        return metadata.armadaCompanyName.trim();
-      case VehicleCategory.amazonPaidRental:
-        final metadata = vehicle.metadata as AmazonPaidRentalMetadata;
-        return metadata.rentalCompanyName.trim();
-      case VehicleCategory.selfSourcedRental:
-        final metadata = vehicle.metadata as SelfSourcedRentalMetadata;
-        return metadata.ownerName.trim();
-      case VehicleCategory.selfOwnedRental:
-        final metadata = vehicle.metadata as SelfOwnedRentalMetadata;
-        return metadata.ownershipType.trim();
-    }
-  }
-
-  String _serviceEndSecondary(FleetVehicle vehicle) {
-    switch (vehicle.category) {
-      case VehicleCategory.armada:
-        final metadata = vehicle.metadata as ArmadaVehicleMetadata;
-        return metadata.armadaId.trim();
-      case VehicleCategory.amazonPaidRental:
-        final metadata = vehicle.metadata as AmazonPaidRentalMetadata;
-        return metadata.contractNumber.trim();
-      case VehicleCategory.selfSourcedRental:
-        final metadata = vehicle.metadata as SelfSourcedRentalMetadata;
-        return metadata.rentalAgreementNumber.trim();
-      case VehicleCategory.selfOwnedRental:
-        final metadata = vehicle.metadata as SelfOwnedRentalMetadata;
-        return metadata.purchaseDate.trim().isEmpty
-            ? metadata.ownershipType.trim()
-            : _formatStoredDate(context, metadata.purchaseDate);
-    }
-  }
-
-  Widget _buildVehicleCards(
-    BuildContext context,
-    List<FleetVehicle> vehicles, {
-    required Map<String, _VehicleListComplianceSummary> complianceByPlate,
-  }) {
-    final t = AppLocalizations.of(context);
-    return ListView.separated(
-      itemCount: vehicles.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final vehicle = vehicles[index];
-        final compliance =
-            complianceByPlate[vehicle.plateNumber] ??
-            _defaultComplianceSummary();
-        final tuvStatus = _tuvStatusPresentationFor(
-          context,
-          compliance.tuvStatus,
-        );
-        return Container(
-          decoration: BoxDecoration(
-            color: _kCardBg,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: _kBorder),
-          ),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: CoPressable(
-                      onTap: () => _showVehicleDetails(vehicle),
-                      borderRadius: BorderRadius.circular(8),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Wrap(
-                          spacing: 10,
-                          runSpacing: 8,
-                          children: [
-                            Text(
-                              vehicle.plateNumber,
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w900,
-                                color: _kText,
-                              ),
-                            ),
-                            if (compliance.missingCount > 0)
-                              _MissingDocumentsBadge(
-                                label: t.tf(
-                                  'fleet_status_missing_documents_count',
-                                  {'count': '${compliance.missingCount}'},
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        tooltip: t.t('fleet_status_action_view_details'),
-                        onPressed: () => _showVehicleDetails(vehicle),
-                        icon: const Icon(Icons.visibility_outlined),
-                      ),
-                      if (_canManageVehicles) ...[
-                        const SizedBox(width: 4),
-                        IconButton(
-                          tooltip: t.t('button_edit'),
-                          onPressed: () => _showVehicleEditor(vehicle: vehicle),
-                          icon: const Icon(Icons.edit_outlined),
-                        ),
-                      ],
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '${vehicle.brand} ${vehicle.model}'.trim(),
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: _kMuted,
-                ),
-              ),
-              const SizedBox(height: 12),
-              _InfoRow(
-                label: t.t('fleet_status_field_category'),
-                value: _categoryLabel(context, vehicle.category),
-              ),
-              const SizedBox(height: 8),
-              _InfoRow(
-                label: t.t('fleet_status_column_tuv_status'),
-                value: tuvStatus.label,
-              ),
-              const SizedBox(height: 14),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _SoftPill(
-                    label: _statusLabel(context, vehicle.status),
-                    textColor: _statusColor(vehicle.status),
-                    backgroundColor: _statusColor(
-                      vehicle.status,
-                    ).withOpacity(0.14),
-                  ),
-                  // Make the TÜV pill clickable so admins can jump
-                  // straight into the detail page when status is
-                  // "missing" / "expired" / "expiring soon" and add
-                  // the certificate.
-                  InkWell(
-                    onTap: () => _showVehicleDetails(vehicle),
-                    borderRadius: BorderRadius.circular(999),
-                    child: Tooltip(
-                      message: 'Klicken um TÜV-Bescheinigung '
-                          'hochzuladen / einzusehen',
-                      child: _SoftPill(
-                        label: tuvStatus.label,
-                        textColor: tuvStatus.color,
-                        backgroundColor:
-                            tuvStatus.color.withOpacity(0.14),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              // const SizedBox(height: 14),
-              // _InfoRow(
-              //   label: t.t('fleet_status_field_registration_date'),
-              //   value: _formatDateString(context, vehicle.registrationDate),
-              // ),
-              const SizedBox(height: 8),
-              _InfoRow(
-                label: t.t('fleet_status_column_updated_at'),
-                value: _formatDateTime(context, vehicle.updatedAt),
-              ),
-              const SizedBox(height: 14),
-              Align(
-                alignment: Alignment.centerRight,
-                child: _canManageVehicles
-                    ? CoButton(
-                        onPressed: () => _deleteVehicle(vehicle),
-                        icon: Icons.delete_outline,
-                        label: t.t('fleet_status_action_delete'),
-                        variant: CoButtonVariant.destructiveQuiet,
-                      )
-                    : Text(
-                        t.t('fleet_status_read_only'),
-                        style: const TextStyle(
-                          color: _kMuted,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  String _serviceStartLabel(BuildContext context, FleetVehicle vehicle) {
-    switch (vehicle.category) {
-      case VehicleCategory.armada:
-        final metadata = vehicle.metadata as ArmadaVehicleMetadata;
-        return _dateOrNotApplicable(context, metadata.contractStartDate);
-      case VehicleCategory.amazonPaidRental:
-        final metadata = vehicle.metadata as AmazonPaidRentalMetadata;
-        return _dateOrNotApplicable(context, metadata.rentalStartDate);
-      case VehicleCategory.selfSourcedRental:
-        final metadata = vehicle.metadata as SelfSourcedRentalMetadata;
-        return _dateOrNotApplicable(context, metadata.rentalStartDate);
-      case VehicleCategory.selfOwnedRental:
-        return AppLocalizations.of(context).t('fleet_status_not_applicable');
-    }
-  }
-
   String _serviceEndLabel(BuildContext context, FleetVehicle vehicle) {
     return _optionalStoredDate(context, vehicle.serviceEndDate);
-  }
-
-  String _dateOrNotApplicable(BuildContext context, String value) {
-    if (value.trim().isEmpty) {
-      return AppLocalizations.of(context).t('fleet_status_not_applicable');
-    }
-    return _formatStoredDate(context, value);
   }
 
   Widget _buildTableActionButton({
@@ -1564,10 +3732,120 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
   }
 }
 
+/// Kompakte Filter-Pill mit Klick-Menü (Handoff): heller Rahmen, Label,
+/// Chevron — aktiv gesetzte Filter bekommen den grünen Akzent.
+class _FilterPill extends StatelessWidget {
+  const _FilterPill({
+    required this.label,
+    required this.items,
+    required this.onSelected,
+    this.active = false,
+    this.leading,
+  });
+
+  final String label;
+  final List<PopupMenuEntry<String>> items;
+  final ValueChanged<String> onSelected;
+  final bool active;
+  final IconData? leading;
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = active
+        ? _FleetStatusPageState._kAccentGreen
+        : _FleetStatusPageState._kSubtle;
+    return PopupMenuButton<String>(
+      position: PopupMenuPosition.under,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      onSelected: onSelected,
+      itemBuilder: (_) => items,
+      child: Container(
+        height: 38,
+        // Deckelt lange Labels (z. B. „Fahrzeugnummer ↑"), damit die
+        // Filterleiste auf schmalen Bildschirmen nicht überläuft.
+        constraints: const BoxConstraints(maxWidth: 210),
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: active
+                ? _FleetStatusPageState._kAccentGreen
+                : _FleetStatusPageState._kLine,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (leading != null) ...[
+              Icon(leading, size: 15, color: foreground),
+              const SizedBox(width: 6),
+            ],
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: foreground,
+                  height: 1.3,
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(Icons.keyboard_arrow_down, size: 15, color: foreground),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Flutter web's default [ScrollBehavior] only lets touch/stylus/trackpad
+/// drag a scroll view — a mouse click-and-drag does nothing on desktop
+/// Chrome. The references chips row needs mouse-drag too, so it stays
+/// reachable without relying on the (also added) Scrollbar thumb.
+class _HorizontalDragScrollBehavior extends MaterialScrollBehavior {
+  @override
+  Set<PointerDeviceKind> get dragDevices => const {
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+    PointerDeviceKind.stylus,
+    PointerDeviceKind.trackpad,
+    PointerDeviceKind.unknown,
+  };
+}
+
+/// Result of the vehicle editor: the vehicle draft itself plus the side
+/// data that is stored outside the vehicle document (workshop, TÜV date).
+class _VehicleEditorResult {
+  const _VehicleEditorResult({
+    required this.draft,
+    required this.workshop,
+    required this.tuvDate,
+    required this.remarks,
+  });
+
+  final FleetVehicleDraft draft;
+  final String workshop;
+  final String tuvDate;
+  final String remarks;
+}
+
 class _VehicleEditorDialog extends StatefulWidget {
-  const _VehicleEditorDialog({required this.vehicle});
+  const _VehicleEditorDialog({
+    required this.vehicle,
+    this.initialWorkshop = '',
+    this.initialTuvDate = '',
+    this.initialRemarks = '',
+  });
 
   final FleetVehicle? vehicle;
+  final String initialWorkshop;
+  final String initialTuvDate;
+  final String initialRemarks;
 
   @override
   State<_VehicleEditorDialog> createState() => _VehicleEditorDialogState();
@@ -1602,6 +3880,10 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
 
   late final TextEditingController _ownershipTypeCtrl;
   late final TextEditingController _purchaseDateCtrl;
+
+  late final TextEditingController _workshopCtrl;
+  late final TextEditingController _tuvDateCtrl;
+  late final TextEditingController _remarksCtrl;
 
   late VehicleCategory _category;
   late VehicleFuelType _fuelType;
@@ -1685,6 +3967,10 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
     _purchaseDateCtrl = TextEditingController(
       text: selfOwnedMetadata.purchaseDate,
     );
+
+    _workshopCtrl = TextEditingController(text: widget.initialWorkshop);
+    _tuvDateCtrl = TextEditingController(text: widget.initialTuvDate);
+    _remarksCtrl = TextEditingController(text: widget.initialRemarks);
   }
 
   @override
@@ -1712,6 +3998,9 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
       _selfSourcedEndCtrl,
       _ownershipTypeCtrl,
       _purchaseDateCtrl,
+      _workshopCtrl,
+      _tuvDateCtrl,
+      _remarksCtrl,
     ]) {
       controller.dispose();
     }
@@ -1743,18 +4032,25 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
         int.tryParse(_manufacturingYearCtrl.text.trim()) ?? 0;
 
     Navigator.of(context).pop(
-      FleetVehicleDraft(
-        plateNumber: normalizePlateNumber(_plateNumberCtrl.text),
-        category: _category,
-        brand: _brandCtrl.text.trim(),
-        model: _modelCtrl.text.trim(),
-        manufacturingYear: manufacturingYear,
-        vinNumber: _vinCtrl.text.trim(),
-        fuelType: _fuelType,
-        status: _status,
-        serviceEndDate: _serviceEndDateCtrl.text.trim(),
-        metadata: _metadataForCategory(),
-        notes: _notesCtrl.text.trim(),
+      _VehicleEditorResult(
+        draft: FleetVehicleDraft(
+          plateNumber: normalizePlateNumber(_plateNumberCtrl.text),
+          category: _category,
+          brand: _brandCtrl.text.trim(),
+          model: _modelCtrl.text.trim(),
+          manufacturingYear: manufacturingYear,
+          vinNumber: _vinCtrl.text.trim(),
+          fuelType: _fuelType,
+          status: _status,
+          serviceEndDate: _serviceEndDateCtrl.text.trim(),
+          metadata: _metadataForCategory(),
+          notes: _notesCtrl.text.trim(),
+        ),
+        workshop: _status == VehicleStatus.groundedService
+            ? _workshopCtrl.text.trim()
+            : widget.initialWorkshop.trim(),
+        tuvDate: _tuvDateCtrl.text.trim(),
+        remarks: _remarksCtrl.text.trim(),
       ),
     );
   }
@@ -1788,6 +4084,9 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
           ownershipType: _ownershipTypeCtrl.text,
           purchaseDate: _purchaseDateCtrl.text,
         );
+      case VehicleCategory.lmr:
+      case VehicleCategory.sesoRental:
+        return const GenericVehicleMetadata();
     }
   }
 
@@ -1839,26 +4138,53 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
                   ),
                 ),
                 const SizedBox(height: 14),
-                DropdownButtonFormField<VehicleCategory>(
-                  value: _category,
-                  decoration: _inputDecoration(
-                    label: t.t('fleet_status_field_category'),
+                // Vehicle category as a quick button (chip) selector.
+                Text(
+                  t.t('fleet_status_field_category'),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    color: Color(0xFF6B7280),
                   ),
-                  onChanged: (value) {
-                    if (value == null) return;
-                    setState(() => _category = value);
-                  },
-                  dropdownColor: Colors.white,
-                  elevation: 8,
-                  borderRadius: BorderRadius.circular(14),
-                  items: VehicleCategory.values
-                      .map(
-                        (category) => DropdownMenuItem<VehicleCategory>(
-                          value: category,
-                          child: Text(_categoryLabel(context, category)),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    // Only the four main categories are selectable.
+                    for (final category in const [
+                      VehicleCategory.armada,
+                      VehicleCategory.sesoRental,
+                      VehicleCategory.lmr,
+                      VehicleCategory.selfOwnedRental,
+                    ])
+                      ChoiceChip(
+                        label: Text(_categoryLabel(context, category)),
+                        selected: _category == category,
+                        showCheckmark: false,
+                        onSelected: (sel) {
+                          if (sel) setState(() => _category = category);
+                        },
+                        selectedColor: const Color(0xFF1D7F5A),
+                        backgroundColor: const Color(0xFFF3F4F6),
+                        labelStyle: TextStyle(
+                          color: _category == category
+                              ? Colors.white
+                              : const Color(0xFF374151),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
                         ),
-                      )
-                      .toList(),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          side: BorderSide(
+                            color: _category == category
+                                ? const Color(0xFF1D7F5A)
+                                : const Color(0xFFE5E7EB),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 const SizedBox(height: 14),
                 Row(
@@ -1979,7 +4305,7 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
                       )
                       .toList(),
                 ),
-                if (_status == VehicleStatus.inService) ...[
+                if (_status.isGrounded) ...[
                   const SizedBox(height: 14),
                   _DateInputField(
                     controller: _serviceEndDateCtrl,
@@ -1999,13 +4325,82 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
                     Align(
                       alignment: Alignment.centerRight,
                       child: CoButton(
-                        onPressed: () => setState(() => _serviceEndDateCtrl.clear()),
+                        onPressed: () =>
+                            setState(() => _serviceEndDateCtrl.clear()),
                         label: t.t('fleet_status_clear_date'),
                         variant: CoButtonVariant.quiet,
                       ),
                     ),
                   ],
                 ],
+                if (_status == VehicleStatus.groundedService) ...[
+                  const SizedBox(height: 14),
+                  // Grounded (Service): where was the vehicle sent for
+                  // repairs?
+                  Builder(
+                    builder: (context) {
+                      final de =
+                          Localizations.localeOf(context).languageCode == 'de';
+                      return TextFormField(
+                        controller: _workshopCtrl,
+                        decoration: _inputDecoration(
+                          label: de
+                              ? 'Werkstatt (wohin wurde das Fahrzeug gebracht?)'
+                              : 'Workshop (where was the vehicle sent?)',
+                        ),
+                      );
+                    },
+                  ),
+                ],
+                const SizedBox(height: 18),
+                Builder(
+                  builder: (context) {
+                    final de =
+                        Localizations.localeOf(context).languageCode == 'de';
+                    return _SectionTitle(
+                      text: de ? 'TÜV / Hauptuntersuchung' : 'TÜV / inspection',
+                    );
+                  },
+                ),
+                const SizedBox(height: 12),
+                Builder(
+                  builder: (context) {
+                    final de =
+                        Localizations.localeOf(context).languageCode == 'de';
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _DateInputField(
+                          controller: _tuvDateCtrl,
+                          label: de
+                              ? 'TÜV gültig bis (HU-Datum, optional)'
+                              : 'TÜV valid until (inspection date, optional)',
+                          onPick: () => _pickDate(_tuvDateCtrl),
+                          validator: (value) {
+                            final trimmed = (value ?? '').trim();
+                            if (trimmed.isEmpty) return null;
+                            if (!isValidVehicleDate(trimmed)) {
+                              return t.t('fleet_status_invalid_date');
+                            }
+                            return null;
+                          },
+                        ),
+                        if (_tuvDateCtrl.text.trim().isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: CoButton(
+                              onPressed: () =>
+                                  setState(() => _tuvDateCtrl.clear()),
+                              label: t.t('fleet_status_clear_date'),
+                              variant: CoButtonVariant.quiet,
+                            ),
+                          ),
+                        ],
+                      ],
+                    );
+                  },
+                ),
                 const SizedBox(height: 18),
                 _SectionTitle(text: t.t('fleet_status_section_metadata')),
                 const SizedBox(height: 12),
@@ -2020,6 +4415,29 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
                   decoration: _inputDecoration(
                     label: t.t('fleet_status_field_notes'),
                   ),
+                ),
+                const SizedBox(height: 18),
+                Builder(
+                  builder: (context) {
+                    final de =
+                        Localizations.localeOf(context).languageCode == 'de';
+                    return _SectionTitle(text: de ? 'Bemerkungen' : 'Remarks');
+                  },
+                ),
+                const SizedBox(height: 12),
+                Builder(
+                  builder: (context) {
+                    final de =
+                        Localizations.localeOf(context).languageCode == 'de';
+                    return TextFormField(
+                      controller: _remarksCtrl,
+                      minLines: 3,
+                      maxLines: 5,
+                      decoration: _inputDecoration(
+                        label: de ? 'Bemerkungen / Remarks' : 'Remarks',
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 24),
                 Row(
@@ -2320,6 +4738,9 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
             ),
           ],
         );
+      case VehicleCategory.lmr:
+      case VehicleCategory.sesoRental:
+        return const SizedBox.shrink();
     }
   }
 
@@ -2366,2031 +4787,6 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
   }
 }
 
-class _VehicleDetailsPage extends StatefulWidget {
-  const _VehicleDetailsPage({
-    required this.vehicle,
-    required this.dspUid,
-    required this.canManageDocuments,
-  });
-
-  final FleetVehicle vehicle;
-  final String dspUid;
-  final bool canManageDocuments;
-
-  @override
-  State<_VehicleDetailsPage> createState() => _VehicleDetailsPageState();
-}
-
-class _VehicleDetailsPageState extends State<_VehicleDetailsPage> {
-  final FleetVehicleDocumentService _documentService =
-      FleetVehicleDocumentService();
-  final FleetVehicleEventService _eventService = FleetVehicleEventService();
-  static const String _eventTypeAllValue = '__all_vehicle_events__';
-  String _eventTypeFilter = _eventTypeAllValue;
-
-  @override
-  void dispose() {
-    super.dispose();
-  }
-
-  Future<void> _showDocumentDialog({FleetVehicleDocument? document}) async {
-    final result = await showModalBottomSheet<_VehicleDocumentDialogResult>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) => _VehicleDocumentDialog(document: document),
-    );
-    if (result == null) return;
-
-    try {
-      if (document == null) {
-        final bytes = result.file.bytes;
-        if (bytes == null) {
-          _showSnack(
-            AppLocalizations.of(
-              context,
-            ).t('fleet_status_vehicle_documents_file_required'),
-            error: true,
-          );
-          return;
-        }
-        await _documentService.createDocument(
-          dspUid: widget.dspUid,
-          plateNumber: widget.vehicle.plateNumber,
-          draft: result.draft,
-          fileBytes: bytes,
-          originalFileName: result.file.name,
-        );
-        _showSnack(
-          AppLocalizations.of(
-            context,
-          ).t('fleet_status_vehicle_documents_create_success'),
-        );
-      } else {
-        await _documentService.updateDocument(
-          dspUid: widget.dspUid,
-          plateNumber: widget.vehicle.plateNumber,
-          documentId: document.documentId,
-          existingDocument: document,
-          draft: result.draft,
-          fileBytes: result.file.bytes,
-          originalFileName: result.file.name.trim().isEmpty
-              ? null
-              : result.file.name,
-        );
-        _showSnack(
-          AppLocalizations.of(
-            context,
-          ).t('fleet_status_vehicle_documents_update_success'),
-        );
-      }
-    } on DuplicateVehicleDocumentTypeException catch (e) {
-      _showSnack(
-        AppLocalizations.of(context).tf(
-          'fleet_status_vehicle_documents_duplicate_type',
-          {'documentType': _documentTypeLabel(e.documentType)},
-        ),
-        error: true,
-      );
-    } on ImmutableVehicleDocumentTypeException catch (e) {
-      _showSnack(
-        AppLocalizations.of(context).tf(
-          'fleet_status_vehicle_documents_type_locked',
-          {'documentType': _documentTypeLabel(e.documentType)},
-        ),
-        error: true,
-      );
-    } on FleetVehicleDocumentException catch (e) {
-      _showSnack(e.message, error: true);
-    } on FirebaseException catch (e) {
-      _showSnack(
-        e.code == 'permission-denied'
-            ? AppLocalizations.of(context).t('fleet_status_permission_denied')
-            : AppLocalizations.of(context).tf(
-                'fleet_status_vehicle_documents_save_failed',
-                {'error': '$e'},
-              ),
-        error: true,
-      );
-    } catch (e) {
-      _showSnack(
-        AppLocalizations.of(
-          context,
-        ).tf('fleet_status_vehicle_documents_save_failed', {'error': '$e'}),
-        error: true,
-      );
-    }
-  }
-
-  Future<void> _deleteDocument(FleetVehicleDocument document) async {
-    final t = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(t.t('fleet_status_vehicle_documents_delete_title')),
-        content: Text(
-          t.tf('fleet_status_vehicle_documents_delete_body', {
-            'documentName': document.documentType,
-          }),
-        ),
-        actions: [
-          CoButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            label: t.t('button_close'),
-            variant: CoButtonVariant.quiet,
-          ),
-          CoButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            label: t.t('button_delete'),
-            variant: CoButtonVariant.destructive,
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-
-    try {
-      await _documentService.softDeleteDocument(
-        dspUid: widget.dspUid,
-        plateNumber: widget.vehicle.plateNumber,
-        documentId: document.documentId,
-      );
-      _showSnack(t.t('fleet_status_vehicle_documents_delete_success'));
-    } on FirebaseException catch (e) {
-      _showSnack(
-        e.code == 'permission-denied'
-            ? t.t('fleet_status_permission_denied')
-            : t.tf('fleet_status_vehicle_documents_delete_failed', {
-                'error': '$e',
-              }),
-        error: true,
-      );
-    } catch (e) {
-      _showSnack(
-        t.tf('fleet_status_vehicle_documents_delete_failed', {'error': '$e'}),
-        error: true,
-      );
-    }
-  }
-
-  Future<void> _openDocument(FleetVehicleDocument document) async {
-    final url = document.fileUrl.trim();
-    if (url.isEmpty) {
-      _showSnack(
-        AppLocalizations.of(
-          context,
-        ).t('fleet_status_vehicle_documents_missing_file'),
-        error: true,
-      );
-      return;
-    }
-    final uri = Uri.tryParse(url);
-    if (uri == null) {
-      _showSnack(
-        AppLocalizations.of(
-          context,
-        ).t('fleet_status_vehicle_documents_open_failed'),
-        error: true,
-      );
-      return;
-    }
-    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!launched && mounted) {
-      _showSnack(
-        AppLocalizations.of(
-          context,
-        ).t('fleet_status_vehicle_documents_open_failed'),
-        error: true,
-      );
-    }
-  }
-
-  Future<void> _showVehicleEventDialog({FleetVehicleEvent? event}) async {
-    final result = await showDialog<_VehicleEventDialogResult>(
-      context: context,
-      builder: (context) => _VehicleEventDialog(event: event),
-    );
-    if (result == null) return;
-
-    try {
-      if (event == null) {
-        await _eventService.createEvent(
-          dspUid: widget.dspUid,
-          plateNumber: widget.vehicle.plateNumber,
-          draft: result.draft,
-          fileBytes: result.file?.bytes,
-          originalFileName: result.file?.name,
-        );
-        _showSnack(
-          AppLocalizations.of(
-            context,
-          ).t('fleet_status_vehicle_events_create_success'),
-        );
-      } else {
-        await _eventService.updateEvent(
-          dspUid: widget.dspUid,
-          plateNumber: widget.vehicle.plateNumber,
-          eventId: event.eventId,
-          existingEvent: event,
-          draft: result.draft,
-          fileBytes: result.file?.bytes,
-          originalFileName: result.file?.name,
-        );
-        _showSnack(
-          AppLocalizations.of(
-            context,
-          ).t('fleet_status_vehicle_events_update_success'),
-        );
-      }
-    } on FleetVehicleEventException catch (e) {
-      _showSnack(e.message, error: true);
-    } on FirebaseException catch (e) {
-      _showSnack(
-        e.code == 'permission-denied'
-            ? AppLocalizations.of(context).t('fleet_status_permission_denied')
-            : AppLocalizations.of(
-                context,
-              ).tf('fleet_status_vehicle_events_save_failed', {'error': '$e'}),
-        error: true,
-      );
-    } catch (e) {
-      _showSnack(
-        AppLocalizations.of(
-          context,
-        ).tf('fleet_status_vehicle_events_save_failed', {'error': '$e'}),
-        error: true,
-      );
-    }
-  }
-
-  Future<void> _deleteVehicleEvent(FleetVehicleEvent event) async {
-    final t = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(t.t('fleet_status_vehicle_events_delete_title')),
-        content: Text(
-          t.tf('fleet_status_vehicle_events_delete_body', {
-            'title': event.title,
-          }),
-        ),
-        actions: [
-          CoButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            label: t.t('button_close'),
-            variant: CoButtonVariant.quiet,
-          ),
-          CoButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            label: t.t('button_delete'),
-            variant: CoButtonVariant.destructive,
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-
-    try {
-      await _eventService.softDeleteEvent(
-        dspUid: widget.dspUid,
-        plateNumber: widget.vehicle.plateNumber,
-        eventId: event.eventId,
-      );
-      _showSnack(t.t('fleet_status_vehicle_events_delete_success'));
-    } on FirebaseException catch (e) {
-      _showSnack(
-        e.code == 'permission-denied'
-            ? t.t('fleet_status_permission_denied')
-            : t.tf('fleet_status_vehicle_events_delete_failed', {
-                'error': '$e',
-              }),
-        error: true,
-      );
-    } catch (e) {
-      _showSnack(
-        t.tf('fleet_status_vehicle_events_delete_failed', {'error': '$e'}),
-        error: true,
-      );
-    }
-  }
-
-  Future<void> _openVehicleEventFile(FleetVehicleEvent event) async {
-    final url = event.fileUrl.trim();
-    if (url.isEmpty) {
-      _showSnack(
-        AppLocalizations.of(
-          context,
-        ).t('fleet_status_vehicle_events_missing_file'),
-        error: true,
-      );
-      return;
-    }
-    final uri = Uri.tryParse(url);
-    if (uri == null) {
-      _showSnack(
-        AppLocalizations.of(
-          context,
-        ).t('fleet_status_vehicle_events_open_failed'),
-        error: true,
-      );
-      return;
-    }
-    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!launched && mounted) {
-      _showSnack(
-        AppLocalizations.of(
-          context,
-        ).t('fleet_status_vehicle_events_open_failed'),
-        error: true,
-      );
-    }
-  }
-
-  List<FleetVehicleEvent> _filterEvents(List<FleetVehicleEvent> events) {
-    return events.where((event) {
-      // Wartungs-/Verschleißteil-Einträge haben ihre eigene Sektion.
-      if (event.eventType.trim().toUpperCase() == 'MAINTENANCE') {
-        return false;
-      }
-      if (_eventTypeFilter != _eventTypeAllValue &&
-          event.eventType != _eventTypeFilter) {
-        return false;
-      }
-      return true;
-    }).toList();
-  }
-
-  void _showSnack(String message, {bool error = false}) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: error ? _FleetStatusPageState._kRed : null,
-        content: Text(message),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final t = AppLocalizations.of(context);
-    return Scaffold(
-      backgroundColor: const Color(0xFFF3F6F7),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF111827),
-        elevation: 0,
-        scrolledUnderElevation: 0.5,
-        title: Text(
-          widget.vehicle.plateNumber,
-          style: const TextStyle(fontWeight: FontWeight.w800),
-        ),
-        actions: [
-          IconButton(
-            tooltip: AppLocalizations.of(context).t('button_close'),
-            icon: const Icon(Icons.close),
-            onPressed: () => Navigator.of(context).maybePop(),
-          ),
-        ],
-      ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final isWide = constraints.maxWidth >= 1100;
-          final left = SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _ProfileStyleCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    t.t('fleet_status_vehicle_details_information_title'),
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: _FleetStatusPageState._kText,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  _InfoRow(
-                    label: t.t('fleet_status_field_plate_number'),
-                    value: widget.vehicle.plateNumber,
-                  ),
-                  const SizedBox(height: 10),
-                  _InfoRow(
-                    label: t.t('fleet_status_field_category'),
-                    value: _categoryLabel(context, widget.vehicle.category),
-                  ),
-                  const SizedBox(height: 10),
-                  _InfoRow(
-                    label: t.t('fleet_status_field_brand'),
-                    value: widget.vehicle.brand,
-                  ),
-                  const SizedBox(height: 10),
-                  _InfoRow(
-                    label: t.t('fleet_status_field_model'),
-                    value: widget.vehicle.model,
-                  ),
-                  const SizedBox(height: 10),
-                  _InfoRow(
-                    label: t.t('fleet_status_field_manufacturing_year'),
-                    value: widget.vehicle.manufacturingYear == 0
-                        ? t.t('fleet_status_vehicle_details_not_set')
-                        : '${widget.vehicle.manufacturingYear}',
-                  ),
-                  const SizedBox(height: 10),
-                  _InfoRow(
-                    label: t.t('fleet_status_field_vin_number'),
-                    value: widget.vehicle.vinNumber,
-                  ),
-                  const SizedBox(height: 10),
-                  _InfoRow(
-                    label: t.t('fleet_status_field_fuel_type'),
-                    value: _fuelTypeLabel(context, widget.vehicle.fuelType),
-                  ),
-                  // const SizedBox(height: 10),
-                  // _InfoRow(
-                  //   label: t.t('fleet_status_field_odometer_km'),
-                  //   value: '${widget.vehicle.odometerKm} km',
-                  // ),
-                  // const SizedBox(height: 10),
-                  // _InfoRow(
-                  //   label: t.t('fleet_status_field_registration_date'),
-                  //   value: _formatStoredDate(context, widget.vehicle.registrationDate),
-                  // ),
-                  const SizedBox(height: 10),
-                  _InfoRow(
-                    label: t.t('fleet_status_field_status'),
-                    value: _statusLabel(context, widget.vehicle.status),
-                  ),
-                  const SizedBox(height: 10),
-                  _InfoRow(
-                    label: t.t('fleet_status_field_service_end_date'),
-                    value: _serviceEndDetailsLabel(context, widget.vehicle),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            _ProfileStyleCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    t.t('fleet_status_section_metadata'),
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: _FleetStatusPageState._kText,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  ..._metadataRows(context, widget.vehicle),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            _ProfileStyleCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    t.t('fleet_status_section_notes'),
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: _FleetStatusPageState._kText,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    widget.vehicle.notes.trim().isEmpty
-                        ? t.t('fleet_status_vehicle_details_not_set')
-                        : widget.vehicle.notes,
-                    style: const TextStyle(
-                      color: _FleetStatusPageState._kText,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _InfoRow(
-                    label: t.t('fleet_status_vehicle_details_created_at'),
-                    value: _formatDateTime(context, widget.vehicle.createdAt),
-                  ),
-                  const SizedBox(height: 10),
-                  _InfoRow(
-                    label: t.t('fleet_status_vehicle_details_updated_at'),
-                    value: _formatDateTime(context, widget.vehicle.updatedAt),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            _ProfileStyleCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          t.t('fleet_status_vehicle_documents_title'),
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: _FleetStatusPageState._kText,
-                          ),
-                        ),
-                      ),
-                      if (widget.canManageDocuments)
-                        CoButton(
-                          onPressed: () => _showDocumentDialog(),
-                          icon: Icons.add,
-                          label: t.t(
-                            'fleet_status_vehicle_documents_add_action',
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  StreamBuilder<List<FleetVehicleDocument>>(
-                    stream: _documentService.watchDocuments(
-                      dspUid: widget.dspUid,
-                      plateNumber: widget.vehicle.plateNumber,
-                    ),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting &&
-                          !snapshot.hasData) {
-                        return const CoStateSwitcher(
-                          child: LinearProgressIndicator(
-                            key: ValueKey('docs-loading'),
-                            minHeight: 2,
-                          ),
-                        );
-                      }
-                      if (snapshot.hasError) {
-                        return CoStateSwitcher(
-                          child: Text(
-                            key: const ValueKey('docs-error'),
-                            t.tf('fleet_status_vehicle_documents_load_failed', {
-                              'error': '${snapshot.error}',
-                            }),
-                          ),
-                        );
-                      }
-                      final docs =
-                          snapshot.data ?? const <FleetVehicleDocument>[];
-                      if (docs.isEmpty) {
-                        return CoStateSwitcher(
-                          child: Container(
-                            key: const ValueKey('docs-empty'),
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(24),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF9FAFB),
-                              borderRadius: BorderRadius.circular(18),
-                              border: Border.all(
-                                color: _FleetStatusPageState._kBorder,
-                              ),
-                            ),
-                            child: Text(
-                              t.t('fleet_status_vehicle_documents_empty'),
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: _FleetStatusPageState._kMuted,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        );
-                      }
-                      return CoStateSwitcher(
-                        child: Column(
-                          key: const ValueKey('docs-list'),
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: docs.map((doc) {
-                          final status = _documentStatusFor(
-                            context,
-                            _documentService.getDocumentStatus(
-                              expiryDate: doc.expiryDate,
-                              fileUrl: doc.fileUrl,
-                            ),
-                          );
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: Material(
-                              color: Colors.transparent,
-                              child: Container(
-                                padding: const EdgeInsets.all(14),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF7F8F8),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: const Color(0xFFE1E4EA),
-                                  ),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              // Text(
-                                              //   doc.documentName,
-                                              //   style: const TextStyle(
-                                              //     fontWeight: FontWeight.w800,
-                                              //     color: _FleetStatusPageState
-                                              //         ._kText,
-                                              //   ),
-                                              // ),
-                                              // const SizedBox(height: 6),
-                                              Wrap(
-                                                spacing: 8,
-                                                runSpacing: 8,
-                                                children: [
-                                                  _StatusBadge(
-                                                    label: _documentTypeLabel(
-                                                      doc.documentType,
-                                                    ),
-                                                    color: _FleetStatusPageState
-                                                        ._kBlue,
-                                                  ),
-                                                  _StatusBadge(
-                                                    label: status.label,
-                                                    color: status.color,
-                                                  ),
-                                                ],
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            IconButton(
-                                              tooltip: t.t('button_open'),
-                                              onPressed: () =>
-                                                  _openDocument(doc),
-                                              icon: const Icon(
-                                                Icons.open_in_new_outlined,
-                                              ),
-                                            ),
-                                            if (widget.canManageDocuments)
-                                              const SizedBox(width: 4),
-                                            if (widget.canManageDocuments) ...[
-                                              IconButton(
-                                                tooltip: t.t('button_edit'),
-                                                onPressed: () =>
-                                                    _showDocumentDialog(
-                                                      document: doc,
-                                                    ),
-                                                icon: const Icon(
-                                                  Icons.edit_outlined,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 4),
-                                              IconButton(
-                                                tooltip: t.t('button_delete'),
-                                                onPressed: () =>
-                                                    _deleteDocument(doc),
-                                                icon: const Icon(
-                                                  Icons.delete_outline,
-                                                ),
-                                              ),
-                                            ],
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 10),
-                                    _InfoRow(
-                                      label: t.t(
-                                        'fleet_status_vehicle_documents_document_number',
-                                      ),
-                                      value: doc.documentNumber.trim().isEmpty
-                                          ? t.t(
-                                              'fleet_status_vehicle_details_not_set',
-                                            )
-                                          : doc.documentNumber,
-                                    ),
-                                    // const SizedBox(height: 8),
-                                    // _InfoRow(
-                                    //   label: t.t(
-                                    //     'fleet_status_vehicle_documents_issue_date',
-                                    //   ),
-                                    //   value: _formatStoredDate(
-                                    //     context,
-                                    //     doc.issueDate,
-                                    //   ),
-                                    // ),
-                                    const SizedBox(height: 8),
-                                    _InfoRow(
-                                      label: t.t(
-                                        'fleet_status_vehicle_documents_expiry_date',
-                                      ),
-                                      value: _formatStoredDate(
-                                        context,
-                                        doc.expiryDate,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    _InfoRow(
-                                      label: t.t(
-                                        'fleet_status_vehicle_documents_file_name',
-                                      ),
-                                      value: doc.fileName.trim().isEmpty
-                                          ? t.t(
-                                              'fleet_status_vehicle_details_not_set',
-                                            )
-                                          : doc.fileName,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    _InfoRow(
-                                      label: t.t(
-                                        'fleet_status_vehicle_documents_file_type',
-                                      ),
-                                      value: doc.fileType.trim().isEmpty
-                                          ? t.t(
-                                              'fleet_status_vehicle_details_not_set',
-                                            )
-                                          : doc.fileType,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    _InfoRow(
-                                      label: t.t('fleet_status_field_notes'),
-                                      value: doc.notes.trim().isEmpty
-                                          ? t.t(
-                                              'fleet_status_vehicle_details_not_set',
-                                            )
-                                          : doc.notes,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            _VehicleMaintenanceSection(
-              dspUid: widget.dspUid,
-              plateNumber: widget.vehicle.plateNumber,
-              eventService: _eventService,
-              canManage: widget.canManageDocuments,
-            ),
-          ],
-        ),
-          );
-          final right = SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(isWide ? 0 : 24, 24, 24, 24),
-            child: _ProfileStyleCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          t.t('fleet_status_vehicle_events_title'),
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: _FleetStatusPageState._kText,
-                          ),
-                        ),
-                      ),
-                      if (widget.canManageDocuments)
-                        CoButton(
-                          onPressed: () => _showVehicleEventDialog(),
-                          icon: Icons.add,
-                          label: t.t(
-                            'fleet_status_vehicle_events_add_action',
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: SizedBox(
-                      width: 240,
-                      child: DropdownButtonFormField<String>(
-                        value: _eventTypeFilter,
-                        decoration: InputDecoration(
-                          labelText: t.t(
-                            'fleet_status_vehicle_events_filter_type',
-                          ),
-                          filled: true,
-                          fillColor: const Color(0xFFF9FAFB),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: const BorderSide(
-                              color: _FleetStatusPageState._kBorder,
-                            ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: const BorderSide(
-                              color: _FleetStatusPageState._kBorder,
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: const BorderSide(
-                              color: _FleetStatusPageState._kGreen,
-                            ),
-                          ),
-                        ),
-                        items: [
-                          DropdownMenuItem<String>(
-                            value: _eventTypeAllValue,
-                            child: Text(
-                              t.t(
-                                'fleet_status_vehicle_events_filter_all_types',
-                              ),
-                            ),
-                          ),
-                          ...fleetVehicleEventTypeOptions.map(
-                            (type) => DropdownMenuItem<String>(
-                              value: type,
-                              child: Text(_eventTypeLabel(context, type)),
-                            ),
-                          ),
-                        ],
-                        dropdownColor: Colors.white,
-                        elevation: 8,
-                        borderRadius: BorderRadius.circular(14),
-                        onChanged: (value) {
-                          if (value == null) return;
-                          setState(() => _eventTypeFilter = value);
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  StreamBuilder<List<FleetVehicleEvent>>(
-                    stream: _eventService.watchEvents(
-                      dspUid: widget.dspUid,
-                      plateNumber: widget.vehicle.plateNumber,
-                      eventType: _eventTypeFilter == _eventTypeAllValue
-                          ? null
-                          : _eventTypeFilter,
-                    ),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting &&
-                          !snapshot.hasData) {
-                        return const CoStateSwitcher(
-                          child: LinearProgressIndicator(
-                            key: ValueKey('events-loading'),
-                            minHeight: 2,
-                          ),
-                        );
-                      }
-                      if (snapshot.hasError) {
-                        return CoStateSwitcher(
-                          child: Text(
-                            key: const ValueKey('events-error'),
-                            t.tf('fleet_status_vehicle_events_load_failed', {
-                              'error': '${snapshot.error}',
-                            }),
-                          ),
-                        );
-                      }
-                      final events = _filterEvents(
-                        snapshot.data ?? const <FleetVehicleEvent>[],
-                      );
-                      if (events.isEmpty) {
-                        return CoStateSwitcher(
-                          child: Container(
-                            key: const ValueKey('events-empty'),
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(24),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF9FAFB),
-                              borderRadius: BorderRadius.circular(18),
-                              border: Border.all(
-                                color: _FleetStatusPageState._kBorder,
-                              ),
-                            ),
-                            child: Text(
-                              t.t('fleet_status_vehicle_events_empty'),
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: _FleetStatusPageState._kMuted,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        );
-                      }
-                      return CoStateSwitcher(
-                        child: Column(
-                          key: const ValueKey('events-list'),
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: events.map((event) {
-                            final metadata = event.metadata;
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: Material(
-                              color: Colors.transparent,
-                              child: Container(
-                                padding: const EdgeInsets.all(14),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF7F8F8),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: const Color(0xFFE1E4EA),
-                                  ),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                event.title,
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.w800,
-                                                  color: _FleetStatusPageState
-                                                      ._kText,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 6),
-                                              Wrap(
-                                                spacing: 8,
-                                                runSpacing: 8,
-                                                children: [
-                                                  _StatusBadge(
-                                                    label: _eventTypeLabel(
-                                                      context,
-                                                      event.eventType,
-                                                    ),
-                                                    color: event.isAccident
-                                                        ? _FleetStatusPageState
-                                                              ._kRed
-                                                        : _FleetStatusPageState
-                                                              ._kBlue,
-                                                  ),
-                                                  if (event.isAccident &&
-                                                      (metadata['damageLevel'] ??
-                                                              '')
-                                                          .toString()
-                                                          .trim()
-                                                          .isNotEmpty)
-                                                    _StatusBadge(
-                                                      label:
-                                                          metadata['damageLevel']
-                                                              .toString(),
-                                                      color:
-                                                          _FleetStatusPageState
-                                                              ._kOrange,
-                                                    ),
-                                                ],
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            if (event.fileUrl.trim().isNotEmpty)
-                                              IconButton(
-                                                tooltip: t.t('button_open'),
-                                                onPressed: () =>
-                                                    _openVehicleEventFile(
-                                                      event,
-                                                    ),
-                                                icon: const Icon(
-                                                  Icons.open_in_new_outlined,
-                                                ),
-                                              ),
-                                            if (event.fileUrl.trim().isNotEmpty &&
-                                                widget.canManageDocuments)
-                                              const SizedBox(width: 4),
-                                            if (widget.canManageDocuments) ...[
-                                              IconButton(
-                                                tooltip: t.t('button_edit'),
-                                                onPressed: () =>
-                                                    _showVehicleEventDialog(
-                                                      event: event,
-                                                    ),
-                                                icon: const Icon(
-                                                  Icons.edit_outlined,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 4),
-                                              IconButton(
-                                                tooltip: t.t('button_delete'),
-                                                onPressed: () =>
-                                                    _deleteVehicleEvent(event),
-                                                icon: const Icon(
-                                                  Icons.delete_outline,
-                                                ),
-                                              ),
-                                            ],
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 10),
-                                    _InfoRow(
-                                      label: t.t(
-                                        'fleet_status_vehicle_events_type',
-                                      ),
-                                      value: _eventTypeLabel(
-                                        context,
-                                        event.eventType,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    _InfoRow(
-                                      label: t.t(
-                                        'fleet_status_vehicle_events_event_date',
-                                      ),
-                                      value: _formatStoredDate(
-                                        context,
-                                        event.eventDate,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    if (event.isAccident) ...[
-                                      _InfoRow(
-                                        label: t.t(
-                                          'fleet_status_vehicle_events_location',
-                                        ),
-                                        value:
-                                            (metadata['location'] ?? '')
-                                                .toString()
-                                                .trim()
-                                                .isEmpty
-                                            ? t.t(
-                                                'fleet_status_vehicle_details_not_set',
-                                              )
-                                            : metadata['location'].toString(),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      _InfoRow(
-                                        label: t.t(
-                                          'fleet_status_vehicle_events_damage_level',
-                                        ),
-                                        value:
-                                            (metadata['damageLevel'] ?? '')
-                                                .toString()
-                                                .trim()
-                                                .isEmpty
-                                            ? t.t(
-                                                'fleet_status_vehicle_details_not_set',
-                                              )
-                                            : (metadata['damageLevel'] ?? '')
-                                                  .toString(),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      _InfoRow(
-                                        label: t.t(
-                                          'fleet_status_vehicle_events_police_report_number',
-                                        ),
-                                        value:
-                                            (metadata['policeReportNumber'] ??
-                                                    '')
-                                                .toString()
-                                                .trim()
-                                                .isEmpty
-                                            ? t.t(
-                                                'fleet_status_vehicle_details_not_set',
-                                              )
-                                            : metadata['policeReportNumber']
-                                                  .toString(),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      _InfoRow(
-                                        label: t.t(
-                                          'fleet_status_vehicle_events_insurance_claim_number',
-                                        ),
-                                        value:
-                                            (metadata['insuranceClaimNumber'] ??
-                                                    '')
-                                                .toString()
-                                                .trim()
-                                                .isEmpty
-                                            ? t.t(
-                                                'fleet_status_vehicle_details_not_set',
-                                              )
-                                            : metadata['insuranceClaimNumber']
-                                                  .toString(),
-                                      ),
-                                      const SizedBox(height: 8),
-                                    ],
-                                    _InfoRow(
-                                      label: t.t(
-                                        'fleet_status_vehicle_documents_file_name',
-                                      ),
-                                      value: event.fileName.trim().isEmpty
-                                          ? t.t(
-                                              'fleet_status_vehicle_details_not_set',
-                                            )
-                                          : event.fileName,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    _InfoRow(
-                                      label: t.t(
-                                        'fleet_status_vehicle_documents_file_type',
-                                      ),
-                                      value: event.fileType.trim().isEmpty
-                                          ? t.t(
-                                              'fleet_status_vehicle_details_not_set',
-                                            )
-                                          : event.fileType,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    _InfoRow(
-                                      label: t.t('fleet_status_field_notes'),
-                                      value: event.notes.trim().isEmpty
-                                          ? t.t(
-                                              'fleet_status_vehicle_details_not_set',
-                                            )
-                                          : event.notes,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-          );
-          if (isWide) {
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(flex: 7, child: left),
-                Expanded(flex: 3, child: right),
-              ],
-            );
-          }
-          return SingleChildScrollView(
-            child: Column(
-              children: [left, right],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  List<Widget> _metadataRows(BuildContext context, FleetVehicle vehicle) {
-    final rows = <MapEntry<String, String>>[];
-    switch (vehicle.category) {
-      case VehicleCategory.armada:
-        final metadata = vehicle.metadata as ArmadaVehicleMetadata;
-        rows.add(
-          MapEntry(
-            AppLocalizations.of(context).t('fleet_status_field_armada_id'),
-            metadata.armadaId,
-          ),
-        );
-        rows.add(
-          MapEntry(
-            AppLocalizations.of(
-              context,
-            ).t('fleet_status_field_armada_company_name'),
-            metadata.armadaCompanyName,
-          ),
-        );
-        rows.add(
-          MapEntry(
-            AppLocalizations.of(
-              context,
-            ).t('fleet_status_field_contract_start_date'),
-            _formatStoredDate(context, metadata.contractStartDate),
-          ),
-        );
-        rows.add(
-          MapEntry(
-            AppLocalizations.of(
-              context,
-            ).t('fleet_status_field_contract_end_date'),
-            _formatStoredDate(context, metadata.contractEndDate),
-          ),
-        );
-        break;
-      case VehicleCategory.amazonPaidRental:
-        final metadata = vehicle.metadata as AmazonPaidRentalMetadata;
-        rows.add(
-          MapEntry(
-            AppLocalizations.of(
-              context,
-            ).t('fleet_status_field_rental_company_name'),
-            metadata.rentalCompanyName,
-          ),
-        );
-        rows.add(
-          MapEntry(
-            AppLocalizations.of(
-              context,
-            ).t('fleet_status_field_contract_number'),
-            metadata.contractNumber,
-          ),
-        );
-        rows.add(
-          MapEntry(
-            AppLocalizations.of(
-              context,
-            ).t('fleet_status_field_rental_start_date'),
-            _formatStoredDate(context, metadata.rentalStartDate),
-          ),
-        );
-        rows.add(
-          MapEntry(
-            AppLocalizations.of(
-              context,
-            ).t('fleet_status_field_rental_end_date'),
-            _formatStoredDate(context, metadata.rentalEndDate),
-          ),
-        );
-        break;
-      case VehicleCategory.selfSourcedRental:
-        final metadata = vehicle.metadata as SelfSourcedRentalMetadata;
-        rows.add(
-          MapEntry(
-            AppLocalizations.of(context).t('fleet_status_field_owner_name'),
-            metadata.ownerName,
-          ),
-        );
-        rows.add(
-          MapEntry(
-            AppLocalizations.of(
-              context,
-            ).t('fleet_status_field_owner_contact_number'),
-            metadata.ownerContactNumber,
-          ),
-        );
-        rows.add(
-          MapEntry(
-            AppLocalizations.of(
-              context,
-            ).t('fleet_status_field_rental_agreement_number'),
-            metadata.rentalAgreementNumber,
-          ),
-        );
-        rows.add(
-          MapEntry(
-            AppLocalizations.of(
-              context,
-            ).t('fleet_status_field_rental_start_date'),
-            _formatStoredDate(context, metadata.rentalStartDate),
-          ),
-        );
-        rows.add(
-          MapEntry(
-            AppLocalizations.of(
-              context,
-            ).t('fleet_status_field_rental_end_date'),
-            _formatStoredDate(context, metadata.rentalEndDate),
-          ),
-        );
-        break;
-      case VehicleCategory.selfOwnedRental:
-        final metadata = vehicle.metadata as SelfOwnedRentalMetadata;
-        rows.add(
-          MapEntry(
-            AppLocalizations.of(context).t('fleet_status_field_ownership_type'),
-            metadata.ownershipType,
-          ),
-        );
-        rows.add(
-          MapEntry(
-            AppLocalizations.of(context).t('fleet_status_field_purchase_date'),
-            _formatStoredDate(context, metadata.purchaseDate),
-          ),
-        );
-        break;
-    }
-
-    return rows
-        .map(
-          (entry) => Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: _InfoRow(
-              label: entry.key,
-              value: entry.value.trim().isEmpty
-                  ? AppLocalizations.of(
-                      context,
-                    ).t('fleet_status_vehicle_details_not_set')
-                  : entry.value,
-            ),
-          ),
-        )
-        .toList();
-  }
-}
-
-class _VehicleDocumentDialogResult {
-  const _VehicleDocumentDialogResult({required this.draft, required this.file});
-
-  final FleetVehicleDocumentDraft draft;
-  final PlatformFile file;
-}
-
-class _VehicleEventDialogResult {
-  const _VehicleEventDialogResult({required this.draft, required this.file});
-
-  final FleetVehicleEventDraft draft;
-  final PlatformFile? file;
-}
-
-class _VehicleEventDialog extends StatefulWidget {
-  const _VehicleEventDialog({this.event});
-
-  final FleetVehicleEvent? event;
-
-  @override
-  State<_VehicleEventDialog> createState() => _VehicleEventDialogState();
-}
-
-class _VehicleEventDialogState extends State<_VehicleEventDialog> {
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  late final TextEditingController _titleCtrl;
-  late final TextEditingController _eventDateCtrl;
-  late final TextEditingController _locationCtrl;
-  late final TextEditingController _policeReportCtrl;
-  late final TextEditingController _insuranceClaimCtrl;
-  late final TextEditingController _notesCtrl;
-  late String _eventType;
-  late String _damageLevel;
-  PlatformFile? _selectedFile;
-
-  bool get _isEditing => widget.event != null;
-
-  @override
-  void initState() {
-    super.initState();
-    final event = widget.event;
-    final metadata = event?.metadata ?? const <String, dynamic>{};
-    _titleCtrl = TextEditingController(text: event?.title ?? '');
-    _eventDateCtrl = TextEditingController(text: event?.eventDate ?? '');
-    _locationCtrl = TextEditingController(
-      text: (metadata['location'] ?? '').toString(),
-    );
-    _policeReportCtrl = TextEditingController(
-      text: (metadata['policeReportNumber'] ?? '').toString(),
-    );
-    _insuranceClaimCtrl = TextEditingController(
-      text: (metadata['insuranceClaimNumber'] ?? '').toString(),
-    );
-    _notesCtrl = TextEditingController(text: event?.notes ?? '');
-    _eventType = _resolveInitialEventType(event?.eventType);
-    _damageLevel = _resolveInitialDamageLevel(
-      metadata['damageLevel']?.toString(),
-    );
-  }
-
-  @override
-  void dispose() {
-    _titleCtrl.dispose();
-    _eventDateCtrl.dispose();
-    _locationCtrl.dispose();
-    _policeReportCtrl.dispose();
-    _insuranceClaimCtrl.dispose();
-    _notesCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _pickDate(TextEditingController controller) async {
-    final now = DateTime.now();
-    final parsed = DateTime.tryParse(controller.text.trim());
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: parsed ?? now,
-      firstDate: DateTime(now.year - 20),
-      lastDate: DateTime(now.year + 20),
-    );
-    if (picked == null) return;
-    controller.text =
-        '${picked.year.toString().padLeft(4, '0')}-'
-        '${picked.month.toString().padLeft(2, '0')}-'
-        '${picked.day.toString().padLeft(2, '0')}';
-    if (mounted) setState(() {});
-  }
-
-  Future<void> _pickFile() async {
-    final result = await FilePicker.platform.pickFiles(
-      allowMultiple: false,
-      withData: true,
-    );
-    if (result == null || result.files.isEmpty) return;
-    setState(() => _selectedFile = result.files.first);
-  }
-
-  String _resolveInitialDamageLevel(String? currentValue) {
-    final normalized = (currentValue ?? '').trim();
-    if (normalized.isNotEmpty) return normalized;
-    return fleetVehicleAccidentDamageLevelOptions.first;
-  }
-
-  String _resolveInitialEventType(String? currentValue) {
-    final normalized = (currentValue ?? '').trim();
-    if (normalized.isNotEmpty) return normalized;
-    return fleetVehicleEventTypeOptions.first;
-  }
-
-  List<String> _damageLevelItems() {
-    final items = <String>[...fleetVehicleAccidentDamageLevelOptions];
-    if (!items.contains(_damageLevel)) {
-      items.insert(0, _damageLevel);
-    }
-    return items;
-  }
-
-  List<String> _eventTypeItems() {
-    final items = <String>[...fleetVehicleEventTypeOptions];
-    if (!items.contains(_eventType)) {
-      items.insert(0, _eventType);
-    }
-    return items;
-  }
-
-  bool get _isAccidentType => _eventType.trim().toUpperCase() == 'ACCIDENT';
-
-  void _submit() {
-    final valid = _formKey.currentState?.validate() ?? false;
-    if (!valid) return;
-
-    final existing = widget.event;
-    final file = _selectedFile;
-    final resolvedFileName = file?.name ?? existing?.fileName ?? '';
-    Navigator.of(context).pop(
-      _VehicleEventDialogResult(
-        draft: FleetVehicleEventDraft(
-          eventType: _eventType.trim(),
-          title: _titleCtrl.text.trim(),
-          eventDate: _eventDateCtrl.text.trim(),
-          metadata: _isAccidentType
-              ? {
-                  'location': _locationCtrl.text.trim(),
-                  'damageLevel': _damageLevel.trim(),
-                  'policeReportNumber': _policeReportCtrl.text.trim(),
-                  'insuranceClaimNumber': _insuranceClaimCtrl.text.trim(),
-                }
-              : const <String, dynamic>{},
-          fileName: resolvedFileName,
-          fileType: _detectFileType(resolvedFileName, existing?.fileType ?? ''),
-          notes: _notesCtrl.text.trim(),
-        ),
-        file: file,
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final t = AppLocalizations.of(context);
-    final existing = widget.event;
-    return Dialog(
-      elevation: 8,
-      backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: const BorderSide(color: Color(0xFFE5E7EB)),
-      ),
-      insetPadding: const EdgeInsets.all(20),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 700),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  t.t(
-                    _isEditing
-                        ? 'fleet_status_vehicle_events_edit_title'
-                        : 'fleet_status_vehicle_events_add_title',
-                  ),
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 18),
-                TextFormField(
-                  controller: _titleCtrl,
-                  decoration: _documentInputDecoration(
-                    t.t('fleet_status_vehicle_events_title_field'),
-                  ),
-                  validator: (value) => _requiredText(
-                    context,
-                    value,
-                    t.t('fleet_status_vehicle_events_title_field'),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                DropdownButtonFormField<String>(
-                  value: _eventType,
-                  decoration: _documentInputDecoration(
-                    t.t('fleet_status_vehicle_events_type'),
-                  ),
-                  items: _eventTypeItems()
-                      .map(
-                        (type) => DropdownMenuItem<String>(
-                          value: type,
-                          child: Text(_eventTypeLabel(context, type)),
-                        ),
-                      )
-                      .toList(),
-                  dropdownColor: Colors.white,
-                  elevation: 8,
-                  borderRadius: BorderRadius.circular(14),
-                  onChanged: (value) {
-                    if (value == null) return;
-                    setState(() => _eventType = value);
-                  },
-                ),
-                const SizedBox(height: 14),
-                _DateInputField(
-                  controller: _eventDateCtrl,
-                  label: t.t('fleet_status_vehicle_events_event_date'),
-                  onPick: () => _pickDate(_eventDateCtrl),
-                  validator: (value) => _requiredDate(
-                    context,
-                    value,
-                    t.t('fleet_status_vehicle_events_event_date'),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                if (_isAccidentType) ...[
-                  TextFormField(
-                    controller: _locationCtrl,
-                    decoration: _documentInputDecoration(
-                      t.t('fleet_status_vehicle_events_location'),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  DropdownButtonFormField<String>(
-                    value: _damageLevel,
-                    decoration: _documentInputDecoration(
-                      t.t('fleet_status_vehicle_events_damage_level'),
-                    ),
-                    items: _damageLevelItems()
-                        .map(
-                          (level) => DropdownMenuItem<String>(
-                            value: level,
-                            child: Text(level),
-                          ),
-                        )
-                        .toList(),
-                    dropdownColor: Colors.white,
-                    elevation: 8,
-                    borderRadius: BorderRadius.circular(14),
-                    onChanged: (value) {
-                      if (value == null) return;
-                      setState(() => _damageLevel = value);
-                    },
-                  ),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: _policeReportCtrl,
-                    decoration: _documentInputDecoration(
-                      t.t('fleet_status_vehicle_events_police_report_number'),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: _insuranceClaimCtrl,
-                    decoration: _documentInputDecoration(
-                      t.t('fleet_status_vehicle_events_insurance_claim_number'),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                ],
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 8,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    CoButton(
-                      onPressed: _pickFile,
-                      icon: Icons.upload_file_outlined,
-                      label: _selectedFile == null
-                          ? t.t('fleet_status_vehicle_events_pick_file')
-                          : t.t('fleet_status_vehicle_events_change_file'),
-                      variant: CoButtonVariant.secondaryOutlined,
-                    ),
-                    SizedBox(
-                      width: 280,
-                      child: Text(
-                        _selectedFile?.name ??
-                            existing?.fileName ??
-                            t.t('fleet_status_vehicle_events_no_file'),
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: _FleetStatusPageState._kMuted,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: _notesCtrl,
-                  minLines: 3,
-                  maxLines: 5,
-                  decoration: _documentInputDecoration(
-                    t.t('fleet_status_field_notes'),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    CoButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      label: t.t('button_close'),
-                      variant: CoButtonVariant.quiet,
-                    ),
-                    const SizedBox(width: 10),
-                    CoButton(
-                      onPressed: _submit,
-                      label: t.t(_isEditing ? 'button_save' : 'button_add'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _VehicleDocumentDialog extends StatefulWidget {
-  const _VehicleDocumentDialog({this.document});
-
-  final FleetVehicleDocument? document;
-
-  @override
-  State<_VehicleDocumentDialog> createState() => _VehicleDocumentDialogState();
-}
-
-class _VehicleDocumentDialogState extends State<_VehicleDocumentDialog> {
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-
-  late final TextEditingController _documentNumberCtrl;
-  late final TextEditingController _expiryDateCtrl;
-  late final TextEditingController _notesCtrl;
-  late String _documentType;
-  PlatformFile? _selectedFile;
-
-  bool get _isEditing => widget.document != null;
-
-  @override
-  void initState() {
-    super.initState();
-    final document = widget.document;
-    _documentType = _resolveInitialDocumentType(document?.documentType);
-    _documentNumberCtrl = TextEditingController(
-      text: document?.documentNumber ?? '',
-    );
-    _expiryDateCtrl = TextEditingController(text: document?.expiryDate ?? '');
-    _notesCtrl = TextEditingController(text: document?.notes ?? '');
-  }
-
-  @override
-  void dispose() {
-    _documentNumberCtrl.dispose();
-    _expiryDateCtrl.dispose();
-    _notesCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _pickDate(TextEditingController controller) async {
-    final now = DateTime.now();
-    final parsed = DateTime.tryParse(controller.text.trim());
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: parsed ?? now,
-      firstDate: DateTime(now.year - 20),
-      lastDate: DateTime(now.year + 20),
-    );
-    if (picked == null) return;
-    controller.text =
-        '${picked.year.toString().padLeft(4, '0')}-'
-        '${picked.month.toString().padLeft(2, '0')}-'
-        '${picked.day.toString().padLeft(2, '0')}';
-    if (mounted) setState(() {});
-  }
-
-  Future<void> _pickFile() async {
-    final result = await FilePicker.platform.pickFiles(
-      allowMultiple: false,
-      withData: true,
-    );
-    if (result == null || result.files.isEmpty) return;
-    setState(() => _selectedFile = result.files.first);
-  }
-
-  String _resolveInitialDocumentType(String? currentValue) {
-    final normalized = _canonicalVehicleDocumentType(
-      (currentValue ?? '').trim(),
-    );
-    if (normalized.isNotEmpty) {
-      return normalized;
-    }
-    return _vehicleDocumentTypeOptions.first;
-  }
-
-  List<String> _documentTypeItems() {
-    final items = <String>[..._vehicleDocumentTypeOptions];
-    if (!items.contains(_documentType)) {
-      items.insert(0, _documentType);
-    }
-    return items;
-  }
-
-  void _submit() {
-    final valid = _formKey.currentState?.validate() ?? false;
-    if (!valid) return;
-
-    if (!_isEditing &&
-        (_selectedFile == null || _selectedFile!.bytes == null)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: _FleetStatusPageState._kRed,
-          content: Text(
-            AppLocalizations.of(
-              context,
-            ).t('fleet_status_vehicle_documents_file_required'),
-          ),
-        ),
-      );
-      return;
-    }
-
-    final existing = widget.document;
-    final file =
-        _selectedFile ??
-        PlatformFile(name: existing?.fileName ?? '', size: 0, bytes: null);
-
-    Navigator.of(context).pop(
-      _VehicleDocumentDialogResult(
-        draft: FleetVehicleDocumentDraft(
-          documentType: _documentType.trim(),
-          documentNumber: _documentNumberCtrl.text.trim(),
-          expiryDate: _expiryDateCtrl.text.trim(),
-          fileName: file.name.trim().isEmpty
-              ? (existing?.fileName ?? '')
-              : file.name,
-          fileType: _detectFileType(file.name, existing?.fileType ?? ''),
-          notes: _notesCtrl.text.trim(),
-        ),
-        file: file,
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final t = AppLocalizations.of(context);
-    final existing = widget.document;
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 12,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-        ),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: 680,
-            maxHeight: MediaQuery.of(context).size.height * 0.92,
-          ),
-          child: SingleChildScrollView(
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE5E7EB),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                Text(
-                  t.t(
-                    _isEditing
-                        ? 'fleet_status_vehicle_documents_edit_title'
-                        : 'fleet_status_vehicle_documents_add_title',
-                  ),
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 18),
-                if (_isEditing)
-                  InputDecorator(
-                    decoration: _documentInputDecoration(
-                      t.t('fleet_status_vehicle_documents_document_type'),
-                    ),
-                    child: Text(
-                      _documentTypeLabel(_documentType),
-                      style: const TextStyle(
-                        color: _FleetStatusPageState._kText,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  )
-                else
-                  DropdownButtonFormField<String>(
-                    value: _documentType,
-                    decoration: _documentInputDecoration(
-                      t.t('fleet_status_vehicle_documents_document_type'),
-                    ),
-                    items: _documentTypeItems()
-                        .map(
-                          (type) => DropdownMenuItem<String>(
-                            value: type,
-                            child: Text(_documentTypeLabel(type)),
-                          ),
-                        )
-                        .toList(),
-                    dropdownColor: Colors.white,
-                    elevation: 8,
-                    borderRadius: BorderRadius.circular(14),
-                    onChanged: (value) {
-                      if (value == null) return;
-                      setState(() => _documentType = value);
-                    },
-                  ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: _documentNumberCtrl,
-                  decoration: _documentInputDecoration(
-                    t.t('fleet_status_vehicle_documents_document_number'),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                _DateInputField(
-                  controller: _expiryDateCtrl,
-                  label: t.t(
-                    'fleet_status_vehicle_documents_expiry_date',
-                  ),
-                  onPick: () => _pickDate(_expiryDateCtrl),
-                  validator: (value) => _requiredDate(
-                    context,
-                    value,
-                    t.t('fleet_status_vehicle_documents_expiry_date'),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 8,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    CoButton(
-                      onPressed: _pickFile,
-                      icon: Icons.upload_file_outlined,
-                      label: _selectedFile == null
-                          ? t.t('fleet_status_vehicle_documents_pick_file')
-                          : t.t('fleet_status_vehicle_documents_change_file'),
-                      variant: CoButtonVariant.secondaryOutlined,
-                    ),
-                    SizedBox(
-                      width: 280,
-                      child: Text(
-                        _selectedFile?.name ??
-                            existing?.fileName ??
-                            t.t('fleet_status_vehicle_documents_no_file'),
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: _FleetStatusPageState._kMuted,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: _notesCtrl,
-                  minLines: 3,
-                  maxLines: 5,
-                  decoration: _documentInputDecoration(
-                    t.t('fleet_status_field_notes'),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    CoButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      label: t.t('button_close'),
-                      variant: CoButtonVariant.quiet,
-                    ),
-                    const SizedBox(width: 10),
-                    CoButton(
-                      onPressed: _submit,
-                      label: t.t(_isEditing ? 'button_save' : 'button_add'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  String _serviceStartLabel(BuildContext context, FleetVehicle vehicle) {
-    switch (vehicle.category) {
-      case VehicleCategory.armada:
-        final metadata = vehicle.metadata as ArmadaVehicleMetadata;
-        return _dateOrNotApplicable(context, metadata.contractStartDate);
-      case VehicleCategory.amazonPaidRental:
-        final metadata = vehicle.metadata as AmazonPaidRentalMetadata;
-        return _dateOrNotApplicable(context, metadata.rentalStartDate);
-      case VehicleCategory.selfSourcedRental:
-        final metadata = vehicle.metadata as SelfSourcedRentalMetadata;
-        return _dateOrNotApplicable(context, metadata.rentalStartDate);
-      case VehicleCategory.selfOwnedRental:
-        return AppLocalizations.of(context).t('fleet_status_not_applicable');
-    }
-  }
-
-  String _serviceEndLabel(BuildContext context, FleetVehicle vehicle) {
-    return _optionalStoredDate(context, vehicle.serviceEndDate);
-  }
-
-  String _dateOrNotApplicable(BuildContext context, String value) {
-    if (value.trim().isEmpty) {
-      return AppLocalizations.of(context).t('fleet_status_not_applicable');
-    }
-    return _formatStoredDate(context, value);
-  }
-
-  Widget _buildTableActionButton({
-    required String tooltip,
-    required IconData icon,
-    required VoidCallback onPressed,
-    Color color = const Color(0xFF4B5563),
-  }) {
-    return IconButton(
-      tooltip: tooltip,
-      onPressed: onPressed,
-      padding: EdgeInsets.zero,
-      visualDensity: VisualDensity.compact,
-      constraints: const BoxConstraints.tightFor(width: 28, height: 28),
-      icon: Icon(icon, size: 20, color: color),
-    );
-  }
-}
-
 class _DocumentStatusPresentation {
   const _DocumentStatusPresentation({required this.label, required this.color});
 
@@ -4416,45 +4812,6 @@ const List<String> _vehicleDocumentTypeOptions = <String>[
   'SERVICE_REPORT',
 ];
 
-class _ToolbarDropdown extends StatelessWidget {
-  const _ToolbarDropdown({
-    required this.value,
-    required this.onChanged,
-    required this.items,
-  });
-
-  final String value;
-  final ValueChanged<String?> onChanged;
-  final List<DropdownMenuItem<String>> items;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 48,
-      child: Container(
-        constraints: const BoxConstraints(minWidth: 210),
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF9FAFB),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: _FleetStatusPageState._kBorder),
-        ),
-        child: DropdownButtonHideUnderline(
-          child: DropdownButton<String>(
-            isExpanded: true,
-            value: value,
-            dropdownColor: Colors.white,
-            elevation: 8,
-            borderRadius: BorderRadius.circular(14),
-            onChanged: onChanged,
-            items: items,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle({required this.text});
 
@@ -4473,94 +4830,6 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
-class _VehicleTableHeaderCell extends StatelessWidget {
-  const _VehicleTableHeaderCell({
-    required this.label,
-    required this.flex,
-    this.alignment = Alignment.centerLeft,
-  });
-
-  final String label;
-  final int flex;
-  final Alignment alignment;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      flex: flex,
-      child: Align(
-        alignment: alignment,
-        child: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF6B7280),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SoftPill extends StatelessWidget {
-  const _SoftPill({
-    required this.label,
-    required this.textColor,
-    required this.backgroundColor,
-  });
-
-  final String label;
-  final Color textColor;
-  final Color backgroundColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: textColor,
-          fontWeight: FontWeight.w600,
-          fontSize: 11,
-        ),
-      ),
-    );
-  }
-}
-
-class _MissingDocumentsBadge extends StatelessWidget {
-  const _MissingDocumentsBadge({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFDE2E1),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Color(0xFFDC2626),
-          fontWeight: FontWeight.w600,
-          fontSize: 11,
-        ),
-      ),
-    );
-  }
-}
-
 // ─── Wartung / Verschleißteile (Reifen, Bremsen, Öl …) ────────────────
 //
 // Speichert pro Fahrzeug Wechsel als Vehicle-Event mit
@@ -4569,812 +4838,6 @@ class _MissingDocumentsBadge extends StatelessWidget {
 // Rules-Änderung nötig). Berechnet je Bauteil, wie viele km das
 // vorige Teil gehalten hat (Differenz der KM-Stände beim nächsten
 // Wechsel).
-
-const String _kMaintenanceEventType = 'MAINTENANCE';
-const List<String> _kMaintenanceComponents = <String>[
-  'TIRE',
-  'BRAKE',
-  'OIL',
-  'OTHER',
-];
-
-String _maintComponentLabel(String code, String lang) {
-  switch (code.trim().toUpperCase()) {
-    case 'TIRE':
-      return lang == 'de' ? 'Reifen' : 'Tires';
-    case 'BRAKE':
-      return lang == 'de' ? 'Bremsen' : 'Brakes';
-    case 'OIL':
-      return lang == 'de' ? 'Öl' : 'Oil';
-    default:
-      return lang == 'de' ? 'Sonstiges' : 'Other';
-  }
-}
-
-IconData _maintComponentIcon(String code) {
-  switch (code.trim().toUpperCase()) {
-    case 'TIRE':
-      return Icons.tire_repair;
-    case 'BRAKE':
-      return Icons.album_outlined;
-    case 'OIL':
-      return Icons.oil_barrel_outlined;
-    default:
-      return Icons.build_circle_outlined;
-  }
-}
-
-String _fmtKm(int km) {
-  final s = km.abs().toString();
-  final buf = StringBuffer();
-  for (var i = 0; i < s.length; i++) {
-    if (i > 0 && (s.length - i) % 3 == 0) buf.write('.');
-    buf.write(s[i]);
-  }
-  return '${km < 0 ? '-' : ''}${buf.toString()}';
-}
-
-int? _maintKmOf(FleetVehicleEvent e) {
-  final v = e.metadata['kmStand'];
-  if (v is int) return v;
-  if (v is num) return v.toInt();
-  return int.tryParse('${v ?? ''}'.trim());
-}
-
-/// One maintenance row with computed lifetime (how long this part held).
-class _MaintRow {
-  _MaintRow({
-    required this.event,
-    required this.component,
-    required this.label,
-    required this.km,
-    required this.kmHeld,
-    required this.isCurrent,
-  });
-
-  final FleetVehicleEvent event;
-  final String component;
-  final String label;
-  final int? km;
-  final int? kmHeld; // km the part lasted until the next change of same component
-  final bool isCurrent; // newest of its component → still mounted
-}
-
-List<_MaintRow> _computeMaintLifetimes(List<FleetVehicleEvent> records) {
-  String compOf(FleetVehicleEvent e) =>
-      (e.metadata['component'] ?? 'OTHER').toString().trim().toUpperCase();
-  String labelOf(FleetVehicleEvent e) =>
-      (e.metadata['label'] ?? '').toString().trim();
-
-  final byComp = <String, List<FleetVehicleEvent>>{};
-  for (final e in records) {
-    byComp.putIfAbsent(compOf(e), () => <FleetVehicleEvent>[]).add(e);
-  }
-
-  final rows = <_MaintRow>[];
-  for (final entry in byComp.entries) {
-    final withKm = entry.value.where((e) => _maintKmOf(e) != null).toList()
-      ..sort((a, b) => _maintKmOf(a)!.compareTo(_maintKmOf(b)!));
-    for (var i = 0; i < withKm.length; i++) {
-      final e = withKm[i];
-      final isCurrent = i == withKm.length - 1;
-      final held = isCurrent ? null : _maintKmOf(withKm[i + 1])! - _maintKmOf(e)!;
-      rows.add(_MaintRow(
-        event: e,
-        component: entry.key,
-        label: labelOf(e),
-        km: _maintKmOf(e),
-        kmHeld: held,
-        isCurrent: isCurrent,
-      ));
-    }
-    // Records without a KM value can't be computed — list them as-is.
-    for (final e in entry.value.where((e) => _maintKmOf(e) == null)) {
-      rows.add(_MaintRow(
-        event: e,
-        component: entry.key,
-        label: labelOf(e),
-        km: null,
-        kmHeld: null,
-        isCurrent: false,
-      ));
-    }
-  }
-  // Display newest first (highest KM first; unknown KM last).
-  rows.sort((a, b) => (b.km ?? -1).compareTo(a.km ?? -1));
-  return rows;
-}
-
-class _VehicleMaintenanceSection extends StatelessWidget {
-  const _VehicleMaintenanceSection({
-    required this.dspUid,
-    required this.plateNumber,
-    required this.eventService,
-    required this.canManage,
-  });
-
-  final String dspUid;
-  final String plateNumber;
-  final FleetVehicleEventService eventService;
-  final bool canManage;
-
-  String _ml(BuildContext context, String en, String de) =>
-      Localizations.localeOf(context).languageCode == 'de' ? de : en;
-
-  Future<void> _add(BuildContext context) async {
-    final lang = Localizations.localeOf(context).languageCode;
-    final messenger = ScaffoldMessenger.of(context);
-    final result = await showModalBottomSheet<_MaintDraftResult>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (_) => _MaintenanceDialog(lang: lang),
-    );
-    if (result == null) return;
-    try {
-      await eventService.createEvent(
-        dspUid: dspUid,
-        plateNumber: plateNumber,
-        draft: FleetVehicleEventDraft(
-          eventType: _kMaintenanceEventType,
-          title: result.label.isNotEmpty
-              ? result.label
-              : _maintComponentLabel(result.component, lang),
-          eventDate: result.date,
-          metadata: <String, dynamic>{
-            'component': result.component,
-            'label': result.label,
-            'kmStand': result.kmStand,
-          },
-          fileName: '',
-          fileType: '',
-          notes: result.notes,
-        ),
-      );
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(_ml(context, 'Maintenance entry saved.',
-              'Wartungseintrag gespeichert.')),
-        ),
-      );
-    } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(
-          backgroundColor: _FleetStatusPageState._kRed,
-          content: Text(_ml(context, 'Could not save: $e',
-              'Speichern fehlgeschlagen: $e')),
-        ),
-      );
-    }
-  }
-
-  Future<void> _delete(BuildContext context, FleetVehicleEvent event) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(_ml(ctx, 'Delete entry', 'Eintrag löschen')),
-        content: Text(_ml(ctx, 'Permanently remove this maintenance entry?',
-            'Diesen Wartungseintrag dauerhaft entfernen?')),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(_ml(ctx, 'Cancel', 'Abbrechen')),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: _FleetStatusPageState._kRed,
-            ),
-            child: Text(_ml(ctx, 'Delete', 'Löschen')),
-          ),
-        ],
-      ),
-    );
-    if (ok != true) return;
-    try {
-      await eventService.softDeleteEvent(
-        dspUid: dspUid,
-        plateNumber: plateNumber,
-        eventId: event.eventId,
-      );
-    } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(
-          backgroundColor: _FleetStatusPageState._kRed,
-          content: Text(_ml(context, 'Could not delete: $e',
-              'Löschen fehlgeschlagen: $e')),
-        ),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final lang = Localizations.localeOf(context).languageCode;
-    return _ProfileStyleCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  _ml(context, 'Maintenance / wear parts',
-                      'Wartung / Verschleißteile'),
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: _FleetStatusPageState._kText,
-                  ),
-                ),
-              ),
-              if (canManage)
-                CoButton(
-                  onPressed: () => _add(context),
-                  icon: Icons.add,
-                  label: _ml(context, 'Add', 'Hinzufügen'),
-                ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            _ml(
-              context,
-              'Log tire / brake / oil changes by mileage — the system computes how long each part lasted.',
-              'Reifen-/Bremsen-/Öl-Wechsel nach Kilometerstand erfassen — das System berechnet, wie lange jedes Teil gehalten hat.',
-            ),
-            style: const TextStyle(
-              fontSize: 12.5,
-              color: _FleetStatusPageState._kMuted,
-              height: 1.35,
-            ),
-          ),
-          const SizedBox(height: 14),
-          StreamBuilder<List<FleetVehicleEvent>>(
-            stream: eventService.watchEvents(
-              dspUid: dspUid,
-              plateNumber: plateNumber,
-              eventType: _kMaintenanceEventType,
-            ),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting &&
-                  !snapshot.hasData) {
-                return const CoStateSwitcher(
-                  child: LinearProgressIndicator(
-                    key: ValueKey('maint-loading'),
-                    minHeight: 2,
-                  ),
-                );
-              }
-              if (snapshot.hasError) {
-                return CoStateSwitcher(
-                  child: Text(
-                    key: const ValueKey('maint-error'),
-                    _ml(context, 'Could not load maintenance records.',
-                        'Wartungseinträge konnten nicht geladen werden.'),
-                  ),
-                );
-              }
-              final records = (snapshot.data ?? const <FleetVehicleEvent>[])
-                  .where((e) => !e.isDeleted)
-                  .toList();
-              if (records.isEmpty) {
-                return CoStateSwitcher(
-                  child: Container(
-                    key: const ValueKey('maint-empty'),
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF9FAFB),
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                        color: _FleetStatusPageState._kBorder,
-                      ),
-                    ),
-                    child: Text(
-                      _ml(context, 'No maintenance entries yet.',
-                          'Noch keine Wartungseinträge.'),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: _FleetStatusPageState._kMuted,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                );
-              }
-              final rows = _computeMaintLifetimes(records);
-              return CoStateSwitcher(
-                child: Column(
-                  key: const ValueKey('maint-list'),
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: rows
-                      .map((r) => _MaintTile(
-                            row: r,
-                            lang: lang,
-                            canManage: canManage,
-                            onDelete: () => _delete(context, r.event),
-                            ml: _ml,
-                          ))
-                      .toList(),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MaintTile extends StatelessWidget {
-  const _MaintTile({
-    required this.row,
-    required this.lang,
-    required this.canManage,
-    required this.onDelete,
-    required this.ml,
-  });
-
-  final _MaintRow row;
-  final String lang;
-  final bool canManage;
-  final VoidCallback onDelete;
-  final String Function(BuildContext, String, String) ml;
-
-  @override
-  Widget build(BuildContext context) {
-    final compLabel = _maintComponentLabel(row.component, lang);
-    final title = row.label.isNotEmpty ? '$compLabel — ${row.label}' : compLabel;
-    final kmText = row.km != null
-        ? '${ml(context, 'Mileage', 'KM-Stand')}: ${_fmtKm(row.km!)} km'
-        : ml(context, 'Mileage: not set', 'KM-Stand: nicht gesetzt');
-    final date = row.event.eventDate.trim();
-
-    Widget? lifetimeBadge;
-    if (row.kmHeld != null) {
-      final name = row.label.isNotEmpty ? row.label : compLabel;
-      lifetimeBadge = _maintBadge(
-        color: const Color(0xFF067647),
-        bg: const Color(0xFFD1FAE5),
-        border: const Color(0xFF34D399),
-        icon: Icons.timelapse_rounded,
-        text: ml(context, '$name lasted ${_fmtKm(row.kmHeld!)} km',
-            '$name hat ${_fmtKm(row.kmHeld!)} km gehalten'),
-      );
-    } else if (row.isCurrent && row.km != null) {
-      lifetimeBadge = _maintBadge(
-        color: const Color(0xFF1D4ED8),
-        bg: const Color(0xFFDBEAFE),
-        border: const Color(0xFF93C5FD),
-        icon: Icons.check_circle_outline,
-        text: ml(context, 'Currently fitted (since ${_fmtKm(row.km!)} km)',
-            'Aktuell montiert (seit ${_fmtKm(row.km!)} km)'),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF7F8F8),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE1E4EA)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(_maintComponentIcon(row.component),
-                    size: 20, color: _FleetStatusPageState._kText),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: _FleetStatusPageState._kText,
-                    ),
-                  ),
-                ),
-                if (date.isNotEmpty)
-                  Text(
-                    date,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: _FleetStatusPageState._kMuted,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                if (canManage) ...[
-                  const SizedBox(width: 4),
-                  InkWell(
-                    onTap: onDelete,
-                    borderRadius: BorderRadius.circular(8),
-                    child: const Padding(
-                      padding: EdgeInsets.all(4),
-                      child: Icon(Icons.delete_outline_rounded,
-                          size: 18, color: _FleetStatusPageState._kMuted),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              kmText,
-              style: const TextStyle(
-                fontSize: 13,
-                color: _FleetStatusPageState._kText,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            if (row.event.notes.trim().isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                row.event.notes.trim(),
-                style: const TextStyle(
-                  fontSize: 12.5,
-                  color: _FleetStatusPageState._kMuted,
-                  height: 1.35,
-                ),
-              ),
-            ],
-            if (lifetimeBadge != null) ...[
-              const SizedBox(height: 10),
-              lifetimeBadge,
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _maintBadge({
-    required Color color,
-    required Color bg,
-    required Color border,
-    required IconData icon,
-    required String text,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: border),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              text,
-              style: TextStyle(
-                fontSize: 13,
-                color: color,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MaintDraftResult {
-  _MaintDraftResult({
-    required this.component,
-    required this.label,
-    required this.kmStand,
-    required this.date,
-    required this.notes,
-  });
-
-  final String component;
-  final String label;
-  final int kmStand;
-  final String date; // YYYY-MM-DD
-  final String notes;
-}
-
-class _MaintenanceDialog extends StatefulWidget {
-  const _MaintenanceDialog({required this.lang});
-  final String lang;
-
-  @override
-  State<_MaintenanceDialog> createState() => _MaintenanceDialogState();
-}
-
-class _MaintenanceDialogState extends State<_MaintenanceDialog> {
-  String _component = 'TIRE';
-  final _labelCtrl = TextEditingController();
-  final _kmCtrl = TextEditingController();
-  final _notesCtrl = TextEditingController();
-  late DateTime _date = DateTime.now();
-  String? _error;
-
-  String get _lang => widget.lang;
-  String _ml(String en, String de) => _lang == 'de' ? de : en;
-
-  @override
-  void dispose() {
-    _labelCtrl.dispose();
-    _kmCtrl.dispose();
-    _notesCtrl.dispose();
-    super.dispose();
-  }
-
-  String _fmtDate(DateTime d) {
-    String two(int v) => v < 10 ? '0$v' : '$v';
-    return '${d.year}-${two(d.month)}-${two(d.day)}';
-  }
-
-  void _submit() {
-    final kmRaw = _kmCtrl.text.trim().replaceAll('.', '').replaceAll(' ', '');
-    final km = int.tryParse(kmRaw);
-    if (km == null || km < 0) {
-      setState(() => _error =
-          _ml('Enter a valid mileage (km).', 'Bitte gültigen KM-Stand eingeben.'));
-      return;
-    }
-    Navigator.of(context).pop(
-      _MaintDraftResult(
-        component: _component,
-        label: _labelCtrl.text.trim(),
-        kmStand: km,
-        date: _fmtDate(_date),
-        notes: _notesCtrl.text.trim(),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 12,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE5E7EB),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              _ml('Add maintenance entry', 'Wartungseintrag hinzufügen'),
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF111827),
-              ),
-            ),
-            const SizedBox(height: 14),
-            DropdownButtonFormField<String>(
-              value: _component,
-              decoration: InputDecoration(
-                labelText: _ml('Component', 'Bauteil'),
-                filled: true,
-                fillColor: const Color(0xFFF9FAFB),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              items: _kMaintenanceComponents
-                  .map((c) => DropdownMenuItem<String>(
-                        value: c,
-                        child: Text(_maintComponentLabel(c, _lang)),
-                      ))
-                  .toList(),
-              onChanged: (v) => setState(() => _component = v ?? 'TIRE'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _labelCtrl,
-              decoration: InputDecoration(
-                labelText: _ml('Label / designation (e.g. "TireXY")',
-                    'Bezeichnung (z. B. "ReifenXY")'),
-                filled: true,
-                fillColor: const Color(0xFFF9FAFB),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _kmCtrl,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: _ml('Mileage at change (km)', 'KM-Stand beim Wechsel'),
-                hintText: 'z. B. 45000',
-                filled: true,
-                fillColor: const Color(0xFFF9FAFB),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            InkWell(
-              onTap: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: _date,
-                  firstDate: DateTime(2015),
-                  lastDate: DateTime(2100),
-                );
-                if (picked != null) setState(() => _date = picked);
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: InputDecorator(
-                decoration: InputDecoration(
-                  labelText: _ml('Change date', 'Wechseldatum'),
-                  filled: true,
-                  fillColor: const Color(0xFFF9FAFB),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(_fmtDate(_date)),
-                    const Icon(Icons.calendar_today_rounded, size: 18),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _notesCtrl,
-              maxLines: 3,
-              minLines: 2,
-              decoration: InputDecoration(
-                labelText: _ml('Notes (optional)', 'Notizen (optional)'),
-                filled: true,
-                fillColor: const Color(0xFFF9FAFB),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 10),
-              Text(
-                _error!,
-                style: const TextStyle(
-                  color: Color(0xFFB91C1C),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text(_ml('Cancel', 'Abbrechen')),
-                ),
-                const SizedBox(width: 8),
-                FilledButton.icon(
-                  onPressed: _submit,
-                  icon: const Icon(Icons.check_rounded, size: 18),
-                  label: Text(_ml('Save', 'Speichern')),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ProfileStyleCard extends StatelessWidget {
-  const _ProfileStyleCard({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
-      child: child,
-    );
-  }
-}
-
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontWeight: FontWeight.w800,
-          fontSize: 12,
-        ),
-      ),
-    );
-  }
-}
-
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Text(
-            label,
-            style: const TextStyle(
-              color: _FleetStatusPageState._kMuted,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Flexible(
-          child: Text(
-            value,
-            textAlign: TextAlign.right,
-            style: const TextStyle(
-              color: _FleetStatusPageState._kText,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 class _DateInputField extends StatelessWidget {
   const _DateInputField({
@@ -5421,14 +4884,32 @@ class _DateInputField extends StatelessWidget {
   }
 }
 
+/// Result of the grounding dialog: optional "back in service" date plus —
+/// for Grounded (Service) — the workshop the vehicle was sent to.
+class _GroundingDialogResult {
+  const _GroundingDialogResult({
+    required this.serviceEndDate,
+    this.workshop = '',
+  });
+
+  final String serviceEndDate;
+  final String workshop;
+}
+
 class _ServiceEndDateDialog extends StatefulWidget {
   const _ServiceEndDateDialog({
     required this.initialValue,
     required this.requiredValue,
+    this.askWorkshop = false,
+    this.initialWorkshop = '',
   });
 
   final String initialValue;
   final bool requiredValue;
+
+  /// Grounded (Service): additionally show a workshop text field.
+  final bool askWorkshop;
+  final String initialWorkshop;
 
   @override
   State<_ServiceEndDateDialog> createState() => _ServiceEndDateDialogState();
@@ -5437,16 +4918,19 @@ class _ServiceEndDateDialog extends StatefulWidget {
 class _ServiceEndDateDialogState extends State<_ServiceEndDateDialog> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   late final TextEditingController _controller;
+  late final TextEditingController _workshopController;
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.initialValue);
+    _workshopController = TextEditingController(text: widget.initialWorkshop);
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _workshopController.dispose();
     super.dispose();
   }
 
@@ -5470,28 +4954,65 @@ class _ServiceEndDateDialogState extends State<_ServiceEndDateDialog> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final de = Localizations.localeOf(context).languageCode == 'de';
     return AlertDialog(
       title: Text(t.t('fleet_status_field_service_end_date')),
       content: SizedBox(
         width: 360,
         child: Form(
           key: _formKey,
-          child: _DateInputField(
-            controller: _controller,
-            label: t.t('fleet_status_field_service_end_date'),
-            onPick: _pickDate,
-            validator: (value) {
-              final trimmed = (value ?? '').trim();
-              if (widget.requiredValue && trimmed.isEmpty) {
-                return t.tf('error_required', {
-                  'field': t.t('fleet_status_field_service_end_date'),
-                });
-              }
-              if (trimmed.isNotEmpty && !isValidVehicleDate(trimmed)) {
-                return t.t('fleet_status_invalid_date');
-              }
-              return null;
-            },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _DateInputField(
+                controller: _controller,
+                label: t.t('fleet_status_field_service_end_date'),
+                onPick: _pickDate,
+                validator: (value) {
+                  final trimmed = (value ?? '').trim();
+                  if (widget.requiredValue && trimmed.isEmpty) {
+                    return t.tf('error_required', {
+                      'field': t.t('fleet_status_field_service_end_date'),
+                    });
+                  }
+                  if (trimmed.isNotEmpty && !isValidVehicleDate(trimmed)) {
+                    return t.t('fleet_status_invalid_date');
+                  }
+                  return null;
+                },
+              ),
+              if (widget.askWorkshop) ...[
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _workshopController,
+                  decoration: InputDecoration(
+                    labelText: de
+                        ? 'Werkstatt (wohin wurde das Fahrzeug gebracht?)'
+                        : 'Workshop (where was the vehicle sent?)',
+                    filled: true,
+                    fillColor: const Color(0xFFF9FAFB),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(
+                        color: _FleetStatusPageState._kBorder,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(
+                        color: _FleetStatusPageState._kBorder,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(
+                        color: _FleetStatusPageState._kGreen,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       ),
@@ -5504,60 +5025,18 @@ class _ServiceEndDateDialogState extends State<_ServiceEndDateDialog> {
         CoButton(
           onPressed: () {
             if (!(_formKey.currentState?.validate() ?? false)) return;
-            Navigator.of(context).pop(_controller.text.trim());
+            Navigator.of(context).pop(
+              _GroundingDialogResult(
+                serviceEndDate: _controller.text.trim(),
+                workshop: _workshopController.text.trim(),
+              ),
+            );
           },
           label: t.t('button_save'),
         ),
       ],
     );
   }
-}
-
-InputDecoration _documentInputDecoration(String label) {
-  return InputDecoration(
-    labelText: label,
-    filled: true,
-    fillColor: const Color(0xFFF9FAFB),
-    border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(16),
-      borderSide: const BorderSide(color: _FleetStatusPageState._kBorder),
-    ),
-    enabledBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(16),
-      borderSide: const BorderSide(color: _FleetStatusPageState._kBorder),
-    ),
-    focusedBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(16),
-      borderSide: const BorderSide(color: _FleetStatusPageState._kGreen),
-    ),
-  );
-}
-
-String? _requiredText(BuildContext context, String? value, String field) {
-  if ((value ?? '').trim().isEmpty) {
-    return AppLocalizations.of(context).tf('error_required', {'field': field});
-  }
-  return null;
-}
-
-String? _requiredDate(BuildContext context, String? value, String field) {
-  final trimmed = (value ?? '').trim();
-  if (trimmed.isEmpty) {
-    return AppLocalizations.of(context).tf('error_required', {'field': field});
-  }
-  if (!isValidVehicleDate(trimmed)) {
-    return AppLocalizations.of(context).t('fleet_status_invalid_date');
-  }
-  return null;
-}
-
-String _detectFileType(String fileName, String fallback) {
-  final lower = fileName.toLowerCase();
-  if (lower.endsWith('.pdf')) return 'PDF';
-  if (lower.endsWith('.png')) return 'PNG';
-  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'JPG';
-  if (lower.endsWith('.webp')) return 'WEBP';
-  return fallback.trim().isEmpty ? 'FILE' : fallback.trim().toUpperCase();
 }
 
 Map<String, _VehicleListComplianceSummary> _buildComplianceByPlate(
@@ -5588,19 +5067,67 @@ Map<String, _VehicleListComplianceSummary> _buildComplianceByPlate(
     }).length;
 
     final tuvDocument = perType['HU_TUV_CERTIFICATE'];
-    final tuvStatus = tuvDocument == null
-        ? FleetVehicleDocumentStatus.missing
-        : service.getDocumentStatus(
-            expiryDate: tuvDocument.expiryDate,
-            fileUrl: tuvDocument.fileUrl,
-          );
 
     result[entry.key] = _VehicleListComplianceSummary(
-      tuvStatus: tuvStatus,
+      tuvStatus: _tuvStatusForDocument(tuvDocument, service),
       missingCount: missingCount,
     );
   }
 
+  return result;
+}
+
+/// TÜV status for the list/filter. Unlike the generic document status, a
+/// TÜV record with a known HU date but no uploaded certificate still counts:
+/// the date alone decides between active / expiring soon / expired. This is
+/// what makes date-only TÜV entries (added via the vehicle editor) work.
+FleetVehicleDocumentStatus _tuvStatusForDocument(
+  FleetVehicleDocument? document,
+  FleetVehicleDocumentService service,
+) {
+  if (document == null) return FleetVehicleDocumentStatus.missing;
+  if (document.fileUrl.trim().isNotEmpty) {
+    return service.getDocumentStatus(
+      expiryDate: document.expiryDate,
+      fileUrl: document.fileUrl,
+    );
+  }
+
+  final parsedExpiry = DateTime.tryParse(document.expiryDate.trim());
+  if (parsedExpiry == null) return FleetVehicleDocumentStatus.missing;
+
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final expiry = DateTime(
+    parsedExpiry.year,
+    parsedExpiry.month,
+    parsedExpiry.day,
+  );
+  if (expiry.isBefore(today)) return FleetVehicleDocumentStatus.expired;
+  if (!expiry.isAfter(today.add(const Duration(days: 30)))) {
+    return FleetVehicleDocumentStatus.expiringSoon;
+  }
+  return FleetVehicleDocumentStatus.active;
+}
+
+/// Latest (non-deleted) HU/TÜV document per plate — used to pre-fill the
+/// TÜV date in the vehicle editor and to update the right record.
+Map<String, FleetVehicleDocument> _latestTuvDocsByPlate(
+  List<FleetVehicleDocument> documents,
+) {
+  final result = <String, FleetVehicleDocument>{};
+  for (final document in documents) {
+    if (document.isDeleted) continue;
+    if (_canonicalVehicleDocumentType(document.documentType) !=
+        'HU_TUV_CERTIFICATE') {
+      continue;
+    }
+    final plate = normalizePlateNumber(document.plateNumber);
+    final current = result[plate];
+    if (current == null || _isDocumentNewer(document, current)) {
+      result[plate] = document;
+    }
+  }
   return result;
 }
 
@@ -5661,74 +5188,48 @@ _DocumentStatusPresentation _tuvStatusPresentationFor(
   }
 }
 
-_DocumentStatusPresentation _documentStatusFor(
-  BuildContext context,
-  FleetVehicleDocumentStatus status,
-) {
-  switch (status) {
-    case FleetVehicleDocumentStatus.expiringSoon:
-      return _DocumentStatusPresentation(
-        label: AppLocalizations.of(
-          context,
-        ).t('fleet_status_vehicle_documents_status_expiring_soon'),
-        color: _FleetStatusPageState._kOrange,
-      );
-    case FleetVehicleDocumentStatus.expired:
-      return _DocumentStatusPresentation(
-        label: AppLocalizations.of(
-          context,
-        ).t('fleet_status_vehicle_documents_status_expired'),
-        color: _FleetStatusPageState._kRed,
-      );
-    case FleetVehicleDocumentStatus.missing:
-      return _DocumentStatusPresentation(
-        label: AppLocalizations.of(
-          context,
-        ).t('fleet_status_vehicle_documents_status_missing'),
-        color: _FleetStatusPageState._kMuted,
-      );
-    case FleetVehicleDocumentStatus.active:
-      return _DocumentStatusPresentation(
-        label: AppLocalizations.of(
-          context,
-        ).t('fleet_status_vehicle_documents_status_active'),
-        color: _FleetStatusPageState._kGreen,
-      );
-  }
-}
-
 String _statusLabel(BuildContext context, VehicleStatus status) {
-  final t = AppLocalizations.of(context);
+  final de = Localizations.localeOf(context).languageCode == 'de';
   switch (status) {
-    case VehicleStatus.grounded:
-      return t.t('fleet_status_status_grounded');
-    case VehicleStatus.inService:
-      return t.t('fleet_status_status_in_service');
-    case VehicleStatus.vorControllable:
-      return 'VOR · steuerbar';
-    case VehicleStatus.vorUncontrollable:
-      return 'VOR · nicht steuerbar';
-    case VehicleStatus.defleeted:
-      return t.t('fleet_status_status_defleeted');
     case VehicleStatus.active:
-      return t.t('fleet_status_status_active');
+      return de ? 'Aktiv' : 'Active';
+    case VehicleStatus.operational:
+      return de ? 'Operativ' : 'Operational';
+    case VehicleStatus.groundedDefect:
+      return de ? 'Grounded (Defekt)' : 'Grounded (defect)';
+    case VehicleStatus.groundedSelfReported:
+      return de
+          ? 'Grounded (Selbst gemeldetes Problem)'
+          : 'Grounded (self-reported issue)';
+    case VehicleStatus.groundedTuvOverdue:
+      return de ? 'Grounded (TÜV überfällig)' : 'Grounded (TÜV overdue)';
+    case VehicleStatus.groundedVsa:
+      return 'Grounded (VSA)';
+    case VehicleStatus.groundedService:
+      return 'Grounded (Service)';
+    case VehicleStatus.inactive:
+      return de ? 'Inaktiv' : 'Inactive';
   }
 }
 
 Color _statusColor(VehicleStatus status) {
   switch (status) {
-    case VehicleStatus.grounded:
-      return _FleetStatusPageState._kRed;
-    case VehicleStatus.inService:
-      return _FleetStatusPageState._kBlue;
-    case VehicleStatus.vorControllable:
-      return const Color(0xFFB45309); // amber — DSP can fix
-    case VehicleStatus.vorUncontrollable:
-      return const Color(0xFF7C3AED); // purple — external blocker
-    case VehicleStatus.defleeted:
-      return _FleetStatusPageState._kMuted;
     case VehicleStatus.active:
       return _FleetStatusPageState._kGreen;
+    case VehicleStatus.operational:
+      return const Color(0xFF16A34A);
+    case VehicleStatus.groundedDefect:
+      return _FleetStatusPageState._kRed;
+    case VehicleStatus.groundedSelfReported:
+      return const Color(0xFFDC2626);
+    case VehicleStatus.groundedTuvOverdue:
+      return const Color(0xFFEA580C);
+    case VehicleStatus.groundedVsa:
+      return const Color(0xFF9F1239);
+    case VehicleStatus.groundedService:
+      return const Color(0xFF1D4ED8);
+    case VehicleStatus.inactive:
+      return _FleetStatusPageState._kMuted;
   }
 }
 
@@ -5740,9 +5241,13 @@ String _categoryLabel(BuildContext context, VehicleCategory category) {
     case VehicleCategory.selfSourcedRental:
       return t.t('fleet_status_category_self_sourced_rental');
     case VehicleCategory.selfOwnedRental:
-      return t.t('fleet_status_category_self_owned_rental');
+      return 'Self Owned';
     case VehicleCategory.armada:
       return t.t('fleet_status_category_armada');
+    case VehicleCategory.lmr:
+      return 'LMR';
+    case VehicleCategory.sesoRental:
+      return 'SESO Rental';
   }
 }
 
@@ -5757,30 +5262,6 @@ String _fuelTypeLabel(BuildContext context, VehicleFuelType fuelType) {
       return t.t('fleet_status_fuel_type_hybrid');
     case VehicleFuelType.diesel:
       return t.t('fleet_status_fuel_type_diesel');
-  }
-}
-
-String _eventTypeLabel(BuildContext context, String eventType) {
-  final t = AppLocalizations.of(context);
-  switch (eventType.trim().toUpperCase()) {
-    case 'SERVICE':
-      return t.t('fleet_status_vehicle_events_type_service');
-    case 'ACCIDENT':
-      return t.t('fleet_status_vehicle_events_type_accident');
-    case 'TYRE_CHANGE':
-      return t.t('fleet_status_vehicle_events_type_tyre_change');
-    case 'INSPECTION':
-      return t.t('fleet_status_vehicle_events_type_inspection');
-    case 'BREAKDOWN':
-      return t.t('fleet_status_vehicle_events_type_breakdown');
-    case 'REPAIR':
-      return t.t('fleet_status_vehicle_events_type_repair');
-    case 'DOCUMENT_RENEWAL':
-      return t.t('fleet_status_vehicle_events_type_document_renewal');
-    case 'CUSTOM':
-      return t.t('fleet_status_vehicle_events_type_custom');
-    default:
-      return eventType.trim().isEmpty ? '-' : eventType;
   }
 }
 
@@ -5822,288 +5303,276 @@ String _optionalStoredDate(BuildContext context, String value) {
   return _formatStoredDate(context, trimmed);
 }
 
-String _serviceEndDetailsLabel(BuildContext context, FleetVehicle vehicle) {
-  return _optionalStoredDate(context, vehicle.serviceEndDate);
-}
-
-String _formatDateTime(BuildContext context, DateTime? value) {
-  if (value == null) {
-    return AppLocalizations.of(context).t('fleet_status_updated_fallback');
-  }
-  final material = MaterialLocalizations.of(context);
-  return '${material.formatShortDate(value)} '
-      '${material.formatTimeOfDay(TimeOfDay.fromDateTime(value))}';
-}
-
-// =================================================================
-//   Fleet Hero — top-of-page summary of the whole fleet
-// =================================================================
-
 class _FleetHero extends StatelessWidget {
   final List<FleetVehicle> vehicles;
   final Map<String, _VehicleListComplianceSummary> compliance;
   final bool isMobile;
 
+  /// Keys of the currently active filters ('TOTAL', 'ARMADA', 'SESO',
+  /// 'LMR', 'SELF_OWNED', 'INACTIVE') — active tiles are highlighted.
+  final Set<String> activeKeys;
+
+  /// Called with the tile key when a counter tile is tapped (filtering).
+  final ValueChanged<String>? onTileTap;
+
   const _FleetHero({
     required this.vehicles,
     required this.compliance,
     this.isMobile = false,
+    this.activeKeys = const <String>{},
+    this.onTileTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final t = AppLocalizations.of(context);
-
-    int countByStatus(VehicleStatus s) =>
-        vehicles.where((v) => v.status == s).length;
-
     final total = vehicles.length;
-    final active = countByStatus(VehicleStatus.active);
-    final grounded = countByStatus(VehicleStatus.grounded);
-    final inService = countByStatus(VehicleStatus.inService);
-    final vorCtrl = countByStatus(VehicleStatus.vorControllable);
-    final vorUnctrl = countByStatus(VehicleStatus.vorUncontrollable);
-    final defleeted = countByStatus(VehicleStatus.defleeted);
+    final inactive = vehicles
+        .where((v) => v.status == VehicleStatus.inactive)
+        .length;
 
-    int tuvExpired = 0;
-    int tuvDueSoon = 0;
-    for (final v in vehicles) {
-      final c = compliance[normalizePlateNumber(v.plateNumber)];
-      if (c == null) continue;
-      switch (c.tuvStatus) {
-        case FleetVehicleDocumentStatus.expired:
-          tuvExpired++;
-          break;
-        case FleetVehicleDocumentStatus.expiringSoon:
-          tuvDueSoon++;
-          break;
-        default:
-          break;
-      }
-    }
+    int countByCat(VehicleCategory cat) =>
+        vehicles.where((v) => v.category == cat).length;
+    final armada = countByCat(VehicleCategory.armada);
+    final lmr = countByCat(VehicleCategory.lmr);
+    final seso = countByCat(VehicleCategory.sesoRental);
+    // Legacy self-sourced counts into Self-Owned so nothing gets lost.
+    final selfOwned =
+        countByCat(VehicleCategory.selfOwnedRental) +
+        countByCat(VehicleCategory.selfSourcedRental);
 
-    if (isMobile) {
-      return Container(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          gradient: const LinearGradient(
-            colors: [Color(0xFF14532D), Color(0xFF1D7F5A)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: LayoutBuilder(builder: (ctx, c) {
-          // Two-column compact grid. "All" first, then statuses.
-          final entries = <(String, int)>[
-            ('All', total),
-            ('Aktiv', active),
-            ('Grounded', grounded),
-            ('In Service', inService),
-            ('VOR · steuerbar', vorCtrl),
-            ('VOR · nicht steuerbar', vorUnctrl),
-            ('Archiviert', defleeted),
-            if (tuvExpired > 0) ('TÜV abgelaufen', tuvExpired),
-            if (tuvDueSoon > 0) ('TÜV bald fällig', tuvDueSoon),
-          ];
-          const gap = 8.0;
-          final tileWidth = (c.maxWidth - gap) / 2;
-          return Wrap(
-            spacing: gap,
-            runSpacing: gap,
-            children: [
-              for (final e in entries)
-                SizedBox(
-                  width: tileWidth,
-                  child: _mobileTile(label: e.$1, value: e.$2),
-                ),
-            ],
-          );
-        }),
+    // Main categories only: Gesamt (dark green) + Armada, SESO, LMR,
+    // Self-Owned, Inaktiv — all in white, slim tiles. Every tile is a
+    // click-to-filter toggle.
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final tiles = <Widget>[
+      _tile(
+        de ? 'Gesamt' : 'Total',
+        total,
+        Icons.local_shipping_outlined,
+        primary: true,
+        filterKey: 'TOTAL',
+      ),
+      _tile(
+        'Armada',
+        armada,
+        Icons.directions_car_filled_outlined,
+        filterKey: 'ARMADA',
+      ),
+      _tile(
+        'SESO Rental',
+        seso,
+        Icons.local_shipping_rounded,
+        filterKey: 'SESO',
+      ),
+      _tile('LMR', lmr, Icons.commute_rounded, filterKey: 'LMR'),
+      _tile(
+        'Self-Owned',
+        selfOwned,
+        Icons.vpn_key_outlined,
+        filterKey: 'SELF_OWNED',
+      ),
+      _tile(
+        de ? 'Inaktiv' : 'Inactive',
+        inactive,
+        Icons.pause_circle_outline_rounded,
+        filterKey: 'INACTIVE',
+      ),
+    ];
+
+    return _tileRow(tiles);
+  }
+
+  /// Renders one row of counter tiles: expanded across the width on
+  /// desktop/tablet, horizontally scrollable (fixed width) on mobile.
+  Widget _tileRow(List<Widget> tiles) {
+    if (tiles.isEmpty) return const SizedBox.shrink();
+    if (!isMobile) {
+      return Row(
+        children: [
+          for (int i = 0; i < tiles.length; i++) ...[
+            Expanded(child: tiles[i]),
+            if (i != tiles.length - 1) const SizedBox(width: 10),
+          ],
+        ],
       );
     }
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF14532D), Color(0xFF1D7F5A)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    // Mobil: schmale Kacheln — nur so breit, dass eine dreistellige Zahl
+    // bequem sitzt. Feste Höhe, damit die Reihe trotz ein- oder zweizeiliger
+    // Labels bündig bleibt.
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
         children: [
-          Row(
-            children: [
-              const Icon(Icons.local_shipping_outlined,
-                  color: Colors.white, size: 22),
-              const SizedBox(width: 8),
-              Text(
-                t.t('fleet_status_title'),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 16,
-                ),
-              ),
-              const Spacer(),
-              _heroBigNumber(label: 'GESAMT', value: total),
-            ],
-          ),
-          const SizedBox(height: 16),
-          LayoutBuilder(builder: (ctx, c) {
-            final narrow = c.maxWidth < 720;
-            final tiles = <Widget>[
-              _heroTile('Aktiv', active,
-                  color: const Color(0xFF6EE7B7), icon: Icons.check_circle),
-              _heroTile('Grounded', grounded,
-                  color: const Color(0xFFFCA5A5), icon: Icons.report_problem),
-              _heroTile('In Service', inService,
-                  color: const Color(0xFF93C5FD), icon: Icons.build_circle),
-              _heroTile('VOR · steuerbar', vorCtrl,
-                  color: const Color(0xFFFCD34D),
-                  icon: Icons.error_outline_outlined),
-              _heroTile('VOR · nicht steuerbar', vorUnctrl,
-                  color: const Color(0xFFC4B5FD),
-                  icon: Icons.block_outlined),
-              _heroTile('Archiviert', defleeted,
-                  color: const Color(0xFFCBD5E1),
-                  icon: Icons.archive_outlined),
-              if (tuvExpired > 0)
-                _heroTile('TÜV abgelaufen', tuvExpired,
-                    color: const Color(0xFFFECACA), icon: Icons.warning_amber),
-              if (tuvDueSoon > 0)
-                _heroTile('TÜV bald fällig', tuvDueSoon,
-                    color: const Color(0xFFFED7AA),
-                    icon: Icons.event_busy_outlined),
-            ];
-            if (narrow) {
-              return Wrap(spacing: 8, runSpacing: 8, children: tiles);
-            }
-            return Row(
-              children: tiles
-                  .expand((w) => [Expanded(child: w), const SizedBox(width: 10)])
-                  .toList()
-                ..removeLast(),
-            );
-          }),
+          for (int i = 0; i < tiles.length; i++) ...[
+            SizedBox(width: 76, height: 68, child: tiles[i]),
+            if (i != tiles.length - 1) const SizedBox(width: 8),
+          ],
         ],
       ),
     );
   }
 
-  /// Mobile-only compact tile: no icon, label on top + big number
-  /// below. Slightly translucent white background to stay legible on
-  /// the dark-green hero gradient.
-  Widget _mobileTile({required String label, required int value}) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+  /// Slim counter tile. "Gesamt" (primary) is the inverted dark-green tile of
+  /// the handoff (#0D5C42); every other tile is a white box with a subtle
+  /// border. Tiles act as filter toggles: the active one gets the handoff
+  /// green (#0D8A60) as border + tinted background.
+  Widget _tile(
+    String label,
+    int value,
+    IconData icon, {
+    bool primary = false,
+    String? filterKey,
+  }) {
+    const primaryBg = Color(0xFF0D5C42);
+    final active = filterKey != null && activeKeys.contains(filterKey);
+    final highlight = active && !primary;
+    final bg = primary
+        ? primaryBg
+        : highlight
+        ? _FleetStatusPageState._kAccentGreenTint
+        : Colors.white;
+    final fg = primary
+        ? Colors.white
+        : highlight
+        ? _FleetStatusPageState._kAccentGreen
+        : _FleetStatusPageState._kSubtle;
+    final numColor = primary
+        ? Colors.white
+        : highlight
+        ? _FleetStatusPageState._kAccentGreen
+        : _FleetStatusPageState._kInk;
+    final borderColor = primary
+        ? primaryBg
+        : highlight
+        ? _FleetStatusPageState._kAccentGreen
+        : _FleetStatusPageState._kLine;
+
+    // Desktop-Handoff: 12px/14px Innenabstand, Label 11px/600 mit Icon,
+    // Zahl 22px/700. Mobil ohne Icon, Label oben klein/uppercase, Zahl
+    // darunter — die Kachel ist dort nur noch „999"-breit.
+    final tile = Container(
+      padding: isMobile
+          ? const EdgeInsets.symmetric(horizontal: 8, vertical: 8)
+          : const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.10),
+        color: bg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.18)),
+        border: Border.all(color: borderColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            '$value',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _heroBigNumber({required String label, required int value}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.18),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: Color(0xFFD1FAE5),
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.0,
-            ),
-          ),
-          Text(
-            '$value',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _heroTile(String label, int value,
-      {required Color color, required IconData icon}) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.10),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withOpacity(0.18)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: color, size: 18),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+          if (isMobile)
+            Expanded(
+              child: Text(
+                label.toUpperCase(),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.3,
+                  color: fg,
+                  height: 1.2,
                 ),
-                Text(
-                  '$value',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
+              ),
+            )
+          else
+            Row(
+              children: [
+                Icon(icon, size: 14, color: fg),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: fg,
+                      height: 1.35,
+                    ),
                   ),
                 ),
               ],
             ),
+          const SizedBox(height: 2),
+          Text(
+            '$value',
+            maxLines: 1,
+            style: TextStyle(
+              fontSize: isMobile ? 20 : 22,
+              fontWeight: FontWeight.w700,
+              color: numColor,
+              height: 1.2,
+            ),
           ),
         ],
+      ),
+    );
+
+    final onTap = onTileTap;
+    if (filterKey == null || onTap == null) return tile;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => onTap(filterKey),
+        child: tile,
+      ),
+    );
+  }
+}
+
+/// Wraps a fleet row/card so it lifts slightly + shows a shadow on hover and
+/// is clickable across its whole surface (inner controls still capture taps).
+class _HoverRow extends StatefulWidget {
+  /// Bekommt den Hover-Zustand, damit die Karte selbst den grünlichen Rand
+  /// des Handoffs setzen kann (der Rand der Karte liegt über dem des
+  /// Wrappers, deshalb kein eigenes Border-Painting hier).
+  final Widget Function(bool hovered) builder;
+  final VoidCallback onTap;
+  const _HoverRow({required this.builder, required this.onTap});
+
+  @override
+  State<_HoverRow> createState() => _HoverRowState();
+}
+
+class _HoverRowState extends State<_HoverRow> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          curve: Curves.easeOut,
+          transform: _hover
+              ? (Matrix4.identity()..translate(0.0, -1.0))
+              : Matrix4.identity(),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            // Handoff-Hover: grünlicher Schatten statt neutralem Grau.
+            boxShadow: _hover
+                ? const [
+                    BoxShadow(
+                      color: Color(0x2E0D8A60),
+                      blurRadius: 12,
+                      offset: Offset(0, 3),
+                    ),
+                  ]
+                : const [],
+          ),
+          child: widget.builder(_hover),
+        ),
       ),
     );
   }

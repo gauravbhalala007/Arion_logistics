@@ -77,9 +77,31 @@ class _DriverWaveplanViewState extends State<DriverWaveplanView>
               '${now.month.toString().padLeft(2, '0')}-'
               '${now.day.toString().padLeft(2, '0')}';
           return snap.docs
-              .where((d) => d.id.startsWith(today))
+              .where(
+                (d) => d.id.startsWith(today) || d.id == 'sticky_note',
+              )
               .toList();
         });
+  }
+
+  /// Text of the admin's sticky note if it is valid today, else ''.
+  static String _stickyTextFrom(
+    List<DocumentSnapshot<Map<String, dynamic>>> docs,
+  ) {
+    for (final d in docs) {
+      if (d.id != 'sticky_note') continue;
+      final data = d.data();
+      if (data == null) return '';
+      final text = (data['text'] ?? '').toString().trim();
+      if (text.isEmpty) return '';
+      final now = DateTime.now();
+      final vf = data['validFrom'];
+      if (vf is Timestamp && now.isBefore(vf.toDate())) return '';
+      final vu = data['validUntil'];
+      if (vu is Timestamp && now.isAfter(vu.toDate())) return '';
+      return text;
+    }
+    return '';
   }
 
   @override
@@ -96,7 +118,10 @@ class _DriverWaveplanViewState extends State<DriverWaveplanView>
               if (snap.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
-              final docs = snap.data ?? const [];
+              final allDocs = snap.data ?? const [];
+              final stickyText = _stickyTextFrom(allDocs);
+              final docs =
+                  allDocs.where((d) => d.id != 'sticky_note').toList();
               // Find the doc that actually contains the driver. If
               // none does, fall back to the first published doc so
               // the dispatcher info / notes still show.
@@ -148,6 +173,10 @@ class _DriverWaveplanViewState extends State<DriverWaveplanView>
                   if (dispatchers.isNotEmpty) ...[
                     const SizedBox(height: AppSpacing.sm),
                     _DispatcherStrip(entries: dispatchers),
+                  ],
+                  if (stickyText.isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    _NoticeBanner(text: stickyText),
                   ],
                   if (notes.isNotEmpty) ...[
                     const SizedBox(height: AppSpacing.sm),
@@ -567,11 +596,21 @@ class _NoticeBanner extends StatelessWidget {
           ),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
-            child: Text(
-              text,
-              style: AppTypography.body.copyWith(
-                color: AppColors.codriverDeep,
-                fontWeight: FontWeight.w600,
+            // Cap the banner height so a long note can never push the
+            // waveplan below it off-screen — the note scrolls inside
+            // its own bounded box instead.
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 140),
+              child: Scrollbar(
+                child: SingleChildScrollView(
+                  child: Text(
+                    text,
+                    style: AppTypography.body.copyWith(
+                      color: AppColors.codriverDeep,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               ),
             ),
           ),

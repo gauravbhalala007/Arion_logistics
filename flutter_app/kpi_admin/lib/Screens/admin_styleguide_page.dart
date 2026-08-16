@@ -54,6 +54,7 @@ class _AdminStyleguidePageState extends State<AdminStyleguidePage> {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     return Scaffold(
       backgroundColor: AdminStyleguidePage._kPageBg,
       body: SafeArea(
@@ -65,8 +66,8 @@ class _AdminStyleguidePageState extends State<AdminStyleguidePage> {
             const SizedBox(height: 20),
             _SectionNav(
               entries: [
-                ('Farben', _farbenKey),
-                ('Typografie', _typoKey),
+                (de ? 'Farben' : 'Colors', _farbenKey),
+                (de ? 'Typografie' : 'Typography', _typoKey),
                 ('Buttons', _buttonsKey),
                 ('TabBars', _tabsKey),
                 ('Inputs', _inputsKey),
@@ -78,11 +79,13 @@ class _AdminStyleguidePageState extends State<AdminStyleguidePage> {
             Padding(
               key: _inputsKey,
               padding: EdgeInsets.zero,
-              child: const _SectionHeader(
+              child: _SectionHeader(
                 title: 'Inputs',
-                subtitle:
-                    'Eingabefelder mit transparentem Rahmen — '
-                    'kein Resting-Border, Inset-Akzent bei Focus.',
+                subtitle: de
+                    ? 'Eingabefelder mit transparentem Rahmen — '
+                        'kein Resting-Border, Inset-Akzent bei Focus.'
+                    : 'Input fields with a transparent frame — '
+                        'no resting border, inset accent on focus.',
               ),
             ),
             const SizedBox(height: 16),
@@ -92,13 +95,17 @@ class _AdminStyleguidePageState extends State<AdminStyleguidePage> {
             Padding(
               key: _buttonsKey,
               padding: EdgeInsets.zero,
-              child: const _SectionHeader(
+              child: _SectionHeader(
                 title: 'Buttons',
-                subtitle:
-                    'Regel: Buttons sind immer vollständig pill-shaped '
-                    '(`StadiumBorder`). Touch-Target ≥ 44 px. Schrift w600, '
-                    'Tap-Feedback via Ripple, bei Bedarf Spring-Scale '
-                    '(0.97 → 1.0 in 80 ms).',
+                subtitle: de
+                    ? 'Regel: Buttons sind immer vollständig pill-shaped '
+                        '(`StadiumBorder`). Touch-Target ≥ 44 px. Schrift w600, '
+                        'Tap-Feedback via Ripple, bei Bedarf Spring-Scale '
+                        '(0.97 → 1.0 in 80 ms).'
+                    : 'Rule: buttons are always fully pill-shaped '
+                        '(`StadiumBorder`). Touch target ≥ 44 px. Type w600, '
+                        'tap feedback via Ripple, Spring-Scale where needed '
+                        '(0.97 → 1.0 in 80 ms).',
               ),
             ),
             const SizedBox(height: 16),
@@ -108,11 +115,13 @@ class _AdminStyleguidePageState extends State<AdminStyleguidePage> {
             Padding(
               key: _tabsKey,
               padding: EdgeInsets.zero,
-              child: const _SectionHeader(
+              child: _SectionHeader(
                 title: 'TabBars',
-                subtitle:
-                    'Standard ist Pill · Glas (cotimer-Stil). '
-                    'Andere Varianten nur in dokumentierten Ausnahmen.',
+                subtitle: de
+                    ? 'Standard ist Pill · Glas (cotimer-Stil). '
+                        'Andere Varianten nur in dokumentierten Ausnahmen.'
+                    : 'The standard is Pill · Glas (co:timer style). '
+                        'Other variants only in documented exceptions.',
               ),
             ),
             const SizedBox(height: 16),
@@ -122,11 +131,13 @@ class _AdminStyleguidePageState extends State<AdminStyleguidePage> {
             Padding(
               key: _farbenKey,
               padding: EdgeInsets.zero,
-              child: const _SectionHeader(
-                title: 'Farben',
-                subtitle:
-                    'Brand-Palette und semantische Tokens. '
-                    'Klick auf einen Hex-Wert kopiert ihn.',
+              child: _SectionHeader(
+                title: de ? 'Farben' : 'Colors',
+                subtitle: de
+                    ? 'Brand-Palette und semantische Tokens. '
+                        'Klick auf einen Hex-Wert kopiert ihn.'
+                    : 'Brand palette and semantic tokens. '
+                        'Click a Hex value to copy it.',
               ),
             ),
             const SizedBox(height: 16),
@@ -136,11 +147,13 @@ class _AdminStyleguidePageState extends State<AdminStyleguidePage> {
             Padding(
               key: _typoKey,
               padding: EdgeInsets.zero,
-              child: const _SectionHeader(
-                title: 'Typografie',
-                subtitle:
-                    'Inter-basierte Skala — Größe, Gewicht und '
-                    'Line-Height pro Rolle.',
+              child: _SectionHeader(
+                title: de ? 'Typografie' : 'Typography',
+                subtitle: de
+                    ? 'Inter-basierte Skala — Größe, Gewicht und '
+                        'Line-Height pro Rolle.'
+                    : 'Inter-based scale — size, weight and '
+                        'line height per role.',
               ),
             ),
             const SizedBox(height: 16),
@@ -235,6 +248,7 @@ class _PageHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -255,9 +269,13 @@ class _PageHeader extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Lebendige Komponenten-Galerie. Jede Schaltfläche, jeder '
-            'Tab, jede Eingabe wird hier dokumentiert mit Beispiel, '
-            'Hintergrund und Schriftfarbe.',
+            de
+                ? 'Lebendige Komponenten-Galerie. Jede Schaltfläche, jeder '
+                    'Tab, jede Eingabe wird hier dokumentiert mit Beispiel, '
+                    'Hintergrund und Schriftfarbe.'
+                : 'A living component gallery. Every button, every '
+                    'Tab, every input is documented here with an example, '
+                    'background and text color.',
             style: AppTypography.body.copyWith(
               color: AdminStyleguidePage._kMuted,
               height: 1.5,
@@ -322,6 +340,7 @@ class _ButtonsBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     return LayoutBuilder(
       builder: (context, c) {
         int cols;
@@ -339,115 +358,143 @@ class _ButtonsBlock extends StatelessWidget {
           childAspectRatio: 1.55,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          children: const [
+          children: [
             // ─── PRIMARY ────────────────────────────────────────
             _ButtonSpec(
               name: 'Primary · Filled',
-              role: 'Haupt-CTA pro Screen — Speichern, Bestellen, Anlegen.',
+              role: de
+                  ? 'Haupt-CTA pro Screen — Speichern, Bestellen, Anlegen.'
+                  : 'Main CTA per screen — save, order, create.',
               bgHex: '#00B287',
               fgHex: '#FFFFFF',
-              preview: _PreviewPrimaryFilled(),
+              preview: const _PreviewPrimaryFilled(),
             ),
             _ButtonSpec(
               name: 'Primary · Filled + Icon',
-              role: 'Haupt-CTA mit visuellem Anker — Plus, Senden, Bestätigen.',
+              role: de
+                  ? 'Haupt-CTA mit visuellem Anker — Plus, Senden, Bestätigen.'
+                  : 'Main CTA with a visual anchor — plus, send, confirm.',
               bgHex: '#00B287',
               fgHex: '#FFFFFF',
-              preview: _PreviewPrimaryFilledIcon(),
+              preview: const _PreviewPrimaryFilledIcon(),
             ),
             _ButtonSpec(
               name: 'Primary · Square Icon (44×44)',
-              role: 'Header-Action wenn nur ein `+` passt — Mobile.',
+              role: de
+                  ? 'Header-Action wenn nur ein `+` passt — Mobile.'
+                  : 'Header action when only a `+` fits — mobile.',
               bgHex: '#00B287',
               fgHex: '#FFFFFF',
-              preview: _PreviewSquarePrimary(),
+              preview: const _PreviewSquarePrimary(),
             ),
 
             // ─── SECONDARY ──────────────────────────────────────
             _ButtonSpec(
               name: 'Secondary · Outlined',
-              role: 'Alternative neben Primary — gleichrangig, weniger Gewicht.',
+              role: de
+                  ? 'Alternative neben Primary — gleichrangig, weniger Gewicht.'
+                  : 'Alternative next to Primary — equal rank, less weight.',
               bgHex: '#FFFFFF',
               fgHex: '#111827',
-              preview: _PreviewSecondaryOutlined(),
+              preview: const _PreviewSecondaryOutlined(),
             ),
             _ButtonSpec(
               name: 'Secondary · Outlined + Icon',
-              role: 'Sekundär mit Aktion-Symbol — Hochladen, Exportieren.',
+              role: de
+                  ? 'Sekundär mit Aktion-Symbol — Hochladen, Exportieren.'
+                  : 'Secondary with an action icon — upload, export.',
               bgHex: '#FFFFFF',
               fgHex: '#111827',
-              preview: _PreviewSecondaryOutlinedIcon(),
+              preview: const _PreviewSecondaryOutlinedIcon(),
             ),
             _ButtonSpec(
               name: 'Secondary · Square Icon (44×44)',
-              role: 'Quiet Header-Tool — Warenkorb, Import, Filter.',
+              role: de
+                  ? 'Quiet Header-Tool — Warenkorb, Import, Filter.'
+                  : 'Quiet header tool — cart, import, filter.',
               bgHex: '#FFFFFF',
               fgHex: '#111827',
-              preview: _PreviewSquareSecondary(),
+              preview: const _PreviewSquareSecondary(),
             ),
 
             // ─── QUIET / TERTIARY ───────────────────────────────
             _ButtonSpec(
               name: 'Quiet · Text',
-              role: 'Untergeordnete Aktion — Abbrechen, Mehr anzeigen.',
+              role: de
+                  ? 'Untergeordnete Aktion — Abbrechen, Mehr anzeigen.'
+                  : 'Subordinate action — cancel, show more.',
               bgHex: 'transparent',
               fgHex: '#006047',
-              preview: _PreviewQuietText(),
+              preview: const _PreviewQuietText(),
             ),
             _ButtonSpec(
               name: 'Quiet · Text + Icon',
-              role: 'Tertiäre Aktion mit Hinweis — Zurück, Filter.',
+              role: de
+                  ? 'Tertiäre Aktion mit Hinweis — Zurück, Filter.'
+                  : 'Tertiary action with a hint — back, filter.',
               bgHex: 'transparent',
               fgHex: '#006047',
-              preview: _PreviewQuietTextIcon(),
+              preview: const _PreviewQuietTextIcon(),
             ),
 
             // ─── DESTRUCTIVE ────────────────────────────────────
             _ButtonSpec(
               name: 'Destructive · Filled',
-              role: 'Unwiderrufliche Aktion — Löschen-Bestätigung.',
+              role: de
+                  ? 'Unwiderrufliche Aktion — Löschen-Bestätigung.'
+                  : 'Irreversible action — delete confirmation.',
               bgHex: '#B91C1C',
               fgHex: '#FFFFFF',
-              preview: _PreviewDestructiveFilled(),
+              preview: const _PreviewDestructiveFilled(),
             ),
             _ButtonSpec(
               name: 'Destructive · Outlined',
-              role: 'Vorschaltige Destruktiv-Wahl — Beanstanden, Verwerfen.',
+              role: de
+                  ? 'Vorschaltige Destruktiv-Wahl — Beanstanden, Verwerfen.'
+                  : 'Upstream destructive choice — dispute, discard.',
               bgHex: '#FFFFFF',
               fgHex: '#B91C1C',
-              preview: _PreviewDestructiveOutlined(),
+              preview: const _PreviewDestructiveOutlined(),
             ),
             _ButtonSpec(
               name: 'Destructive · Quiet Text',
-              role: 'Inline-Destruktiv im Editor — Löschen-Link.',
+              role: de
+                  ? 'Inline-Destruktiv im Editor — Löschen-Link.'
+                  : 'Inline destructive in the editor — delete link.',
               bgHex: 'transparent',
               fgHex: '#B91C1C',
-              preview: _PreviewDestructiveText(),
+              preview: const _PreviewDestructiveText(),
             ),
 
             // ─── ICON-ONLY ──────────────────────────────────────
             _ButtonSpec(
               name: 'Icon · Plain (48×48)',
-              role: 'AppBar-Action, Back-Pfeil, Schließen.',
+              role: de
+                  ? 'AppBar-Action, Back-Pfeil, Schließen.'
+                  : 'AppBar action, back arrow, close.',
               bgHex: 'transparent',
               fgHex: '#111827',
-              preview: _PreviewIconPlain(),
+              preview: const _PreviewIconPlain(),
             ),
             _ButtonSpec(
               name: 'Icon · Circle Light (32×32)',
-              role: 'Mini-Action auf Karte — Edit-Stift auf Photo.',
+              role: de
+                  ? 'Mini-Action auf Karte — Edit-Stift auf Photo.'
+                  : 'Mini action on a card — edit pencil on a photo.',
               bgHex: '#FFFFFF',
               fgHex: '#111827',
-              preview: _PreviewIconCircleLight(),
+              preview: const _PreviewIconCircleLight(),
             ),
 
             // ─── DISABLED STATE ─────────────────────────────────
             _ButtonSpec(
               name: 'Primary · Disabled',
-              role: 'Ausgegrauter Zustand, z.B. Submit ohne Eingabe.',
+              role: de
+                  ? 'Ausgegrauter Zustand, z.B. Submit ohne Eingabe.'
+                  : 'Greyed-out state, e.g. submit without input.',
               bgHex: '#E5E7EB',
               fgHex: '#9AA3AF',
-              preview: _PreviewPrimaryDisabled(),
+              preview: const _PreviewPrimaryDisabled(),
             ),
           ],
         );
@@ -572,17 +619,18 @@ class _ColorSwatch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final color = _parse(hex);
     final isTransparent = hex.toLowerCase() == 'transparent';
     return Tooltip(
-      message: 'Kopiere $hex',
+      message: de ? 'Kopiere $hex' : 'Copy $hex',
       child: InkWell(
         onTap: () {
           Clipboard.setData(ClipboardData(text: hex));
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               duration: const Duration(seconds: 2),
-              content: Text('$hex kopiert'),
+              content: Text(de ? '$hex kopiert' : '$hex copied'),
             ),
           );
         },
@@ -654,18 +702,26 @@ class _ColorSwatch extends StatelessWidget {
 class _PreviewPrimaryFilled extends StatelessWidget {
   const _PreviewPrimaryFilled();
   @override
-  Widget build(BuildContext context) =>
-      CoButton(onPressed: () {}, label: 'Bestellen');
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    return CoButton(
+      onPressed: () {},
+      label: de ? 'Bestellen' : 'Order',
+    );
+  }
 }
 
 class _PreviewPrimaryFilledIcon extends StatelessWidget {
   const _PreviewPrimaryFilledIcon();
   @override
-  Widget build(BuildContext context) => CoButton(
-        onPressed: () {},
-        label: 'Neuer Artikel',
-        icon: Icons.add_rounded,
-      );
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    return CoButton(
+      onPressed: () {},
+      label: de ? 'Neuer Artikel' : 'New item',
+      icon: Icons.add_rounded,
+    );
+  }
 }
 
 class _PreviewSquarePrimary extends StatelessWidget {
@@ -681,22 +737,28 @@ class _PreviewSquarePrimary extends StatelessWidget {
 class _PreviewSecondaryOutlined extends StatelessWidget {
   const _PreviewSecondaryOutlined();
   @override
-  Widget build(BuildContext context) => CoButton(
-        onPressed: () {},
-        label: 'Abbrechen',
-        variant: CoButtonVariant.secondaryOutlined,
-      );
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    return CoButton(
+      onPressed: () {},
+      label: de ? 'Abbrechen' : 'Cancel',
+      variant: CoButtonVariant.secondaryOutlined,
+    );
+  }
 }
 
 class _PreviewSecondaryOutlinedIcon extends StatelessWidget {
   const _PreviewSecondaryOutlinedIcon();
   @override
-  Widget build(BuildContext context) => CoButton(
-        onPressed: () {},
-        label: 'Hochladen',
-        icon: Icons.upload_outlined,
-        variant: CoButtonVariant.secondaryOutlined,
-      );
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    return CoButton(
+      onPressed: () {},
+      label: de ? 'Hochladen' : 'Upload',
+      icon: Icons.upload_outlined,
+      variant: CoButtonVariant.secondaryOutlined,
+    );
+  }
 }
 
 class _PreviewSquareSecondary extends StatelessWidget {
@@ -711,64 +773,82 @@ class _PreviewSquareSecondary extends StatelessWidget {
 class _PreviewQuietText extends StatelessWidget {
   const _PreviewQuietText();
   @override
-  Widget build(BuildContext context) => CoButton(
-        onPressed: () {},
-        label: 'Mehr anzeigen',
-        variant: CoButtonVariant.quiet,
-      );
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    return CoButton(
+      onPressed: () {},
+      label: de ? 'Mehr anzeigen' : 'Show more',
+      variant: CoButtonVariant.quiet,
+    );
+  }
 }
 
 class _PreviewQuietTextIcon extends StatelessWidget {
   const _PreviewQuietTextIcon();
   @override
-  Widget build(BuildContext context) => CoButton(
-        onPressed: () {},
-        label: 'Zurück',
-        icon: Icons.arrow_back_rounded,
-        variant: CoButtonVariant.quiet,
-      );
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    return CoButton(
+      onPressed: () {},
+      label: de ? 'Zurück' : 'Back',
+      icon: Icons.arrow_back_rounded,
+      variant: CoButtonVariant.quiet,
+    );
+  }
 }
 
 class _PreviewDestructiveFilled extends StatelessWidget {
   const _PreviewDestructiveFilled();
   @override
-  Widget build(BuildContext context) => CoButton(
-        onPressed: () {},
-        label: 'Löschen',
-        variant: CoButtonVariant.destructive,
-      );
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    return CoButton(
+      onPressed: () {},
+      label: de ? 'Löschen' : 'Delete',
+      variant: CoButtonVariant.destructive,
+    );
+  }
 }
 
 class _PreviewDestructiveOutlined extends StatelessWidget {
   const _PreviewDestructiveOutlined();
   @override
-  Widget build(BuildContext context) => CoButton(
-        onPressed: () {},
-        label: 'Beanstanden',
-        variant: CoButtonVariant.destructiveOutlined,
-      );
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    return CoButton(
+      onPressed: () {},
+      label: de ? 'Beanstanden' : 'Dispute',
+      variant: CoButtonVariant.destructiveOutlined,
+    );
+  }
 }
 
 class _PreviewDestructiveText extends StatelessWidget {
   const _PreviewDestructiveText();
   @override
-  Widget build(BuildContext context) => CoButton(
-        onPressed: () {},
-        label: 'Artikel löschen',
-        icon: Icons.delete_outline,
-        variant: CoButtonVariant.destructiveQuiet,
-      );
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    return CoButton(
+      onPressed: () {},
+      label: de ? 'Artikel löschen' : 'Delete item',
+      icon: Icons.delete_outline,
+      variant: CoButtonVariant.destructiveQuiet,
+    );
+  }
 }
 
 class _PreviewIconPlain extends StatelessWidget {
   const _PreviewIconPlain();
   @override
-  Widget build(BuildContext context) => IconButton(
-        onPressed: () {},
-        icon: const Icon(Icons.arrow_back_rounded),
-        color: AdminStyleguidePage._kText,
-        tooltip: 'Zurück',
-      );
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    return IconButton(
+      onPressed: () {},
+      icon: const Icon(Icons.arrow_back_rounded),
+      color: AdminStyleguidePage._kText,
+      tooltip: de ? 'Zurück' : 'Back',
+    );
+  }
 }
 
 class _PreviewIconCircleLight extends StatelessWidget {
@@ -798,8 +878,13 @@ class _PreviewIconCircleLight extends StatelessWidget {
 class _PreviewPrimaryDisabled extends StatelessWidget {
   const _PreviewPrimaryDisabled();
   @override
-  Widget build(BuildContext context) =>
-      const CoButton(onPressed: null, label: 'Bestellen');
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    return CoButton(
+      onPressed: null,
+      label: de ? 'Bestellen' : 'Order',
+    );
+  }
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -811,26 +896,29 @@ class _ColorsBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: const [
+      children: [
         _PaletteRow(
           title: 'Brand',
-          subtitle: 'Primäre Markenfarbe in drei Tönen.',
+          subtitle: de
+              ? 'Primäre Markenfarbe in drei Tönen.'
+              : 'Primary brand color in three shades.',
           tiles: [
-            _PaletteTile(
+            const _PaletteTile(
               name: 'codriverGreen',
               hex: '#00B287',
               role: 'Primary CTA',
               dark: false,
             ),
-            _PaletteTile(
+            const _PaletteTile(
               name: 'codriverDeep',
               hex: '#006047',
               role: 'Active Brand · Quiet Text',
               dark: true,
             ),
-            _PaletteTile(
+            const _PaletteTile(
               name: 'green50',
               hex: '#E6F8F2',
               role: 'Brand Tint Surface',
@@ -838,24 +926,26 @@ class _ColorsBlock extends StatelessWidget {
             ),
           ],
         ),
-        SizedBox(height: 12),
+        const SizedBox(height: 12),
         _PaletteRow(
           title: 'Text & Surface',
-          subtitle: 'Hierarchie aus Near-Black bis Hairline-Border.',
+          subtitle: de
+              ? 'Hierarchie aus Near-Black bis Hairline-Border.'
+              : 'Hierarchy from near-black to hairline border.',
           tiles: [
             _PaletteTile(
               name: 'textPrimary',
               hex: '#111827',
-              role: 'Haupttext',
+              role: de ? 'Haupttext' : 'Body text',
               dark: true,
             ),
             _PaletteTile(
               name: 'textMuted',
               hex: '#6B7280',
-              role: 'Sekundärtext',
+              role: de ? 'Sekundärtext' : 'Secondary text',
               dark: true,
             ),
-            _PaletteTile(
+            const _PaletteTile(
               name: 'textDisabled',
               hex: '#9AA3AF',
               role: 'Disabled · Placeholder',
@@ -864,10 +954,10 @@ class _ColorsBlock extends StatelessWidget {
             _PaletteTile(
               name: 'pageBg',
               hex: '#F3F6F7',
-              role: 'Seitenhintergrund',
+              role: de ? 'Seitenhintergrund' : 'Page background',
               dark: false,
             ),
-            _PaletteTile(
+            const _PaletteTile(
               name: 'softSurface',
               hex: '#F9FAFB',
               role: 'Inputs · Sub-Surfaces',
@@ -876,29 +966,31 @@ class _ColorsBlock extends StatelessWidget {
             _PaletteTile(
               name: 'border',
               hex: '#E5E7EB',
-              role: 'Hairline-Trennlinien',
+              role: de ? 'Hairline-Trennlinien' : 'Hairline dividers',
               dark: false,
             ),
           ],
         ),
-        SizedBox(height: 12),
+        const SizedBox(height: 12),
         _PaletteRow(
           title: 'Status',
-          subtitle: 'Funktionale Farben — immer mit Icon oder Text als Verstärkung.',
+          subtitle: de
+              ? 'Funktionale Farben — immer mit Icon oder Text als Verstärkung.'
+              : 'Functional colors — always reinforced by an icon or text.',
           tiles: [
             _PaletteTile(
               name: 'success',
               hex: '#00B287',
-              role: 'In Bestand · OK',
+              role: de ? 'In Bestand · OK' : 'In stock · OK',
               dark: false,
             ),
             _PaletteTile(
               name: 'warning',
               hex: '#D97706',
-              role: 'Niedriger Bestand · Pending',
+              role: de ? 'Niedriger Bestand · Pending' : 'Low stock · Pending',
               dark: false,
             ),
-            _PaletteTile(
+            const _PaletteTile(
               name: 'warningBg',
               hex: '#FEF3C7',
               role: 'Warning-Surface',
@@ -907,22 +999,22 @@ class _ColorsBlock extends StatelessWidget {
             _PaletteTile(
               name: 'danger',
               hex: '#B91C1C',
-              role: 'Destruktiv · Out of Stock',
+              role: de ? 'Destruktiv · Out of Stock' : 'Destructive · Out of Stock',
               dark: true,
             ),
-            _PaletteTile(
+            const _PaletteTile(
               name: 'dangerBg',
               hex: '#FEE2E2',
               role: 'Danger-Surface',
               dark: false,
             ),
-            _PaletteTile(
+            const _PaletteTile(
               name: 'info',
               hex: '#1D4ED8',
               role: 'In Review · Mentee-Border',
               dark: true,
             ),
-            _PaletteTile(
+            const _PaletteTile(
               name: 'infoBg',
               hex: '#DBEAFE',
               role: 'Info-Surface',
@@ -1000,19 +1092,20 @@ class _PaletteTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final color = _parse();
     final fg = dark ? Colors.white : AdminStyleguidePage._kText;
     return SizedBox(
       width: 200,
       child: Tooltip(
-        message: 'Kopiere $hex',
+        message: de ? 'Kopiere $hex' : 'Copy $hex',
         child: InkWell(
           onTap: () {
             Clipboard.setData(ClipboardData(text: hex));
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 duration: const Duration(seconds: 2),
-                content: Text('$hex kopiert'),
+                content: Text(de ? '$hex kopiert' : '$hex copied'),
               ),
             );
           },
@@ -1215,38 +1308,51 @@ class _TabBarsBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: const [
+      children: [
         _TabBarSpec(
           name: 'Pill · Neutral · Standard',
-          role: 'Der gesetzte Standard. Trough hellgrau (`#EEF1F4`), '
-              'aktive weiße Pill mit Hairline-Border + sanftem Schatten. '
-              'Aktiver Text Near-Black, inaktiv mittelgrau — kein Grün, '
-              'keine GPU-teure Blur.',
+          role: de
+              ? 'Der gesetzte Standard. Trough hellgrau (`#EEF1F4`), '
+                  'aktive weiße Pill mit Hairline-Border + sanftem Schatten. '
+                  'Aktiver Text Near-Black, inaktiv mittelgrau — kein Grün, '
+                  'keine GPU-teure Blur.'
+              : 'The set standard. Light grey trough (`#EEF1F4`), '
+                  'active white Pill with Hairline Border + soft shadow. '
+                  'Active text near-black, inactive mid-grey — no green, '
+                  'no GPU-expensive blur.',
           bgHex: '#EEF1F4',
           fgHex: '#111827',
-          preview: _PreviewPillNeutral(),
+          preview: const _PreviewPillNeutral(),
         ),
-        SizedBox(height: 12),
+        const SizedBox(height: 12),
         _TabBarSpec(
           name: 'Pill · Glas · Legacy',
-          role: 'BackdropFilter-Variante (cotimer-Original). Nicht mehr '
-              'verwenden — der Glas-Effekt ist auf Flutter Web teuer und '
-              'wird global durch das Neutral-Pendant ersetzt.',
+          role: de
+              ? 'BackdropFilter-Variante (cotimer-Original). Nicht mehr '
+                  'verwenden — der Glas-Effekt ist auf Flutter Web teuer und '
+                  'wird global durch das Neutral-Pendant ersetzt.'
+              : 'BackdropFilter variant (co:timer original). Do not use '
+                  'anymore — the Glas effect is expensive on Flutter web and '
+                  'is being replaced globally by the Neutral counterpart.',
           bgHex: '#FFFFFF · 72%',
           fgHex: '#000000',
-          preview: _PreviewPillGlass(),
+          preview: const _PreviewPillGlass(),
         ),
-        SizedBox(height: 12),
+        const SizedBox(height: 12),
         _TabBarSpec(
           name: 'Underline · Brand · Legacy',
-          role: 'Klassischer Indicator-Stil. Nur noch für Bestandscode, '
-              'neu nicht mehr verwenden — Pill · Neutral ist überall die '
-              'Lösung.',
+          role: de
+              ? 'Klassischer Indicator-Stil. Nur noch für Bestandscode, '
+                  'neu nicht mehr verwenden — Pill · Neutral ist überall die '
+                  'Lösung.'
+              : 'Classic indicator style. Legacy code only, do not use for '
+                  'anything new — Pill · Neutral is the answer everywhere.',
           bgHex: '#F3F6F7',
           fgHex: '#00B287',
-          preview: _PreviewUnderlineBrand(),
+          preview: const _PreviewUnderlineBrand(),
         ),
       ],
     );
@@ -1270,6 +1376,7 @@ class _TabBarSpec extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     return Container(
       decoration: BoxDecoration(
         color: AdminStyleguidePage._kCardBg,
@@ -1319,7 +1426,7 @@ class _TabBarSpec extends StatelessWidget {
                   runSpacing: 6,
                   children: [
                     _ColorSwatch(label: 'BG', hex: bgHex),
-                    _ColorSwatch(label: 'FG aktiv', hex: fgHex),
+                    _ColorSwatch(label: de ? 'FG aktiv' : 'FG active', hex: fgHex),
                   ],
                 ),
               ],
@@ -1348,6 +1455,7 @@ class _PreviewPillNeutralState extends State<_PreviewPillNeutral>
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 360),
       child: Container(
@@ -1385,10 +1493,10 @@ class _PreviewPillNeutralState extends State<_PreviewPillNeutral>
           labelPadding: EdgeInsets.zero,
           splashFactory: NoSplash.splashFactory,
           overlayColor: WidgetStateProperty.all(Colors.transparent),
-          tabs: const [
-            Tab(height: 38, text: 'Alles'),
-            Tab(height: 38, text: 'Kleidung'),
-            Tab(height: 38, text: 'Werkstatt'),
+          tabs: [
+            Tab(height: 38, text: de ? 'Alles' : 'All'),
+            Tab(height: 38, text: de ? 'Kleidung' : 'Clothing'),
+            Tab(height: 38, text: de ? 'Werkstatt' : 'Workshop'),
           ],
         ),
       ),
@@ -1413,6 +1521,7 @@ class _PreviewPillGlassState extends State<_PreviewPillGlass>
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 380),
       child: Container(
@@ -1462,11 +1571,11 @@ class _PreviewPillGlassState extends State<_PreviewPillGlass>
               labelPadding: EdgeInsets.zero,
               splashFactory: NoSplash.splashFactory,
               overlayColor: WidgetStateProperty.all(Colors.transparent),
-              tabs: const [
-                Tab(height: 38, text: 'Live'),
-                Tab(height: 38, text: 'Zeitkonto'),
-                Tab(height: 38, text: 'Korrekturen'),
-                Tab(height: 38, text: 'Compliance'),
+              tabs: [
+                const Tab(height: 38, text: 'Live'),
+                const Tab(height: 38, text: 'Zeitkonto'),
+                Tab(height: 38, text: de ? 'Korrekturen' : 'Corrections'),
+                const Tab(height: 38, text: 'Compliance'),
               ],
             ),
           ),
@@ -1494,6 +1603,7 @@ class _PreviewUnderlineBrandState extends State<_PreviewUnderlineBrand>
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 420),
       child: Material(
@@ -1507,10 +1617,10 @@ class _PreviewUnderlineBrandState extends State<_PreviewUnderlineBrand>
           labelStyle: AppTypography.subheadline
               .copyWith(fontWeight: FontWeight.w800),
           unselectedLabelStyle: AppTypography.subheadline,
-          tabs: const [
-            Tab(text: 'Urlaub'),
-            Tab(text: 'Zeitkonto'),
-            Tab(text: 'Krankmeldungen'),
+          tabs: [
+            Tab(text: de ? 'Urlaub' : 'Leave'),
+            const Tab(text: 'Zeitkonto'),
+            const Tab(text: 'Krankmeldungen'),
           ],
         ),
       ),
@@ -1608,6 +1718,7 @@ class _InputsBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     return LayoutBuilder(
       builder: (context, c) {
         int cols;
@@ -1625,55 +1736,69 @@ class _InputsBlock extends StatelessWidget {
           childAspectRatio: 1.55,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          children: const [
+          children: [
             _InputSpec(
               name: 'Text · Default',
-              role: 'Standard-Eingabe — Name, Notiz, kurze Werte.',
+              role: de
+                  ? 'Standard-Eingabe — Name, Notiz, kurze Werte.'
+                  : 'Standard input — name, note, short values.',
               bgHex: '#F9FAFB',
               fgHex: '#111827',
-              preview: _PreviewInputDefault(),
+              preview: const _PreviewInputDefault(),
             ),
             _InputSpec(
-              name: 'Text · Mit Label',
-              role: 'Eingabe mit dauerhaft sichtbarem Label oben.',
+              name: de ? 'Text · Mit Label' : 'Text · With label',
+              role: de
+                  ? 'Eingabe mit dauerhaft sichtbarem Label oben.'
+                  : 'Input with a permanently visible label on top.',
               bgHex: '#F9FAFB',
               fgHex: '#111827',
-              preview: _PreviewInputLabeled(),
+              preview: const _PreviewInputLabeled(),
             ),
             _InputSpec(
               name: 'Search',
-              role: 'Suchfeld mit Lupen-Präfix — Pill-Shape.',
+              role: de
+                  ? 'Suchfeld mit Lupen-Präfix — Pill-Shape.'
+                  : 'Search field with a magnifier prefix — Pill shape.',
               bgHex: '#F9FAFB',
               fgHex: '#111827',
-              preview: _PreviewInputSearch(),
+              preview: const _PreviewInputSearch(),
             ),
             _InputSpec(
               name: 'Number · Compact',
-              role: 'Schmales Zahlenfeld — Mindestmenge, Mengen-Stepper.',
+              role: de
+                  ? 'Schmales Zahlenfeld — Mindestmenge, Mengen-Stepper.'
+                  : 'Narrow number field — minimum quantity, quantity stepper.',
               bgHex: '#F9FAFB',
               fgHex: '#111827',
-              preview: _PreviewInputNumber(),
+              preview: const _PreviewInputNumber(),
             ),
             _InputSpec(
               name: 'Multiline',
-              role: 'Mehrzeilige Beschreibung — wächst mit dem Inhalt.',
+              role: de
+                  ? 'Mehrzeilige Beschreibung — wächst mit dem Inhalt.'
+                  : 'Multi-line description — grows with the content.',
               bgHex: '#F9FAFB',
               fgHex: '#111827',
-              preview: _PreviewInputMultiline(),
+              preview: const _PreviewInputMultiline(),
             ),
             _InputSpec(
               name: 'Disabled',
-              role: 'Read-only-Zustand für gesperrte Felder.',
+              role: de
+                  ? 'Read-only-Zustand für gesperrte Felder.'
+                  : 'Read-only state for locked fields.',
               bgHex: '#F3F4F6',
               fgHex: '#9AA3AF',
-              preview: _PreviewInputDisabled(),
+              preview: const _PreviewInputDisabled(),
             ),
             _InputSpec(
               name: 'Error',
-              role: 'Inline-Validierung mit roter Inset-Border + Hinweis.',
+              role: de
+                  ? 'Inline-Validierung mit roter Inset-Border + Hinweis.'
+                  : 'Inline validation with a red inset Border + hint.',
               bgHex: '#F9FAFB',
               fgHex: '#B91C1C',
-              preview: _PreviewInputError(),
+              preview: const _PreviewInputError(),
             ),
           ],
         );
@@ -1775,36 +1900,46 @@ class _InputSpec extends StatelessWidget {
 class _PreviewInputDefault extends StatelessWidget {
   const _PreviewInputDefault();
   @override
-  Widget build(BuildContext context) => SizedBox(
-        width: 280,
-        child: TextField(
-          decoration: _styleguideInputDecoration(hint: 'z.B. Sicherheitsweste'),
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    return SizedBox(
+      width: 280,
+      child: TextField(
+        decoration: _styleguideInputDecoration(
+          hint: de ? 'z.B. Sicherheitsweste' : 'e.g. safety vest',
         ),
-      );
+      ),
+    );
+  }
 }
 
 class _PreviewInputLabeled extends StatelessWidget {
   const _PreviewInputLabeled();
   @override
-  Widget build(BuildContext context) => SizedBox(
-        width: 280,
-        child: TextField(
-          decoration: _styleguideInputDecoration(
-            hint: 'Beeswift',
-            label: 'Lieferant',
-          ),
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    return SizedBox(
+      width: 280,
+      child: TextField(
+        decoration: _styleguideInputDecoration(
+          hint: 'Beeswift',
+          label: de ? 'Lieferant' : 'Supplier',
         ),
-      );
+      ),
+    );
+  }
 }
 
 class _PreviewInputSearch extends StatelessWidget {
   const _PreviewInputSearch();
   @override
-  Widget build(BuildContext context) => SizedBox(
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    return SizedBox(
         width: 280,
         child: TextField(
           decoration: _styleguideInputDecoration(
-            hint: 'Suche nach Artikel…',
+            hint: de ? 'Suche nach Artikel…' : 'Search items…',
             prefixIcon: const Padding(
               padding: EdgeInsets.only(left: 12, right: 8),
               child: Icon(
@@ -1832,6 +1967,7 @@ class _PreviewInputSearch extends StatelessWidget {
           ),
         ),
       );
+  }
 }
 
 class _PreviewInputNumber extends StatelessWidget {
@@ -1858,15 +1994,18 @@ class _PreviewInputNumber extends StatelessWidget {
 class _PreviewInputMultiline extends StatelessWidget {
   const _PreviewInputMultiline();
   @override
-  Widget build(BuildContext context) => SizedBox(
-        width: 280,
-        child: TextField(
-          maxLines: 3,
-          decoration: _styleguideInputDecoration(
-            hint: 'Beschreibung des Artikels…',
-          ),
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    return SizedBox(
+      width: 280,
+      child: TextField(
+        maxLines: 3,
+        decoration: _styleguideInputDecoration(
+          hint: de ? 'Beschreibung des Artikels…' : 'Item description…',
         ),
-      );
+      ),
+    );
+  }
 }
 
 class _PreviewInputDisabled extends StatelessWidget {
@@ -1889,17 +2028,21 @@ class _PreviewInputDisabled extends StatelessWidget {
 class _PreviewInputError extends StatelessWidget {
   const _PreviewInputError();
   @override
-  Widget build(BuildContext context) => SizedBox(
-        width: 280,
-        child: TextField(
-          controller: TextEditingController(text: ''),
-          decoration: _styleguideInputDecoration(
-            hint: 'Pflichtfeld',
-            label: 'Name',
-            error: true,
-          ).copyWith(
-            errorText: 'Name darf nicht leer sein.',
-          ),
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    return SizedBox(
+      width: 280,
+      child: TextField(
+        controller: TextEditingController(text: ''),
+        decoration: _styleguideInputDecoration(
+          hint: de ? 'Pflichtfeld' : 'Required field',
+          label: 'Name',
+          error: true,
+        ).copyWith(
+          errorText:
+              de ? 'Name darf nicht leer sein.' : 'Name must not be empty.',
         ),
-      );
+      ),
+    );
+  }
 }

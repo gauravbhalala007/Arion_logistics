@@ -14,6 +14,9 @@ import 'Screens/admin_shell_page.dart';
 import 'Screens/admin_inventory_detail_page.dart';
 import 'Screens/recruiting_form_page.dart';
 import 'Screens/public_review_page.dart';
+import 'Screens/dispatcher_review_page.dart';
+import 'Screens/public_plan_page.dart';
+import 'Screens/owner_insights_page.dart';
 import 'services/recruiting_slug_service.dart';
 import 'models/recruiting_application.dart';
 import 'widgets/app_side_menu.dart'; // for AppNav
@@ -112,10 +115,55 @@ class App extends StatelessWidget {
             // Public, link-only review page (Sterne + Text). No auth.
             //   /bewertung  ·  /review
             final namePath = Uri.parse(name).path;
+            // Monatliche Fahrerbewertung durch Dispatcher (Link + Token)
+            //   /fahrerbewertung?t=<token>
+            if (namePath == '/fahrerbewertung' ||
+                namePath == '/driver-review') {
+              final token = Uri.parse(name).queryParameters['t'] ?? '';
+              return MaterialPageRoute<void>(
+                settings: settings,
+                builder: (_) => DispatcherReviewPage(token: token),
+              );
+            }
             if (namePath == '/bewertung' || namePath == '/review') {
+              // Mit Token ist es eine Fahrerbewertung, ohne Token die
+              // oeffentliche Sterne-Seite der Landingpage. So bleiben
+              // bereits verschickte /review?t=…-Links gueltig.
+              final token = Uri.parse(name).queryParameters['t'] ?? '';
+              if (token.trim().isNotEmpty) {
+                return MaterialPageRoute<void>(
+                  settings: settings,
+                  builder: (_) => DispatcherReviewPage(token: token),
+                );
+              }
               return MaterialPageRoute<void>(
                 settings: settings,
                 builder: (_) => _wrapSelectable(const PublicReviewPage()),
+              );
+            }
+            // Private, password-gated owner usage dashboard. Unlisted route;
+            // the callable it uses is additionally locked to owner UIDs.
+            //   /insights
+            if (namePath == '/insights') {
+              return MaterialPageRoute<void>(
+                settings: settings,
+                builder: (_) => _wrapSelectable(const OwnerInsightsPage()),
+              );
+            }
+            // Public, link-only plan viewer (wave/shift plan). No auth —
+            // the share ID is unguessable and the doc is world-readable.
+            //   /plan/<shareId>
+            // IMPORTANT: also match the bare '/plan' segment — Flutter
+            // resolves deep initial routes segment by segment ('/', '/plan',
+            // '/plan/<id>'); if any segment fails the WHOLE deep link falls
+            // back to '/' (login).
+            if (namePath == '/plan' || namePath.startsWith('/plan/')) {
+              final segs = Uri.parse(name).pathSegments;
+              final shareId = segs.length >= 2 ? segs[1] : '';
+              return MaterialPageRoute<void>(
+                settings: settings,
+                builder: (_) =>
+                    _wrapSelectable(PublicPlanPage(shareId: shareId)),
               );
             }
             final isJobs = name.startsWith('/jobs');
@@ -170,6 +218,12 @@ class App extends StatelessWidget {
             '/cdf': (_) => _wrapSelectable(
               const AdminShellPage(initialNav: AppNav.cdf),
             ),
+            '/dwc': (_) => _wrapSelectable(
+              const AdminShellPage(initialNav: AppNav.dwc),
+            ),
+            '/contact-compliance': (_) => _wrapSelectable(
+              const AdminShellPage(initialNav: AppNav.contactCompliance),
+            ),
             '/drivers': (_) => _wrapSelectable(
               const AdminShellPage(initialNav: AppNav.drivers),
             ),
@@ -190,6 +244,12 @@ class App extends StatelessWidget {
             '/shift-absence': (_) => _wrapSelectable(
               const AdminShellPage(initialNav: AppNav.shiftAbsence),
             ),
+            '/da-requests': (_) => _wrapSelectable(
+              const AdminShellPage(initialNav: AppNav.daRequests),
+            ),
+            '/safety-training': (_) => _wrapSelectable(
+              const AdminShellPage(initialNav: AppNav.safetyTraining),
+            ),
             '/incident-reports': (_) => _wrapSelectable(
               const AdminShellPage(initialNav: AppNav.incidentReports),
             ),
@@ -201,6 +261,9 @@ class App extends StatelessWidget {
             ),
             '/notifications': (_) => _wrapSelectable(
               const AdminShellPage(initialNav: AppNav.notifications),
+            ),
+            '/app-updates': (_) => _wrapSelectable(
+              const AdminShellPage(initialNav: AppNav.appUpdates),
             ),
             '/feedback': (_) => _wrapSelectable(
               const AdminShellPage(initialNav: AppNav.feedback),
@@ -218,6 +281,12 @@ class App extends StatelessWidget {
             ),
             '/shift-plan': (_) => _wrapSelectable(
               const AdminShellPage(initialNav: AppNav.shiftPlan),
+            ),
+            '/payment-check': (_) => _wrapSelectable(
+              const AdminShellPage(initialNav: AppNav.paymentCheck),
+            ),
+            '/monthly-plan': (_) => _wrapSelectable(
+              const AdminShellPage(initialNav: AppNav.monthlyPlan),
             ),
 
             '/coming-soon': (_) =>

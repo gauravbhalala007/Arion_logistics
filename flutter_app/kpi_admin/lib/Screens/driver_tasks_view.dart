@@ -232,6 +232,11 @@ class _DriverTasksViewState extends State<DriverTasksView> {
             final task = tasks[i];
             final statusColor = _statusColor(task.status);
             final feedbackBusy = _submittingFeedback.contains(task.id);
+            // Show the task in the driver's active app language when an
+            // auto-translation exists; otherwise fall back to the source text.
+            final lang = Localizations.localeOf(context).languageCode;
+            final taskTitle = task.localizedTitle(lang);
+            final taskDescription = task.localizedDescription(lang);
 
             return Container(
               padding: const EdgeInsets.all(14),
@@ -247,7 +252,7 @@ class _DriverTasksViewState extends State<DriverTasksView> {
                     children: [
                       Expanded(
                         child: Text(
-                          task.title,
+                          taskTitle,
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
@@ -275,10 +280,10 @@ class _DriverTasksViewState extends State<DriverTasksView> {
                       ),
                     ],
                   ),
-                  if (task.description.isNotEmpty) ...[
+                  if (taskDescription.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Text(
-                      task.description,
+                      taskDescription,
                       style: const TextStyle(
                         color: Color(0xFF4B5563),
                         height: 1.35,

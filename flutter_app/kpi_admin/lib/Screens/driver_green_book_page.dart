@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +8,7 @@ import 'package:video_player/video_player.dart';
 
 import '../localization/app_localizations.dart';
 import '../widgets/web_video_embed.dart';
+import 'driver_green_book_training_page.dart';
 
 const Color _kGreenBookText = Color(0xFF1F2937);
 const Color _kGreenBookMuted = Color(0xFF7A869F);
@@ -45,7 +48,7 @@ class DriverGreenBookPage extends StatefulWidget {
 }
 
 class _DriverGreenBookPageState extends State<DriverGreenBookPage> {
-  late Future<String> _videoUrlFuture;
+  late Future<({String url, String lang})> _videoUrlFuture;
   String _lastLocaleCode = '';
 
   @override
@@ -59,12 +62,14 @@ class _DriverGreenBookPageState extends State<DriverGreenBookPage> {
     _videoUrlFuture = _loadVideoUrl();
   }
 
-  Future<String> _loadVideoUrl() async {
+  Future<({String url, String lang})> _loadVideoUrl() async {
     final lang = Localizations.localeOf(context).languageCode.toLowerCase();
-    String fallbackFor(String code) {
-      return _kGreenBookVideoFallbacks[code] ??
-          _kGreenBookVideoFallbacks['en'] ??
-          '';
+    // Liefert Video-URL samt der Sprache, in der das Video tatsaechlich
+    // vorliegt — fuer Sprachen ohne eigenes Video ist das Englisch.
+    ({String url, String lang}) fallbackFor(String code) {
+      final own = _kGreenBookVideoFallbacks[code];
+      if (own != null && own.isNotEmpty) return (url: own, lang: code);
+      return (url: _kGreenBookVideoFallbacks['en'] ?? '', lang: 'en');
     }
 
     if (widget.dspUid.trim().isEmpty) {
@@ -77,26 +82,43 @@ class _DriverGreenBookPageState extends State<DriverGreenBookPage> {
         .doc('green_book');
 
     try {
+      // Ohne Zeitlimit blieb die Karte bei schlechter Verbindung ewig im
+      // Ladezustand — der Fallback greift dann nach 6 Sekunden.
       DocumentSnapshot<Map<String, dynamic>> snap;
       try {
-        snap = await ref.get(const GetOptions(source: Source.server));
-      } on FirebaseException {
-        snap = await ref.get();
+        snap = await ref
+            .get(const GetOptions(source: Source.server))
+            .timeout(const Duration(seconds: 6));
+      } catch (_) {
+        try {
+          snap = await ref.get().timeout(const Duration(seconds: 4));
+        } catch (_) {
+          return fallbackFor(lang);
+        }
       }
       final data = snap.data() ?? const <String, dynamic>{};
-      final candidates = [
-        (data['videoUrl_$lang'] ?? '').toString().trim(),
-        (data['mediaUrl_$lang'] ?? '').toString().trim(),
-        (data['url_$lang'] ?? '').toString().trim(),
-        (data['videoUrl'] ?? '').toString().trim(),
-        (data['mediaUrl'] ?? '').toString().trim(),
-        (data['url'] ?? '').toString().trim(),
+      // Reihenfolge bewusst so: erst das Video in der Sprache des
+      // Fahrers (hinterlegt oder mitgeliefert), dann das englische.
+      // Ein generisch hinterlegtes Video kommt zuletzt — sonst
+      // bekaeme z. B. ein tuerkischer Fahrer ein deutsches Video,
+      // obwohl ein englisches vorliegt.
+      final candidates = <({String url, String lang})>[
+        (url: (data['videoUrl_$lang'] ?? '').toString().trim(), lang: lang),
+        (url: (data['mediaUrl_$lang'] ?? '').toString().trim(), lang: lang),
+        (url: (data['url_$lang'] ?? '').toString().trim(), lang: lang),
+        (url: _kGreenBookVideoFallbacks[lang] ?? '', lang: lang),
+        (url: (data['videoUrl_en'] ?? '').toString().trim(), lang: 'en'),
+        (url: (data['mediaUrl_en'] ?? '').toString().trim(), lang: 'en'),
+        (url: _kGreenBookVideoFallbacks['en'] ?? '', lang: 'en'),
+        (url: (data['videoUrl'] ?? '').toString().trim(), lang: lang),
+        (url: (data['mediaUrl'] ?? '').toString().trim(), lang: lang),
+        (url: (data['url'] ?? '').toString().trim(), lang: lang),
         fallbackFor(lang),
       ];
       for (final value in candidates) {
-        if (value.isNotEmpty) return value;
+        if (value.url.isNotEmpty) return value;
       }
-      return '';
+      return (url: '', lang: lang);
     } catch (_) {
       return fallbackFor(lang);
     }
@@ -142,6 +164,8 @@ class _DriverGreenBookPageState extends State<DriverGreenBookPage> {
     }
 
     final googleDrivePreviewUri = _googleDrivePreviewUri(uri);
+
+    // Native App: Drive-Vorschau im In-App-Browser.
     if (!kIsWeb && googleDrivePreviewUri != null) {
       final opened = await launchUrl(
         googleDrivePreviewUri,
@@ -155,6 +179,26 @@ class _DriverGreenBookPageState extends State<DriverGreenBookPage> {
       return;
     }
 
+    // Mobile Browser (vor allem iOS Safari): Der eingebettete Rahmen im
+    // Dialog spielt dort oft nicht ab und ist auf kleinen Displays kaum
+    // bedienbar. Deshalb das Video in einem eigenen Tab öffnen.
+    final isNarrowWeb = kIsWeb && MediaQuery.sizeOf(context).width < 820;
+    if (isNarrowWeb) {
+      final target = googleDrivePreviewUri ?? uri;
+      final opened = await launchUrl(
+        target,
+        mode: LaunchMode.externalApplication,
+        webOnlyWindowName: '_blank',
+      );
+      if (!opened && mounted) {
+        messenger?.showSnackBar(
+          SnackBar(content: Text(t.t('faq_green_book_video_open_failed'))),
+        );
+      }
+      return;
+    }
+
+    if (!mounted) return;
     await showDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -162,6 +206,18 @@ class _DriverGreenBookPageState extends State<DriverGreenBookPage> {
         videoUri: googleDrivePreviewUri ?? uri,
         title: t.t('driver_green_book_video_title'),
         useWebEmbed: kIsWeb && googleDrivePreviewUri != null,
+      ),
+    );
+  }
+
+  void _openTraining() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (ctx) => DriverGreenBookTrainingPage(
+          dspUid: widget.dspUid,
+          driverTransporterId: widget.driverTransporterId,
+          onBack: () => Navigator.of(ctx).pop(),
+        ),
       ),
     );
   }
@@ -184,6 +240,10 @@ class _DriverGreenBookPageState extends State<DriverGreenBookPage> {
         return const _LanguageMeta(flag: '🇹🇷', label: 'Turkce');
       case 'ru':
         return const _LanguageMeta(flag: '🇷🇺', label: 'Русский');
+      case 'bg':
+        return const _LanguageMeta(flag: '🇧🇬', label: 'Български');
+      case 'es':
+        return const _LanguageMeta(flag: '🇪🇸', label: 'Español');
       default:
         return const _LanguageMeta(flag: '🇬🇧', label: 'English');
     }
@@ -193,7 +253,6 @@ class _DriverGreenBookPageState extends State<DriverGreenBookPage> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final langCode = Localizations.localeOf(context).languageCode.toLowerCase();
-    final langMeta = _languageMeta(langCode);
     const noUnderline = TextStyle(
       decoration: TextDecoration.none,
       decorationColor: Colors.transparent,
@@ -226,23 +285,32 @@ class _DriverGreenBookPageState extends State<DriverGreenBookPage> {
                 ],
               ),
               const SizedBox(height: 14),
-              FutureBuilder<String>(
+              FutureBuilder<({String url, String lang})>(
                 future: _videoUrlFuture,
                 builder: (context, snap) {
+                  final loading =
+                      snap.connectionState == ConnectionState.waiting;
+                  // Fuer Sprachen ohne eigenes Video laeuft das englische
+                  // — dann zeigt die Karte auch Englisch an, statt eine
+                  // Sprache zu versprechen, die im Video nicht vorkommt.
+                  final videoLang = snap.data?.lang ?? langCode;
+                  final meta = _languageMeta(videoLang);
                   return _GreenBookVideoCard(
                     title: t.t('driver_green_book_video_title'),
-                    flag: langMeta.flag,
-                    languageLabel: langMeta.label,
-                    onTap: () => _openVideo(snap.data ?? ''),
+                    flag: meta.flag,
+                    languageLabel: meta.label,
+                    loading: loading,
+                    onTap: loading
+                        ? null
+                        : () => _openVideo(snap.data?.url ?? ''),
                   );
                 },
               ),
               const SizedBox(height: 14),
               _GreenBookTestCta(
                 label: t.t('driver_green_book_start_test'),
-                note: t.t('coming_soon'),
-                onTap: null,
-                disabled: true,
+                onTap: _openTraining,
+                disabled: false,
               ),
               const SizedBox(height: 16),
               _SectionCard(
@@ -293,13 +361,15 @@ class _GreenBookVideoCard extends StatelessWidget {
   final String title;
   final String flag;
   final String languageLabel;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final bool loading;
 
   const _GreenBookVideoCard({
     required this.title,
     required this.flag,
     required this.languageLabel,
     required this.onTap,
+    this.loading = false,
   });
 
   @override
@@ -326,11 +396,24 @@ class _GreenBookVideoCard extends StatelessWidget {
                   color: Color(0xFFD8F1DE),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
-                  Icons.play_arrow_rounded,
-                  size: 54,
-                  color: _kGreenBookPrimary,
-                ),
+                child: loading
+                    ? const Center(
+                        child: SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.6,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              _kGreenBookPrimary,
+                            ),
+                          ),
+                        ),
+                      )
+                    : const Icon(
+                        Icons.play_arrow_rounded,
+                        size: 54,
+                        color: _kGreenBookPrimary,
+                      ),
               ),
               const SizedBox(height: 18),
               Text(
@@ -364,13 +447,11 @@ class _GreenBookVideoCard extends StatelessWidget {
 
 class _GreenBookTestCta extends StatelessWidget {
   final String label;
-  final String note;
   final VoidCallback? onTap;
   final bool disabled;
 
   const _GreenBookTestCta({
     required this.label,
-    required this.note,
     required this.onTap,
     this.disabled = false,
   });
@@ -427,16 +508,6 @@ class _GreenBookTestCta extends StatelessWidget {
                 ),
               ),
             ),
-          ),
-        ),
-        const SizedBox(height: 10),
-        Text(
-          note,
-          style: TextStyle(
-            color: disabled ? const Color(0xFF7A8699) : const Color(0xFFFF3B30),
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            decoration: TextDecoration.none,
           ),
         ),
       ],
@@ -562,6 +633,12 @@ class _GreenBookVideoDialogState extends State<_GreenBookVideoDialog> {
   Future<void>? _initializeFuture;
   String? _error;
 
+  /// Muss über die gesamte Lebensdauer des Dialogs stabil bleiben. Wurde
+  /// der Typ bei jedem build() neu erzeugt, verwarf Flutter das iframe
+  /// mitten im Laden — das Video erschien dadurch nie.
+  late final String _viewType =
+      'green-book-video-${DateTime.now().microsecondsSinceEpoch}';
+
   @override
   void initState() {
     super.initState();
@@ -626,8 +703,7 @@ class _GreenBookVideoDialogState extends State<_GreenBookVideoDialog> {
                     color: Colors.black,
                     child: widget.useWebEmbed
                         ? buildWebVideoEmbed(
-                            viewType:
-                                'green-book-video-${DateTime.now().microsecondsSinceEpoch}',
+                            viewType: _viewType,
                             uri: widget.videoUri,
                           )
                         : FutureBuilder<void>(

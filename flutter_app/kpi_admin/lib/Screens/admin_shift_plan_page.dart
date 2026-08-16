@@ -4,9 +4,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import '../models/shift_plan.dart';
 import '../services/shift_plan_parser.dart';
+import '../services/public_plan_service.dart';
 import '../services/shift_plan_repository.dart';
+import '../widgets/share_link_dialog.dart';
+import '../utils/xlsx_loader.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../widgets/admin_scope.dart';
@@ -59,6 +65,11 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
   /// upload timestamp and to grey out the UI for past days.
   ShiftPlanDoc? _existingPublished;
   StreamSubscription<ShiftPlanDoc?>? _publishedSub;
+  StreamSubscription<ShiftPlanDoc?>? _draftSub;
+  // Latest snapshots from each stream for the current day. Published wins;
+  // the draft is the fallback so an internally-saved plan survives refresh.
+  ShiftPlanDoc? _latestPublished;
+  ShiftPlanDoc? _latestDraft;
 
   final List<String> _selectedDispatchers = <String>[];
   /// Per-dispatcher shift range, mirrors the Waveplan pattern.
@@ -95,6 +106,7 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
   @override
   void dispose() {
     _publishedSub?.cancel();
+    _draftSub?.cancel();
     _meetCtrl.dispose();
     _searchCtrl.dispose();
     super.dispose();
@@ -102,47 +114,68 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
 
   void _bindPublishedStream() {
     _publishedSub?.cancel();
+    _draftSub?.cancel();
     final adminUid = _adminUid;
     if (adminUid == null) return;
+    final boundKey = _currentDateKey;
+    // Reset the cached snapshots so data from the previous day can't leak
+    // into the new day before its own streams have emitted.
+    _latestPublished = null;
+    _latestDraft = null;
     _publishedSub = _repo
-        .watch(adminUid: adminUid, dateKey: _currentDateKey)
+        .watch(adminUid: adminUid, dateKey: boundKey)
         .listen((doc) {
-      if (!mounted) return;
-      // We hydrate `_entries` (and the other doc-level controls) from
-      // Firestore whenever:
-      //   • The day is past/today (Excel re-upload is forbidden, so
-      //     the admin always wants to see what actually ran), OR
-      //   • There's a published doc AND no local edits cache for
-      //     this day (page just (re)mounted — Firestore is the only
-      //     source of truth after a browser refresh).
-      // Future days where the admin already has local edits keep
-      // their in-memory `_entries` (the cache check below).
-      final hasLocalEdits =
-          _entriesByDate.containsKey(_currentDateKey) ||
-              _entries.isNotEmpty;
-      final shouldHydrate =
-          doc != null && (_isPastOrToday || !hasLocalEdits);
-      setState(() {
-        _existingPublished = doc;
-        if (shouldHydrate) {
-          _entries = List<ShiftPlanEntry>.from(doc.entries);
-          _parkingOffsetMinutes = doc.parkingOffsetMinutes;
-          _meetCtrl.text = doc.parkingOffsetMinutes.toString();
-          _shiftByDispatcher
-            ..clear()
-            ..addAll(doc.dispatcherShifts);
-          _selectedDispatchers
-            ..clear()
-            ..addAll(doc.dispatchers);
-          _planNotes = List<ShiftPlanNote>.from(doc.notes);
-          // Seed the in-memory edits cache so subsequent navigation
-          // away + back preserves what we just hydrated.
-          if (!_isPastOrToday) {
-            _entriesByDate[_currentDateKey] =
-                List<ShiftPlanEntry>.from(doc.entries);
-          }
+      if (!mounted || boundKey != _currentDateKey) return;
+      _latestPublished = doc;
+      _hydrateFromStreams();
+    });
+    // Also watch the internally-saved draft. A saved-but-unpublished plan
+    // lives only in `shift_plan_drafts`, so without this it vanished on
+    // refresh / re-login. Published always wins over a draft.
+    _draftSub = _repo
+        .watchDraft(adminUid: adminUid, dateKey: boundKey)
+        .listen((doc) {
+      if (!mounted || boundKey != _currentDateKey) return;
+      _latestDraft = doc;
+      _hydrateFromStreams();
+    });
+  }
+
+  /// Hydrate `_entries` and the doc-level controls from Firestore. The
+  /// published plan takes precedence; the internally-saved draft is the
+  /// fallback. We hydrate whenever the day is past/today (Firestore is the
+  /// source of truth) OR there are no local edits yet (page just mounted /
+  /// browser refresh). Future days with local edits keep their in-memory
+  /// `_entries`.
+  void _hydrateFromStreams() {
+    final published = _latestPublished;
+    final source = published ?? _latestDraft;
+    final hasLocalEdits =
+        _entriesByDate.containsKey(_currentDateKey) || _entries.isNotEmpty;
+    final shouldHydrate =
+        source != null && (_isPastOrToday || !hasLocalEdits);
+    setState(() {
+      // Only a truly published doc counts as "published" (drives the
+      // Unpublish button and the published badge); a draft does not.
+      _existingPublished = published;
+      if (shouldHydrate) {
+        _entries = List<ShiftPlanEntry>.from(source.entries);
+        _parkingOffsetMinutes = source.parkingOffsetMinutes;
+        _meetCtrl.text = source.parkingOffsetMinutes.toString();
+        _shiftByDispatcher
+          ..clear()
+          ..addAll(source.dispatcherShifts);
+        _selectedDispatchers
+          ..clear()
+          ..addAll(source.dispatchers);
+        _planNotes = List<ShiftPlanNote>.from(source.notes);
+        // Seed the in-memory edits cache so subsequent navigation
+        // away + back preserves what we just hydrated.
+        if (!_isPastOrToday) {
+          _entriesByDate[_currentDateKey] =
+              List<ShiftPlanEntry>.from(source.entries);
         }
-      });
+      }
     });
   }
 
@@ -173,7 +206,10 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
     // navigation. Past / today days come from Firestore so we don't
     // cache them in the edit map.
     final leavingKey = _currentDateKey;
-    if (!_isPastOrToday) {
+    // In week mode we work with the whole parsed week (back-fill incl. past
+    // days), so we cache edits for every day. Single-day mode only caches
+    // future days (past/today hydrate from Firestore).
+    if (!_isPastOrToday || _weekMode) {
       _entriesByDate[leavingKey] =
           List<ShiftPlanEntry>.from(_entries);
     }
@@ -181,13 +217,14 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
     setState(() {
       _selectedDate = DateTime(d.year, d.month, d.day);
       _existingPublished = null;
-      if (_isPastOrToday) {
-        // Past / today: hydrate from Firestore in the stream listener,
-        // never from a cached Excel parse. This prevents accidentally
-        // overwriting historic plans with stale Excel data.
+      if (_isPastOrToday && !_weekMode) {
+        // Single-day past/today: hydrate from Firestore in the stream
+        // listener, never from a cached Excel parse. This prevents
+        // accidentally overwriting historic plans with stale Excel data.
         _entries = <ShiftPlanEntry>[];
       } else {
-        // Priority: in-memory edits cache > Excel parse > empty.
+        // Future days — and ANY day in week mode (back-fill) — read from
+        // the in-memory edits cache, else the Excel parse, else empty.
         final cached = _entriesByDate[_currentDateKey];
         if (cached != null) {
           _entries = List<ShiftPlanEntry>.from(cached);
@@ -311,6 +348,7 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
 
   Future<void> _pickAndParseFile() async {
     if (_uploading) return;
+    final de = Localizations.localeOf(context).languageCode == 'de';
     // ignore: avoid_print
     print('[shift-plan] _pickAndParseFile: opening file picker');
     setState(() => _parseError = null);
@@ -367,6 +405,9 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
       _uploading = true;
       _uploadPhase = 'Reading file…';
     });
+    // CSS overlay keeps animating even while the synchronous workbook
+    // decode blocks the Dart isolate (a Flutter spinner would freeze).
+    XlsxLoader.show(de ? 'Datei wird gelesen …' : 'Reading file…');
 
     // Wait two frames so the overlay AND its pulse animation have time
     // to paint before the parser runs. The async parser yields back to
@@ -381,6 +422,7 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
       parsed = await parseShiftPlanExcelAsync(
         bytes,
         onPhase: (phase) {
+          XlsxLoader.message(phase);
           if (!mounted) return;
           setState(() => _uploadPhase = phase);
         },
@@ -397,6 +439,7 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
       parserStack = st;
     }
 
+    XlsxLoader.hide();
     if (!mounted) return;
     setState(() {
       _uploading = false;
@@ -442,11 +485,6 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
       return;
     }
 
-    // Ask which day to load. Preference order:
-    //   1. Currently-selected date, if it's in the parsed range AND
-    //      it's not a past day (we never default to a past day).
-    //   2. First future day (today or later).
-    //   3. First day overall (fallback when only past days exist).
     final now = DateTime.now();
     final todayKey = '${now.year.toString().padLeft(4, '0')}-'
         '${now.month.toString().padLeft(2, '0')}-'
@@ -455,6 +493,62 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
       (k) => k.compareTo(todayKey) >= 0,
       orElse: () => '',
     );
+
+    // When the file contains more than one day, let the admin choose the
+    // scope: load the WHOLE WEEK (all days → week mode, Save/Publish week)
+    // or a SINGLE DAY (day picker → day mode).
+    if (available.length > 1) {
+      final scope = await showDialog<String>(
+        context: context,
+        builder: (ctx) => _UploadScopeDialog(dayCount: available.length),
+      );
+      if (scope == null || !mounted) return;
+      if (scope == 'week') {
+        // Pick a sensible day to display in the editor; week-mode
+        // Save/Publish act on every day regardless of what's shown.
+        final displayKey =
+            firstFuture.isNotEmpty ? firstFuture : available.first;
+        final dd = DateTime.parse(displayKey);
+        // Week mode shows the parsed data for ANY day — including past
+        // days — so back-filling last week actually displays its drivers
+        // instead of an empty editor.
+        final freshEntries = List<ShiftPlanEntry>.from(
+          parsed.assignmentsByDate[displayKey] ?? const <ShiftPlanEntry>[],
+        );
+        setState(() {
+          _weekMode = true;
+          _selectedDate = DateTime(dd.year, dd.month, dd.day);
+          _entries = freshEntries;
+          _entriesByDate[displayKey] =
+              List<ShiftPlanEntry>.from(freshEntries);
+        });
+        _bindPublishedStream();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.codriverDeep,
+            content: Text(
+              de
+                  ? 'Ganze Woche geladen · ${available.length} Tage. '
+                      '„Save week" speichert alle Tage intern, „Publish week" '
+                      'veröffentlicht sie an Fahrer.'
+                  : 'Whole week loaded · ${available.length} days. '
+                      '"Save week" stores all days internally, "Publish week" '
+                      'releases them to drivers.',
+              style: const TextStyle(color: Colors.white),
+            ),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+        return;
+      }
+      // scope == 'day' → fall through to the single-day picker.
+    }
+
+    // Single-day load. Preference order for the default selection:
+    //   1. Currently-selected date if it's in range AND not past.
+    //   2. First future day (today or later).
+    //   3. First day overall (fallback when only past days exist).
     final defaultKey = (available.contains(_currentDateKey) &&
             _currentDateKey.compareTo(todayKey) >= 0)
         ? _currentDateKey
@@ -485,6 +579,7 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
                 const <ShiftPlanEntry>[],
           );
     setState(() {
+      _weekMode = false;
       _selectedDate =
           DateTime(pickedDate.year, pickedDate.month, pickedDate.day);
       _entries = freshEntries;
@@ -564,6 +659,462 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
   }
 
   bool get _canPublish => _publishBlockedReason() == null;
+
+  /// Internal save is allowed whenever there is data to write — in week
+  /// mode the parsed Excel must contain days, in day mode the editor must
+  /// have entries. Unlike publish, it has no slot-fill / window gates and
+  /// never skips past days.
+  bool get _canSaveInternal {
+    if (_weekMode) {
+      return _parsed != null && _parsed!.assignmentsByDate.isNotEmpty;
+    }
+    return _entries.isNotEmpty;
+  }
+
+  /// Save the plan(s) internally to `shift_plan_drafts` WITHOUT publishing
+  /// to drivers. In week mode every day from the Excel is written —
+  /// including past days — so old weeks can be back-filled for the Payment
+  /// Check. No countdown, no driver notification.
+  Future<void> _saveInternal() async {
+    final adminUid = _adminUid;
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    if (adminUid == null) return;
+    if (!_canSaveInternal) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_weekMode
+              ? 'No data in the file.'
+              : 'No shifts loaded for this day.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _publishing = true);
+    try {
+      var count = 0;
+      if (_weekMode) {
+        for (final entry in _parsed!.assignmentsByDate.entries) {
+          await _repo.saveInternal(
+            adminUid: adminUid,
+            plan: ShiftPlanDoc(
+              dateKey: entry.key,
+              entries: entry.value,
+              station: _parsed?.station ?? '',
+              company: _parsed?.company ?? '',
+              dispatchers: List<String>.from(_selectedDispatchers),
+              notes: List<ShiftPlanNote>.from(_planNotes),
+              meetingTime: '',
+              parkingOffsetMinutes: _parkingOffsetMinutes,
+              dispatcherShifts: Map<String, List<String>>.from(
+                _shiftByDispatcher,
+              ),
+              publishedAt: null,
+            ),
+          );
+          count++;
+        }
+      } else {
+        await _repo.saveInternal(
+          adminUid: adminUid,
+          plan: ShiftPlanDoc(
+            dateKey: _currentDateKey,
+            entries: _entries,
+            station: _parsed?.station ?? '',
+            company: _parsed?.company ?? '',
+            dispatchers: List<String>.from(_selectedDispatchers),
+            notes: List<ShiftPlanNote>.from(_planNotes),
+            meetingTime: '',
+            parkingOffsetMinutes: _parkingOffsetMinutes,
+            dispatcherShifts: Map<String, List<String>>.from(
+              _shiftByDispatcher,
+            ),
+            publishedAt: null,
+          ),
+        );
+        count = 1;
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.codriverDeep,
+          content: Text(
+            de
+                ? 'Intern gespeichert ($count ${count == 1 ? 'Tag' : 'Tage'}) — '
+                    'nicht an Fahrer veröffentlicht. Erscheint im Payment Check.'
+                : 'Saved internally ($count ${count == 1 ? 'day' : 'days'}) — '
+                    'not published to drivers. Appears in Payment Check.',
+            style: const TextStyle(color: Colors.white),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            de ? 'Speichern fehlgeschlagen: $e' : 'Save failed: $e',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _publishing = false);
+    }
+  }
+
+  // Simple, compact PDF of the current shift plan. Week mode → one table per
+  // day; day mode → just the shown day. Opens the browser print/save dialog.
+  Future<void> _generatePdf() async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final hasDay = _entries.isNotEmpty;
+    final hasWeek = _parsed != null && _parsed!.assignmentsByDate.isNotEmpty;
+    if (!hasDay && !hasWeek) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            de
+                ? 'Keine Shiftplan-Daten zum Exportieren.'
+                : 'No shift plan data to export.',
+          ),
+        ),
+      );
+      return;
+    }
+    final days = <MapEntry<String, List<ShiftPlanEntry>>>[];
+    if (_weekMode && hasWeek) {
+      final keys = _parsed!.assignmentsByDate.keys.toList()..sort();
+      for (final k in keys) {
+        days.add(MapEntry(k, _parsed!.assignmentsByDate[k]!));
+      }
+    } else {
+      days.add(MapEntry(_currentDateKey, _entries));
+    }
+    final station = (_parsed?.station ?? '').trim();
+    final company = (_parsed?.company ?? '').trim();
+    final firstDate = DateTime.tryParse(days.first.key) ?? _selectedDate;
+
+    final doc = pw.Document();
+    doc.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(28),
+        build: (ctx) {
+          final brandDeep = PdfColor.fromInt(0xFF006047);
+          final brandTint = PdfColor.fromInt(0xFFE8F6F1);
+          final w = <pw.Widget>[
+            pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              children: [
+                pw.Container(
+                  width: 5,
+                  height: 20,
+                  margin: const pw.EdgeInsets.only(right: 8),
+                  color: PdfColor.fromInt(0xFF00B287),
+                ),
+                pw.Text('Shift Plan',
+                    style: pw.TextStyle(
+                        fontSize: 20,
+                        fontWeight: pw.FontWeight.bold,
+                        color: brandDeep)),
+              ],
+            ),
+            pw.Text(
+              [
+                'Week ${_pdfIsoWeek(firstDate)} · ${firstDate.year}',
+                if (company.isNotEmpty) company,
+                if (station.isNotEmpty) station,
+              ].join('  ·  '),
+              style:
+                  const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+            ),
+          ];
+          if (_selectedDispatchers.isNotEmpty) {
+            w.add(pw.SizedBox(height: 2));
+            w.add(pw.Text('Dispatchers: ${_selectedDispatchers.join(', ')}',
+                style: const pw.TextStyle(
+                    fontSize: 9, color: PdfColors.grey700)));
+          }
+          // Legend at the top.
+          w.add(pw.SizedBox(height: 8));
+          w.add(pw.Container(
+            width: double.infinity,
+            padding:
+                const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+            decoration: pw.BoxDecoration(
+              color: brandTint,
+              borderRadius: pw.BorderRadius.circular(4),
+            ),
+            child: pw.Text(
+              'P = Parking Time / Meeting Time        W = Waiting Area (Working Time)',
+              style: pw.TextStyle(fontSize: 8.5, color: brandDeep),
+            ),
+          ));
+          for (final d in days) {
+            final date = DateTime.tryParse(d.key);
+            w.add(pw.SizedBox(height: 12));
+            w.add(pw.Text(date == null ? d.key : _pdfDate(date),
+                style: pw.TextStyle(
+                    fontSize: 12, fontWeight: pw.FontWeight.bold)));
+            w.addAll(_pdfDaySections(d.value));
+          }
+          return w;
+        },
+      ),
+    );
+    await Printing.layoutPdf(
+      name: (_weekMode && days.length > 1)
+          ? 'Shift_Plan_Week${_pdfIsoWeek(firstDate)}_${firstDate.year}.pdf'
+          : 'Shift_Plan_${days.first.key}.pdf',
+      onLayout: (format) async => doc.save(),
+    );
+  }
+
+  /// Publishes a read-only snapshot of the current plan under an
+  /// unguessable public link (viewable without login) and shows the
+  /// copy dialog. Shares the same day/week scope the PDF export uses.
+  Future<void> _shareShiftPlan() async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final hasDay = _entries.isNotEmpty;
+    final hasWeek = _parsed != null && _parsed!.assignmentsByDate.isNotEmpty;
+    if (!hasDay && !hasWeek) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            de
+                ? 'Keine Shiftplan-Daten zum Teilen.'
+                : 'No shift plan data to share.',
+          ),
+        ),
+      );
+      return;
+    }
+    final days = <MapEntry<String, List<ShiftPlanEntry>>>[];
+    if (_weekMode && hasWeek) {
+      final keys = _parsed!.assignmentsByDate.keys.toList()..sort();
+      for (final k in keys) {
+        days.add(MapEntry(k, _parsed!.assignmentsByDate[k]!));
+      }
+    } else {
+      days.add(MapEntry(_currentDateKey, _entries));
+    }
+    final station = (_parsed?.station ?? '').trim();
+    final company = (_parsed?.company ?? '').trim();
+    final firstDate = DateTime.tryParse(days.first.key) ?? _selectedDate;
+
+    String dayLabel(String key) {
+      final d = DateTime.tryParse(key);
+      return d == null ? key : _pdfDate(d);
+    }
+
+    String shiftsText(ShiftPlanEntry e) {
+      final parts = <String>[];
+      for (final b in e.blocks) {
+        final raw = b.startTime.trim();
+        if (raw.isEmpty) continue;
+        final park = _pdfParkFor(raw);
+        final work = _toGermanTime(raw);
+        parts.add(park.isEmpty ? 'W $work' : 'P $park   W $work');
+      }
+      return parts.join('    +    ');
+    }
+
+    final sections = <Map<String, dynamic>>[];
+    for (final d in days) {
+      String firstStart(ShiftPlanEntry e) =>
+          e.blocks.isNotEmpty ? e.blocks.first.startTime.trim() : '';
+      final rows = d.value
+          .where((e) =>
+              e.driverName.trim().isNotEmpty ||
+              e.transporterId.trim().isNotEmpty)
+          .toList()
+        ..sort((a, b) {
+          final t = _pdfTimeKey(firstStart(a))
+              .compareTo(_pdfTimeKey(firstStart(b)));
+          if (t != 0) return t;
+          return a.driverName
+              .toLowerCase()
+              .compareTo(b.driverName.toLowerCase());
+        });
+      sections.add({
+        'title': dayLabel(d.key),
+        'rows': [
+          for (final e in rows)
+            {
+              'primary': e.driverName.isEmpty ? '—' : e.driverName,
+              'secondary': shiftsText(e),
+            },
+        ],
+      });
+    }
+
+    try {
+      final url = await PublicPlanService().share(
+        key: _weekMode && days.length > 1
+            ? 'shiftplan_week_${days.first.key}'
+            : 'shiftplan_${days.first.key}',
+        payload: {
+          'type': 'shiftplan',
+          'title': 'Shift Plan',
+          'subtitle': 'Week ${_pdfIsoWeek(firstDate)} · ${firstDate.year}',
+          'date': '',
+          'company': company,
+          'station': station,
+          'notes':
+              'P = Parking Time / Meeting Time · W = Waiting Area (Working Time)',
+          'sections': sections,
+        },
+      );
+      if (!mounted) return;
+      await showShareLinkDialog(context, url);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            de
+                ? 'Link erstellen fehlgeschlagen: $e'
+                : 'Creating the link failed: $e',
+          ),
+        ),
+      );
+    }
+  }
+
+  int _pdfIsoWeek(DateTime d) {
+    final day = DateTime.utc(d.year, d.month, d.day);
+    final th = day.add(Duration(days: 4 - day.weekday));
+    final jan4 = DateTime.utc(th.year, 1, 4);
+    final week1Monday = jan4.subtract(Duration(days: jan4.weekday - 1));
+    return th.difference(week1Monday).inDays ~/ 7 + 1;
+  }
+
+  String _pdfDate(DateTime d) {
+    const wd = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const mo = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return '${wd[d.weekday - 1]}, ${d.day} ${mo[d.month - 1]} ${d.year}';
+  }
+
+  /// Minutes-since-midnight for a time string like "11:20am" / "13:05";
+  /// used to sort shift-time groups. Returns a large number if unparseable.
+  int _pdfTimeKey(String s) {
+    final m = RegExp(r'(\d{1,2}):(\d{2})\s*(am|pm)?', caseSensitive: false)
+        .firstMatch(s);
+    if (m == null) return 99999;
+    var h = int.parse(m.group(1)!);
+    final min = int.parse(m.group(2)!);
+    final ap = (m.group(3) ?? '').toLowerCase();
+    if (ap == 'pm' && h != 12) h += 12;
+    if (ap == 'am' && h == 12) h = 0;
+    return h * 60 + min;
+  }
+
+  /// Parking/meeting time for a single dispatch time = dispatch −
+  /// parkingOffset, formatted "HH:MM". Empty when unparseable/negative.
+  /// Mirrors the app's `_MeetingDispatchPair` meeting value exactly.
+  String _pdfParkFor(String dispatch) {
+    final key = _pdfTimeKey(dispatch);
+    if (key >= 99999) return '';
+    final total = key - _parkingOffsetMinutes;
+    if (total < 0) return '';
+    String p(int n) => n.toString().padLeft(2, '0');
+    return '${p(total ~/ 60)}:${p(total % 60)}';
+  }
+
+  /// All shifts of a driver as a coloured rich-text cell. Each shift is a
+  /// "P <park>   W <work>" pair (German 24h time, no arrow); a second shift on
+  /// the same day is appended with a "+" separator. "P"/"W" markers use the
+  /// CoDriver green so they tie back to the legend.
+  pw.Widget _pdfShiftCell(ShiftPlanEntry e) {
+    final base = pw.TextStyle(fontSize: 9, color: PdfColor.fromInt(0xFF3D3D3D));
+    final marker = pw.TextStyle(
+        fontSize: 9,
+        fontWeight: pw.FontWeight.bold,
+        color: PdfColor.fromInt(0xFF006047));
+    final plus = pw.TextStyle(
+        fontSize: 9,
+        fontWeight: pw.FontWeight.bold,
+        color: PdfColor.fromInt(0xFF00B287));
+    final spans = <pw.InlineSpan>[];
+    var first = true;
+    for (final b in e.blocks) {
+      final raw = b.startTime.trim();
+      if (raw.isEmpty) continue;
+      final work = _toGermanTime(raw);
+      final park = _pdfParkFor(raw);
+      if (!first) spans.add(pw.TextSpan(text: '    +    ', style: plus));
+      first = false;
+      if (park.isNotEmpty) {
+        spans.add(pw.TextSpan(text: 'P ', style: marker));
+        spans.add(pw.TextSpan(text: '$park     ', style: base));
+      }
+      spans.add(pw.TextSpan(text: 'W ', style: marker));
+      spans.add(pw.TextSpan(text: work, style: base));
+    }
+    return pw.RichText(text: pw.TextSpan(children: spans));
+  }
+
+  /// One day as a single Name | Shifts table (no time grouping). Each row is
+  /// a driver; the shift cell holds every shift the driver has.
+  List<pw.Widget> _pdfDaySections(List<ShiftPlanEntry> entries) {
+    String firstStart(ShiftPlanEntry e) =>
+        e.blocks.isNotEmpty ? e.blocks.first.startTime.trim() : '';
+    final rows = entries
+        .where((e) =>
+            e.driverName.trim().isNotEmpty ||
+            e.transporterId.trim().isNotEmpty)
+        .toList()
+      ..sort((a, b) {
+        final t = _pdfTimeKey(firstStart(a)).compareTo(_pdfTimeKey(firstStart(b)));
+        if (t != 0) return t;
+        return a.driverName.toLowerCase().compareTo(b.driverName.toLowerCase());
+      });
+    if (rows.isEmpty) {
+      return [
+        pw.Padding(
+          padding: const pw.EdgeInsets.only(top: 4),
+          child: pw.Text('No drivers.',
+              style:
+                  const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
+        ),
+      ];
+    }
+    return [
+      pw.SizedBox(height: 4),
+      pw.Table(
+        border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+        columnWidths: {
+          0: const pw.FlexColumnWidth(3),
+          1: const pw.FlexColumnWidth(5),
+        },
+        children: [
+          for (var i = 0; i < rows.length; i++)
+            pw.TableRow(
+              decoration: pw.BoxDecoration(
+                color: i.isEven ? PdfColors.grey100 : PdfColors.white,
+              ),
+              children: [
+                pw.Padding(
+                  padding: const pw.EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 4),
+                  child: pw.Text(
+                      rows[i].driverName.isEmpty ? '—' : rows[i].driverName,
+                      style: pw.TextStyle(
+                          fontSize: 9, fontWeight: pw.FontWeight.bold)),
+                ),
+                pw.Padding(
+                  padding: const pw.EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 4),
+                  child: _pdfShiftCell(rows[i]),
+                ),
+              ],
+            ),
+        ],
+      ),
+    ];
+  }
 
   Future<void> _publish() async {
     final adminUid = _adminUid;
@@ -1265,6 +1816,11 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
                     publishLabel:
                         _weekMode ? 'Publish week' : 'Publish day',
                     onPublish: _publish,
+                    onSaveInternal: _saveInternal,
+                    canSaveInternal: _canSaveInternal,
+                    saveLabel: _weekMode ? 'Save week' : 'Save day',
+                    onPdf: _generatePdf,
+                    onShare: _shareShiftPlan,
                     canClear: _entries.isNotEmpty && !_publishing,
                     onClear: _clearAllEntries,
                     canUnpublish: _existingPublished != null &&
@@ -1308,21 +1864,10 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
                 ],
               ),
             ),
-            // Upload overlay — rendered directly (no fade-in switcher)
-            // so the first paint lands on the very next frame, before
-            // the synchronous Excel parser blocks the main thread.
-            if (_uploading)
-              Positioned.fill(
-                child: AbsorbPointer(
-                  absorbing: true,
-                  child: ColoredBox(
-                    color: Colors.black.withValues(alpha: 0.45),
-                    child: Center(
-                      child: _UploadLoadingCard(phase: _uploadPhase),
-                    ),
-                  ),
-                ),
-              ),
+            // Upload progress is shown by the compositor-driven HTML/CSS
+            // loader (#xlsx-loader, driven via XlsxLoader) — a single,
+            // window-centered overlay. The old Flutter overlay was removed
+            // so there aren't two misaligned popups during the parse.
           ],
         ),
       ),
@@ -1361,14 +1906,55 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
     );
   }
 
+  /// Mobile: die drei Spalten teilen sich den Screen nicht mehr mit
+  /// fixen Höhen (Overflow, Upload-Button unerreichbar), sondern werden
+  /// über Segmente umgeschaltet — jede Sektion bekommt die volle Höhe.
+  int _narrowTab = 0;
+
   Widget _narrowLayout() {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     return Column(
       children: [
-        SizedBox(height: 180, child: _leftColumn()),
+        SizedBox(
+          width: double.infinity,
+          child: SegmentedButton<int>(
+            segments: [
+              ButtonSegment(
+                value: 0,
+                label: Text(de ? 'Plan' : 'Plan'),
+                icon: const Icon(Icons.event_note_rounded, size: 16),
+              ),
+              ButtonSegment(
+                value: 1,
+                label: Text(de ? 'Fahrer' : 'Drivers'),
+                icon: const Icon(Icons.group_rounded, size: 16),
+              ),
+              ButtonSegment(
+                value: 2,
+                label: Text(de ? 'Upload' : 'Upload'),
+                icon: const Icon(Icons.tune_rounded, size: 16),
+              ),
+            ],
+            selected: {_narrowTab},
+            showSelectedIcon: false,
+            style: ButtonStyle(
+              visualDensity: VisualDensity.compact,
+              textStyle: WidgetStatePropertyAll(
+                AppTypography.footnote.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ),
+            onSelectionChanged: (s) =>
+                setState(() => _narrowTab = s.first),
+          ),
+        ),
         const SizedBox(height: 10),
-        Expanded(child: _middleColumn()),
-        const SizedBox(height: 10),
-        SizedBox(height: 320, child: _rightColumn()),
+        Expanded(
+          child: switch (_narrowTab) {
+            1 => _leftColumn(),
+            2 => _rightColumn(),
+            _ => _middleColumn(),
+          },
+        ),
       ],
     );
   }
@@ -1402,6 +1988,99 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
     );
   }
 
+  /// Extracts the shift length in hours from a duration string like
+  /// "9 Std." / "8,5 Std." → "9h" / "8.5h". Falls back to the raw string.
+  String _durHours(String dur) {
+    final m = RegExp(r'(\d+(?:[.,]\d+)?)').firstMatch(dur);
+    if (m == null) return dur.trim();
+    return '${m.group(1)!.replaceAll(',', '.')}h';
+  }
+
+  /// Per-dispatch-time tour counter for the current day: one chip per start
+  /// time showing a circle with the number of tours (blocks) at that time
+  /// plus "HH:MM | <hours>h". App-only (not part of the PDF).
+  Widget _tourCounterBar() {
+    // time → list of duration strings for the tours at that time.
+    final byTime = <String, List<String>>{};
+    for (final e in _entries) {
+      for (final b in e.blocks) {
+        final raw = b.startTime.trim();
+        if (raw.isEmpty) continue;
+        byTime.putIfAbsent(_toGermanTime(raw), () => <String>[]).add(b.duration);
+      }
+    }
+    if (byTime.isEmpty) return const SizedBox.shrink();
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final times = byTime.keys.toList()..sort();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 2, 12, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6, left: 2),
+            child: Text(
+              de ? 'Touren pro Uhrzeit' : 'Tours per dispatch time',
+              style: AppTypography.caption1.copyWith(
+                color: _kMuted,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final t in times)
+                _tourChip(t, byTime[t]!.length, _durHours(byTime[t]!.first)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tourChip(String time, int count, String hours) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(4, 4, 10, 4),
+      decoration: BoxDecoration(
+        color: _kSoft,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: _kBorder),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              color: AppColors.codriverGreen,
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              '$count',
+              style: AppTypography.caption1.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(width: 7),
+          Text(
+            '$time | $hours',
+            style: AppTypography.subheadline.copyWith(
+              color: _kText,
+              fontWeight: FontWeight.w700,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _middleColumn() {
     final groups = _groupedByStart();
     return Container(
@@ -1416,45 +2095,55 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 8, 10),
-            child: Row(
+            // Wrap statt Row: auf Mobile brechen die Buttons unter den
+            // Titel um, statt ihn auf wenige Pixel zu quetschen.
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              runSpacing: 8,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _formatDate(_selectedDate),
-                        style: AppTypography.headline.copyWith(
-                          color: _kText,
-                          fontWeight: FontWeight.w800,
-                        ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _formatDate(_selectedDate),
+                      style: AppTypography.headline.copyWith(
+                        color: _kText,
+                        fontWeight: FontWeight.w800,
                       ),
-                      Text(
-                        '${_entries.length} drivers · '
-                        '${_entries.where((e) => e.kind == ShiftKind.rescue).length} rescue · '
-                        '${_entries.where((e) => e.kind == ShiftKind.extra).length} extra',
-                        style: AppTypography.caption1.copyWith(
-                          color: _kMuted,
-                        ),
+                    ),
+                    Text(
+                      '${_entries.length} drivers · '
+                      '${_entries.where((e) => e.kind == ShiftKind.rescue).length} rescue · '
+                      '${_entries.where((e) => e.kind == ShiftKind.extra).length} extra',
+                      style: AppTypography.caption1.copyWith(
+                        color: _kMuted,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                CoButton(
-                  onPressed: () => _addManualSlot(ShiftKind.rescue),
-                  label: '+ Rescue',
-                  variant: CoButtonVariant.secondaryOutlined,
-                ),
-                const SizedBox(width: 6),
-                CoButton(
-                  onPressed: () => _addManualSlot(ShiftKind.extra),
-                  label: '+ Extra',
-                  variant: CoButtonVariant.secondaryOutlined,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CoButton(
+                      onPressed: () => _addManualSlot(ShiftKind.rescue),
+                      label: '+ Rescue',
+                      variant: CoButtonVariant.secondaryOutlined,
+                    ),
+                    const SizedBox(width: 6),
+                    CoButton(
+                      onPressed: () => _addManualSlot(ShiftKind.extra),
+                      label: '+ Extra',
+                      variant: CoButtonVariant.secondaryOutlined,
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
+          // Tour counter per dispatch time (app-only, not in the PDF).
+          _tourCounterBar(),
           // Search bar — filters the list by driver name or TID.
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
@@ -1809,6 +2498,11 @@ class _Header extends StatelessWidget {
     this.publishing = false,
     this.publishLabel = 'Publish',
     this.onPublish,
+    this.onSaveInternal,
+    this.canSaveInternal = false,
+    this.saveLabel = 'Save',
+    this.onPdf,
+    this.onShare,
     this.canClear = false,
     this.onClear,
     this.canUnpublish = false,
@@ -1826,6 +2520,11 @@ class _Header extends StatelessWidget {
   final bool publishing;
   final String publishLabel;
   final VoidCallback? onPublish;
+  final VoidCallback? onSaveInternal;
+  final bool canSaveInternal;
+  final String saveLabel;
+  final VoidCallback? onPdf;
+  final VoidCallback? onShare;
   final bool canClear;
   final VoidCallback? onClear;
   final bool canUnpublish;
@@ -1844,11 +2543,13 @@ class _Header extends StatelessWidget {
   final String? softWarning;
 
   /// ISO week number for the selected date (KW). Standard German
-  /// calendar week — Thursday rule.
+  /// calendar week — Thursday rule. UTC-basiert wegen Sommerzeit.
   int _isoWeek(DateTime d) {
-    final thursday = d.add(Duration(days: 4 - d.weekday));
-    final firstThursday = DateTime(thursday.year, 1, 4);
-    return ((thursday.difference(firstThursday).inDays) ~/ 7) + 1;
+    final day = DateTime.utc(d.year, d.month, d.day);
+    final thursday = day.add(Duration(days: 4 - day.weekday));
+    final jan4 = DateTime.utc(thursday.year, 1, 4);
+    final week1Monday = jan4.subtract(Duration(days: jan4.weekday - 1));
+    return thursday.difference(week1Monday).inDays ~/ 7 + 1;
   }
 
   String _formatDate(DateTime d) {
@@ -1867,6 +2568,7 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       decoration: BoxDecoration(
@@ -1874,58 +2576,60 @@ class _Header extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: _AdminShiftPlanPageState._kBorder),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: AppColors.green50,
-              borderRadius: BorderRadius.circular(12),
+      // Mobile: Titel und Aktionen untereinander statt in einer Zeile —
+      // auf schmalen Screens quetschte die Row den Titel auf ~90 px.
+      child: LayoutBuilder(builder: (context, box) {
+        final narrow = box.maxWidth < 640;
+        final titleRow = Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppColors.green50,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.event_note_rounded,
+                color: AppColors.codriverDeep,
+              ),
             ),
-            child: const Icon(
-              Icons.event_note_rounded,
-              color: AppColors.codriverDeep,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Shift Plan',
-                  style: AppTypography.title2.copyWith(
-                    color: _AdminShiftPlanPageState._kText,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Shift Plan',
+                    style: AppTypography.title2.copyWith(
+                      color: _AdminShiftPlanPageState._kText,
+                    ),
                   ),
-                ),
-                Text(
-                  'KW ${_isoWeek(selectedDate)} · '
-                  '${selectedDate.year} · '
-                  '${_formatDate(selectedDate)}',
-                  style: AppTypography.caption1.copyWith(
-                    color: AppColors.codriverDeep,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.4,
+                  Text(
+                    '${de ? 'KW' : 'Week'} ${_isoWeek(selectedDate)} · '
+                    '${selectedDate.year} · '
+                    '${_formatDate(selectedDate)}',
+                    style: AppTypography.caption1.copyWith(
+                      color: AppColors.codriverDeep,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.4,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
+          ],
+        );
+        final actions = Wrap(
+          alignment: narrow ? WrapAlignment.start : WrapAlignment.end,
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
           if (publishedAt != null) ...[
             const SizedBox(width: 12),
             Container(
@@ -2068,6 +2772,40 @@ class _Header extends StatelessWidget {
               variant: CoButtonVariant.destructiveQuiet,
             ),
           ],
+          // Compact PDF export of the current plan.
+          if (onPdf != null) ...[
+            const SizedBox(width: 6),
+            CoButton(
+              onPressed: publishing ? null : onPdf,
+              label: 'PDF',
+              icon: Icons.picture_as_pdf_outlined,
+              variant: CoButtonVariant.quiet,
+            ),
+          ],
+          // Public share link (viewable without login).
+          if (onShare != null) ...[
+            const SizedBox(width: 6),
+            CoButton(
+              onPressed: publishing ? null : onShare,
+              label: 'Link',
+              icon: Icons.link_rounded,
+              variant: CoButtonVariant.quiet,
+            ),
+          ],
+          // Internal save — persists to shift_plan_drafts without
+          // publishing to drivers. Lets the admin back-fill past weeks
+          // for the Payment Check. Always available alongside Publish.
+          if (onSaveInternal != null) ...[
+            const SizedBox(width: 6),
+            CoButton(
+              onPressed:
+                  !canSaveInternal || publishing ? null : onSaveInternal,
+              label: saveLabel,
+              icon: Icons.save_outlined,
+              variant: CoButtonVariant.quiet,
+              busy: publishing,
+            ),
+          ],
           // Single Publish↔Unpublish toggle. While a doc is published
           // the button switches to the destructive Unpublish action;
           // otherwise it's the standard green Publish.
@@ -2089,10 +2827,27 @@ class _Header extends StatelessWidget {
               busy: publishing,
             ),
           ],
-        ],
-      ),
-        ],
-      ),
+          ],
+        );
+        if (narrow) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              titleRow,
+              const SizedBox(height: 10),
+              actions,
+            ],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(child: titleRow),
+            const SizedBox(width: 12),
+            Flexible(child: actions),
+          ],
+        );
+      }),
     );
   }
 }
@@ -2167,18 +2922,35 @@ class _KwToggle extends StatelessWidget {
   final VoidCallback onToggle;
 
   int _isoWeek(DateTime d) {
-    final thursday = d.add(Duration(days: 4 - d.weekday));
-    final firstThursday = DateTime(thursday.year, 1, 4);
-    final week = ((thursday.difference(firstThursday).inDays) ~/ 7) + 1;
-    return week;
+    final day = DateTime.utc(d.year, d.month, d.day);
+    final thursday = day.add(Duration(days: 4 - day.weekday));
+    final jan4 = DateTime.utc(thursday.year, 1, 4);
+    final week1Monday = jan4.subtract(Duration(days: jan4.weekday - 1));
+    return thursday.difference(week1Monday).inDays ~/ 7 + 1;
+  }
+
+  /// The ISO week shared by the most days in [dateKeys] — robust to an
+  /// Amazon Sunday-start column belonging to the previous ISO week.
+  int _majorityIsoWeek(List<String> dateKeys) {
+    final counts = <int, int>{};
+    for (final dk in dateKeys) {
+      final d = DateTime.tryParse(dk);
+      if (d != null) {
+        final w = _isoWeek(d);
+        counts[w] = (counts[w] ?? 0) + 1;
+      }
+    }
+    if (counts.isEmpty) return _isoWeek(DateTime.parse(dateKeys.first));
+    return counts.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
   }
 
   @override
   Widget build(BuildContext context) {
     final dates = parsed?.availableDateKeys ?? const <String>[];
-    final kwLabel = dates.isEmpty
-        ? 'KW'
-        : 'KW ${_isoWeek(DateTime.parse(dates.first))}';
+    // Use the MAJORITY ISO week of the file's days, not just the first day.
+    // Amazon Zeitpläne start on Sunday, and a Sunday belongs to the previous
+    // ISO week — taking the first date would mislabel the whole plan.
+    final kwLabel = dates.isEmpty ? 'KW' : 'KW ${_majorityIsoWeek(dates)}';
     return CoPressable(
       onTap: parsed == null ? null : onToggle,
       borderRadius: BorderRadius.circular(999),
@@ -2602,7 +3374,8 @@ class _AssignmentRow extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(10, 6, 6, 6),
-              child: Row(
+              child: _HScrollOnNarrow(
+                child: Row(
                 children: [
                   // Left colour bar
                   Container(
@@ -2793,6 +3566,7 @@ class _AssignmentRow extends StatelessWidget {
                     const SizedBox(width: 28),
                 ],
               ),
+              ),
             ),
           ),
         );
@@ -2801,10 +3575,41 @@ class _AssignmentRow extends StatelessWidget {
   }
 }
 
+/// Auf schmalen Screens (Mobile) wird das Kind horizontal scrollbar mit
+/// fester Mindestbreite gerendert statt auf ~350 px zusammengequetscht.
+class _HScrollOnNarrow extends StatelessWidget {
+  const _HScrollOnNarrow({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.sizeOf(context).width >= 600) return child;
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: SizedBox(width: 680, child: child),
+    );
+  }
+}
+
 /// Pairs the Meeting (parking arrival) time with the Dispatch start
 /// time for one shift block. Two micro-pills side by side, separated
 /// by an arrow — keeps every row single-line even when a driver has
 /// two shifts in the day.
+/// Converts any shift time string ("7:00am", "6:00pm", "16:00", "07:00") to
+/// German 24-hour "HH:MM". Returns the trimmed input when unparseable.
+String _toGermanTime(String raw) {
+  final m = RegExp(r'(\d{1,2}):(\d{2})\s*(am|pm)?', caseSensitive: false)
+      .firstMatch(raw.trim());
+  if (m == null) return raw.trim();
+  var h = int.tryParse(m.group(1) ?? '0') ?? 0;
+  final min = int.tryParse(m.group(2) ?? '0') ?? 0;
+  final suf = (m.group(3) ?? '').toLowerCase();
+  if (suf == 'pm' && h < 12) h += 12;
+  if (suf == 'am' && h == 12) h = 0;
+  String p(int n) => n.toString().padLeft(2, '0');
+  return '${p(h % 24)}:${p(min)}';
+}
+
 class _MeetingDispatchPair extends StatelessWidget {
   const _MeetingDispatchPair({
     required this.meeting,
@@ -2856,7 +3661,7 @@ class _MeetingDispatchPair extends StatelessWidget {
           ),
           const SizedBox(width: 3),
           Text(
-            dispatch,
+            _toGermanTime(dispatch),
             style: AppTypography.caption2.copyWith(
               color: _AdminShiftPlanPageState._kText,
               fontWeight: FontWeight.w800,
@@ -2954,6 +3759,7 @@ class _EntryEditorDialogState extends State<_EntryEditorDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final hasDriver = widget.entry.transporterId.trim().isNotEmpty;
     final hasMentee = _menteeTid.trim().isNotEmpty;
     final canDeleteSlot = widget.entry.kind != ShiftKind.regular ||
@@ -3067,10 +3873,10 @@ class _EntryEditorDialogState extends State<_EntryEditorDialog> {
                       const SizedBox(height: 6),
                       TextField(
                         controller: _meet,
-                        decoration: const InputDecoration(
-                          hintText: 'z.B. 10:10',
+                        decoration: InputDecoration(
+                          hintText: de ? 'z.B. 10:10' : 'e.g. 10:10',
                           isDense: true,
-                          border: OutlineInputBorder(),
+                          border: const OutlineInputBorder(),
                         ),
                       ),
                       const SizedBox(height: 14),
@@ -4232,6 +5038,138 @@ class _TimePickerDialogState extends State<_TimePickerDialog> {
 // ──────────────────────────────────────────────────────────────────
 //   DAY PICKER DIALOG  (after Excel upload)
 // ──────────────────────────────────────────────────────────────────
+
+/// Asks whether a freshly-uploaded multi-day file should be loaded as the
+/// WHOLE WEEK (all days → week mode) or a SINGLE DAY (day picker). Returns
+/// 'week' or 'day' via Navigator.pop.
+class _UploadScopeDialog extends StatelessWidget {
+  const _UploadScopeDialog({required this.dayCount});
+
+  final int dayCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 460),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(22, 20, 22, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                de ? 'Was möchtest du laden?' : 'What do you want to load?',
+                style: AppTypography.title3.copyWith(
+                  color: _AdminShiftPlanPageState._kText,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                de
+                    ? 'Die Datei enthält $dayCount Tage. Du kannst die ganze Woche '
+                        'laden oder nur einen einzelnen Tag.'
+                    : 'The file contains $dayCount days. You can load the whole '
+                        'week or just a single day.',
+                style: AppTypography.footnote.copyWith(
+                  color: _AdminShiftPlanPageState._kMuted,
+                ),
+              ),
+              const SizedBox(height: 18),
+              _ScopeOption(
+                icon: Icons.calendar_view_week_rounded,
+                title: de ? 'Ganze Woche' : 'Whole week',
+                subtitle: de
+                    ? 'Alle $dayCount Tage laden — Save/Publish week'
+                    : 'Load all $dayCount days — Save/Publish week',
+                onTap: () => Navigator.of(context).pop('week'),
+              ),
+              const SizedBox(height: 10),
+              _ScopeOption(
+                icon: Icons.today_rounded,
+                title: de ? 'Einzelner Tag' : 'Single day',
+                subtitle: de
+                    ? 'Einen Tag auswählen — Save/Publish day'
+                    : 'Pick one day — Save/Publish day',
+                onTap: () => Navigator.of(context).pop('day'),
+              ),
+              const SizedBox(height: 14),
+              Align(
+                alignment: Alignment.centerRight,
+                child: CoButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  label: de ? 'Abbrechen' : 'Cancel',
+                  variant: CoButtonVariant.quiet,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ScopeOption extends StatelessWidget {
+  const _ScopeOption({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.green50,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Icon(icon, color: AppColors.codriverDeep),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      style: AppTypography.body.copyWith(
+                        color: _AdminShiftPlanPageState._kText,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: AppTypography.caption1.copyWith(
+                        color: _AdminShiftPlanPageState._kMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded,
+                  color: AppColors.codriverDeep),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _DayPickerDialog extends StatefulWidget {
   const _DayPickerDialog({

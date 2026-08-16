@@ -6,8 +6,77 @@ import 'package:intl/intl.dart';
 import '../localization/app_localizations.dart';
 import '../theme/app_colors.dart';
 import '../widgets/co_pressable.dart';
+import '../widgets/metric_info_chip.dart';
 
 final _pct = NumberFormat.decimalPattern('de');
+
+/// POD Quality reject reasons rendered as interactive `MetricInfoChip`s.
+/// Sorted by count desc so the most-frequent issues are first.
+/// `rejects` is the raw map from Firestore (`summary.podQuality.rejects`).
+List<Widget> buildPodRejectChips(
+  BuildContext context,
+  Map<String, dynamic> rejects,
+) {
+  final t = AppLocalizations.of(context);
+
+  num? n(String k) {
+    // Try the key as-is (summary uses ...Count keys),
+    // then fall back to the same key without the trailing "Count"
+    // (per-driver maps use 'blurryPhoto', 'photoTooDark', etc.).
+    dynamic v = rejects[k];
+    if (v == null && k.endsWith('Count')) {
+      v = rejects[k.substring(0, k.length - 'Count'.length)];
+    }
+    if (v == null) return null;
+    if (v is num) return v;
+    if (v is String) return num.tryParse(v.trim().replaceAll(',', '.'));
+    return null;
+  }
+
+  String fmt(num? v) {
+    if (v == null) return '—';
+    try {
+      return _pct.format(v);
+    } catch (_) {
+      return '—';
+    }
+  }
+
+  final entries = <_PodRejectEntry>[
+    _PodRejectEntry('blurryPhotoCount', 'pod_quality_blurry'),
+    _PodRejectEntry('photoTooDarkCount', 'pod_quality_too_dark'),
+    _PodRejectEntry('noPackageDetectedCount', 'pod_quality_no_package'),
+    _PodRejectEntry('packageInCarCount', 'pod_quality_in_car'),
+    _PodRejectEntry('packageTooCloseCount', 'pod_quality_too_close'),
+  ];
+
+  entries.sort((a, b) {
+    final ca = n(a.dataKey) ?? 0;
+    final cb = n(b.dataKey) ?? 0;
+    final aWarn = ca > 0;
+    final bWarn = cb > 0;
+    if (aWarn != bWarn) return bWarn ? 1 : -1;
+    if (ca != cb) return cb.compareTo(ca);
+    return a.labelKey.compareTo(b.labelKey);
+  });
+
+  return entries.map((e) {
+    final c = n(e.dataKey);
+    return MetricInfoChip(
+      label: t.t(e.labelKey),
+      value: fmt(c),
+      count: c,
+      description: t.t('${e.labelKey}_desc'),
+      tip: t.t('${e.labelKey}_tip'),
+    );
+  }).toList();
+}
+
+class _PodRejectEntry {
+  final String dataKey;
+  final String labelKey;
+  const _PodRejectEntry(this.dataKey, this.labelKey);
+}
 final _int = NumberFormat.decimalPattern('de');
 
 String _pctStr(num? v) {
@@ -47,8 +116,26 @@ class PodQualityWeekPage extends StatefulWidget {
   State<PodQualityWeekPage> createState() => _PodQualityWeekPageState();
 }
 
+/// Per-driver reject-reason filter options: (podQuality key, label key).
+const List<(String, String)> _kPodRejectFilters = [
+  ('blurryPhoto', 'pod_quality_blurry'),
+  ('photoTooDark', 'pod_quality_too_dark'),
+  ('noPackageDetected', 'pod_quality_no_package'),
+  ('packageInCar', 'pod_quality_in_car'),
+  ('packageTooClose', 'pod_quality_too_close'),
+];
+
+/// Reject count for [key] on a driver's podQuality map, tolerating both the
+/// short per-driver key and a `<key>Count` variant.
+double _podRejectCount(Map<String, dynamic> pod, String key) {
+  return _num(pod[key]) ?? _num(pod['${key}Count']) ?? 0;
+}
+
 class _PodQualityWeekPageState extends State<PodQualityWeekPage> {
   late final Stream<DocumentSnapshot<Map<String, dynamic>>> _reportStream;
+
+  // null = show all drivers; otherwise a podQuality reject key to filter by.
+  String? _rejectFilter;
 
   Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _scores() {
     final uid = AdminScope.adminUidOf(context)!;
@@ -56,7 +143,8 @@ class _PodQualityWeekPageState extends State<PodQualityWeekPage> {
         .collection('users')
         .doc(uid)
         .collection('scores')
-        .where('reportRef', isEqualTo: widget.reportRef)
+        // Query by reportPath (string) — survives migration cleanly.
+        .where('reportPath', isEqualTo: widget.reportRef.path)
         .snapshots()
         .map((s) => s.docs);
   }
@@ -70,6 +158,7 @@ class _PodQualityWeekPageState extends State<PodQualityWeekPage> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final de = Localizations.localeOf(context).languageCode == 'de';
     return Material(
       color: const Color(0xFFF5F7F9),
       child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
@@ -218,38 +307,10 @@ class _PodQualityWeekPageState extends State<PodQualityWeekPage> {
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
-                          children: [
-                            _MiniStat(
-                              label: t.t('pod_quality_blurry'),
-                              value: _intStr(
-                                _num(podRejects['blurryPhotoCount']),
-                              ),
-                            ),
-                            _MiniStat(
-                              label: t.t('pod_quality_too_dark'),
-                              value: _intStr(
-                                _num(podRejects['photoTooDarkCount']),
-                              ),
-                            ),
-                            _MiniStat(
-                              label: t.t('pod_quality_no_package'),
-                              value: _intStr(
-                                _num(podRejects['noPackageDetectedCount']),
-                              ),
-                            ),
-                            _MiniStat(
-                              label: t.t('pod_quality_in_car'),
-                              value: _intStr(
-                                _num(podRejects['packageInCarCount']),
-                              ),
-                            ),
-                            _MiniStat(
-                              label: t.t('pod_quality_too_close'),
-                              value: _intStr(
-                                _num(podRejects['packageTooCloseCount']),
-                              ),
-                            ),
-                          ],
+                          children: buildPodRejectChips(
+                            context,
+                            podRejects,
+                          ),
                         ),
                       ],
                     ],
@@ -284,6 +345,26 @@ class _PodQualityWeekPageState extends State<PodQualityWeekPage> {
                             )
                             .toList();
 
+                        final fk = _rejectFilter;
+                        final visible = fk == null
+                            ? rows
+                            : (rows.where((d) {
+                                final pod = (d.data()['podQuality'] as Map?)
+                                        ?.cast<String, dynamic>() ??
+                                    const <String, dynamic>{};
+                                return _podRejectCount(pod, fk) > 0;
+                              }).toList()
+                              ..sort((a, b) {
+                                final pa = (a.data()['podQuality'] as Map?)
+                                        ?.cast<String, dynamic>() ??
+                                    const <String, dynamic>{};
+                                final pb = (b.data()['podQuality'] as Map?)
+                                        ?.cast<String, dynamic>() ??
+                                    const <String, dynamic>{};
+                                return _podRejectCount(pb, fk)
+                                    .compareTo(_podRejectCount(pa, fk));
+                              }));
+
                         if (rows.isEmpty) {
                           return CoStateSwitcher(
                             child: Center(
@@ -312,12 +393,31 @@ class _PodQualityWeekPageState extends State<PodQualityWeekPage> {
                                   const SizedBox(width: 8),
                                   _SectionTag(
                                     label: t.tf('pod_quality_entries_count', {
-                                      'count': '${rows.length}',
+                                      'count': '${visible.length}',
                                     }),
                                   ),
                                 ],
                               ),
                             ),
+                            _RejectFilterBar(
+                              selected: _rejectFilter,
+                              onSelected: (k) =>
+                                  setState(() => _rejectFilter = k),
+                            ),
+                            if (fk != null && visible.isEmpty)
+                              Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(24, 24, 24, 8),
+                                child: Text(
+                                  de
+                                      ? 'Kein Fahrer mit diesem Reject-Grund in '
+                                          'dieser Woche.'
+                                      : 'No driver with this reject reason '
+                                          'this week.',
+                                  style:
+                                      const TextStyle(color: Color(0xFF6B7280)),
+                                ),
+                              ),
                             Expanded(
                               child: ListView.separated(
                                 padding: const EdgeInsets.fromLTRB(
@@ -326,11 +426,11 @@ class _PodQualityWeekPageState extends State<PodQualityWeekPage> {
                                   24,
                                   24,
                                 ),
-                                itemCount: rows.length,
+                                itemCount: visible.length,
                                 separatorBuilder: (_, __) =>
                                     const SizedBox(height: 12),
                                 itemBuilder: (context, i) {
-                                  final data = rows[i].data();
+                                  final data = visible[i].data();
                                   final pod =
                                       (data['podQuality'] as Map?)
                                           ?.cast<String, dynamic>() ??
@@ -458,41 +558,9 @@ class _PodQualityWeekPageState extends State<PodQualityWeekPage> {
                                               label: t.t('pod_quality_rejects'),
                                               value: _intStr(rejects),
                                             ),
-                                            _MiniStat(
-                                              label: t.t('pod_quality_blurry'),
-                                              value: _intStr(
-                                                _num(pod['blurryPhoto']),
-                                              ),
-                                            ),
-                                            _MiniStat(
-                                              label: t.t(
-                                                'pod_quality_too_dark',
-                                              ),
-                                              value: _intStr(
-                                                _num(pod['photoTooDark']),
-                                              ),
-                                            ),
-                                            _MiniStat(
-                                              label: t.t(
-                                                'pod_quality_no_package',
-                                              ),
-                                              value: _intStr(
-                                                _num(pod['noPackageDetected']),
-                                              ),
-                                            ),
-                                            _MiniStat(
-                                              label: t.t('pod_quality_in_car'),
-                                              value: _intStr(
-                                                _num(pod['packageInCar']),
-                                              ),
-                                            ),
-                                            _MiniStat(
-                                              label: t.t(
-                                                'pod_quality_too_close',
-                                              ),
-                                              value: _intStr(
-                                                _num(pod['packageTooClose']),
-                                              ),
+                                            ...buildPodRejectChips(
+                                              context,
+                                              pod,
                                             ),
                                           ],
                                         ),
@@ -512,6 +580,43 @@ class _PodQualityWeekPageState extends State<PodQualityWeekPage> {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// Horizontal chip bar to filter the driver list by a POD reject reason.
+class _RejectFilterBar extends StatelessWidget {
+  final String? selected;
+  final ValueChanged<String?> onSelected;
+  const _RejectFilterBar({required this.selected, required this.onSelected});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    Widget chip(String? key, String label) {
+      return Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: ChoiceChip(
+          label: Text(label),
+          selected: selected == key,
+          selectedColor: AppColors.codriverGreen.withValues(alpha: 0.18),
+          onSelected: (_) => onSelected(key),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+      child: SizedBox(
+        height: 40,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          children: [
+            chip(null, 'Alle'),
+            for (final e in _kPodRejectFilters) chip(e.$1, t.t(e.$2)),
+          ],
+        ),
       ),
     );
   }

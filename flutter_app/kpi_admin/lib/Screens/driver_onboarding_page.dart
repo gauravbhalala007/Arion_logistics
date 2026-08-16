@@ -9,6 +9,29 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../localization/app_localizations.dart';
 
+/// MIME-Type für Uploads aus dem Dateinamen — ohne expliziten
+/// contentType blocken die Storage-Rules (isImage / isImageOrPdf)
+/// den Upload auf Flutter Web.
+String _uploadContentType(String name) {
+  final ext =
+      name.contains('.') ? name.split('.').last.toLowerCase() : '';
+  switch (ext) {
+    case 'png':
+      return 'image/png';
+    case 'webp':
+      return 'image/webp';
+    case 'gif':
+      return 'image/gif';
+    case 'heic':
+    case 'heif':
+      return 'image/heic';
+    case 'pdf':
+      return 'application/pdf';
+    default:
+      return 'image/jpeg';
+  }
+}
+
 class DriverOnboardingPage extends StatefulWidget {
   final DocumentReference<Map<String, dynamic>> driverRef;
 
@@ -369,7 +392,11 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
           .child(widget.driverRef.id)
           .child('${DateTime.now().millisecondsSinceEpoch}_$originalName');
 
-      await ref.putData(bytes);
+      await ref.putData(
+        bytes,
+        fb.SettableMetadata(
+            contentType: _uploadContentType(originalName)),
+      );
       final url = await ref.getDownloadURL();
 
       await docsCol.doc(docType).set({
@@ -455,7 +482,10 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
           .child(widget.driverRef.id)
           .child('profile_${DateTime.now().millisecondsSinceEpoch}_${f.name}');
 
-      await ref.putData(bytes);
+      await ref.putData(
+        bytes,
+        fb.SettableMetadata(contentType: _uploadContentType(f.name)),
+      );
       final url = await ref.getDownloadURL();
 
       await widget.driverRef.set({

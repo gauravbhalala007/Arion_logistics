@@ -3,8 +3,99 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../localization/app_localizations.dart';
+import '../widgets/metric_info_chip.dart';
 
 final _intFmt = NumberFormat.decimalPattern('de');
+final _eurFmt = NumberFormat.currency(
+  locale: 'de_DE',
+  symbol: '€',
+  decimalDigits: 2,
+);
+
+/// Geschätzte Kosten pro DNR-Fall (Amazon-Erstattung + operativer
+/// Mehraufwand). Heuristik — kann später pro DSP per Firestore-Setting
+/// konfigurierbar werden.
+const double kEurPerDnr = 5.50;
+
+String _eurStr(num? dnrCount) {
+  if (dnrCount == null) return '—';
+  final eur = dnrCount * kEurPerDnr;
+  try {
+    return _eurFmt.format(eur);
+  } catch (_) {
+    return '€ ${eur.toStringAsFixed(2)}';
+  }
+}
+
+/// Sorted list of Concessions focus areas as `MetricInfoChip`s, sorted
+/// by count descending so the most-frequent mistakes appear first.
+/// `focus` is the raw map from Firestore (`summary.concessions.focusBuckets`).
+List<Widget> buildConcessionsFocusChips(
+  BuildContext context,
+  Map<String, dynamic> focus,
+) {
+  final t = AppLocalizations.of(context);
+
+  num? n(String k) {
+    final v = focus[k];
+    if (v == null) return null;
+    if (v is num) return v;
+    if (v is String) return num.tryParse(v.trim().replaceAll(',', '.'));
+    return null;
+  }
+
+  String fmt(num? v) {
+    if (v == null) return '—';
+    try {
+      return _intFmt.format(v);
+    } catch (_) {
+      return '—';
+    }
+  }
+
+  // Order: dataKey, labelKey (rest derived: ${labelKey}_desc + _tip).
+  // Listed in default order — gets re-sorted by count below.
+  final entries = <_FocusEntry>[
+    _FocusEntry('attendedDnr', 'concessions_focus_attended_dnr'),
+    _FocusEntry('photoOnDelivery', 'concessions_focus_photo_on_delivery'),
+    _FocusEntry(
+      'successfulContact',
+      'concessions_focus_successful_contact',
+    ),
+    _FocusEntry('delivered25m', 'concessions_focus_delivered_25m'),
+    _FocusEntry('falseScan', 'concessions_focus_false_scan'),
+    _FocusEntry('mailbox', 'concessions_focus_mailbox'),
+    _FocusEntry('deliveredOtp', 'concessions_focus_delivered_otp'),
+  ];
+
+  // Sort: warnings (count > 0) first, then by count desc, then alpha.
+  entries.sort((a, b) {
+    final ca = n(a.dataKey) ?? 0;
+    final cb = n(b.dataKey) ?? 0;
+    final aWarn = ca > 0;
+    final bWarn = cb > 0;
+    if (aWarn != bWarn) return bWarn ? 1 : -1;
+    if (ca != cb) return cb.compareTo(ca);
+    return a.labelKey.compareTo(b.labelKey);
+  });
+
+  return entries.map((e) {
+    final c = n(e.dataKey);
+    return MetricInfoChip(
+      label: t.t(e.labelKey),
+      value: fmt(c),
+      count: c,
+      description: t.t('${e.labelKey}_desc'),
+      tip: t.t('${e.labelKey}_tip'),
+    );
+  }).toList();
+}
+
+class _FocusEntry {
+  final String dataKey;
+  final String labelKey;
+  const _FocusEntry(this.dataKey, this.labelKey);
+}
 
 String _intStr(num? v) {
   if (v == null) return '—';
@@ -37,13 +128,79 @@ class ConcessionsWeekPage extends StatefulWidget {
 class _ConcessionsWeekPageState extends State<ConcessionsWeekPage> {
   late final Stream<DocumentSnapshot<Map<String, dynamic>>> _reportStream;
 
+  Future<void> _confirmDeleteDetail(BuildContext context) async {
+    final t = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t.t('concessions_delete_week_title')),
+        content: Text(
+          t.tf('concessions_delete_week_body', {
+            'week': t.t('concessions_shell_week_title'),
+          }),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(t.t('admin_home_cancel')),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFB42318),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(t.t('concessions_delete_week_confirm')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final db = FirebaseFirestore.instance;
+    try {
+      final uid = FirebaseAuth.instance.currentUser!.uid;
+      final scoresSnap = await db
+          .collection('users')
+          .doc(uid)
+          .collection('scores')
+          .where('reportPath', isEqualTo: widget.reportRef.path)
+          .get();
+      const chunkSize = 400;
+      for (var i = 0; i < scoresSnap.docs.length; i += chunkSize) {
+        final batch = db.batch();
+        final end = (i + chunkSize < scoresSnap.docs.length)
+            ? i + chunkSize
+            : scoresSnap.docs.length;
+        for (final d in scoresSnap.docs.sublist(i, end)) {
+          batch.delete(d.reference);
+        }
+        await batch.commit();
+      }
+      await widget.reportRef.delete();
+      if (!mounted) return;
+      Navigator.of(context).maybePop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            t.tf('concessions_delete_week_failed', {'error': '$e'}),
+          ),
+        ),
+      );
+    }
+  }
+
   Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _scores() {
     final uid = FirebaseAuth.instance.currentUser!.uid;
+    // Query by reportPath (string) — survives migration cleanly. The
+    // alternative .where('reportRef', isEqualTo: widget.reportRef) used
+    // to fail silently in some imports because the imported
+    // DocumentReference instances did not equality-match.
     return FirebaseFirestore.instance
         .collection('users')
         .doc(uid)
         .collection('scores')
-        .where('reportRef', isEqualTo: widget.reportRef)
+        .where('reportPath', isEqualTo: widget.reportRef.path)
         .snapshots()
         .map((s) => s.docs);
   }
@@ -85,6 +242,9 @@ class _ConcessionsWeekPageState extends State<ConcessionsWeekPage> {
           final dnrCount = _num(concSummary['dnrCount']);
           final dnrDpmo = _num(concSummary['dnrDpmo']);
 
+          final reportYear = (report['year'] as num?)?.toInt() ?? 0;
+          final reportWeek = (report['weekNumber'] as num?)?.toInt() ?? 0;
+
           return Column(
             children: [
               Padding(
@@ -107,10 +267,12 @@ class _ConcessionsWeekPageState extends State<ConcessionsWeekPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            child: Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 10,
                               children: [
                                 Text(
                                   label,
@@ -121,17 +283,40 @@ class _ConcessionsWeekPageState extends State<ConcessionsWeekPage> {
                                   ),
                                 ),
                                 if (station.isNotEmpty)
-                                  Text(
-                                    station,
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      color: Color(0xFF6B7280),
-                                      fontWeight: FontWeight.w700,
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF3F4F6),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      station,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        color: Color(0xFF374151),
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 0.5,
+                                      ),
                                     ),
                                   ),
                               ],
                             ),
                           ),
+                          IconButton(
+                            tooltip: t.t(
+                              'concessions_delete_week_tooltip',
+                            ),
+                            icon: const Icon(
+                              Icons.delete_outline_rounded,
+                              color: Color(0xFFB42318),
+                              size: 22,
+                            ),
+                            onPressed: () => _confirmDeleteDetail(context),
+                          ),
+                          const SizedBox(width: 4),
                           _SectionTag(
                             label: t.t('concessions_title'),
                             icon: Icons.report_gmailerrorred_outlined,
@@ -141,7 +326,7 @@ class _ConcessionsWeekPageState extends State<ConcessionsWeekPage> {
                       const SizedBox(height: 16),
                       LayoutBuilder(
                         builder: (context, constraints) {
-                          final useRow = constraints.maxWidth >= 540;
+                          final useRow = constraints.maxWidth >= 720;
                           final tiles = [
                             _StatTile(
                               label: t.t('concessions_delivered'),
@@ -158,6 +343,11 @@ class _ConcessionsWeekPageState extends State<ConcessionsWeekPage> {
                               value: _intStr(dnrDpmo),
                               tone: _TileTone.warn,
                             ),
+                            _StatTile(
+                              label: t.t('concessions_loss'),
+                              value: _eurStr(dnrCount),
+                              tone: _TileTone.danger,
+                            ),
                           ];
 
                           if (useRow) {
@@ -168,6 +358,8 @@ class _ConcessionsWeekPageState extends State<ConcessionsWeekPage> {
                                 Expanded(child: tiles[1]),
                                 const SizedBox(width: 12),
                                 Expanded(child: tiles[2]),
+                                const SizedBox(width: 12),
+                                Expanded(child: tiles[3]),
                               ],
                             );
                           }
@@ -193,52 +385,10 @@ class _ConcessionsWeekPageState extends State<ConcessionsWeekPage> {
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
-                          children: [
-                            _MiniStat(
-                              label: t.t('concessions_focus_attended_dnr'),
-                              value: _intStr(
-                                _num(concFocus['attendedDnr']),
-                              ),
-                            ),
-                            _MiniStat(
-                              label: t.t(
-                                'concessions_focus_photo_on_delivery',
-                              ),
-                              value: _intStr(
-                                _num(concFocus['photoOnDelivery']),
-                              ),
-                            ),
-                            _MiniStat(
-                              label: t.t(
-                                'concessions_focus_successful_contact',
-                              ),
-                              value: _intStr(
-                                _num(concFocus['successfulContact']),
-                              ),
-                            ),
-                            _MiniStat(
-                              label:
-                                  t.t('concessions_focus_delivered_25m'),
-                              value: _intStr(
-                                _num(concFocus['delivered25m']),
-                              ),
-                            ),
-                            _MiniStat(
-                              label: t.t('concessions_focus_false_scan'),
-                              value: _intStr(_num(concFocus['falseScan'])),
-                            ),
-                            _MiniStat(
-                              label: t.t('concessions_focus_mailbox'),
-                              value: _intStr(_num(concFocus['mailbox'])),
-                            ),
-                            _MiniStat(
-                              label:
-                                  t.t('concessions_focus_delivered_otp'),
-                              value: _intStr(
-                                _num(concFocus['deliveredOtp']),
-                              ),
-                            ),
-                          ],
+                          children: buildConcessionsFocusChips(
+                            context,
+                            concFocus,
+                          ),
                         ),
                       ],
                     ],
@@ -259,10 +409,43 @@ class _ConcessionsWeekPageState extends State<ConcessionsWeekPage> {
                           );
                         }
                         final docs = scoreSnap.data ?? const [];
+                        // XLSX-Summary-Zeilen ausfiltern (TOTALDNRCOUNT
+                        // u. ä.) — die addieren bereits alle Fahrer und
+                        // wuerden hier doppelt erscheinen.
+                        const summaryKeys = {
+                          'TOTAL',
+                          'TOTALDNR',
+                          'TOTALDNRCOUNT',
+                          'TOTAL_DNR',
+                          'TOTAL_DNR_COUNT',
+                          'SUMMARY',
+                          'GESAMT',
+                          'GESAMTSUMME',
+                          'SUM',
+                          'TOTALS',
+                        };
+                        bool isSummary(Map<String, dynamic> data) {
+                          final tid =
+                              (data['transporterId'] ?? '').toString();
+                          final name =
+                              (data['driverName'] ?? '').toString();
+                          final tidU = tid.trim().toUpperCase();
+                          final nameU = name.trim().toUpperCase();
+                          final tidN =
+                              tidU.replaceAll(RegExp(r'[^A-Z]'), '');
+                          final nameN =
+                              nameU.replaceAll(RegExp(r'[^A-Z]'), '');
+                          return summaryKeys.contains(tidU) ||
+                              summaryKeys.contains(nameU) ||
+                              summaryKeys.contains(tidN) ||
+                              summaryKeys.contains(nameN);
+                        }
                         final rows = docs
                             .where(
                               (d) =>
-                                  (d.data()['concessions'] as Map?) != null,
+                                  (d.data()['concessions'] as Map?) !=
+                                      null &&
+                                  !isSummary(d.data()),
                             )
                             .toList();
 
@@ -421,26 +604,10 @@ class _ConcessionsWeekPageState extends State<ConcessionsWeekPage> {
                                                 ],
                                               ),
                                             ),
-                                            Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.end,
-                                              children: [
-                                                _StatPill(
-                                                  label: t.t(
-                                                    'concessions_dnr_count',
-                                                  ),
-                                                  value: _intStr(totalDnr),
-                                                  tone: _TileTone.warn,
-                                                ),
-                                                const SizedBox(height: 6),
-                                                _StatPill(
-                                                  label: t.t(
-                                                    'concessions_dnr_dpmo_4w',
-                                                  ),
-                                                  value: _intStr(dpmo4w),
-                                                  tone: _TileTone.warn,
-                                                ),
-                                              ],
+                                            // Kompakte Metrik-Leiste: DNRs · DPMO · Loss
+                                            _DriverMetricStrip(
+                                              dnrCount: totalDnr,
+                                              dpmo4w: dpmo4w,
                                             ),
                                           ],
                                         ),
@@ -455,102 +622,15 @@ class _ConcessionsWeekPageState extends State<ConcessionsWeekPage> {
                                               ),
                                               value: _intStr(totalDelivered),
                                             ),
-                                            _MiniStat(
-                                              label: t.tf(
-                                                'concessions_week_w',
-                                                {'week': '1'},
-                                              ),
-                                              value: _intStr(
-                                                _num(byWeek['w1']),
-                                              ),
+                                            ..._dnrWeekChips(
+                                              context,
+                                              byWeek: byWeek,
+                                              reportYear: reportYear,
+                                              reportWeek: reportWeek,
                                             ),
-                                            _MiniStat(
-                                              label: t.tf(
-                                                'concessions_week_w',
-                                                {'week': '2'},
-                                              ),
-                                              value: _intStr(
-                                                _num(byWeek['w2']),
-                                              ),
-                                            ),
-                                            _MiniStat(
-                                              label: t.tf(
-                                                'concessions_week_w',
-                                                {'week': '3'},
-                                              ),
-                                              value: _intStr(
-                                                _num(byWeek['w3']),
-                                              ),
-                                            ),
-                                            _MiniStat(
-                                              label: t.tf(
-                                                'concessions_week_w',
-                                                {'week': '4'},
-                                              ),
-                                              value: _intStr(
-                                                _num(byWeek['w4']),
-                                              ),
-                                            ),
-                                            _MiniStat(
-                                              label: t.t(
-                                                'concessions_focus_attended_dnr',
-                                              ),
-                                              value: _intStr(
-                                                _num(focus['attendedDnr']),
-                                              ),
-                                            ),
-                                            _MiniStat(
-                                              label: t.t(
-                                                'concessions_focus_photo_on_delivery',
-                                              ),
-                                              value: _intStr(
-                                                _num(
-                                                  focus['photoOnDelivery'],
-                                                ),
-                                              ),
-                                            ),
-                                            _MiniStat(
-                                              label: t.t(
-                                                'concessions_focus_successful_contact',
-                                              ),
-                                              value: _intStr(
-                                                _num(
-                                                  focus[
-                                                      'successfulContact'],
-                                                ),
-                                              ),
-                                            ),
-                                            _MiniStat(
-                                              label: t.t(
-                                                'concessions_focus_delivered_25m',
-                                              ),
-                                              value: _intStr(
-                                                _num(focus['delivered25m']),
-                                              ),
-                                            ),
-                                            _MiniStat(
-                                              label: t.t(
-                                                'concessions_focus_false_scan',
-                                              ),
-                                              value: _intStr(
-                                                _num(focus['falseScan']),
-                                              ),
-                                            ),
-                                            _MiniStat(
-                                              label: t.t(
-                                                'concessions_focus_mailbox',
-                                              ),
-                                              value: _intStr(
-                                                _num(focus['mailbox']),
-                                              ),
-                                            ),
-                                            _MiniStat(
-                                              label: t.t(
-                                                'concessions_focus_delivered_otp',
-                                              ),
-                                              value: _intStr(
-                                                _num(focus['deliveredOtp']),
-                                              ),
+                                            ...buildConcessionsFocusChips(
+                                              context,
+                                              focus,
                                             ),
                                           ],
                                         ),
@@ -573,7 +653,7 @@ class _ConcessionsWeekPageState extends State<ConcessionsWeekPage> {
   }
 }
 
-enum _TileTone { neutral, good, warn }
+enum _TileTone { neutral, good, warn, danger }
 
 class _StatTile extends StatelessWidget {
   final String label;
@@ -598,6 +678,10 @@ class _StatTile extends StatelessWidget {
       case _TileTone.warn:
         bg = const Color(0xFFFFEDD5);
         fg = const Color(0xFF9A3412);
+        break;
+      case _TileTone.danger:
+        bg = const Color(0xFFFEE4E2);
+        fg = const Color(0xFFB42318);
         break;
       case _TileTone.neutral:
       default:
@@ -662,6 +746,10 @@ class _StatPill extends StatelessWidget {
       case _TileTone.warn:
         bg = const Color(0xFFFFEDD5);
         fg = const Color(0xFF9A3412);
+        break;
+      case _TileTone.danger:
+        bg = const Color(0xFFFEE4E2);
+        fg = const Color(0xFFB42318);
         break;
       case _TileTone.neutral:
       default:
@@ -816,4 +904,176 @@ class _AvatarBadge extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Kompakte horizontale Metrik-Leiste fuer Concessions Driver-Row.
+/// Drei Werte nebeneinander: DNRs, DPMO 4W, geschaetzter EUR-Verlust.
+/// Jede Zelle ist tap-bar → oeffnet Erklaer-Sheet (MetricInfoChip).
+class _DriverMetricStrip extends StatelessWidget {
+  final double? dnrCount;
+  final double? dpmo4w;
+  const _DriverMetricStrip({this.dnrCount, this.dpmo4w});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        MetricInfoChip(
+          label: t.t('concessions_dnr_count'),
+          value: _intStr(dnrCount),
+          count: dnrCount,
+          description: t.t('concessions_dnr_count_desc'),
+          tip: t.t('concessions_dnr_count_tip'),
+        ),
+        const SizedBox(width: 6),
+        MetricInfoChip(
+          label: t.t('concessions_dnr_dpmo_4w'),
+          value: _intStr(dpmo4w),
+          count: dpmo4w,
+          description: t.t('concessions_dnr_dpmo_4w_desc'),
+          tip: t.t('concessions_dnr_dpmo_4w_tip'),
+        ),
+        const SizedBox(width: 6),
+        MetricInfoChip(
+          label: t.t('concessions_loss'),
+          value: _eurStr(dnrCount),
+          count: dnrCount,
+          description: t.t('concessions_loss_desc'),
+          tip: t.t('concessions_loss_tip'),
+        ),
+      ],
+    );
+  }
+}
+
+/// Berechnet die ISO-Kalenderwoche fuer (year, week, offset).
+/// offset == 0 → genau die Report-Woche
+/// offset == -1 → eine Woche frueher, etc.
+/// Behandelt Jahreswechsel: KW 1 → KW 52/53 des Vorjahres.
+({int year, int week}) _shiftIsoWeek(int year, int week, int offset) {
+  int y = year;
+  int w = week + offset;
+  while (w < 1) {
+    y -= 1;
+    final prevMax = _isoWeeksInYear(y);
+    w += prevMax;
+  }
+  while (w > _isoWeeksInYear(y)) {
+    w -= _isoWeeksInYear(y);
+    y += 1;
+  }
+  return (year: y, week: w);
+}
+
+/// Liefert das Datum (Montag, 00:00 UTC) der gegebenen ISO-Kalenderwoche.
+/// Der 4. Januar liegt per Definition in KW 1 — wir suchen den Montag
+/// dieser Woche und addieren (week - 1) * 7 Tage.
+DateTime _isoWeekMonday(int year, int week) {
+  final jan4 = DateTime.utc(year, 1, 4);
+  final jan4Dow = jan4.weekday; // 1=Mo .. 7=So
+  final week1Monday = jan4.subtract(Duration(days: jan4Dow - 1));
+  return week1Monday.add(Duration(days: (week - 1) * 7));
+}
+
+int _isoWeeksInYear(int year) {
+  // Eine ISO-Woche hat das Jahr 53 wenn der 1.1. ein Donnerstag ist
+  // oder es ein Schaltjahr ist und der 1.1. ein Mittwoch ist.
+  final jan1Dow = DateTime(year, 1, 1).weekday;
+  final isLeap =
+      (year % 4 == 0) && ((year % 100 != 0) || (year % 400 == 0));
+  if (jan1Dow == DateTime.thursday) return 53;
+  if (isLeap && jan1Dow == DateTime.wednesday) return 53;
+  return 52;
+}
+
+/// Erzeugt Chips fuer DNR-Vorkommen pro echter Kalenderwoche.
+/// Nur Wochen mit count > 0 werden gezeigt, sortiert: neueste zuerst.
+List<Widget> _dnrWeekChips(
+  BuildContext context, {
+  required Map<String, dynamic> byWeek,
+  required int reportYear,
+  required int reportWeek,
+}) {
+  if (reportWeek <= 0) return const [];
+  final t = AppLocalizations.of(context);
+
+  // w4 = neueste Woche (= reportWeek), w1 = aelteste (= reportWeek - 3)
+  // Mappe w-Schluessel auf Offset relativ zur Report-Woche.
+  const wToOffset = <String, int>{
+    'w4': 0,
+    'w3': -1,
+    'w2': -2,
+    'w1': -3,
+  };
+
+  final entries = <({int year, int week, int count})>[];
+  for (final wKey in wToOffset.keys) {
+    final raw = byWeek[wKey];
+    final n = (raw is num)
+        ? raw.toInt()
+        : (raw is String ? int.tryParse(raw.trim()) ?? 0 : 0);
+    if (n <= 0) continue;
+    final shifted = _shiftIsoWeek(reportYear, reportWeek, wToOffset[wKey]!);
+    entries.add((year: shifted.year, week: shifted.week, count: n));
+  }
+
+  // Sort: newest first (highest year then week desc)
+  entries.sort((a, b) {
+    final yc = b.year.compareTo(a.year);
+    if (yc != 0) return yc;
+    return b.week.compareTo(a.week);
+  });
+
+  if (entries.isEmpty) return const [];
+
+  return entries.map((e) {
+    final mondayDate = _isoWeekMonday(e.year, e.week);
+    final sundayDate = mondayDate.add(const Duration(days: 6));
+    final df = DateFormat('dd.MM.', 'de_DE');
+    final dfFull = DateFormat('dd.MM.yyyy', 'de_DE');
+    final dateRange = mondayDate.year == sundayDate.year
+        ? '${df.format(mondayDate)} – ${dfFull.format(sundayDate)}'
+        : '${dfFull.format(mondayDate)} – ${dfFull.format(sundayDate)}';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEE4E2),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFFFECDCA)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.event_busy_rounded,
+            size: 14,
+            color: Color(0xFFB42318),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            dateRange,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF7A271A),
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '· ${e.count}',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFFB42318),
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
+    );
+  }).toList();
 }

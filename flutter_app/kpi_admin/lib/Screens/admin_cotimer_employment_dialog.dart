@@ -127,25 +127,34 @@ class _EmploymentEditDialogState extends State<EmploymentEditDialog> {
   }
 
   Future<void> _save() async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final monthly = double.tryParse(_monthlyCtrl.text.replaceAll(',', '.'));
     final weekly = double.tryParse(_weeklyCtrl.text.replaceAll(',', '.'));
     final daily = double.tryParse(_dailyCtrl.text.replaceAll(',', '.'));
     if (_mode == _SollMode.fixedMonthly) {
       if (monthly == null || monthly <= 0 || monthly > 250) {
-        setState(() => _error = 'Monatsstunden: Wert zwischen 1 und 250');
+        setState(() => _error = de
+            ? 'Monatsstunden: Wert zwischen 1 und 250'
+            : 'Monthly hours: value between 1 and 250');
         return;
       }
     } else {
       if (weekly == null || weekly <= 0 || weekly > 60) {
-        setState(() => _error = 'Wochenstunden: Wert zwischen 1 und 60');
+        setState(() => _error = de
+            ? 'Wochenstunden: Wert zwischen 1 und 60'
+            : 'Weekly hours: value between 1 and 60');
         return;
       }
       if (daily == null || daily <= 0 || daily > 12) {
-        setState(() => _error = 'Tagesstunden: Wert zwischen 1 und 12');
+        setState(() => _error = de
+            ? 'Tagesstunden: Wert zwischen 1 und 12'
+            : 'Daily hours: value between 1 and 12');
         return;
       }
       if (_workingDays.isEmpty) {
-        setState(() => _error = 'Mindestens einen Arbeitstag wählen');
+        setState(() => _error = de
+            ? 'Mindestens einen Arbeitstag wählen'
+            : 'Select at least one working day');
         return;
       }
     }
@@ -183,6 +192,7 @@ class _EmploymentEditDialogState extends State<EmploymentEditDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     return Scaffold(
       backgroundColor: const Color(0xFFF2F2F7),
       appBar: AppBar(
@@ -196,7 +206,7 @@ class _EmploymentEditDialogState extends State<EmploymentEditDialog> {
           onPressed: _saving ? null : () => Navigator.of(context).pop(false),
         ),
         title: Text(
-          'Arbeitsvertrag',
+          de ? 'Arbeitsvertrag' : 'Employment contract',
           style: AppTypography.headline.copyWith(
               color: Colors.black,
             fontWeight: FontWeight.w800,
@@ -216,7 +226,7 @@ class _EmploymentEditDialogState extends State<EmploymentEditDialog> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : Text(
-                    'Speichern',
+                    de ? 'Speichern' : 'Save',
                     style: AppTypography.subheadline.copyWith(
                       color: AppColors.codriverGreen,
                       fontWeight: FontWeight.w800,
@@ -235,7 +245,9 @@ class _EmploymentEditDialogState extends State<EmploymentEditDialog> {
                     padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
                     children: [
                       Text(
-                        'Gilt für alle Fahrer dieses Unternehmens.',
+                        de
+                            ? 'Gilt für alle Fahrer dieses Unternehmens.'
+                            : 'Applies to all drivers of this company.',
                         style: AppTypography.footnote.copyWith(
                           color: AppColors.labelSecondaryLight,
                           fontWeight: FontWeight.w600,
@@ -243,21 +255,23 @@ class _EmploymentEditDialogState extends State<EmploymentEditDialog> {
                       ),
                       const SizedBox(height: 16),
                       _SettingsSection(
-                        title: 'Soll-Modus',
+                        title: de ? 'Soll-Modus' : 'Target hours mode',
                         children: [
                           _ModeRow(
-                            title: 'Fest pro Monat',
-                            subtitle:
-                                'z.B. 173 h/Monat (DE-Standard Vollzeit)',
+                            title: de ? 'Fest pro Monat' : 'Fixed per month',
+                            subtitle: de
+                                ? 'z.B. 173 h/Monat (DE-Standard Vollzeit)'
+                                : 'e.g. 173 h/month (German full-time standard)',
                             selected: _mode == _SollMode.fixedMonthly,
                             onTap: () => setState(
                                 () => _mode = _SollMode.fixedMonthly),
                           ),
                           const _SettingsDivider(),
                           _ModeRow(
-                            title: 'Berechnet',
-                            subtitle:
-                                'Arbeitstage × Tagesstunden – Feiertage',
+                            title: de ? 'Berechnet' : 'Calculated',
+                            subtitle: de
+                                ? 'Arbeitstage × Tagesstunden – Feiertage'
+                                : 'Working days × daily hours – public holidays',
                             selected: _mode == _SollMode.workdayBased,
                             onTap: () => setState(
                                 () => _mode = _SollMode.workdayBased),
@@ -267,12 +281,14 @@ class _EmploymentEditDialogState extends State<EmploymentEditDialog> {
                       const SizedBox(height: 20),
                       if (_mode == _SollMode.fixedMonthly)
                         _SettingsSection(
-                          title: 'Monatsstunden',
-                          footer:
-                              'DE-Standard Vollzeit ≈ 173 h/Monat.',
+                          title: de ? 'Monatsstunden' : 'Monthly hours',
+                          footer: de
+                              ? 'DE-Standard Vollzeit ≈ 173 h/Monat.'
+                              : 'German full-time standard ≈ 173 h/month.',
                           children: [
                             _NumberInputRow(
-                              title: 'Stunden pro Monat',
+                              title:
+                                  de ? 'Stunden pro Monat' : 'Hours per month',
                               controller: _monthlyCtrl,
                               suffix: 'h',
                             ),
@@ -280,16 +296,16 @@ class _EmploymentEditDialogState extends State<EmploymentEditDialog> {
                         )
                       else
                         _SettingsSection(
-                          title: 'Vertragsstunden',
+                          title: de ? 'Vertragsstunden' : 'Contract hours',
                           children: [
                             _NumberInputRow(
-                              title: 'Pro Woche',
+                              title: de ? 'Pro Woche' : 'Per week',
                               controller: _weeklyCtrl,
                               suffix: 'h',
                             ),
                             const _SettingsDivider(),
                             _NumberInputRow(
-                              title: 'Pro Tag',
+                              title: de ? 'Pro Tag' : 'Per day',
                               controller: _dailyCtrl,
                               suffix: 'h',
                             ),
@@ -298,13 +314,17 @@ class _EmploymentEditDialogState extends State<EmploymentEditDialog> {
                       if (_mode == _SollMode.workdayBased) ...[
                         const SizedBox(height: 20),
                         _SettingsSection(
-                          title: 'Arbeitswoche',
-                          footer:
-                              'Bestimmt welche Wochentage als Werktage '
-                              'zählen.',
+                          title: de ? 'Arbeitswoche' : 'Working week',
+                          footer: de
+                              ? 'Bestimmt welche Wochentage als Werktage '
+                                  'zählen.'
+                              : 'Defines which weekdays count as working '
+                                  'days.',
                           children: [
                             _WeekPresetRow(
-                              title: '5 Tage (Mo–Fr)',
+                              title: de
+                                  ? '5 Tage (Mo–Fr)'
+                                  : '5 days (Mon–Fri)',
                               days: const {
                                 'MO', 'TU', 'WE', 'TH', 'FR',
                               },
@@ -317,7 +337,9 @@ class _EmploymentEditDialogState extends State<EmploymentEditDialog> {
                             ),
                             const _SettingsDivider(),
                             _WeekPresetRow(
-                              title: '6 Tage (Mo–Sa)',
+                              title: de
+                                  ? '6 Tage (Mo–Sa)'
+                                  : '6 days (Mon–Sat)',
                               days: const {
                                 'MO', 'TU', 'WE', 'TH', 'FR', 'SA',
                               },
@@ -333,12 +355,14 @@ class _EmploymentEditDialogState extends State<EmploymentEditDialog> {
                       ],
                       const SizedBox(height: 20),
                       _SettingsSection(
-                        title: 'Feiertage',
-                        footer:
-                            'Tippe auf das Bundesland, um es zu ändern.',
+                        title: de ? 'Feiertage' : 'Public holidays',
+                        footer: de
+                            ? 'Tippe auf das Bundesland, um es zu ändern.'
+                            : 'Tap the Bundesland (German federal state) to '
+                                'change it.',
                         children: [
                           _PickerRow(
-                            title: 'Bundesland',
+                            title: de ? 'Bundesland' : 'Bundesland (state)',
                             value: _bundeslandLabel(_bundesland),
                             onTap: _openBundeslandPicker,
                           ),
@@ -376,6 +400,7 @@ class _EmploymentEditDialogState extends State<EmploymentEditDialog> {
   }
 
   Future<void> _openBundeslandPicker() async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final keys = _bundeslaender.keys.toList();
     final initialIndex =
         keys.indexOf(_bundesland).clamp(0, keys.length - 1);
@@ -405,7 +430,7 @@ class _EmploymentEditDialogState extends State<EmploymentEditDialog> {
                     CupertinoButton(
                       padding: EdgeInsets.zero,
                       onPressed: () => Navigator.of(ctx).pop(),
-                      child: const Text('Abbrechen'),
+                      child: Text(de ? 'Abbrechen' : 'Cancel'),
                     ),
                     const Spacer(),
                     Text(
@@ -424,7 +449,7 @@ class _EmploymentEditDialogState extends State<EmploymentEditDialog> {
                         Navigator.of(ctx).pop();
                       },
                       child: Text(
-                        'Fertig',
+                        de ? 'Fertig' : 'Done',
                         style: AppTypography.subheadline.copyWith(
                           color: AppColors.codriverGreen,
                           fontWeight: FontWeight.w800,

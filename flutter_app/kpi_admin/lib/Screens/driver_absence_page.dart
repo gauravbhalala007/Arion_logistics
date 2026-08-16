@@ -762,11 +762,19 @@ class _DriverAbsencePageState extends State<DriverAbsencePage> {
     double annualVacationDays,
   ) {
     final now = DateTime.now();
+    // Ticket KJV4n2S: Die Übersicht bildet ausschließlich das
+    // **bezahlte** Urlaubskontingent ab. Unbezahlter Urlaub
+    // (`paid == false`) wird weiterhin in der Antragsliste angezeigt,
+    // zehrt aber weder „Genommen" noch „Verfügbar" auf. Fehlt das Feld
+    // (alle Bestandsdaten), gilt der Antrag als bezahlt und zählt mit —
+    // gleiche Konvention wie serverseitig (`paid !== false`).
     final approvedVacationDays = docs.fold<double>(0, (total, doc) {
       final data = doc.data();
       final type = _stringOf(data['type']).toLowerCase();
       final status = _stringOf(data['status']).toLowerCase();
       if (type != 'vacation' || status != 'approved') return total;
+      final paid = data['paid'] is bool ? data['paid'] as bool : true;
+      if (!paid) return total;
       return total +
           _inclusiveDays(
             _toDate(data['fromDate']),
@@ -819,7 +827,16 @@ class _DriverAbsencePageState extends State<DriverAbsencePage> {
       final data = doc.data();
       final type = _stringOf(data['type']).toLowerCase();
       final status = _stringOf(data['status']).toLowerCase();
-      if (type != 'vacation' || status == 'rejected') continue;
+      // Ticket jlmRu2T: vom Admin stornierte Anträge ('cancelled')
+      // werden — wie abgelehnte — nicht mehr als offener/genehmigter
+      // Urlaub gelistet. Ohne diesen Filter würden sie hier fälschlich
+      // als „offen" erscheinen, weil `_statusChip` nur approved/rejected
+      // kennt.
+      if (type != 'vacation' ||
+          status == 'rejected' ||
+          status == 'cancelled') {
+        continue;
+      }
 
       final from = _toDate(data['fromDate']);
       final to = _toDate(data['toDate']);
@@ -831,6 +848,9 @@ class _DriverAbsencePageState extends State<DriverAbsencePage> {
           to: to,
           days: _inclusiveDays(from, to),
           status: status.isEmpty ? 'pending' : status,
+          // Gleiche Konvention wie überall sonst: `paid !== false`
+          // zählt als bezahlt (Bestandsdaten ohne Feld).
+          paid: data['paid'] is bool ? data['paid'] as bool : true,
         ),
       );
     }
@@ -920,6 +940,7 @@ class _DriverAbsencePageState extends State<DriverAbsencePage> {
       endLabel: t.t('driver_absence_end_label'),
       daysLabel: t.t('driver_absence_days_label'),
       dayLabel: t.t('driver_absence_day_label'),
+      unpaidLabel: t.t('driver_absence_unpaid'),
       daysPerYear: t.t('driver_absence_days_per_year'),
       ofWord: t.t('driver_absence_of_word'),
       requestButton: t.t('driver_absence_request_button'),
@@ -1102,6 +1123,11 @@ class _VacationPeriodCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = context.findAncestorStateOfType<_DriverAbsencePageState>();
     final showStatus = item.status != 'approved';
+    // Ticket ZhSAgmp: unbezahlter Urlaub verbraucht kein Kontingent →
+    // Kachel zeigt 0 Tage, dafür ein erklärendes „Unbezahlt"-Label.
+    // Der Text kommt aus AppLocalizations — die Fahrer-App läuft in
+    // 11 Sprachen, ein DE/EN-Inline-Check wäre hier zu kurz gesprungen.
+    final shownDays = item.quotaDays;
 
     return _InfoCard(
       child: Row(
@@ -1145,34 +1171,69 @@ class _VacationPeriodCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          Container(
+          SizedBox(
             width: 78,
-            height: 86,
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFF1E8),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            alignment: Alignment.center,
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  '${item.days}',
-                  style: const TextStyle(
-                    color: Color(0xFFFF7A18),
-                    fontSize: 24,
-                    fontWeight: FontWeight.w900,
+                Container(
+                  width: 78,
+                  height: 86,
+                  decoration: BoxDecoration(
+                    color: item.paid
+                        ? const Color(0xFFFFF1E8)
+                        : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  alignment: Alignment.center,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        '$shownDays',
+                        style: TextStyle(
+                          color: item.paid
+                              ? const Color(0xFFFF7A18)
+                              : const Color(0xFF94A3B8),
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        shownDays == 1 ? labels.dayLabel : labels.daysLabel,
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  item.days == 1 ? labels.dayLabel : labels.daysLabel,
-                  style: const TextStyle(
-                    color: Color(0xFF64748B),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
+                if (!item.paid) ...[
+                  const SizedBox(height: 6),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE2E8F0),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      labels.unpaidLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Color(0xFF475569),
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -1238,12 +1299,22 @@ class _VacationPeriodItem {
   final int days;
   final String status;
 
+  /// Ticket ZhSAgmp: unbezahlter Urlaub (`paid == false`) verbraucht kein
+  /// Kontingent. Die Tage-Kachel zeigt dafür „0", der Zeitraum bleibt
+  /// aber sichtbar — plus ein „Unbezahlt/Unpaid"-Label, damit die 0
+  /// verständlich ist. Fehlendes `paid`-Feld = bezahlt (Bestandsdaten).
+  final bool paid;
+
   const _VacationPeriodItem({
     required this.from,
     required this.to,
     required this.days,
     required this.status,
+    required this.paid,
   });
+
+  /// Tage, die tatsächlich aufs Urlaubskontingent gehen.
+  int get quotaDays => paid ? days : 0;
 }
 
 class _AbsenceLabels {
@@ -1258,6 +1329,10 @@ class _AbsenceLabels {
   final String endLabel;
   final String daysLabel;
   final String dayLabel;
+
+  /// Ticket ZhSAgmp: Kennzeichnung an der Tage-Kachel, wenn der Urlaub
+  /// unbezahlt ist und deshalb 0 Kontingent-Tage verbraucht.
+  final String unpaidLabel;
   final String daysPerYear;
   final String ofWord;
   final String requestButton;
@@ -1294,6 +1369,7 @@ class _AbsenceLabels {
     required this.endLabel,
     required this.daysLabel,
     required this.dayLabel,
+    required this.unpaidLabel,
     required this.daysPerYear,
     required this.ofWord,
     required this.requestButton,

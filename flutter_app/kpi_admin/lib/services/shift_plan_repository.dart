@@ -35,6 +35,39 @@ class ShiftPlanRepository {
     await _docRef(adminUid, plan.dateKey).set(plan.toCreatePayload());
   }
 
+  DocumentReference<Map<String, dynamic>> _draftDocRef(
+    String adminUid,
+    String dateKey,
+  ) =>
+      _firestore
+          .collection('users')
+          .doc(adminUid)
+          .collection('shift_plan_drafts')
+          .doc(dateKey);
+
+  /// Persist a plan WITHOUT publishing to drivers. Stored in a separate
+  /// `shift_plan_drafts` collection that drivers cannot read, so it stays
+  /// internal. Used to back-fill past weeks for the Payment Check.
+  Future<void> saveInternal({
+    required String adminUid,
+    required ShiftPlanDoc plan,
+  }) async {
+    await _draftDocRef(adminUid, plan.dateKey).set(plan.toDraftPayload());
+  }
+
+  /// Watch the internally-saved draft for a day (if any). Lets the admin
+  /// page rehydrate a saved-but-unpublished plan after a browser refresh
+  /// or re-login, so "Save" actually persists across sessions.
+  Stream<ShiftPlanDoc?> watchDraft({
+    required String adminUid,
+    required String dateKey,
+  }) {
+    return _draftDocRef(adminUid, dateKey).snapshots().map((snap) {
+      if (!snap.exists) return null;
+      return ShiftPlanDoc.fromDoc(snap);
+    });
+  }
+
   Future<void> unpublish({
     required String adminUid,
     required String dateKey,

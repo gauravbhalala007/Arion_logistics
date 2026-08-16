@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum VehicleCategory {
   armada('ARMADA'),
+  lmr('LMR'),
+  sesoRental('SESO_RENTAL'),
   amazonPaidRental('AMAZON_PAID_RENTAL'),
   selfSourcedRental('SELF_SOURCED_RENTAL'),
   selfOwnedRental('SELF_OWNED_RENTAL');
@@ -13,6 +15,11 @@ enum VehicleCategory {
   static VehicleCategory fromFirestore(dynamic value) {
     final normalized = (value ?? '').toString().trim().toUpperCase();
     switch (normalized) {
+      case 'LMR':
+        return VehicleCategory.lmr;
+      case 'SESO_RENTAL':
+      case 'SESO':
+        return VehicleCategory.sesoRental;
       case 'AMAZON_PAID_RENTAL':
         return VehicleCategory.amazonPaidRental;
       case 'SELF_SOURCED_RENTAL':
@@ -54,23 +61,62 @@ enum VehicleFuelType {
 
 enum VehicleStatus {
   active('ACTIVE'),
-  grounded('GROUNDED'),
-  inService('IN_SERVICE'),
-  defleeted('DEFLEETED');
+  operational('OPERATIONAL'),
+  groundedDefect('GROUNDED_DEFECT'),
+  groundedSelfReported('GROUNDED_SELF_REPORTED'),
+  groundedTuvOverdue('GROUNDED_TUV_OVERDUE'),
+
+  /// Grounded because of a VSA (Vehicle Service Agreement) issue.
+  ///
+  /// Wire value is the legacy 'GROUNDED' string because the deployed
+  /// Firestore rules only accept a fixed whitelist of status values —
+  /// reusing an allowed legacy value avoids a rules deploy.
+  groundedVsa('GROUNDED'),
+
+  /// Grounded because the vehicle is in the workshop for repairs.
+  /// The workshop name is stored separately (fleet_vehicle_extras).
+  ///
+  /// Wire value is the legacy 'IN_SERVICE' string (see [groundedVsa]).
+  groundedService('IN_SERVICE'),
+  inactive('INACTIVE');
 
   const VehicleStatus(this.value);
 
   final String value;
 
+  /// True for the "grounded / off-road" states. These keep the optional
+  /// "back in service on" date.
+  bool get isGrounded =>
+      this == VehicleStatus.groundedDefect ||
+      this == VehicleStatus.groundedSelfReported ||
+      this == VehicleStatus.groundedTuvOverdue ||
+      this == VehicleStatus.groundedVsa ||
+      this == VehicleStatus.groundedService;
+
   static VehicleStatus fromFirestore(dynamic value) {
     final normalized = (value ?? '').toString().trim().toUpperCase();
     switch (normalized) {
+      case 'OPERATIONAL':
+        return VehicleStatus.operational;
+      case 'GROUNDED_DEFECT':
+        return VehicleStatus.groundedDefect;
+      // Legacy wire values reused for the two newer grounded reasons
+      // (rules whitelist — see enum docs above).
       case 'GROUNDED':
-        return VehicleStatus.grounded;
+        return VehicleStatus.groundedVsa;
       case 'IN_SERVICE':
-        return VehicleStatus.inService;
+        return VehicleStatus.groundedService;
+      case 'GROUNDED_SELF_REPORTED':
+      case 'VOR_CONTROLLABLE':
+      case 'VOR_CTRL':
+        return VehicleStatus.groundedSelfReported;
+      case 'GROUNDED_TUV_OVERDUE':
+      case 'VOR_UNCONTROLLABLE':
+      case 'VOR_UNCTRL':
+        return VehicleStatus.groundedTuvOverdue;
+      case 'INACTIVE':
       case 'DEFLEETED':
-        return VehicleStatus.defleeted;
+        return VehicleStatus.inactive;
       case 'ACTIVE':
       default:
         return VehicleStatus.active;
@@ -93,6 +139,9 @@ abstract class VehicleMetadata {
         return const SelfSourcedRentalMetadata();
       case VehicleCategory.selfOwnedRental:
         return const SelfOwnedRentalMetadata();
+      case VehicleCategory.lmr:
+      case VehicleCategory.sesoRental:
+        return const GenericVehicleMetadata();
     }
   }
 
@@ -112,8 +161,20 @@ abstract class VehicleMetadata {
         return SelfSourcedRentalMetadata.fromMap(map);
       case VehicleCategory.selfOwnedRental:
         return SelfOwnedRentalMetadata.fromMap(map);
+      case VehicleCategory.lmr:
+      case VehicleCategory.sesoRental:
+        return const GenericVehicleMetadata();
     }
   }
+}
+
+/// Metadata for categories that carry no extra category-specific fields
+/// (currently LMR and SESO Rental). Stores nothing beyond the base vehicle.
+class GenericVehicleMetadata extends VehicleMetadata {
+  const GenericVehicleMetadata();
+
+  @override
+  Map<String, dynamic> toMap() => const <String, dynamic>{};
 }
 
 class ArmadaVehicleMetadata extends VehicleMetadata {

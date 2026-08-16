@@ -1,6 +1,6 @@
 # Stripe-Integration — Trial + Abo
 
-Stand: 13. Mai 2026
+Stand: 30. Mai 2026 (erweitert um Rechnungs-UI-Features)
 Status: **Planung** (noch nicht implementiert)
 
 ---
@@ -443,7 +443,11 @@ export const dailyTrialEnforcement = onSchedule('0 3 * * *', async () => {
 - `lib/services/billing_service.dart` — Wrapper für Cloud Functions
 - `lib/widgets/subscription_guard.dart` — Banner / Read-only-Overlay
 - `lib/Screens/admin_billing_page.dart` — Settings-Page mit Plan, Karte, Rechnungen
+- `lib/Screens/admin_invoice_detail_page.dart` — Inline-PDF-Viewer einer einzelnen Rechnung
 - `lib/widgets/station_pricing_card.dart` — wiederverwendbar: zeigt „2 Stationen × €100 = €200/Monat"
+- `lib/widgets/invoice_list.dart` — Filterbare Liste der Rechnungen mit Status-Chips
+- `lib/widgets/failed_payment_banner.dart` — Roter Banner oben bei offenen / fehlgeschlagenen Rechnungen
+- `lib/services/invoice_export_service.dart` — CSV + ZIP-Export für Buchhaltung
 
 ### `BillingService` (Wrapper)
 ```dart
@@ -543,10 +547,107 @@ return AdminScope(
 │ [Karte verwalten]   öffnet Stripe Portal         │
 └──────────────────────────────────────────────────┘
 
-┌─ Rechnungen ─────────────────────────────────────┐
-│ Mai 2026   €238,00   PAID    [PDF]               │
-│ April 2026 €238,00   PAID    [PDF]               │
+┌─ Failed-Payment-Banner (nur falls offen) ────────┐
+│ ⚠ Rechnung Mai 2026 nicht bezahlt — €238,00      │
+│   Karte abgelehnt. [Jetzt bezahlen]              │
 └──────────────────────────────────────────────────┘
+
+┌─ Rechnungen ─────────────────────────────────────┐
+│ Jahr: [2026 ▾]   Status: [Alle][Bezahlt][Offen]  │
+│                                                  │
+│ Mai 2026    €238,00   PAID    [Öffnen] [PDF]     │
+│ Apr 2026    €238,00   PAID    [Öffnen] [PDF]     │
+│ Mär 2026    €119,00   PAID    [Öffnen] [PDF]     │
+│                                                  │
+│ [Jahresexport 2026 herunterladen] · CSV + PDFs   │
+└──────────────────────────────────────────────────┘
+```
+
+### Rechnungs-Features im Detail
+
+**Inline-PDF-Viewer** (`admin_invoice_detail_page.dart`)
+- Klick auf „Öffnen" navigiert zu `/billing/invoice/{invoiceId}`
+- Desktop: `<iframe>` mit `invoicePdfUrl`, Vollbild
+- Mobile: nativer Browser-Download (Stripe-PDFs sind Cross-Origin → kein In-App-Viewer möglich)
+- Header zeigt: Rechnungsnummer, Zeitraum, Betrag, Status-Pill, Buttons „PDF herunterladen" + „In Stripe öffnen"
+
+**Filter & Sortierung** (`invoice_list.dart`)
+- Jahr-Dropdown (auto-befüllt aus vorhandenen Rechnungen, Default: aktuelles Jahr)
+- Status-Chips horizontal: `Alle` · `Bezahlt` · `Offen` · `Fehlgeschlagen`
+- Sortierung: immer absteigend nach `periodStart`
+- Empty-State: „Noch keine Rechnungen. Die erste kommt nach Trial-Ende."
+
+**Failed-Payment-Banner** (`failed_payment_banner.dart`)
+- StreamBuilder auf `invoices` mit `where('status', 'in', ['open', 'uncollectible'])`
+- Wenn ≥ 1 Treffer: roter Banner oben in `admin_billing_page.dart` UND als globaler Banner über `SubscriptionGuard`
+- Button „Jetzt bezahlen" linkt direkt auf `hostedInvoiceUrl` (Stripe-Pay-Page, neuer Tab)
+- Dismissable nur, wenn Subscription-Status `past_due` → User soll Banner sehen, bis bezahlt
+
+**Jahres-Export** (`invoice_export_service.dart`)
+- Neue Callable `exportInvoiceArchive` (Cloud Function):
+  ```ts
+  export const exportInvoiceArchive = onCall(
+    { secrets: [stripeSecret], memory: '512MiB', timeoutSeconds: 120 },
+    async (req) => {
+      const uid = req.auth?.uid;
+      const year = req.data.year as number;
+      // 1) Firestore-Invoices des Jahres laden
+      // 2) Pro Invoice PDF von Stripe (signed URL) fetchen
+      // 3) ZIP bauen: invoices-2026.csv + 2026-05.pdf, 2026-04.pdf, ...
+      // 4) ZIP nach Storage uploaden, Signed-URL (15 min TTL) zurück
+      return { downloadUrl, fileName: `codriver-invoices-${year}.zip` };
+    },
+  );
+  ```
+- CSV-Felder: Rechnungsnummer, Datum, Zeitraum von, Zeitraum bis, Netto, USt., Brutto, Status, PDF-Dateiname
+- Nutzbar für DATEV-Import / Buchhalter-Übergabe
+
+### `InvoiceList`-Widget — Skizze
+```dart
+class InvoiceList extends StatefulWidget {
+  final String adminUid;
+  const InvoiceList({super.key, required this.adminUid});
+
+  @override
+  State<InvoiceList> createState() => _InvoiceListState();
+}
+
+class _InvoiceListState extends State<InvoiceList> {
+  int _year = DateTime.now().year;
+  _InvoiceStatusFilter _status = _InvoiceStatusFilter.all;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('users').doc(widget.adminUid)
+          .collection('invoices')
+          .orderBy('periodStart', descending: true)
+          .snapshots(),
+      builder: (context, snap) {
+        final docs = (snap.data?.docs ?? []).where((d) {
+          final data = d.data();
+          final ts = (data['periodStart'] as Timestamp?)?.toDate();
+          if (ts == null || ts.year != _year) return false;
+          return _status.matches(data['status'] as String?);
+        }).toList();
+
+        if (docs.isEmpty) return const _EmptyInvoices();
+        return Column(children: [
+          _YearAndStatusBar(
+            year: _year,
+            status: _status,
+            onYear: (y) => setState(() => _year = y),
+            onStatus: (s) => setState(() => _status = s),
+          ),
+          ...docs.map((d) => _InvoiceRow(snap: d)),
+          const SizedBox(height: 16),
+          _ExportButton(year: _year, adminUid: widget.adminUid),
+        ]);
+      },
+    );
+  }
+}
 ```
 
 ### Side-Menu-Eintrag
@@ -607,6 +708,7 @@ match /users/{userId}/{document=**} {
 | **1** | Cloud Functions: `onAdminApproved`, `createCheckoutSession`, `createPortalSession` | 1–2 Tage |
 | **2** | Cloud Functions: `stripeWebhook`, `onScorecardUploaded`, `dailyTrialEnforcement` | 2 Tage |
 | **3** | Flutter: `BillingService`, `SubscriptionGuard`, `AdminBillingPage`, Side-Menu-Eintrag | 2 Tage |
+| **3b** | Flutter: `InvoiceList` (Filter + Status-Chips), `InvoiceDetailPage`, `FailedPaymentBanner`, `InvoiceExportService` + `exportInvoiceArchive`-Function | 1 Tag |
 | **4** | Firestore Rules + Migrations-Script für bestehende Nutzer | 0.5 Tag |
 | **5** | Live-Mode-Switch, Real-Card-Test, Monitoring | 0.5 Tag |
 

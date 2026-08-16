@@ -22,14 +22,11 @@ app.add_middleware(
         "http://127.0.0.1:5000",
         "http://localhost:8080",
         "http://127.0.0.1:8080",
-        # Production (Firebase Hosting + Custom Domain)
+        # Production (Firebase Hosting + Custom Domain) — codriver-eu only.
         "https://dsp-codriver.de",
         "https://www.dsp-codriver.de",
         "https://codriver-eu.web.app",
         "https://codriver-eu.firebaseapp.com",
-        # Legacy (old project — bleibt fuer Notfall-Rollback)
-        "https://gaurav-arion-001-3d94a.web.app",
-        "https://gaurav-arion-001-3d94a.firebaseapp.com",
     ],
     allow_credentials=False,
     allow_methods=["*"],
@@ -103,6 +100,26 @@ class DriverRow(BaseModel):
     CONC_Focus_Mailbox: Optional[float] = None
     CONC_Focus_DeliveredOtp: Optional[float] = None
 
+    # Customer Delivery Feedback (CDF, driver-level)
+    CDF_TotalFeedback: Optional[float] = None
+    CDF_NegativeFeedback: Optional[float] = None
+    CDF_L1_NeverReceived: Optional[float] = None
+    CDF_L1_DriverMishandled: Optional[float] = None
+    CDF_L1_NotDeliveredToPreferredLocation: Optional[float] = None
+    CDF_L1_DamagedPackage: Optional[float] = None
+    CDF_L1_DeliveryWasLate: Optional[float] = None
+    CDF_L1_BadDeliveryExperience: Optional[float] = None
+    CDF_L1_DriverWasUnprofessional: Optional[float] = None
+    CDF_L1_Other: Optional[float] = None
+    # Event-level details (raw per-event rows for the detail UI)
+    CDF_Events: Optional[List[Dict[str, Any]]] = None
+
+    # DWC / IADC (driver-level, from the weekly HTML report)
+    DWC_DwcPct: Optional[float] = None
+    DWC_IadcPct: Optional[float] = None
+    # Per-category miss counts, e.g. { "Photo Defect": 3, "Contact Miss": 5 }.
+    DWC_Misses: Optional[Dict[str, int]] = None
+
 class ParserSummary(BaseModel):
     overallScore: Optional[float] = None
     overallStatus: Optional[str] = None
@@ -126,10 +143,25 @@ class ParserSummary(BaseModel):
     concessionsSummary: Optional[Dict[str, Any]] = None
     concessionsFocusBuckets: Optional[Dict[str, Any]] = None
 
+    cdfSummary: Optional[Dict[str, Any]] = None
+    cdfL1Distribution: Optional[Dict[str, Any]] = None
+
+    dwcSummary: Optional[Dict[str, Any]] = None
+
 class ParserResponse(BaseModel):
     count: int
     drivers: List[DriverRow]
     summary: Optional[ParserSummary] = None
+    # Cortex fleet import — populated by /parse when the uploaded file
+    # is a VehiclesData XLSX. Vehicles are pass-through dicts (no strict
+    # schema yet) so the Flutter dedup logic can match on FIN.
+    vehicles: Optional[List[Dict[str, Any]]] = None
+
+    # Amazon DSP invoice / Gutschrift — populated when the uploaded file is
+    # a weekly credit note. Pass-through dict: { invoiceNumber, week,
+    # rangeStart, rangeEnd, total, lines: [{date, serviceType, unitPrice,
+    # quantity, total}, ...] }. Used by the Payment Check reconciliation.
+    invoice: Optional[Dict[str, Any]] = None
 
 # ===============================
 # HELPERS
@@ -961,6 +993,172 @@ def add_ranking_and_status(
 # ROUTES
 # ===============================
 # ===============================
+# FLEET (Cortex VehiclesData) XLSX HANDLING
+# ===============================
+#
+# Amazon's Cortex portal exports the DSP fleet as an XLSX with German
+# headers: FIN, Fahrzeugname, Nummernschild, Marke, Modell, Untermodell,
+# Status, Betriebsstatus, Fahrzeuganbieter, Eigentumstypus,
+# Startdatum/Enddatum des Eigentums, payload, cubicCapacity, ...
+#
+# We extract every row, normalize the key fields, and return a flat
+# list. The Flutter side handles dedup by FIN/VIN.
+
+# Cortex exportiert je nach Spracheinstellung des Kontos deutsche ODER
+# englische Spaltenüberschriften. Beide Fassungen müssen erkannt werden —
+# vorher scheiterte der englische Export mit "Keine Fahrzeuge erkannt".
+VEHICLES_REQUIRED_HEADERS = {"fin", "nummernschild"}
+VEHICLES_REQUIRED_HEADERS_EN = {"vin", "licenseplatenumber"}
+
+# Zielfeld → mögliche Spaltenüberschriften (deutsch zuerst, dann englisch).
+VEHICLE_COLUMN_ALIASES = {
+    "vinNumber": ["FIN", "vin"],
+    "plateNumber": ["Nummernschild", "licensePlateNumber"],
+    "fleetName": ["Fahrzeugname", "vehicleName"],
+    "brand": ["Marke", "make"],
+    "model": ["Modell", "model"],
+    "submodel": ["Untermodell", "subModel"],
+    "status": ["Status"],
+    "statusPriority": ["Status-Priorität", "statusPriority"],
+    "statusReasonCode": ["Status-Ursachencode", "statusReasonCode"],
+    "statusReasonMessage": ["StatusGrundMeldung", "statusReasonMessage"],
+    "operationalStatus": ["Betriebsstatus", "operationalStatus"],
+    "statusSearchValue": ["StatusSuchwert", "statusSearchValue"],
+    "subcontractorName": ["subcontractorName"],
+    "vehicleProvider": ["Fahrzeuganbieter", "vehicleProvider"],
+    "registrationType": [
+        "Fahrzeugregistrierungstypus", "vehicleRegistrationType",
+    ],
+    "manufacturingYear": ["Jahr", "year"],
+    "vehicleType": ["Typus", "Type"],
+    "ownershipType": ["Eigentumstypus", "ownershipType"],
+    "ownershipStart": ["Startdatum des Eigentums", "ownershipStartDate"],
+    "ownershipEnd": ["Enddatum des Eigentums", "ownershipEndDate"],
+    "pmStatistics": ["PM-Statistiken", "pmStats"],
+    "registrationExpiry": [
+        "Datum des Ablaufs der Registrierung", "registrationExpiryDate",
+    ],
+    "registeredState": ["registeredState"],
+    "serviceTier": ["serviceTier"],
+    "stationCode": ["stationCode"],
+    "payload": ["payload"],
+    "cubicCapacity": ["cubicCapacity"],
+    "serviceType": ["serviceType"],
+}
+
+
+def _is_vehicles_xlsx(filename: str, content: bytes) -> bool:
+    name = (filename or "").lower()
+    if not (name.endswith(".xlsx") or name.endswith(".xls")):
+        return False
+    # Filename hint
+    if "vehicles" in name or "fahrzeug" in name or "cortex" in name:
+        return True
+    # Header sniff
+    try:
+        from openpyxl import load_workbook as _peek
+        wb = _peek(io.BytesIO(content), data_only=True, read_only=True)
+        for sname in wb.sheetnames:
+            ws = wb[sname]
+            first = next(ws.iter_rows(values_only=True), None)
+            if not first:
+                continue
+            heads = {str(c or "").strip().lower() for c in first}
+            if (VEHICLES_REQUIRED_HEADERS.issubset(heads)
+                    or VEHICLES_REQUIRED_HEADERS_EN.issubset(heads)):
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def _extract_vehicles_from_xlsx(content: bytes, filename: str):
+    """Returns ({}, [vehicles…]).
+    Each vehicle is a flat camelCase dict ready for Firestore."""
+    from openpyxl import load_workbook
+    wb = load_workbook(io.BytesIO(content), data_only=True, read_only=True)
+    ws = wb.active
+    # Build header → index map (German lowercased)
+    headers = [str(c or "").strip() for c in next(ws.iter_rows(values_only=True))]
+    idx = {h.lower(): i for i, h in enumerate(headers)}
+
+    def cell(row, name: str) -> str:
+        """Liest eine Spalte. `name` ist entweder eine Überschrift oder ein
+        Zielfeld aus VEHICLE_COLUMN_ALIASES; im zweiten Fall werden die
+        deutsche und die englische Überschrift der Reihe nach probiert."""
+        candidates = VEHICLE_COLUMN_ALIASES.get(name, [name])
+        for cand in candidates:
+            i = idx.get(cand.lower())
+            if i is None or i >= len(row):
+                continue
+            v = row[i]
+            if v is None:
+                continue
+            text = str(v).strip()
+            if text:
+                return text
+        return ""
+
+    def cell_int(row, name: str):
+        v = cell(row, name)
+        if not v:
+            return None
+        try:
+            return int(float(v))
+        except ValueError:
+            return None
+
+    vehicles: List[Dict[str, Any]] = []
+    for ri, row in enumerate(ws.iter_rows(values_only=True), start=1):
+        if ri == 1:
+            continue  # skip header
+        fin = cell(row, "vinNumber")
+        plate = cell(row, "plateNumber")
+        if not fin and not plate:
+            continue  # empty row
+
+        vehicles.append({
+            "vinNumber": fin,
+            "plateNumber": plate,
+            "fleetName": cell(row, "fleetName"),
+            "brand": cell(row, "brand"),
+            "model": cell(row, "model"),
+            "submodel": cell(row, "submodel"),
+            "status": cell(row, "status"),
+            "statusPriority": cell(row, "statusPriority"),
+            "statusReasonCode": cell(row, "statusReasonCode"),
+            "statusReasonMessage": cell(row, "statusReasonMessage"),
+            "operationalStatus": cell(row, "operationalStatus"),
+            "statusSearchValue": cell(row, "statusSearchValue"),
+            "subcontractorName": cell(row, "subcontractorName"),
+            "vehicleProvider": cell(row, "vehicleProvider"),
+            "registrationType": cell(row, "registrationType"),
+            "manufacturingYear": cell_int(row, "manufacturingYear"),
+            "vehicleType": cell(row, "vehicleType"),
+            "ownershipType": cell(row, "ownershipType"),
+            "ownershipStart": cell(row, "ownershipStart"),
+            "ownershipEnd": cell(row, "ownershipEnd"),
+            "pmStatistics": cell(row, "pmStatistics"),
+            "registrationExpiry": cell(row, "registrationExpiry"),
+            "registeredState": cell(row, "registeredState"),
+            "serviceTier": cell(row, "serviceTier"),
+            "stationCode": cell(row, "stationCode"),
+            "payload": cell(row, "payload"),
+            "cubicCapacity": cell(row, "cubicCapacity"),
+            "serviceType": cell(row, "serviceType"),
+            "_source": "cortex_xlsx",
+        })
+
+    summary = {
+        "vehiclesImport": {
+            "totalRows": len(vehicles),
+            "source": "cortex",
+        }
+    }
+    return summary, vehicles
+
+
+# ===============================
 # CONCESSIONS XLSX HANDLING
 # ===============================
 
@@ -1183,6 +1381,936 @@ def _extract_concessions_from_xlsx(content: bytes, filename: str):
     return summary, drivers
 
 
+# ===============================
+# NEW DSC CONCESSION XLSX HANDLING (Amazon 2026 format)
+# ===============================
+
+# Maps the new DSC bucket labels (case-insensitive, partial OK) to internal keys.
+# These replace the older "focus areas" buckets.
+_DSC_BUCKET_MAP = {
+    "delivered to household member / customer": "deliveredToHouseholdMember",
+    "delivered to household member/customer": "deliveredToHouseholdMember",
+    "delivered to household member": "deliveredToHouseholdMember",
+    "delivery preferences not followed": "deliveryPreferencesNotFollowed",
+    "multiple concessions reasons": "multipleConcessionsReasons",
+    "geo distance > 25m": "geoDistance25m",
+    "geo distance > 25 m": "geoDistance25m",
+    "delivered to neighbour": "deliveredToNeighbour",
+    "delivered to neighbor": "deliveredToNeighbour",
+    "delivered to receptionist": "deliveredToReceptionist",
+}
+
+
+def _is_dsc_concessions_xlsx_by_sheets(wb) -> bool:
+    """Detect new DSC format by looking for DSC-specific sheet names."""
+    sheets_lower = {s.lower() for s in wb.sheetnames}
+    return (
+        "dsc concessions" in sheets_lower
+        or "dsc by transporter id" in sheets_lower
+        or "dsc concession bucket summary" in sheets_lower
+    )
+
+
+def _fmt_xlsx_date(v: Any) -> Optional[str]:
+    """Convert Excel cell value to ISO date string. Returns None if not a
+    valid date/datetime."""
+    if v is None:
+        return None
+    if hasattr(v, "isoformat"):
+        try:
+            return v.isoformat()
+        except Exception:
+            pass
+    s = str(v).strip()
+    if not s or s == "—":
+        return None
+    return s
+
+
+def _extract_dsc_concessions_from_xlsx(content: bytes, filename: str):
+    """Parse Amazon DSC Concession XLSX (new 2026 format).
+
+    Returns (summary_dict, drivers_list) — schema-compatible with the
+    legacy `_extract_concessions_from_xlsx` so existing UI keeps working,
+    plus additional fields:
+      * CONC_DnrEvents — per-driver list of {trackingId, dnrDate,
+                          deliveryDateTime, ...} for exact-date display
+      * CONC_DnrCountByWeek — actual {year-week: count} map
+      * CONC_DscBuckets — {bucketKey: count} per driver
+    """
+    from openpyxl import load_workbook
+
+    wb = load_workbook(io.BytesIO(content), data_only=True, read_only=True)
+    sheets = {s.lower(): s for s in wb.sheetnames}
+    meta = _parse_concessions_meta_from_filename(filename)
+
+    drivers_by_id: Dict[str, Dict[str, Any]] = {}
+    week_labels: List[str] = []
+
+    # ----- Sheet 1: "DSC by Transporter ID" (per-driver weekly counts + DPMO) -----
+    if "dsc by transporter id" in sheets:
+        ws = wb[sheets["dsc by transporter id"]]
+        rows = list(ws.iter_rows(values_only=True))
+
+        header_idx = None
+        for i, row in enumerate(rows):
+            if row and any(
+                c is not None and str(c).strip() == "Transporter ID"
+                for c in row
+            ):
+                header_idx = i
+                break
+
+        if header_idx is not None:
+            headers = rows[header_idx]
+            count_cols: List[tuple] = []   # (col_idx, "YYYY-WW")
+            dpmo_cols: List[tuple] = []
+            total_delivered_col: Optional[int] = None
+            total_dsc_count_col: Optional[int] = None
+            dpmo_4w_col: Optional[int] = None
+
+            for j, h in enumerate(headers):
+                if h is None:
+                    continue
+                hs = str(h).strip()
+                m_count = re.match(r"^(\d{4})-(\d{1,2})_DSC_Count$", hs, re.I)
+                m_dpmo = re.match(r"^(\d{4})-(\d{1,2})_DSC_DPMO$", hs, re.I)
+                if m_count:
+                    count_cols.append(
+                        (j, f"{m_count.group(1)}-{m_count.group(2).zfill(2)}")
+                    )
+                elif m_dpmo:
+                    dpmo_cols.append(
+                        (j, f"{m_dpmo.group(1)}-{m_dpmo.group(2).zfill(2)}")
+                    )
+                elif hs.lower() == "total delivered":
+                    total_delivered_col = j
+                elif hs.lower() == "total dsc count":
+                    total_dsc_count_col = j
+                elif "last 4 weeks" in hs.lower() or "last4weeks" in hs.lower():
+                    dpmo_4w_col = j
+
+            count_cols.sort(key=lambda x: x[1])
+            dpmo_cols.sort(key=lambda x: x[1])
+            week_labels = [w for _, w in count_cols]
+
+            for row in rows[header_idx + 1:]:
+                if not row or row[0] is None:
+                    continue
+                tid = str(row[0]).strip()
+                if not tid:
+                    continue
+                tid_lower = tid.lower()
+                # Filter out totals/summary rows (e.g. "Total DSC Count",
+                # "Total Delivered", "Grand Total", "Total")
+                if (
+                    tid_lower in ("grand total", "total")
+                    or tid_lower.startswith("total ")
+                    or "total dsc" in tid_lower
+                    or "grand total" in tid_lower
+                ):
+                    continue
+
+                entry: Dict[str, Any] = {"Transporter ID": tid}
+
+                if total_delivered_col is not None and len(row) > total_delivered_col:
+                    entry["CONC_TotalDelivered"] = _xlsx_num(
+                        row[total_delivered_col]
+                    )
+                if total_dsc_count_col is not None and len(row) > total_dsc_count_col:
+                    entry["CONC_TotalDnr"] = _xlsx_num(row[total_dsc_count_col])
+                if dpmo_4w_col is not None and len(row) > dpmo_4w_col:
+                    entry["CONC_DnrDpmo4w"] = _xlsx_num(row[dpmo_4w_col])
+
+                # Backwards-compatible W1..W4 (oldest..newest of available weeks)
+                latest4_counts = count_cols[-4:]
+                latest4_dpmos = dpmo_cols[-4:]
+                for idx, (col_i, _) in enumerate(latest4_counts):
+                    entry[f"CONC_DnrCount_W{idx + 1}"] = (
+                        _xlsx_num(row[col_i]) if len(row) > col_i else None
+                    )
+                for idx, (col_i, _) in enumerate(latest4_dpmos):
+                    entry[f"CONC_DnrDpmo_W{idx + 1}"] = (
+                        _xlsx_num(row[col_i]) if len(row) > col_i else None
+                    )
+
+                # Exact weekly counts keyed by real year-week label
+                by_week: Dict[str, float] = {}
+                for col_i, week_lbl in count_cols:
+                    val = _xlsx_num(row[col_i]) if len(row) > col_i else None
+                    if val is not None:
+                        by_week[week_lbl] = val
+                if by_week:
+                    entry["CONC_DnrCountByWeek"] = by_week
+
+                drivers_by_id[tid] = entry
+
+    # ----- Sheet 2: "DSC Concessions" (event-level rows with dates) -----
+    events_by_driver: Dict[str, List[Dict[str, Any]]] = {}
+    if "dsc concessions" in sheets:
+        ws = wb[sheets["dsc concessions"]]
+        rows = list(ws.iter_rows(values_only=True))
+        if rows:
+            headers_lower = [
+                str(c or "").strip().lower() for c in rows[0]
+            ]
+
+            def hcol(name: str) -> Optional[int]:
+                try:
+                    return headers_lower.index(name)
+                except ValueError:
+                    return None
+
+            c_tid = hcol("transporter_id")
+            c_tracking = hcol("tracking_id")
+            c_dnr_date = hcol("dnr_date")
+            c_delivery_dt = hcol("delivery_date_time")
+            c_actual = hcol("actual_delivery_type")
+            c_promised = hcol("promised_delivery_type")
+            c_year = hcol("year")
+            c_week = hcol("week")
+
+            for row in rows[1:]:
+                if not row or c_tid is None or len(row) <= c_tid or row[c_tid] is None:
+                    continue
+                tid = str(row[c_tid]).strip()
+                if not tid:
+                    continue
+
+                def at(idx):
+                    return row[idx] if idx is not None and len(row) > idx else None
+
+                evt = {
+                    "trackingId": (str(at(c_tracking)).strip()
+                                   if at(c_tracking) is not None else None),
+                    "dnrDate": _fmt_xlsx_date(at(c_dnr_date)),
+                    "deliveryDateTime": _fmt_xlsx_date(at(c_delivery_dt)),
+                    "actualDeliveryType": (str(at(c_actual)).strip()
+                                            if at(c_actual) is not None else None),
+                    "promisedDeliveryType": (str(at(c_promised)).strip()
+                                              if at(c_promised) is not None else None),
+                    "year": (int(at(c_year))
+                              if at(c_year) is not None
+                              and str(at(c_year)).strip().isdigit() else None),
+                    "week": (int(at(c_week))
+                              if at(c_week) is not None
+                              and str(at(c_week)).strip().isdigit() else None),
+                }
+                # strip None
+                evt = {k: v for k, v in evt.items() if v is not None}
+                events_by_driver.setdefault(tid, []).append(evt)
+
+    for tid, events in events_by_driver.items():
+        entry = drivers_by_id.setdefault(tid, {"Transporter ID": tid})
+        # Sort newest first
+        def evt_sort_key(e):
+            return e.get("dnrDate") or e.get("deliveryDateTime") or ""
+        events.sort(key=evt_sort_key, reverse=True)
+        entry["CONC_DnrEvents"] = events
+
+    # ----- Sheet 3: "DSC Concession Bucket Summary" (DSP + per-driver buckets) -----
+    focus_dsp: Dict[str, float] = {}
+    buckets_by_driver: Dict[str, Dict[str, float]] = {}
+
+    bucket_sheet_name = None
+    for s_lower, s_orig in sheets.items():
+        if "dsc" in s_lower and "bucket" in s_lower and "summary" in s_lower:
+            bucket_sheet_name = s_orig
+            break
+
+    if bucket_sheet_name:
+        ws = wb[bucket_sheet_name]
+        rows = list(ws.iter_rows(values_only=True))
+
+        in_dsp_block = False
+        in_tid_block = False
+        grand_total_col: Optional[int] = None
+
+        for row in rows:
+            if not row or row[0] is None:
+                continue
+            first = str(row[0]).strip()
+            if not first:
+                continue
+            first_lower = first.lower()
+
+            if first_lower == "bucket":
+                in_dsp_block = True
+                in_tid_block = False
+                grand_total_col = None
+                for j, h in enumerate(row):
+                    if h is not None and str(h).strip().lower() == "grand total":
+                        grand_total_col = j
+                        break
+                continue
+
+            if first_lower == "transporter id":
+                in_dsp_block = False
+                in_tid_block = True
+                grand_total_col = None
+                for j, h in enumerate(row):
+                    if h is not None and str(h).strip().lower() == "grand total":
+                        grand_total_col = j
+                        break
+                continue
+
+            if first_lower in ("grand total", "total"):
+                continue
+
+            if in_dsp_block:
+                bucket_key = _DSC_BUCKET_MAP.get(first_lower)
+                if bucket_key and grand_total_col is not None and len(row) > grand_total_col:
+                    val = _xlsx_num(row[grand_total_col])
+                    if val is not None:
+                        focus_dsp[bucket_key] = (
+                            focus_dsp.get(bucket_key, 0) + val
+                        )
+
+            elif in_tid_block:
+                # row: TID | Bucket | year-week cols... | Grand Total
+                tid = first
+                bucket_label_raw = (
+                    str(row[1] or "").strip().lower() if len(row) > 1 else ""
+                )
+                bucket_key = _DSC_BUCKET_MAP.get(bucket_label_raw)
+                if bucket_key and grand_total_col is not None and len(row) > grand_total_col:
+                    val = _xlsx_num(row[grand_total_col])
+                    if val is not None:
+                        d_buckets = buckets_by_driver.setdefault(tid, {})
+                        d_buckets[bucket_key] = d_buckets.get(bucket_key, 0) + val
+
+    for tid, buckets in buckets_by_driver.items():
+        entry = drivers_by_id.setdefault(tid, {"Transporter ID": tid})
+        entry["CONC_DscBuckets"] = buckets
+        for key, val in buckets.items():
+            entry[f"CONC_Bucket_{key}"] = val
+
+    # ----- DSP-level summary aggregates -----
+    total_dsc_count = 0.0
+    total_delivered_dsp = 0.0
+    for d in drivers_by_id.values():
+        td = d.get("CONC_TotalDelivered")
+        if isinstance(td, (int, float)):
+            total_delivered_dsp += td
+        tc = d.get("CONC_TotalDnr")
+        if isinstance(tc, (int, float)):
+            total_dsc_count += tc
+
+    dnr_dpmo = (
+        (total_dsc_count / total_delivered_dsp * 1_000_000)
+        if total_delivered_dsp > 0
+        else None
+    )
+
+    year: Optional[int] = None
+    week_number = meta.get("weekNumber")
+    if week_labels:
+        latest = week_labels[-1]
+        m = re.match(r"(\d{4})-(\d{1,2})", latest)
+        if m:
+            year = int(m.group(1))
+            if week_number is None:
+                week_number = int(m.group(2))
+
+    summary_block = {
+        "delVolume": total_delivered_dsp if total_delivered_dsp > 0 else None,
+        "dnrCount": total_dsc_count if total_dsc_count > 0 else None,
+        "dnrDpmo": dnr_dpmo,
+        "weekLabels": week_labels,
+    }
+    summary_block = {k: v for k, v in summary_block.items() if v is not None}
+
+    drivers = list(drivers_by_id.values())
+
+    summary: Dict[str, Any] = {
+        "concessionsSummary": summary_block,
+        "concessionsFocusBuckets": focus_dsp,
+        "weekText": f"KW {week_number}" if week_number else None,
+        "weekNumber": week_number,
+        "year": year,
+        "stationCode": meta.get("stationCode"),
+        "concessionsFormat": "dsc",
+    }
+    summary = {k: v for k, v in summary.items() if v is not None}
+
+    return summary, drivers
+
+
+# =================================================================
+#  CDF (Customer Delivery Feedback) HTML report parsing
+# =================================================================
+#
+# Amazon's CDF report comes as an HTML file with a single big <tbody>
+# of "Negative Feedback Tracking IDs". Each row has the columns:
+#
+#   Tracking ID | Transporter ID | Feedback L0 | L1 | L2 |
+#   Feedback Date | Delivery Time | City | Postal Code |
+#   Contact Compliance | PHR Compliance | PHR Safe Place |
+#   PHR Delivery Location | Package Scanned > 25m Distance |
+#   DNR Concession
+#
+# We aggregate per Transporter ID and keep all event-level rows so the
+# UI can show "which feedbacks happened on which dates" per driver.
+
+# Stable mapping from raw "Feedback L1" labels to camelCase keys used
+# in Firestore + the Flutter UI. Anything unknown falls into "other".
+CDF_L1_KEY_MAP: Dict[str, str] = {
+    "never received delivery": "neverReceived",
+    "driver mishandled package": "driverMishandled",
+    "not delivered to preferred location": "notDeliveredToPreferredLocation",
+    "damaged package": "damagedPackage",
+    "delivery was late": "deliveryWasLate",
+    "bad delivery experience": "badDeliveryExperience",
+    "driver was unprofessional": "driverWasUnprofessional",
+}
+
+
+def _is_cdf_html(filename: str, content: bytes) -> bool:
+    name = (filename or "").lower()
+    if "cdf" in name and (
+        name.endswith(".html") or name.endswith(".htm")
+    ):
+        return True
+    # Sniff first few KB of the file — Amazon's title includes "CDF Report"
+    head = content[:4096].decode("utf-8", errors="ignore").lower()
+    return ("cdf report" in head) and ("<html" in head or "<table" in head)
+
+
+def _parse_cdf_meta_from_filename(filename: str) -> Dict[str, Any]:
+    """e.g. "DE-AION-DBY5-Week19-CDF-report.html"
+    → {country: 'DE', dsp: 'AION', stationCode: 'DBY5',
+       weekNumber: 19, year: <inferred>}.
+    """
+    out: Dict[str, Any] = {}
+    if not filename:
+        return out
+    base = filename.rsplit("/", 1)[-1]
+    m = re.search(r"([A-Z]{2})-([A-Z]+)-([A-Z0-9]+)-Week(\d{1,2})", base, re.I)
+    if m:
+        out["country"] = m.group(1).upper()
+        out["dsp"] = m.group(2).upper()
+        out["stationCode"] = m.group(3).upper()
+        out["weekNumber"] = int(m.group(4))
+    y = re.search(r"(20\d{2})", base)
+    if y:
+        out["year"] = int(y.group(1))
+    return out
+
+
+def _extract_cdf_from_html(content: bytes, filename: str):
+    """Parse the negative-feedback table → per-driver aggregations
+    plus the raw event rows so the UI can render per-event details.
+    """
+    try:
+        from bs4 import BeautifulSoup  # type: ignore
+    except Exception as e:
+        raise RuntimeError(
+            "CDF HTML parsing requires beautifulsoup4 — add it to "
+            "requirements.txt and redeploy."
+        ) from e
+
+    meta = _parse_cdf_meta_from_filename(filename)
+
+    html = content.decode("utf-8", errors="replace")
+    soup = BeautifulSoup(html, "html.parser")
+
+    # Find the table with the "Tracking ID" header — there is only one
+    # data table of interest in the report. We also identify the actual
+    # header row (some Amazon variants stack a thead + tfoot which would
+    # duplicate th cells if naively flattened).
+    target_table = None
+    header_cells: List[str] = []
+    for table in soup.find_all("table"):
+        # Look at each header row's *direct* th children only (avoid
+        # nested tables and tfoot duplicates).
+        for tr in table.find_all("tr"):
+            ths = tr.find_all("th", recursive=False)
+            labels = [(th.get_text() or "").strip() for th in ths]
+            lower = [s.lower() for s in labels]
+            if "tracking id" in lower and "transporter id" in lower:
+                target_table = table
+                header_cells = labels
+                break
+        if target_table is not None:
+            break
+    if target_table is None or not header_cells:
+        # No data table → return empty result, but still pass meta back so
+        # the UI can record "uploaded empty week" if needed.
+        return meta, []
+
+    # Build a column-name → index map (lowercased keys)
+    col_idx: Dict[str, int] = {
+        h.lower(): i for i, h in enumerate(header_cells)
+    }
+
+    def cell_text(row_cells, name: str) -> str:
+        i = col_idx.get(name.lower())
+        if i is None or i >= len(row_cells):
+            return ""
+        return (row_cells[i].get_text() or "").strip()
+
+    # Aggregate by transporter id
+    by_driver: Dict[str, Dict[str, Any]] = {}
+    events: List[Dict[str, Any]] = []
+
+    for tr in target_table.find_all("tr"):
+        tds = tr.find_all("td")
+        if not tds:
+            continue
+        tid = cell_text(tds, "Transporter ID")
+        if not tid:
+            continue
+        l0 = cell_text(tds, "Feedback L0")
+        l1 = cell_text(tds, "Feedback L1")
+        l2 = cell_text(tds, "Feedback L2")
+        fb_date = cell_text(tds, "Feedback Date")
+        delivery_time = cell_text(tds, "Delivery Time")
+        city = cell_text(tds, "City")
+        postal = cell_text(tds, "Postal Code")
+        tracking = cell_text(tds, "Tracking ID")
+        dnr_concession = cell_text(tds, "DNR Concession")
+        phr_loc = cell_text(tds, "PHR - Delivery Location")
+        far_scan = cell_text(tds, "Package Scanned > 25m Distance")
+
+        event = {
+            "trackingId": tracking,
+            "transporterId": tid,
+            "feedbackL0": l0,
+            "feedbackL1": l1,
+            "feedbackL2": l2,
+            "feedbackDate": fb_date,
+            "deliveryTime": delivery_time,
+            "city": city,
+            "postalCode": postal,
+            "phrDeliveryLocation": phr_loc,
+            "packageScannedFar": (far_scan or "").upper() == "Y",
+            "dnrConcession": (dnr_concession or "").upper() == "Y",
+        }
+        events.append(event)
+
+        d = by_driver.setdefault(tid, {
+            "Transporter ID": tid,
+            "CDF_TotalFeedback": 0,
+            "CDF_NegativeFeedback": 0,
+            "CDF_L1_NeverReceived": 0,
+            "CDF_L1_DriverMishandled": 0,
+            "CDF_L1_NotDeliveredToPreferredLocation": 0,
+            "CDF_L1_DamagedPackage": 0,
+            "CDF_L1_DeliveryWasLate": 0,
+            "CDF_L1_BadDeliveryExperience": 0,
+            "CDF_L1_DriverWasUnprofessional": 0,
+            "CDF_L1_Other": 0,
+            "CDF_Events": [],
+        })
+        d["CDF_TotalFeedback"] += 1
+        if (l0 or "").lower().startswith("was not so great"):
+            d["CDF_NegativeFeedback"] += 1
+        # Bucketize by L1
+        key = CDF_L1_KEY_MAP.get((l1 or "").lower(), None)
+        if key:
+            pascal = key[0].upper() + key[1:]
+            field = f"CDF_L1_{pascal}"
+            if field in d:
+                d[field] += 1
+            else:
+                d["CDF_L1_Other"] += 1
+        else:
+            d["CDF_L1_Other"] += 1
+        d["CDF_Events"].append(event)
+
+    # Distribution across all drivers (for the hero card)
+    distribution: Dict[str, int] = {}
+    for d in by_driver.values():
+        for k, v in d.items():
+            if k.startswith("CDF_L1_"):
+                distribution[k] = distribution.get(k, 0) + int(v)
+
+    summary = dict(meta)
+    summary["cdfSummary"] = {
+        "totalDrivers": len(by_driver),
+        "totalEvents": len(events),
+        "totalNegative": sum(
+            int(d["CDF_NegativeFeedback"]) for d in by_driver.values()
+        ),
+    }
+    summary["cdfL1Distribution"] = distribution
+
+    drivers = list(by_driver.values())
+    drivers.sort(
+        key=lambda d: int(d.get("CDF_NegativeFeedback") or 0), reverse=True
+    )
+    return summary, drivers
+
+
+# ===============================
+# DWC / IADC (weekly HTML report)
+# ===============================
+def _is_dwc_html(filename: str, content: bytes) -> bool:
+    name = (filename or "").lower()
+    if ("dwc" in name or "iadc" in name) and (
+        name.endswith(".html") or name.endswith(".htm")
+    ):
+        return True
+    # Sniff: Amazon's title is "… DWC/IADC Report …".
+    head = content[:4096].decode("utf-8", errors="ignore").lower()
+    return ("dwc" in head and "iadc" in head) and (
+        "<html" in head or "<table" in head
+    )
+
+
+def _parse_dwc_meta_from_filename(filename: str) -> Dict[str, Any]:
+    """e.g. "DE-AION-DBY5-DWC-IADC-Report_2026-26.html"
+    → {country:'DE', dsp:'AION', stationCode:'DBY5', year:2026, weekNumber:26}.
+    """
+    out: Dict[str, Any] = {}
+    if not filename:
+        return out
+    base = filename.rsplit("/", 1)[-1]
+    m = re.search(r"([A-Z]{2})-([A-Z]+)-([A-Z0-9]+)-DWC", base, re.I)
+    if m:
+        out["country"] = m.group(1).upper()
+        out["dsp"] = m.group(2).upper()
+        out["stationCode"] = m.group(3).upper()
+    w = re.search(r"(20\d{2})[-_]?W?(\d{1,2})(?!\d)", base)
+    if w:
+        out["year"] = int(w.group(1))
+        out["weekNumber"] = int(w.group(2))
+    return out
+
+
+def _dwc_percent(token: Optional[str]) -> Optional[float]:
+    if token is None:
+        return None
+    t = token.strip().replace("%", "").replace(",", ".")
+    if not t:
+        return None
+    try:
+        return round(float(t), 2)
+    except ValueError:
+        return None
+
+
+def _dwc_weekly_bucket_totals(html: str):
+    """Reads the weekly aggregate "Bucket / Reason / Total" tables and returns
+    `{ total: bucketName }`. Those tables carry clean, localized bucket names
+    (via `data-expand-row-id`) plus each bucket's station-wide weekly total —
+    which we use to self-calibrate which column of the wide per-driver table
+    is which bucket (see `_extract_dwc_from_html`)."""
+    from bs4 import BeautifulSoup  # type: ignore
+
+    # Restrict to the weekly section (before the first "Day:" heading) so the
+    # daily aggregates don't shadow the weekly totals.
+    wi = html.find("Week:")
+    di = html.find("Day:", wi if wi >= 0 else 0)
+    weekly = html[wi:di] if wi >= 0 and di > wi else html
+    wsoup = BeautifulSoup(weekly, "html.parser")
+
+    by_total: Dict[int, str] = {}
+    for th in wsoup.find_all(attrs={"data-expand-row-id": True}):
+        name = th.get("data-expand-row-id")
+        tr = th.find_parent("tr")
+        if tr is None:
+            continue
+        nums = [
+            (c.get_text() or "").strip()
+            for c in tr.find_all(["th", "td"])
+            if (c.get_text() or "").strip().isdigit()
+        ]
+        if nums:
+            total = int(nums[-1])
+            by_total.setdefault(total, name)  # first (weekly) wins
+    return by_total
+
+
+def _extract_dwc_from_html(content: bytes, filename: str):
+    """Parse the weekly "DWC/IADC Misses by Transporter ID" table into
+    per-driver DWC% / IADC% rows + per-driver miss counts by category, plus
+    the week-level DWC% / IADC%."""
+    try:
+        from bs4 import BeautifulSoup  # type: ignore
+    except Exception as e:
+        raise RuntimeError(
+            "DWC HTML parsing requires beautifulsoup4 — add it to "
+            "requirements.txt and redeploy."
+        ) from e
+
+    meta = _parse_dwc_meta_from_filename(filename)
+    html = content.decode("utf-8", errors="replace")
+    soup = BeautifulSoup(html, "html.parser")
+
+    # Week-level DWC% / IADC%. The weekly section is rendered before the
+    # daily ones, so the first occurrence is the weekly value.
+    text_all = soup.get_text("\n")
+    mdwc = re.search(r"DWC\s*%\s*:\s*([\d.,]+)\s*%", text_all)
+    miadc = re.search(r"IADC\s*%\s*:\s*([\d.,]+)\s*%", text_all)
+    week_dwc = _dwc_percent(mdwc.group(1)) if mdwc else None
+    week_iadc = _dwc_percent(miadc.group(1)) if miadc else None
+
+    # Locate the per-transporter table + remember its header/group rows.
+    target_table = None
+    header_labels: List[str] = []
+    group_row = None
+    for table in soup.find_all("table"):
+        trs = table.find_all("tr")
+        for tr in trs:
+            cells = tr.find_all(["th", "td"], recursive=False)
+            labels = [(c.get_text() or "").strip() for c in cells]
+            lower = [x.lower() for x in labels]
+            if "transporter id" in lower and "dwc %" in lower:
+                header_labels = labels
+                target_table = table
+                group_row = trs[0] if trs else None
+                break
+        if target_table is not None:
+            break
+
+    if target_table is None or not header_labels:
+        summary = dict(meta)
+        summary["dwcSummary"] = {
+            "dwcPct": week_dwc, "iadcPct": week_iadc, "totalDrivers": 0,
+        }
+        return summary, []
+
+    lower = [x.lower() for x in header_labels]
+    tid_i = lower.index("transporter id") if "transporter id" in lower else None
+    dwc_i = lower.index("dwc %") if "dwc %" in lower else None
+    iadc_i = lower.index("iadc %") if "iadc %" in lower else None
+    total_cols = [i for i, x in enumerate(lower) if x == "total"]
+
+    # Group (ROW0) label per leaf column — used to label any miss column whose
+    # total can't be matched to an aggregate bucket.
+    leaf = len(header_labels)
+    group_of: List[str] = [""] * leaf
+    if group_row is not None:
+        ci = 0
+        for c in group_row.find_all(["th", "td"], recursive=False):
+            span = int(c.get("colspan", 1))
+            g = (c.get_text() or "").strip()
+            for _ in range(span):
+                if ci < leaf:
+                    group_of[ci] = g
+                    ci += 1
+
+    def looks_like_tid(x: str) -> bool:
+        return bool(re.match(r"^A[A-Z0-9]{10,}$", (x or "").strip().upper()))
+
+    # Pass 1: collect each driver's raw values at every "Total" column, and
+    # accumulate the column sums across drivers.
+    rows_raw: List[Dict[str, Any]] = []
+    col_sum: Dict[int, int] = {i: 0 for i in total_cols}
+    for tr in target_table.find_all("tr"):
+        # The Transporter ID sits in a row-header <th>; include it so the
+        # column positions line up with the header row.
+        tds = tr.find_all(["th", "td"], recursive=False)
+        if not tds or tid_i is None or tid_i >= len(tds):
+            continue
+        tid = (tds[tid_i].get_text() or "").strip()
+        if not looks_like_tid(tid):
+            continue
+
+        def cell(i: Optional[int]) -> str:
+            if i is None or i >= len(tds):
+                return ""
+            return (tds[i].get_text() or "").strip()
+
+        counts: Dict[int, int] = {}
+        for i in total_cols:
+            txt = cell(i)
+            n = int(txt) if txt.isdigit() else 0
+            counts[i] = n
+            col_sum[i] += n
+        rows_raw.append({
+            "tid": tid,
+            "dwc": _dwc_percent(cell(dwc_i)),
+            "iadc": _dwc_percent(cell(iadc_i)),
+            "counts": counts,
+        })
+
+    # Self-calibrate: match each Total column to a bucket by its column-sum ==
+    # the weekly aggregate bucket total. Unmatched columns fall back to their
+    # ROW0 group name so nothing is silently mislabelled.
+    bucket_totals = _dwc_weekly_bucket_totals(html)
+    col_name: Dict[int, str] = {}
+    used = set()
+    for i in total_cols:
+        name = bucket_totals.get(col_sum[i])
+        if name and name not in used:
+            col_name[i] = name
+            used.add(name)
+        else:
+            g = group_of[i] or "Misses"
+            col_name[i] = f"{g} (Total)"
+
+    by_driver: List[Dict[str, Any]] = []
+    for r in rows_raw:
+        misses: Dict[str, int] = {}
+        for i in total_cols:
+            n = r["counts"].get(i, 0)
+            if n > 0:
+                misses[col_name[i]] = misses.get(col_name[i], 0) + n
+        by_driver.append({
+            "Transporter ID": r["tid"],
+            "DWC_DwcPct": r["dwc"],
+            "DWC_IadcPct": r["iadc"],
+            "DWC_Misses": misses,
+        })
+
+    summary = dict(meta)
+    summary["dwcSummary"] = {
+        "dwcPct": week_dwc,
+        "iadcPct": week_iadc,
+        "totalDrivers": len(by_driver),
+    }
+    # Worst IADC first — those drivers need the most attention.
+    by_driver.sort(
+        key=lambda d: (d.get("DWC_IadcPct") is None, d.get("DWC_IadcPct") or 0.0)
+    )
+    return summary, by_driver
+
+
+# ===============================
+# AMAZON DSP INVOICE / GUTSCHRIFT
+# ===============================
+def _is_amazon_dsp_invoice_pdf(pdf: "pdfplumber.PDF", filename: str) -> bool:
+    """Detect an Amazon DSP weekly credit note (Gutschrift / Rechnung)."""
+    name = (filename or "").lower()
+    if any(tag in name for tag in ("rechnung", "gutschrift", "invoice")):
+        return True
+    text = ""
+    try:
+        text = clean_str(pdf.pages[0].extract_text() or "").lower()
+    except Exception:
+        text = ""
+    signatures = (
+        "details des rechnungsdatums",
+        "rechnung - inv-",
+        "gutschrift",
+        "für zustellungen in woche",
+        "fur zustellungen in woche",
+    )
+    return any(sig in text for sig in signatures)
+
+
+def _us_date_to_iso(raw: str) -> Optional[str]:
+    """'06/01/2026' (MM/DD/YYYY) -> '2026-06-01'."""
+    s = clean_str(raw)
+    m = re.match(r"^(\d{1,2})/(\d{1,2})/(\d{4})$", s)
+    if not m:
+        return None
+    mm, dd, yyyy = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    if not (1 <= mm <= 12 and 1 <= dd <= 31):
+        return None
+    return f"{yyyy:04d}-{mm:02d}-{dd:02d}"
+
+
+def _extract_invoice(pdf: "pdfplumber.PDF", filename: str) -> Dict[str, Any]:
+    """Parse the weekly DSP credit note into header + per-day line items.
+
+    The detail table ("Details des Rechnungsdatums") has columns:
+    Datum (MM/DD/YYYY) · Beschreibung · Stückpreis · Menge · Summe.
+    We collect every row across all pages/tables whose first cell is a
+    US-format date — that naturally excludes the aggregated top summary
+    table (its first column is text, not a date).
+    """
+    full_text = " ".join(
+        clean_str(p.extract_text() or "") for p in pdf.pages
+    )
+
+    res: Dict[str, Any] = {
+        "invoiceNumber": None,
+        "week": None,
+        "rangeStart": None,
+        "rangeEnd": None,
+        "total": None,
+        "lines": [],
+    }
+
+    if m := re.search(r"(INV-[A-Z0-9]+-\d+)", full_text, re.IGNORECASE):
+        res["invoiceNumber"] = m.group(1)
+
+    # "Für Zustellungen in Woche 23: 05/31/2026 to 06/06/2026"
+    if m := re.search(
+        r"[Ww]oche\s*(\d{1,2})\s*:?\s*(\d{1,2}/\d{1,2}/\d{4})\s*"
+        r"(?:to|bis|-|–|—)\s*(\d{1,2}/\d{1,2}/\d{4})",
+        full_text,
+    ):
+        res["week"] = int(m.group(1))
+        res["rangeStart"] = _us_date_to_iso(m.group(2))
+        res["rangeEnd"] = _us_date_to_iso(m.group(3))
+    elif m := re.search(r"[Ww]oche\s*(\d{1,2})", full_text):
+        res["week"] = int(m.group(1))
+
+    if m := re.search(r"Gesamtbetrag\s*([0-9.,]+)", full_text):
+        res["total"] = to_num(m.group(1))
+
+    lines: List[Dict[str, Any]] = []
+    seen = set()
+    for page in pdf.pages:
+        for table in page.extract_tables() or []:
+            if not table:
+                continue
+            for row in table:
+                if not row:
+                    continue
+                cells = [clean_str(c) for c in row]
+                iso = _us_date_to_iso(cells[0]) if cells else None
+                if not iso or len(cells) < 5:
+                    continue
+                desc = cells[1]
+                unit = to_num(cells[2])
+                qty = to_num(cells[3])
+                total = to_num(cells[4])
+                if not desc:
+                    continue
+                key = (iso, desc, qty, total)
+                if key in seen:
+                    continue
+                seen.add(key)
+                lines.append({
+                    "date": iso,
+                    "serviceType": desc,
+                    "unitPrice": unit,
+                    "quantity": qty,
+                    "total": total,
+                })
+
+    # Fallback: if the detail table has no ruling lines, pdfplumber won't
+    # return it via extract_tables(). Parse the per-day rows from raw text
+    # instead: "06/01/2026  <description>  158,25 €  2.0  316,50 €".
+    if not lines:
+        row_re = re.compile(
+            r"(\d{1,2}/\d{1,2}/\d{4})\s+(.+?)\s+"
+            r"([0-9.,]+)\s*€\s+([0-9.,]+)\s+([0-9.,]+)\s*€"
+        )
+        for page in pdf.pages:
+            for raw_line in (page.extract_text() or "").split("\n"):
+                ln = clean_str(raw_line)
+                m = row_re.search(ln)
+                if not m:
+                    continue
+                iso = _us_date_to_iso(m.group(1))
+                if not iso:
+                    continue
+                desc = clean_str(m.group(2))
+                qty = to_num(m.group(4))
+                total = to_num(m.group(5))
+                key = (iso, desc, qty, total)
+                if not desc or key in seen:
+                    continue
+                seen.add(key)
+                lines.append({
+                    "date": iso,
+                    "serviceType": desc,
+                    "unitPrice": to_num(m.group(3)),
+                    "quantity": qty,
+                    "total": total,
+                })
+
+    lines.sort(key=lambda r: (r["date"], r["serviceType"]))
+    res["lines"] = lines
+    return res
+
+
 @app.get("/health")
 def health():
     return {"ok": True}
@@ -1192,9 +2320,55 @@ async def parse_pdf(file: UploadFile = File(...)):
     content = await file.read()
     filename = file.filename or ""
 
-    # XLSX route: Concessions report
+    # HTML route: DWC / IADC weekly report (per-driver DWC% / IADC%)
+    if _is_dwc_html(filename, content):
+        summary, drivers = _extract_dwc_from_html(content, filename)
+        return {
+            "count": len(drivers),
+            "drivers": drivers,
+            "summary": summary or None,
+        }
+
+    # HTML route: CDF (Customer Delivery Feedback) weekly report
+    if _is_cdf_html(filename, content):
+        summary, drivers = _extract_cdf_from_html(content, filename)
+        return {
+            "count": len(drivers),
+            "drivers": drivers,
+            "summary": summary or None,
+        }
+
+    # XLSX route: Cortex VehiclesData export (DSP fleet from Amazon)
+    if _is_vehicles_xlsx(filename, content):
+        summary, vehicles = _extract_vehicles_from_xlsx(content, filename)
+        return {
+            "count": len(vehicles),
+            "drivers": [],
+            "vehicles": vehicles,
+            "summary": summary or None,
+        }
+
+    # XLSX route: Concessions report (legacy OR new DSC format)
     if _is_concessions_xlsx(filename):
-        summary, drivers = _extract_concessions_from_xlsx(content, filename)
+        # Peek at the workbook sheets to choose the right parser. The new
+        # 2026 "DSC Concession" XLSX has a different structure with
+        # event-level rows + per-week date columns.
+        from openpyxl import load_workbook as _peek_wb
+        try:
+            peek = _peek_wb(io.BytesIO(content), data_only=True, read_only=True)
+            is_dsc = _is_dsc_concessions_xlsx_by_sheets(peek)
+        except Exception:
+            is_dsc = False
+        # filename hint: "DSC" anywhere in name → also assume DSC format
+        if "dsc" in (filename or "").lower():
+            is_dsc = True
+
+        if is_dsc:
+            summary, drivers = _extract_dsc_concessions_from_xlsx(
+                content, filename
+            )
+        else:
+            summary, drivers = _extract_concessions_from_xlsx(content, filename)
         return {
             "count": len(drivers),
             "drivers": drivers,
@@ -1202,6 +2376,15 @@ async def parse_pdf(file: UploadFile = File(...)):
         }
 
     with pdfplumber.open(io.BytesIO(content)) as pdf:
+        # Amazon DSP weekly credit note (Gutschrift) — per-day, per-service
+        # line items for the Payment Check reconciliation.
+        if _is_amazon_dsp_invoice_pdf(pdf, filename):
+            invoice = _extract_invoice(pdf, filename)
+            return {
+                "count": len(invoice.get("lines", [])),
+                "drivers": [],
+                "invoice": invoice,
+            }
         if _is_pod_quality_pdf(pdf, filename):
             summary = _extract_pod_quality_summary(pdf, filename)
             drivers = _extract_pod_quality_drivers(pdf)
