@@ -28,7 +28,6 @@ import '../theme/app_typography.dart';
 import '../widgets/co_button.dart';
 import '../widgets/pill_tab_bar.dart';
 import 'add_driver_dialog.dart';
-import 'admin_recruiting_form_builder_page.dart';
 
 class AdminRecruitingPanel extends StatefulWidget {
   const AdminRecruitingPanel({super.key, required this.adminUid});
@@ -97,16 +96,6 @@ class _AdminRecruitingPanelState extends State<AdminRecruitingPanel>
     await launchUrl(url, mode: LaunchMode.externalApplication);
   }
 
-  Future<void> _openFormBuilder() async {
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute(
-        builder: (_) => AdminRecruitingFormBuilderPage(
-          adminUid: widget.adminUid,
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -118,23 +107,6 @@ class _AdminRecruitingPanelState extends State<AdminRecruitingPanel>
               child: PillTabBar(
                 controller: _tabs,
                 tabs: const ['Local / EU', 'Non-EU / Working Visa'],
-              ),
-            ),
-            const SizedBox(width: 8),
-            IconButton(
-              onPressed: _openFormBuilder,
-              icon: const Icon(Icons.tune_rounded),
-              tooltip: 'Form builder',
-              color: AppColors.codriverDeep,
-              style: IconButton.styleFrom(
-                backgroundColor: AppColors.green50,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(
-                    color: AppColors.codriverGreen
-                        .withValues(alpha: 0.3),
-                  ),
-                ),
               ),
             ),
           ],

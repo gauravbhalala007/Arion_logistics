@@ -38,7 +38,6 @@ import '../widgets/app_update_popup.dart';
 import 'admin_approvals_page.dart';
 import 'admin_faq_page.dart';
 import 'admin_academy_page.dart';
-import 'admin_dispatcher_pill_page.dart';
 import 'admin_dispatchers_page.dart';
 import 'admin_dispatcher_center_page.dart';
 import 'dsp_profile_page.dart';
@@ -759,41 +758,22 @@ class _HeaderLanguageAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final code = (localeController.locale ?? Localizations.localeOf(context))
-        .languageCode;
     final de = Localizations.localeOf(context).languageCode == 'de';
+    // Neutrales Sprach-Icon statt Landesflagge (Kundenwunsch) — die
+    // Flaggen erscheinen weiterhin in der Auswahl-Liste des Sheets.
     return Tooltip(
       message: de ? 'Sprache' : 'Language',
       waitDuration: const Duration(milliseconds: 500),
       child: Material(
-        // Die Flagge selbst ist die Fläche — kein zusätzlicher Farbring.
         color: Colors.transparent,
         shape: const CircleBorder(),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: () => _select(context),
-          child: SizedBox(
+          child: const SizedBox(
             width: 48,
             height: 48,
-            child: Center(
-              child: Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.35),
-                  ),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: SvgPicture.asset(
-                  flagAsset(code),
-                  width: 42,
-                  height: 42,
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
+            child: Icon(Icons.language, size: 26, color: Colors.white),
           ),
         ),
       ),
@@ -970,29 +950,6 @@ class _AdminMobileBottomNav extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Runde Menü-Kachel — etwas heller als die Bar und ein paar Pixel
-          // höher gesetzt als die übrigen Punkte.
-          Transform.translate(
-            offset: const Offset(0, -5),
-            child: Tooltip(
-              message: de ? 'Menü' : 'Menu',
-              waitDuration: const Duration(milliseconds: 500),
-              child: Material(
-                color: Colors.white.withValues(alpha: 0.14),
-                shape: const CircleBorder(),
-                clipBehavior: Clip.antiAlias,
-                child: InkWell(
-                  onTap: onOpenMenu,
-                  child: const SizedBox(
-                    width: 52,
-                    height: 52,
-                    child: Icon(Icons.menu, size: 25, color: Colors.white),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 4),
           for (final item in items)
             Expanded(
               child: _NavItem(
@@ -1004,6 +961,26 @@ class _AdminMobileBottomNav extends StatelessWidget {
                 idleColor: _idleColor,
               ),
             ),
+          const SizedBox(width: 4),
+          // Runde Menü-Kachel ganz rechts, vertikal mittig — etwas heller
+          // als die Bar.
+          Tooltip(
+            message: de ? 'Menü' : 'Menu',
+            waitDuration: const Duration(milliseconds: 500),
+            child: Material(
+              color: Colors.white.withValues(alpha: 0.14),
+              shape: const CircleBorder(),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: onOpenMenu,
+                child: const SizedBox(
+                  width: 52,
+                  height: 52,
+                  child: Icon(Icons.menu, size: 25, color: Colors.white),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -1042,7 +1019,19 @@ class _NavItem extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 28, color: color),
+              // Kreisrunder Hintergrund hinter jedem Icon; aktiv = grüner
+              // Tint, inaktiv = dezente helle Fläche auf dem Navy.
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: selected
+                      ? activeColor.withValues(alpha: 0.18)
+                      : Colors.white.withValues(alpha: 0.08),
+                ),
+                child: Icon(icon, size: 24, color: color),
+              ),
               const SizedBox(height: 2),
               Text(
                 label,

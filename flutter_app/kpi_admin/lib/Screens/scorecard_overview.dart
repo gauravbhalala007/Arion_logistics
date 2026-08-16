@@ -786,13 +786,38 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage>
             : t.t('dash_no_name');
         final statusText = _prettyStatus(e.statusCode, t);
         final statusColor = _statusColorFromCode(e.statusCode);
-        return _BestDriverRow(
-          rank: i + 1,
-          score: e.avgScore,
-          name: name,
-          statusText: statusText,
-          statusColor: statusColor,
-          deliveredTotal: deliveredTotals[normalizedTid],
+        // Klick öffnet die Gesamtübersicht aller Leistungen des Fahrers
+        // (gleiche Detailseite wie in der Wochen-Scorecard).
+        return Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () {
+              final uid = AdminScope.adminUidOf(context) ??
+                  FirebaseAuth.instance.currentUser?.uid;
+              if (uid == null) return;
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => DriverScoreDetailPage(
+                    uid: uid,
+                    transporterId: e.transporterId,
+                    driverName: name,
+                    currentScore: e.avgScore,
+                    currentBucket: e.statusCode,
+                  ),
+                ),
+              );
+            },
+            child: _BestDriverRow(
+              rank: i + 1,
+              score: e.avgScore,
+              name: name,
+              statusText: statusText,
+              statusColor: statusColor,
+              deliveredTotal: deliveredTotals[normalizedTid],
+            ),
+          ),
         );
       },
     );

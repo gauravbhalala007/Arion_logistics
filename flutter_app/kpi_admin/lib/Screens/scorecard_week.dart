@@ -1128,7 +1128,7 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
                                   : _s(nameMap[_normTid(tid)]).trim();
                           Navigator.of(context).push(
                             MaterialPageRoute<void>(
-                              builder: (_) => _DriverScoreDetailPage(
+                              builder: (_) => DriverScoreDetailPage(
                                 uid: uid,
                                 transporterId: tid,
                                 driverName: name,
@@ -2334,31 +2334,34 @@ class _CoSummaryMetricRow extends StatelessWidget {
 //  card on the weekly scorecard.
 // ════════════════════════════════════════════════════════════════════════
 
-class _DriverScoreDetailPage extends StatefulWidget {
+class DriverScoreDetailPage extends StatefulWidget {
   final String uid;
   final String transporterId;
   final String driverName;
   final double currentScore;
   final String currentBucket;
 
-  /// Report the detail was opened from — defines "this week".
-  final String reportId;
+  /// Report the detail was opened from — defines "this week". `null` =
+  /// ohne Wochen-Kontext (z.B. Absprung aus "Beste Fahrer"): der Loader
+  /// nimmt dann die jüngste Woche.
+  final String? reportId;
 
-  const _DriverScoreDetailPage({
+  const DriverScoreDetailPage({
+    super.key,
     required this.uid,
     required this.transporterId,
     required this.driverName,
     required this.currentScore,
     required this.currentBucket,
-    required this.reportId,
+    this.reportId,
   });
 
   @override
-  State<_DriverScoreDetailPage> createState() =>
-      _DriverScoreDetailPageState();
+  State<DriverScoreDetailPage> createState() =>
+      DriverScoreDetailPageState();
 }
 
-class _DriverScoreDetailPageState extends State<_DriverScoreDetailPage> {
+class DriverScoreDetailPageState extends State<DriverScoreDetailPage> {
   // Datenladung + Concessions/POD/CDF-Sektionen leben in
   // `widgets/driver_performance_sections.dart` — dieselbe Quelle, die auch
   // die Driver-Hub-Detailseite („2a") verwendet.
