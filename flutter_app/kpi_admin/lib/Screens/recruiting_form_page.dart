@@ -117,6 +117,10 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
   /// Stored under `customAnswers.needsAccommodation` (bool).
   bool? _needsAccommodation;
 
+  /// Local/EU only — does the applicant have their own vehicle to get to
+  /// work? Stored under `customAnswers.ownVehicleForCommute` (bool).
+  bool? _ownVehicleForCommute;
+
   // ── Step 3: sizing + contact ──
   final _shirtSize = TextEditingController();
   final _shoeSize = TextEditingController();
@@ -756,6 +760,16 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
           ro: 'Vă rugăm să răspundeți la întrebarea despre cazare.',
         );
       }
+      // Eigenes Fahrzeug für den Arbeitsweg — ebenfalls Pflicht (Local/EU).
+      if (_isLocal && _ownVehicleForCommute == null) {
+        return _lt(
+          de: 'Bitte die Frage zum eigenen Fahrzeug beantworten.',
+          en: 'Please answer the question about your own vehicle.',
+          bg: 'Моля, отговорете на въпроса за собствено превозно средство.',
+          hu: 'Kérjük, válaszoljon a saját járműre vonatkozó kérdésre.',
+          ro: 'Vă rugăm să răspundeți la întrebarea despre vehiculul propriu.',
+        );
+      }
       // livingSince is Visa-only — Local/EU dropped the field.
       if (!_isLocal && _livingSince == null) {
         return _vt('Që nga kur? mungon.', 'Seit wann? fehlt.');
@@ -1222,6 +1236,8 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
           'formLanguage': _localLang ?? 'de',
           // Zusätzliche Unterkunft gewünscht? (Pflichtfrage im Adress-Schritt)
           'needsAccommodation': _needsAccommodation ?? false,
+          // Eigenes Fahrzeug für den Arbeitsweg? (Pflichtfrage, Adress-Schritt)
+          'ownVehicleForCommute': _ownVehicleForCommute ?? false,
           // Frühestmöglicher Starttermin als ISO-Datum (yyyy-MM-dd).
           if (_earliestStart != null)
             'earliestStart':
@@ -2473,6 +2489,42 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   ),
                   selected: _needsAccommodation == false,
                   onTap: () => setState(() => _needsAccommodation = false),
+                ),
+              ],
+            ),
+          ),
+          _LabeledField(
+            label: _lt(
+              de: 'Haben Sie ein eigenes Fahrzeug für den Weg zur Arbeit?',
+              en: 'Do you have your own vehicle to get to work?',
+              bg: 'Имате ли собствено превозно средство за път до работа?',
+              hu: 'Van saját járműve a munkába járáshoz?',
+              ro: 'Aveți un vehicul propriu pentru a ajunge la muncă?',
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _ChoiceTile(
+                  label: _lt(
+                    de: 'Ja, ich habe ein eigenes Fahrzeug',
+                    en: 'Yes, I have my own vehicle',
+                    bg: 'Да, имам собствено превозно средство',
+                    hu: 'Igen, van saját járművem',
+                    ro: 'Da, am un vehicul propriu',
+                  ),
+                  selected: _ownVehicleForCommute == true,
+                  onTap: () => setState(() => _ownVehicleForCommute = true),
+                ),
+                _ChoiceTile(
+                  label: _lt(
+                    de: 'Nein, ich habe kein eigenes Fahrzeug',
+                    en: "No, I don't have my own vehicle",
+                    bg: 'Не, нямам собствено превозно средство',
+                    hu: 'Nem, nincs saját járművem',
+                    ro: 'Nu, nu am un vehicul propriu',
+                  ),
+                  selected: _ownVehicleForCommute == false,
+                  onTap: () => setState(() => _ownVehicleForCommute = false),
                 ),
               ],
             ),
