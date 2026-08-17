@@ -25,6 +25,7 @@ import '../services/recruiting_repository.dart';
 import '../services/recruiting_slug_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
+import '../utils/cyrillic_translit.dart';
 import '../widgets/co_button.dart';
 import '../widgets/pill_tab_bar.dart';
 import 'add_driver_dialog.dart';
@@ -358,6 +359,8 @@ class _ChannelTabState extends State<_ChannelTab> {
       final q = _search;
       visible = visible.where((a) {
         return a.displayName.toLowerCase().contains(q) ||
+            // Auch in lateinischer Umschrift suchbar (kyrillische Namen).
+            transliterateCyrillic(a.displayName).toLowerCase().contains(q) ||
             a.email.toLowerCase().contains(q) ||
             a.phoneWhatsApp.toLowerCase().contains(q);
       }).toList();
@@ -599,7 +602,10 @@ class _ApplicationRow extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            app.displayName,
+                            hasCyrillic(app.displayName)
+                                ? '${app.displayName} · '
+                                    '${transliterateCyrillic(app.displayName)}'
+                                : app.displayName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: AppTypography.subheadline.copyWith(
@@ -942,7 +948,9 @@ class _RecruitingApplicationDetailPageState
           bottom: BorderSide(color: Color(0xFFE5E7EB)),
         ),
         title: Text(
-          app.displayName,
+          hasCyrillic(app.displayName)
+              ? '${app.displayName} · ${transliterateCyrillic(app.displayName)}'
+              : app.displayName,
           style: AppTypography.title3.copyWith(
             color: const Color(0xFF111827),
             fontWeight: FontWeight.w800,
@@ -1457,13 +1465,30 @@ class _DetailRow extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: SelectableText(
-              value.isEmpty ? '—' : value,
-              style: AppTypography.body.copyWith(
-                color: const Color(0xFF111827),
-                fontWeight: FontWeight.w600,
-                height: 1.4,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SelectableText(
+                  value.isEmpty ? '—' : value,
+                  style: AppTypography.body.copyWith(
+                    color: const Color(0xFF111827),
+                    fontWeight: FontWeight.w600,
+                    height: 1.4,
+                  ),
+                ),
+                // Kyrillische Antworten (z.B. bulgarisches Formular):
+                // lateinische Umschrift direkt darunter, damit das Team
+                // den Wert lesen und weiterverwenden kann.
+                if (hasCyrillic(value))
+                  SelectableText(
+                    transliterateCyrillic(value),
+                    style: AppTypography.caption1.copyWith(
+                      color: const Color(0xFF6B7280),
+                      fontStyle: FontStyle.italic,
+                      height: 1.35,
+                    ),
+                  ),
+              ],
             ),
           ),
           if (value.trim().isNotEmpty)
