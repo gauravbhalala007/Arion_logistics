@@ -1494,7 +1494,12 @@ class _DetailRow extends StatelessWidget {
           if (value.trim().isNotEmpty)
             InkWell(
               onTap: () async {
-                await Clipboard.setData(ClipboardData(text: value.trim()));
+                // Kyrillische Werte in lateinischer Umschrift kopieren —
+                // die wird im Tagesgeschäft (Verträge, Systeme) gebraucht.
+                final copyText = hasCyrillic(value)
+                    ? transliterateCyrillic(value.trim())
+                    : value.trim();
+                await Clipboard.setData(ClipboardData(text: copyText));
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
