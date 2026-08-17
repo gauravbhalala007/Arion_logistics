@@ -30,7 +30,6 @@ import '../utils/cyrillic_translit.dart';
 import '../widgets/co_button.dart';
 import '../widgets/pill_tab_bar.dart';
 import 'add_driver_dialog.dart';
-import 'recruiting_agency_form_page.dart';
 
 class AdminRecruitingPanel extends StatefulWidget {
   const AdminRecruitingPanel({super.key, required this.adminUid});
@@ -106,36 +105,6 @@ class _AdminRecruitingPanelState extends State<AdminRecruitingPanel>
     );
   }
 
-  /// Opens the agency form inside the app for the team (admin is signed
-  /// in → a newly entered agency is saved to the directory instantly).
-  Future<void> _openAgencyForm() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => Scaffold(
-          backgroundColor: const Color(0xFFF3F6F7),
-          appBar: AppBar(
-            backgroundColor: Colors.white,
-            surfaceTintColor: Colors.white,
-            elevation: 0.5,
-            title: Text(
-              Localizations.localeOf(context).languageCode == 'de'
-                  ? 'Agentur-Formular'
-                  : 'Agency form',
-              style: AppTypography.title3.copyWith(
-                color: const Color(0xFF111827),
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-          body: RecruitingAgencyFormPage(
-            adminUid: widget.adminUid,
-            isInternal: true,
-          ),
-        ),
-      ),
-    );
-  }
-
   Future<void> _shareLink(RecruitingChannel channel) async {
     final url = _publicFormUrl(channel);
     await Clipboard.setData(ClipboardData(text: url));
@@ -204,7 +173,6 @@ class _AdminRecruitingPanelState extends State<AdminRecruitingPanel>
                 onShareLink: () => _shareLink(RecruitingChannel.visa),
                 onOpenLink: () => _openLink(RecruitingChannel.visa),
                 onShareAgencyLink: _shareAgencyLink,
-                onOpenAgencyForm: _openAgencyForm,
                 onSyncAgencies: (apps) => _agencyRepo.syncFromApplications(
                   adminUid: widget.adminUid,
                   apps: apps,
@@ -236,7 +204,6 @@ class _ChannelTab extends StatefulWidget {
     required this.onUpdateStatus,
     required this.onDelete,
     this.onShareAgencyLink,
-    this.onOpenAgencyForm,
     this.onSyncAgencies,
   });
 
@@ -247,7 +214,6 @@ class _ChannelTab extends StatefulWidget {
 
   /// Non-EU tab only — staffing-agency entry points.
   final VoidCallback? onShareAgencyLink;
-  final VoidCallback? onOpenAgencyForm;
 
   /// Adopts agencies from public submissions into the directory.
   final Future<void> Function(List<RecruitingApplication> apps)?
@@ -295,72 +261,46 @@ class _ChannelTabState extends State<_ChannelTab> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(
-              padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
-              decoration: BoxDecoration(
-                color: AppColors.green50,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color:
-                      AppColors.codriverGreen.withValues(alpha: 0.3),
-                ),
-              ),
-              child: Row(
+            // Visa-Tab: beide Formular-Links kompakt nebeneinander (auch
+            // mobil), nur Titel + Copy-Button. Local-Tab: eine Karte.
+            if (widget.channel == RecruitingChannel.visa)
+              Row(
                 children: [
-                  const Icon(
-                    Icons.link_rounded,
-                    color: AppColors.codriverDeep,
-                  ),
-                  const SizedBox(width: 10),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          widget.channel == RecruitingChannel.visa
-                              ? 'Non-EU / Working Visa form'
-                              : 'Local / EU form',
-                          style: AppTypography.subheadline.copyWith(
-                            color: AppColors.codriverDeep,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        Text(
-                          'Send this link to applicants — no login '
-                          'required.',
-                          style: AppTypography.caption2.copyWith(
-                            color: AppColors.codriverDeep
-                                .withValues(alpha: 0.7),
-                          ),
-                        ),
-                      ],
+                    child: _CompactLinkCard(
+                      label: 'Visa form',
+                      icon: Icons.link_rounded,
+                      accent: AppColors.codriverDeep,
+                      background: AppColors.green50,
+                      border:
+                          AppColors.codriverGreen.withValues(alpha: 0.3),
+                      onCopy: widget.onShareLink,
                     ),
                   ),
-                  CoButton(
-                    onPressed: widget.onShareLink,
-                    label: 'Copy link',
-                    icon: Icons.content_copy_rounded,
-                    variant: CoButtonVariant.secondaryOutlined,
-                  ),
-                  const SizedBox(width: 6),
-                  CoButton(
-                    onPressed: widget.onOpenLink,
-                    label: 'Open',
-                    icon: Icons.open_in_new_rounded,
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _CompactLinkCard(
+                      label: 'Agency form',
+                      icon: Icons.apartment_rounded,
+                      accent: const Color(0xFF7C3AED),
+                      background:
+                          const Color(0xFF7C3AED).withValues(alpha: 0.06),
+                      border:
+                          const Color(0xFF7C3AED).withValues(alpha: 0.3),
+                      onCopy: widget.onShareAgencyLink,
+                    ),
                   ),
                 ],
+              )
+            else
+              _CompactLinkCard(
+                label: 'Local / EU form',
+                icon: Icons.link_rounded,
+                accent: AppColors.codriverDeep,
+                background: AppColors.green50,
+                border: AppColors.codriverGreen.withValues(alpha: 0.3),
+                onCopy: widget.onShareLink,
               ),
-            ),
-            // Non-EU tab: staffing agencies send candidate data instead
-            // of the candidates applying themselves.
-            if (widget.onOpenAgencyForm != null) ...[
-              const SizedBox(height: 10),
-              _AgencyLinkCard(
-                onOpenForm: widget.onOpenAgencyForm!,
-                onShareLink: widget.onShareAgencyLink,
-              ),
-            ],
             const SizedBox(height: 14),
             Expanded(
               child: _buildBody(context, snap, apps),
@@ -1641,69 +1581,82 @@ class _DetailRow extends StatelessWidget {
 
 /// Einstiegskarte für das Agentur-Formular im Non-EU-Tab: intern öffnen
 /// oder den öffentlichen Link an die Personalagentur weitergeben.
-class _AgencyLinkCard extends StatelessWidget {
-  const _AgencyLinkCard({
-    required this.onOpenForm,
-    required this.onShareLink,
+/// Kompakte Formular-Link-Karte: nur Titel + kleiner Copy-Button —
+/// Desktop wie Mobil, im Visa-Tab stehen zwei davon nebeneinander.
+class _CompactLinkCard extends StatelessWidget {
+  const _CompactLinkCard({
+    required this.label,
+    required this.icon,
+    required this.accent,
+    required this.background,
+    required this.border,
+    required this.onCopy,
   });
 
-  final VoidCallback onOpenForm;
-  final VoidCallback? onShareLink;
+  final String label;
+  final IconData icon;
+  final Color accent;
+  final Color background;
+  final Color border;
+  final VoidCallback? onCopy;
 
   @override
   Widget build(BuildContext context) {
     final de = Localizations.localeOf(context).languageCode == 'de';
-    const accent = Color(0xFF7C3AED);
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+      padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
       decoration: BoxDecoration(
-        color: accent.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: accent.withValues(alpha: 0.3)),
+        color: background,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: border),
       ),
       child: Row(
         children: [
-          const Icon(Icons.apartment_rounded, color: accent),
-          const SizedBox(width: 10),
+          Icon(icon, size: 18, color: accent),
+          const SizedBox(width: 8),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  de ? 'Agentur-Formular' : 'Staffing agency form',
-                  style: AppTypography.subheadline.copyWith(
-                    color: accent,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                Text(
-                  de
-                      ? 'Für Personalagenturen, die Kandidaten-Daten '
-                          'einreichen — intern ausfüllen oder Link teilen.'
-                      : 'For agencies submitting candidate data — fill it '
-                          'in internally or share the link.',
-                  style: AppTypography.caption2.copyWith(
-                    color: const Color(0xFF6B7280),
-                    height: 1.35,
-                  ),
-                ),
-              ],
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTypography.subheadline.copyWith(
+                fontSize: 14,
+                color: accent,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
-          if (onShareLink != null) ...[
-            CoButton(
-              onPressed: onShareLink,
-              label: de ? 'Link kopieren' : 'Copy link',
-              icon: Icons.content_copy_rounded,
-              variant: CoButtonVariant.secondaryOutlined,
+          const SizedBox(width: 8),
+          Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: onCopy,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: border),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.content_copy_rounded, size: 14, color: accent),
+                    const SizedBox(width: 5),
+                    Text(
+                      de ? 'Link' : 'Link',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: accent,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            const SizedBox(width: 6),
-          ],
-          CoButton(
-            onPressed: onOpenForm,
-            label: de ? 'Formular öffnen' : 'Open form',
-            icon: Icons.open_in_new_rounded,
           ),
         ],
       ),
