@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../Screens/owner_insights_page.dart';
 import '../services/admin_expiry_aggregator.dart';
 import '../services/auth_service.dart';
 import '../localization/app_localizations.dart';
@@ -441,6 +442,28 @@ class AppSideMenu extends StatelessWidget {
             ),
           ],
         ),
+      ),
+      // Owner-Dashboard (Nutzerzahlen aller CoDriver-Firmen): NUR für das
+      // Arion-Hauptkonto sichtbar; die Seite selbst verlangt zusätzlich das
+      // Passwort, das serverseitig in `getOwnerUsageStats` geprüft wird.
+      Builder(
+        builder: (context) {
+          final email =
+              FirebaseAuth.instance.currentUser?.email?.toLowerCase() ?? '';
+          if (email != 'admin@arion-logistics.de') {
+            return const SizedBox.shrink();
+          }
+          return _MenuItem(
+            icon: Icons.query_stats,
+            label: 'Insights',
+            active: false,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const OwnerInsightsPage(),
+              ),
+            ),
+          );
+        },
       ),
     ];
 
