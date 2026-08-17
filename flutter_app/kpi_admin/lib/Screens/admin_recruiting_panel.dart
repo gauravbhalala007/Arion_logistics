@@ -21,6 +21,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/recruiting_application.dart';
 import '../models/recruiting_form_config.dart';
+import '../services/recruiting_agency_repository.dart';
 import '../services/recruiting_repository.dart';
 import '../services/recruiting_slug_service.dart';
 import '../theme/app_colors.dart';
@@ -29,6 +30,7 @@ import '../utils/cyrillic_translit.dart';
 import '../widgets/co_button.dart';
 import '../widgets/pill_tab_bar.dart';
 import 'add_driver_dialog.dart';
+import 'recruiting_agency_form_page.dart';
 
 class AdminRecruitingPanel extends StatefulWidget {
   const AdminRecruitingPanel({super.key, required this.adminUid});
@@ -42,6 +44,7 @@ class _AdminRecruitingPanelState extends State<AdminRecruitingPanel>
     with SingleTickerProviderStateMixin {
   late final TabController _tabs;
   final _repo = RecruitingRepository();
+  final _agencyRepo = RecruitingAgencyRepository();
   String? _brandSlug; // e.g. "arion" — looked up once on init.
 
   @override
@@ -74,6 +77,63 @@ class _AdminRecruitingPanelState extends State<AdminRecruitingPanel>
     }
     return '${base.origin}/#/jobs?dsp=${widget.adminUid}'
         '&type=${channel.value}';
+  }
+
+  /// Public URL of the staffing-agency form. Same shape as the driver
+  /// links, with the `agency` type segment.
+  String _agencyFormUrl() {
+    final base = Uri.base;
+    if (_brandSlug != null && _brandSlug!.isNotEmpty) {
+      return '${base.origin}/#/jobs/$_brandSlug/agency';
+    }
+    return '${base.origin}/#/jobs?dsp=${widget.adminUid}&type=agency';
+  }
+
+  Future<void> _shareAgencyLink() async {
+    final url = _agencyFormUrl();
+    await Clipboard.setData(ClipboardData(text: url));
+    if (!mounted) return;
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: AppColors.codriverDeep,
+        content: Text(
+          de ? 'Agentur-Link kopiert · $url' : 'Agency link copied · $url',
+          style: const TextStyle(color: Colors.white),
+        ),
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
+  /// Opens the agency form inside the app for the team (admin is signed
+  /// in → a newly entered agency is saved to the directory instantly).
+  Future<void> _openAgencyForm() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => Scaffold(
+          backgroundColor: const Color(0xFFF3F6F7),
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.white,
+            elevation: 0.5,
+            title: Text(
+              Localizations.localeOf(context).languageCode == 'de'
+                  ? 'Agentur-Formular'
+                  : 'Agency form',
+              style: AppTypography.title3.copyWith(
+                color: const Color(0xFF111827),
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          body: RecruitingAgencyFormPage(
+            adminUid: widget.adminUid,
+            isInternal: true,
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _shareLink(RecruitingChannel channel) async {
@@ -143,6 +203,12 @@ class _AdminRecruitingPanelState extends State<AdminRecruitingPanel>
                 ),
                 onShareLink: () => _shareLink(RecruitingChannel.visa),
                 onOpenLink: () => _openLink(RecruitingChannel.visa),
+                onShareAgencyLink: _shareAgencyLink,
+                onOpenAgencyForm: _openAgencyForm,
+                onSyncAgencies: (apps) => _agencyRepo.syncFromApplications(
+                  adminUid: widget.adminUid,
+                  apps: apps,
+                ),
                 onUpdateStatus: (id, status) => _repo.updateStatus(
                   adminUid: widget.adminUid,
                   applicationId: id,
@@ -169,12 +235,23 @@ class _ChannelTab extends StatefulWidget {
     required this.onOpenLink,
     required this.onUpdateStatus,
     required this.onDelete,
+    this.onShareAgencyLink,
+    this.onOpenAgencyForm,
+    this.onSyncAgencies,
   });
 
   final RecruitingChannel channel;
   final Stream<List<RecruitingApplication>> stream;
   final VoidCallback onShareLink;
   final VoidCallback onOpenLink;
+
+  /// Non-EU tab only — staffing-agency entry points.
+  final VoidCallback? onShareAgencyLink;
+  final VoidCallback? onOpenAgencyForm;
+
+  /// Adopts agencies from public submissions into the directory.
+  final Future<void> Function(List<RecruitingApplication> apps)?
+      onSyncAgencies;
   final Future<void> Function(String id, RecruitingStatus status)
       onUpdateStatus;
   final Future<void> Function(String id) onDelete;
@@ -191,12 +268,30 @@ class _ChannelTabState extends State<_ChannelTab> {
   // Non-EU only: when true, show just "Arbeitgeberwechsel" applicants.
   bool _employerChangeOnly = false;
 
+  /// Agencies from PUBLIC submissions can only be adopted into the
+  /// directory by an authenticated admin (settings is admin-write-only),
+  /// so we do it here — once per mounted tab, and only if the repository
+  /// actually finds something new (the call is idempotent).
+  bool _agenciesSynced = false;
+
+  void _maybeSyncAgencies(List<RecruitingApplication> apps) {
+    final sync = widget.onSyncAgencies;
+    if (sync == null || _agenciesSynced || apps.isEmpty) return;
+    if (!apps.any((a) => a.customAnswers['viaAgency'] == true)) return;
+    _agenciesSynced = true;
+    // Fire-and-forget: never block or fail the list rendering.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      sync(apps).catchError((_) {});
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<RecruitingApplication>>(
       stream: widget.stream,
       builder: (context, snap) {
         final apps = snap.data ?? const <RecruitingApplication>[];
+        _maybeSyncAgencies(apps);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -257,6 +352,15 @@ class _ChannelTabState extends State<_ChannelTab> {
                 ],
               ),
             ),
+            // Non-EU tab: staffing agencies send candidate data instead
+            // of the candidates applying themselves.
+            if (widget.onOpenAgencyForm != null) ...[
+              const SizedBox(height: 10),
+              _AgencyLinkCard(
+                onOpenForm: widget.onOpenAgencyForm!,
+                onShareLink: widget.onShareAgencyLink,
+              ),
+            ],
             const SizedBox(height: 14),
             Expanded(
               child: _buildBody(context, snap, apps),
@@ -641,6 +745,10 @@ class _ApplicationRow extends StatelessWidget {
                       runSpacing: 4,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
+                        // Applications filed by a staffing agency look
+                        // identical otherwise — flag them up front.
+                        if (app.customAnswers['viaAgency'] == true)
+                          const _AgencyBadge(),
                         if (_ContractTypePill.forKey(
                               (app.customAnswers['employmentInterest'] ?? '')
                                   .toString(),
@@ -1011,6 +1119,10 @@ class _RecruitingApplicationDetailPageState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // Agentur-Einreichung: Kontaktblock ganz oben, damit das
+                // Team sofort sieht, an wen es sich wendet.
+                if (app.customAnswers['viaAgency'] == true)
+                  _AgencyContactBlock(answers: app.customAnswers),
                 _PipelineStrip(
                   current: _status,
                   channel: app.channel,
@@ -1527,6 +1639,240 @@ class _DetailRow extends StatelessWidget {
   }
 }
 
+/// Einstiegskarte für das Agentur-Formular im Non-EU-Tab: intern öffnen
+/// oder den öffentlichen Link an die Personalagentur weitergeben.
+class _AgencyLinkCard extends StatelessWidget {
+  const _AgencyLinkCard({
+    required this.onOpenForm,
+    required this.onShareLink,
+  });
+
+  final VoidCallback onOpenForm;
+  final VoidCallback? onShareLink;
+
+  @override
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    const accent = Color(0xFF7C3AED);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: accent.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.apartment_rounded, color: accent),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  de ? 'Agentur-Formular' : 'Staffing agency form',
+                  style: AppTypography.subheadline.copyWith(
+                    color: accent,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Text(
+                  de
+                      ? 'Für Personalagenturen, die Kandidaten-Daten '
+                          'einreichen — intern ausfüllen oder Link teilen.'
+                      : 'For agencies submitting candidate data — fill it '
+                          'in internally or share the link.',
+                  style: AppTypography.caption2.copyWith(
+                    color: const Color(0xFF6B7280),
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (onShareLink != null) ...[
+            CoButton(
+              onPressed: onShareLink,
+              label: de ? 'Link kopieren' : 'Copy link',
+              icon: Icons.content_copy_rounded,
+              variant: CoButtonVariant.secondaryOutlined,
+            ),
+            const SizedBox(width: 6),
+          ],
+          CoButton(
+            onPressed: onOpenForm,
+            label: de ? 'Formular öffnen' : 'Open form',
+            icon: Icons.open_in_new_rounded,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Kompaktes Abzeichen für Bewerbungen, die über eine Personalagentur
+/// eingereicht wurden. Erscheint in der Listenzeile neben den Meta-Chips.
+class _AgencyBadge extends StatelessWidget {
+  const _AgencyBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    const accent = Color(0xFF7C3AED);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: accent.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.apartment_rounded, size: 12, color: accent),
+          const SizedBox(width: 4),
+          Text(
+            de ? 'über Personalagentur' : 'via staffing agency',
+            style: AppTypography.caption2.copyWith(
+              color: accent,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Agentur-Kontaktblock in der Detailansicht. Arion hat keinen direkten
+/// Kontakt zur Kandidatin oder zum Kandidaten — sobald die
+/// Vorabzustimmung da ist, wendet sich das Team an diese Agentur.
+class _AgencyContactBlock extends StatelessWidget {
+  const _AgencyContactBlock({required this.answers});
+
+  final Map<String, dynamic> answers;
+
+  String _v(String key) => (answers[key] ?? '').toString().trim();
+
+  @override
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    const accent = Color(0xFF7C3AED);
+    final name = _v('agencyName');
+    final phone = _v('agencyPhone');
+    final email = _v('agencyEmail');
+
+    Future<void> copy(String value) async {
+      await Clipboard.setData(ClipboardData(text: value));
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.codriverDeep,
+          content: Text(
+            de ? 'Kopiert · $value' : 'Copied · $value',
+            style: const TextStyle(color: Colors.white),
+          ),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+
+    Widget row(IconData icon, String label, String value) {
+      if (value.isEmpty) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Row(
+          children: [
+            Icon(icon, size: 16, color: accent),
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 76,
+              child: Text(
+                label,
+                style: AppTypography.caption2.copyWith(
+                  color: const Color(0xFF6B7280),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            Expanded(
+              child: SelectableText(
+                value,
+                style: AppTypography.caption1.copyWith(
+                  color: const Color(0xFF111827),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            InkWell(
+              onTap: () => copy(value),
+              borderRadius: BorderRadius.circular(6),
+              child: const Padding(
+                padding: EdgeInsets.all(4),
+                child: Icon(
+                  Icons.copy_rounded,
+                  size: 15,
+                  color: Color(0xFF9CA3AF),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.fromLTRB(14, 12, 10, 14),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: accent.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.apartment_rounded, size: 18, color: accent),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  de
+                      ? 'Eingereicht über Personalagentur'
+                      : 'Submitted via staffing agency',
+                  style: AppTypography.caption1.copyWith(
+                    color: accent,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            de
+                ? 'Kein direkter Kontakt zur Kandidatin / zum Kandidaten — '
+                    'bitte die Agentur kontaktieren, sobald die '
+                    'Vorabzustimmung vorliegt.'
+                : 'No direct contact with the candidate — please reach out '
+                    'to the agency once the pre-approval arrives.',
+            style: AppTypography.caption2.copyWith(
+              color: const Color(0xFF6B7280),
+              height: 1.4,
+            ),
+          ),
+          row(Icons.business_rounded, de ? 'Agentur' : 'Agency', name),
+          row(Icons.phone_rounded, de ? 'Telefon' : 'Phone', phone),
+          row(Icons.mail_outline_rounded, de ? 'E-Mail' : 'Email', email),
+        ],
+      ),
+    );
+  }
+}
+
 /// Hinweis in der Bewerbungs-Detailansicht, wenn die Bewerberin oder der
 /// Bewerber von jemandem geworben wurde — inklusive Erinnerung an die
 /// 100-€-Werbeprämie (Aktion bis Ende September).
@@ -1609,6 +1955,12 @@ class _CustomAnswersGroup extends StatelessWidget {
   /// applicant detail view shows „Krankenkasse" instead of „healthInsurance".
   static const Map<String, String> _builtInLabels = {
     'formLanguage': 'Formular-Sprache',
+    'viaAgency': 'Über Personalagentur',
+    'agencyName': 'Agentur',
+    'agencyPhone': 'Agentur-Telefon',
+    'agencyEmail': 'Agentur-E-Mail',
+    'candidateGender': 'Geschlecht',
+    'agencySubmittedInternally': 'Intern vom Team erfasst',
     'employmentInterest': 'Beschäftigungs-Wunsch',
     'parttimeDaysPerWeek': 'Teilzeit-Tage pro Woche',
     'parttimeWeekdays': 'Teilzeit-Wochentage',
@@ -1636,6 +1988,12 @@ class _CustomAnswersGroup extends StatelessWidget {
   /// English counterparts of [_builtInLabels] for admins using EN.
   static const Map<String, String> _builtInLabelsEn = {
     'formLanguage': 'Form language',
+    'viaAgency': 'Via staffing agency',
+    'agencyName': 'Agency',
+    'agencyPhone': 'Agency phone',
+    'agencyEmail': 'Agency email',
+    'candidateGender': 'Gender',
+    'agencySubmittedInternally': 'Entered internally by the team',
     'employmentInterest': 'Employment preference',
     'parttimeDaysPerWeek': 'Part-time days per week',
     'parttimeWeekdays': 'Part-time weekdays',
@@ -1664,6 +2022,12 @@ class _CustomAnswersGroup extends StatelessWidget {
   /// payroll → family → notes in the same sequence regardless of map
   /// iteration order.
   static const List<String> _builtInOrder = [
+    'viaAgency',
+    'agencyName',
+    'agencyPhone',
+    'agencyEmail',
+    'candidateGender',
+    'agencySubmittedInternally',
     'formLanguage',
     'employmentInterest',
     'parttimeDaysPerWeek',
@@ -1782,6 +2146,19 @@ class _CustomAnswersGroup extends StatelessWidget {
         if (d == null) return s;
         return '${d.day.toString().padLeft(2, '0')}.'
             '${d.month.toString().padLeft(2, '0')}.${d.year}';
+      case 'candidateGender':
+        return (de
+                ? const {
+                    'm': 'Männlich',
+                    'f': 'Weiblich',
+                    'd': 'Divers',
+                  }
+                : const {
+                    'm': 'Male',
+                    'f': 'Female',
+                    'd': 'Diverse',
+                  })[s] ??
+            s;
       case 'employmentInterest':
         return (de
                 ? const {

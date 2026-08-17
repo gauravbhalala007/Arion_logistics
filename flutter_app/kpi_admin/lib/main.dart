@@ -12,6 +12,7 @@ import 'Screens/verify_email_page.dart';
 import 'Screens/driver_dashboard_page.dart';
 import 'Screens/admin_shell_page.dart';
 import 'Screens/admin_inventory_detail_page.dart';
+import 'Screens/recruiting_agency_form_page.dart';
 import 'Screens/recruiting_form_page.dart';
 import 'Screens/public_review_page.dart';
 import 'Screens/dispatcher_review_page.dart';
@@ -180,6 +181,11 @@ class App extends StatelessWidget {
               final channel = typeRaw == 'visa'
                   ? RecruitingChannel.visa
                   : RecruitingChannel.local;
+              // Staffing-agency form — same loader, different page. It
+              // submits on the `visa` channel (the Firestore rule pins
+              // the public create to local|visa) but is flagged via
+              // customAnswers.viaAgency.
+              final isAgency = typeRaw == 'agency';
               final legacyUid = uri.queryParameters['dsp'] ?? '';
 
               return MaterialPageRoute<void>(
@@ -189,6 +195,7 @@ class App extends StatelessWidget {
                     slug: slug,
                     legacyAdminUid: legacyUid,
                     channel: channel,
+                    isAgency: isAgency,
                   ),
                 ),
               );
@@ -323,10 +330,15 @@ class _RecruitingFormLoader extends StatefulWidget {
   final String legacyAdminUid;
   final RecruitingChannel channel;
 
+  /// `?type=agency` → render the staffing-agency form instead of the
+  /// driver application form.
+  final bool isAgency;
+
   const _RecruitingFormLoader({
     required this.slug,
     required this.legacyAdminUid,
     required this.channel,
+    this.isAgency = false,
   });
 
   @override
@@ -395,6 +407,9 @@ class _RecruitingFormLoaderState extends State<_RecruitingFormLoader> {
           ),
         ),
       );
+    }
+    if (widget.isAgency) {
+      return RecruitingAgencyFormPage(adminUid: _resolvedUid!);
     }
     return RecruitingFormPage(
       adminUid: _resolvedUid!,

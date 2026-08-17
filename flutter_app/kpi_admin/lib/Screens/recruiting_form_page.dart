@@ -8,19 +8,17 @@
 //
 // Routed by main.dart from `/apply?dsp=<adminUid>&type=local|visa`.
 
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:image/image.dart' as img;
 
 import '../models/recruiting_application.dart';
 import '../models/recruiting_form_config.dart';
 import '../services/recruiting_repository.dart';
+import '../services/recruiting_upload_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../widgets/co_button.dart';
@@ -1031,28 +1029,8 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
   /// 350–600 KB — still perfectly readable for ID documents, but
   /// upload-friendly on cellular and well below iOS Safari's resumable-
   /// upload sweet spot.
-  Future<Uint8List?> _compressImage(Uint8List raw) async {
-    try {
-      final decoded = img.decodeImage(raw);
-      if (decoded == null) return null;
-      const maxEdge = 1600;
-      final longest = decoded.width > decoded.height
-          ? decoded.width
-          : decoded.height;
-      final resized = longest > maxEdge
-          ? img.copyResize(
-              decoded,
-              width: decoded.width >= decoded.height ? maxEdge : null,
-              height: decoded.width >= decoded.height ? null : maxEdge,
-              interpolation: img.Interpolation.linear,
-            )
-          : decoded;
-      final encoded = img.encodeJpg(resized, quality: 75);
-      return Uint8List.fromList(encoded);
-    } catch (_) {
-      return null;
-    }
-  }
+  Future<Uint8List?> _compressImage(Uint8List raw) =>
+      const RecruitingUploadService().compressImage(raw);
 
   /// Upload a single picked file to Firebase Storage under
   ///   `recruiting/{adminUid}/{appId}/{label}.{ext}`
@@ -1069,54 +1047,15 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
     required String appId,
     required String label,
     required _PickedFile file,
-  }) async {
-    final ext = file.mimeType == 'application/pdf'
-        ? 'pdf'
-        : file.mimeType == 'image/png'
-            ? 'png'
-            : file.mimeType == 'image/heic'
-                ? 'heic'
-                : 'jpg';
-    final path = 'recruiting/${widget.adminUid}/$appId/$label.$ext';
-    final encodedPath = Uri.encodeComponent(path);
-    // Hard-code the bucket the app uses — `firebase_options.dart` and
-    // the deployed Storage CORS config agree on this value, so it stays
-    // consistent across all environments.
-    const bucket = 'codriver-eu.firebasestorage.app';
-    final uri = Uri.parse(
-      'https://firebasestorage.googleapis.com/v0/b/$bucket/o'
-      '?uploadType=media&name=$encodedPath',
-    );
-
-    final resp = await http.post(
-      uri,
-      headers: <String, String>{
-        'Content-Type': file.mimeType,
-      },
-      body: file.bytes,
-    );
-
-    if (resp.statusCode != 200) {
-      throw Exception(
-        'Storage POST returned ${resp.statusCode}: ${resp.body}',
+  }) =>
+      const RecruitingUploadService().uploadDocument(
+        adminUid: widget.adminUid,
+        appId: appId,
+        label: label,
+        bytes: file.bytes,
+        filename: file.filename,
+        mimeType: file.mimeType,
       );
-    }
-
-    final meta = jsonDecode(resp.body) as Map<String, dynamic>;
-    final downloadTokens = (meta['downloadTokens'] ?? '').toString();
-    final downloadUrl =
-        'https://firebasestorage.googleapis.com/v0/b/$bucket/o/'
-        '$encodedPath?alt=media&token=$downloadTokens';
-
-    return RecruitingDocument(
-      label: label,
-      filename: file.filename,
-      mimeType: file.mimeType,
-      downloadUrl: downloadUrl,
-      storagePath: path,
-      sizeBytes: file.bytes.lengthInBytes,
-    );
-  }
 
   // ── Submit ──────────────────────────────────────────────────────
   /// Two-phase submit:
