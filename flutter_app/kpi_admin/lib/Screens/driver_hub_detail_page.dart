@@ -1230,14 +1230,24 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
       ));
     }
 
-    // Der Typ-Zusatz „(EU)" / „(Nicht-EU)" ist selbst der Einstieg in den
-    // Bestands-Editor für die Führerscheinart (kein zweites Icon nötig).
-    final licenseTooltip =
-        _tr('Führerschein-Typ ändern', 'Change licence type');
+    // Führerschein-Art (`onboarding.licenseType`) als eigene Zeile — der
+    // Wert ist der Einstieg in den Bestands-Editor `_adminEditLicenseType`.
+    rows.add(_valueRow(
+      label: _tr('Führerschein-Art', 'Licence type'),
+      value: isNonEu ? _tr('Nicht-EU', 'Non-EU') : 'EU',
+      onEdit: () => widget.actions.editLicenseType(licenseType),
+      tooltip: _tr('Führerschein-Typ ändern', 'Change licence type'),
+    ));
+
     if (isNonEu) {
+      // Ausländische Führerscheine gelten in Deutschland nur 6 Monate ab
+      // Einreise — das Datum wird deshalb aus `firstDayInGermany` gerechnet
+      // (und beim Speichern zusätzlich in `licenseExpiry` gespiegelt, damit
+      // die Ablauf-Benachrichtigungen es sehen).
       rows.add(_expiryRow(
-        label: _tr('Führerschein (Nicht-EU)', 'Licence (non-EU)'),
+        label: _tr('Führerschein gültig bis', 'Licence valid until'),
         date: firstDay == null ? null : _addMonths(firstDay, 6),
+        warnMonths: 2,
         onEdit: () => widget.actions.pickOnboardingDate(
           fieldKey: 'firstDayInGermany',
           current: _str(onboarding['firstDayInGermany']),
@@ -1245,12 +1255,26 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
             'licenseExpiry': _fmtDate(_addMonths(picked, 6)),
           },
         ),
-        onEditLabel: () => widget.actions.editLicenseType(licenseType),
-        labelTooltip: licenseTooltip,
+        editTooltip: _tr(
+          'Einreisedatum ändern (6 Monate Gültigkeit)',
+          'Edit entry date (6 months validity)',
+        ),
+      ));
+      rows.add(_valueRow(
+        label: _tr('In Deutschland seit', 'In Germany since'),
+        value: firstDay == null ? '—' : _fmtDate(firstDay),
+        muted: firstDay == null,
+        onEdit: () => widget.actions.pickOnboardingDate(
+          fieldKey: 'firstDayInGermany',
+          current: _str(onboarding['firstDayInGermany']),
+          extraFields: (picked) => {
+            'licenseExpiry': _fmtDate(_addMonths(picked, 6)),
+          },
+        ),
       ));
     } else {
       rows.add(_expiryRow(
-        label: _tr('Führerschein (EU)', 'Licence (EU)'),
+        label: _tr('Führerschein gültig bis', 'Licence valid until'),
         date: parseFlexibleDate(onboarding['licenseExpiry']),
         noExpiry: onboarding['licenseNoExpiry'] == true,
         onEdit: () => widget.actions.editExpiryOrNone(
@@ -1258,8 +1282,6 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
           noExpiryKey: 'licenseNoExpiry',
           currentDate: _str(onboarding['licenseExpiry']),
         ),
-        onEditLabel: () => widget.actions.editLicenseType(licenseType),
-        labelTooltip: licenseTooltip,
       ));
     }
 
@@ -1279,13 +1301,62 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
     );
   }
 
+  /// Zeile ohne Datum (z. B. Führerschein-Art) — gleiche Geometrie wie
+  /// [_expiryRow], damit Labels und Werte im Block bündig stehen.
+  Widget _valueRow({
+    required String label,
+    required String value,
+    required VoidCallback onEdit,
+    String? tooltip,
+    bool muted = false,
+  }) {
+    return Row(
+      children: [
+        const SizedBox(width: 16),
+        Expanded(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12, color: _C.text2, height: 1.3),
+          ),
+        ),
+        const SizedBox(width: 8),
+        InkWell(
+          onTap: onEdit,
+          borderRadius: BorderRadius.circular(6),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: muted ? _C.muted : _C.text,
+                height: 1.3,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 2),
+        _IconAction(
+          icon: Icons.edit_outlined,
+          size: 15,
+          color: _C.muted,
+          tooltip: tooltip ?? '${_tr('Bearbeiten', 'Edit')}: $label',
+          onTap: onEdit,
+        ),
+      ],
+    );
+  }
+
   Widget _expiryRow({
     required String label,
     required DateTime? date,
     bool noExpiry = false,
     required VoidCallback onEdit,
-    VoidCallback? onEditLabel,
-    String? labelTooltip,
+    String? editTooltip,
+    int warnMonths = 12,
   }) {
     final today = _today();
     Color dot = _C.green;
@@ -1294,7 +1365,7 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
       if (date.isBefore(today)) {
         dot = _C.redValue;
         valueColor = _C.redValue;
-      } else if (date.isBefore(_addMonths(today, 12))) {
+      } else if (date.isBefore(_addMonths(today, warnMonths))) {
         dot = _C.amberDot;
         valueColor = _C.amberText;
       }
@@ -1321,28 +1392,12 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: Builder(builder: (context) {
-            const labelText = TextStyle(
-              fontSize: 12,
-              color: _C.text2,
-              height: 1.3,
-            );
-            final text = Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: labelText,
-            );
-            if (onEditLabel == null) return text;
-            return Align(
-              alignment: Alignment.centerLeft,
-              child: _HoverUnderline(
-                tooltip: labelTooltip ?? label,
-                onTap: onEditLabel,
-                child: text,
-              ),
-            );
-          }),
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12, color: _C.text2, height: 1.3),
+          ),
         ),
         const SizedBox(width: 8),
         // Datum selbst ist ebenfalls Tap-Ziel — nur der 15-px-Stift
@@ -1369,7 +1424,7 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
           icon: Icons.edit_outlined,
           size: 15,
           color: _C.muted,
-          tooltip: '${_tr('Bearbeiten', 'Edit')}: $label',
+          tooltip: editTooltip ?? '${_tr('Bearbeiten', 'Edit')}: $label',
           onTap: onEdit,
         ),
       ],
@@ -1832,7 +1887,35 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
             onEdit: () =>
                 widget.actions.editDriverLanguage(onboarding['language']),
           ),
+          _inGermanySinceField(onboarding),
         ],
+      ),
+    );
+  }
+
+  /// „In Deutschland seit" — erstes Einreisedatum
+  /// (`onboarding.firstDayInGermany`, Bestandsfeld).
+  ///
+  /// Bei einem **Nicht-EU-Führerschein** gilt die Fahrerlaubnis in
+  /// Deutschland nur 6 Monate ab Einreise. Beim Speichern wird deshalb —
+  /// exakt wie in der alten Detailansicht — zusätzlich
+  /// `onboarding.licenseExpiry` auf Einreise + 6 Monate gesetzt, damit die
+  /// Ablauf-Benachrichtigungen den abgeleiteten Wert sehen. Bei einem
+  /// EU-Führerschein bleibt `licenseExpiry` unangetastet.
+  _FieldSpec _inGermanySinceField(Map<String, dynamic> onboarding) {
+    final label = _tr('In Deutschland seit', 'In Germany since');
+    final firstDay = parseFlexibleDate(onboarding['firstDayInGermany']);
+    final isNonEu = _normalizeLicense(onboarding) == 'non_eu';
+
+    return _FieldSpec(
+      label: label,
+      value: _fmtDate(firstDay),
+      onEdit: () => widget.actions.pickOnboardingDate(
+        fieldKey: 'firstDayInGermany',
+        current: _str(onboarding['firstDayInGermany']),
+        extraFields: isNonEu
+            ? (picked) => {'licenseExpiry': _fmtDate(_addMonths(picked, 6))}
+            : null,
       ),
     );
   }

@@ -2748,7 +2748,9 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
       for (final row in sheet.rows) {
         buf.writeln(row.map(cellText).join('\t'));
       }
-      parsed = _parseTabularWaveplan(buf.toString());
+      // Same autodetection as the paste path, so an XLSX in the newer
+      // 5-column "ASSIGN DA" layout imports too.
+      parsed = _parsePastedWaveplan(buf.toString());
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2810,6 +2812,14 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
     //   WAVE ⇥ routeCode ⇥ Stage ⇥ DA NAME ⇥ DSP ⇥ Waiting Area
     // Try that first — rows without tabs fall through untouched, so the
     // classic line-per-field format below keeps working.
+    // NEW Amazon dispatch export — 5 fields per route:
+    //   dispatchTime ⇥ routeCode ⇥ DispatchArea ⇥ Waiting Area Spur ⇥ ASSIGN DA
+    // Tried BEFORE the tabular parser: its rows also start with a time,
+    // but column 4 carries the lane (`links`/`rechts`) instead of the DA
+    // name, so the tabular parser would mis-read the TID.
+    final assignDa = _parseAssignDaWaveplan(input);
+    if (assignDa.isNotEmpty) return assignDa;
+
     final tabular = _parseTabularWaveplan(input);
     if (tabular.isNotEmpty) return tabular;
 
@@ -2888,6 +2898,209 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
         ),
       );
       i += 9;
+    }
+    return out;
+  }
+
+  // ─── New Amazon "ASSIGN DA" export (5 fields per route) ───────────────
+
+  /// Header labels of the new Amazon dispatch export. Used both to skip
+  /// the header block and to recognise the format up front.
+  static const _assignDaHeaderTokens = <String>{
+    'dispatchtime',
+    'routecode',
+    'dispatcharea',
+    'waiting area spur',
+    'waitingareaspur',
+    'assign da',
+    'assignda',
+  };
+
+  /// `links` / `rechts` (and their English spellings) → the canonical
+  /// lane value the editor, the public plan and the driver app expect.
+  /// Returns `null` when [raw] isn't a lane token at all.
+  static String? _normaliseSpur(String raw) {
+    final s = raw.trim().toLowerCase();
+    if (s.isEmpty) return null;
+    if (s == 'links' || s == 'left' || s.contains('arrow_left')) return 'links';
+    if (s == 'rechts' || s == 'right' || s.contains('arrow_right')) {
+      return 'rechts';
+    }
+    return null;
+  }
+
+  /// Extracts the transporter ID from an `ASSIGN DA` cell shaped
+  /// `<TID> / <DSP> / <TID>`. Tolerates a single value without slashes,
+  /// identical or differing outer TIDs and stray whitespace. Returns
+  /// `(tid, dsp)`; both may be `null`.
+  static ({String? tid, String? dsp}) _splitAssignDa(String raw) {
+    final parts = raw
+        .split('/')
+        .map((p) => p.trim())
+        .where((p) => p.isNotEmpty)
+        .toList();
+    if (parts.isEmpty) return (tid: null, dsp: null);
+    // Amazon TIDs are long alphanumeric all-caps tokens; the DSP code in
+    // the middle is a short abbreviation (AION, BOYO, …).
+    final tidRe = RegExp(r'^[A-Z0-9]{8,}$');
+    String? tid;
+    for (final p in parts) {
+      final up = p.toUpperCase();
+      if (tidRe.hasMatch(up)) {
+        tid = up;
+        break;
+      }
+    }
+    tid ??= parts.first.toUpperCase();
+    if (tid.isEmpty) tid = null;
+    String? dsp;
+    for (final p in parts) {
+      final up = p.toUpperCase();
+      if (up != tid && up.isNotEmpty) {
+        dsp = p.trim();
+        break;
+      }
+    }
+    return (tid: tid, dsp: dsp);
+  }
+
+  /// Parses the newer Amazon dispatch export with **5 fields per route**:
+  ///   1. dispatchTime         (`11:00:00`)
+  ///   2. routeCode            (`CA_A49`)
+  ///   3. DispatchArea         (`STG-B.6` — letter = area, number = slot)
+  ///   4. Waiting Area Spur    (`links` / `rechts`)
+  ///   5. ASSIGN DA            (`<TID> / <DSP> / <TID>` or just `<TID>`)
+  ///
+  /// Both shapes of the same export are accepted:
+  ///   • **column-wise** — one route per line, tab-separated,
+  ///   • **line-wise** — 5 consecutive lines per route (how the values
+  ///     arrive when copied straight out of the web tool).
+  ///
+  /// Tolerates a leading header block, blank lines and 12-hour times.
+  /// Returns an empty list when the paste isn't this format, so the
+  /// caller can fall through to the other parsers.
+  List<WaveplanRoute> _parseAssignDaWaveplan(String input) {
+    final timeRe = RegExp(
+      r'^\d{1,2}:\d{2}(?::\d{2})?\s*(AM|PM)?$',
+      caseSensitive: false,
+    );
+
+    WaveplanRoute build({
+      required String time,
+      required String routeCode,
+      required String area,
+      required String spur,
+      required String assignDa,
+    }) {
+      final da = _splitAssignDa(assignDa);
+      return WaveplanRoute(
+        routeCode: routeCode,
+        // This export carries no separate route ID — the route code is
+        // unique within the day, so it doubles as the ID (same as TMGM).
+        routeId: routeCode,
+        dispatchArea: area,
+        waitingAreaSpur: spur,
+        dispatchTime: _normaliseClock(time),
+        shiftEndTime: '',
+        serviceType: '',
+        transporterId: da.tid,
+        assignedDsp: da.dsp,
+      );
+    }
+
+    // ── 1) Column-wise (tab-separated) ─────────────────────────────────
+    final rows = <WaveplanRoute>[];
+    for (final line in input.split('\n')) {
+      final cells = line.split('\t').map((c) => c.trim()).toList();
+      if (cells.length < 4) continue;
+      if (!timeRe.hasMatch(cells[0])) continue; // header / junk row
+      if (cells[1].isEmpty) continue; // no route code
+      final spur = _normaliseSpur(cells[3]);
+      // The lane in column 4 is what separates this export from the
+      // TMGM tabular one (which carries the DA name there).
+      if (spur == null) continue;
+      rows.add(
+        build(
+          time: cells[0],
+          routeCode: cells[1],
+          area: cells[2],
+          spur: spur,
+          assignDa: cells.length > 4 ? cells[4] : '',
+        ),
+      );
+    }
+    if (rows.isNotEmpty) return rows;
+
+    // ── 2) Line-wise (5 lines per route) ───────────────────────────────
+    final raw = input
+        .split(RegExp(r'[\n\t]'))
+        .map((l) => l.trim())
+        .where((l) => l.isNotEmpty)
+        .toList();
+    // Only the two labels unique to THIS export count as positive
+    // identification — `routeCode` alone also appears in the TMGM header.
+    const distinctiveHeaders = <String>{
+      'waiting area spur',
+      'waitingareaspur',
+      'assign da',
+      'assignda',
+    };
+    var sawHeader = false;
+    final lines = <String>[];
+    for (final l in raw) {
+      final key = l.toLowerCase();
+      if (_assignDaHeaderTokens.contains(key)) {
+        if (distinctiveHeaders.contains(key)) sawHeader = true;
+        continue;
+      }
+      lines.add(l);
+    }
+
+    final out = <WaveplanRoute>[];
+    var i = 0;
+    while (i + 3 < lines.length) {
+      // Anchor: a time followed by a NON-time line. The classic 9-field
+      // export has two times in a row, so it can never match here.
+      if (!timeRe.hasMatch(lines[i]) || timeRe.hasMatch(lines[i + 1])) {
+        i += 1;
+        continue;
+      }
+      final spur = _normaliseSpur(lines[i + 3]);
+      if (spur != null) {
+        // An unassigned route has no ASSIGN DA cell at all, so the next
+        // line is already the following record's dispatch time — never
+        // swallow it as a transporter ID.
+        final daLine = i + 4 < lines.length ? lines[i + 4] : '';
+        final hasDa = daLine.isNotEmpty && !timeRe.hasMatch(daLine);
+        out.add(
+          build(
+            time: lines[i],
+            routeCode: lines[i + 1],
+            area: lines[i + 2],
+            spur: spur,
+            assignDa: hasDa ? daLine : '',
+          ),
+        );
+        i += hasDa ? 5 : 4;
+        continue;
+      }
+      // Lane column missing entirely — only accepted when the header
+      // block positively identified this export, so we never steal a
+      // paste that belongs to one of the other parsers.
+      if (sawHeader && lines[i + 3].contains('/')) {
+        out.add(
+          build(
+            time: lines[i],
+            routeCode: lines[i + 1],
+            area: lines[i + 2],
+            spur: '',
+            assignDa: lines[i + 3],
+          ),
+        );
+        i += 4;
+        continue;
+      }
+      i += 1;
     }
     return out;
   }

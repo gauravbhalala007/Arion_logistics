@@ -12903,10 +12903,12 @@ class AppLocalizations {
     // Paste-wave dialog
     'waveplan_paste_dialog_title': 'Paste Waveplan',
     'waveplan_paste_dialog_intro':
-        'Copy the table from Excel or a website and paste here. Expected: '
-        '9 fields per route in this order — dispatchTime, shiftEnd, '
-        'routeCode, routeId, dispatchArea, spur, "TID / DSP / TID", DSP, '
-        'serviceType.',
+        'Copy the table from Excel or a website and paste here. The format '
+        'is detected automatically. Supported: 9 fields per route '
+        '(dispatchTime, shiftEnd, routeCode, routeId, dispatchArea, spur, '
+        '"TID / DSP / TID", DSP, serviceType) or the newer 5 fields '
+        '(dispatchTime, routeCode, DispatchArea, Waiting Area Spur, '
+        'ASSIGN DA).',
     // Clear dialog
     'waveplan_clear_dialog_title': 'Clear Waveplan?',
     'waveplan_clear_dialog_body':
@@ -13241,9 +13243,11 @@ class AppLocalizations {
       'waveplan_paste_dialog_title': 'Waveplan einfügen',
       'waveplan_paste_dialog_intro':
           'Tabelle aus Excel oder Webseite kopieren und hier einfügen. '
-          'Erwartet: 9 Felder pro Route in dieser Reihenfolge — '
-          'dispatchTime, shiftEnd, routeCode, routeId, dispatchArea, spur, '
-          '"TID / DSP / TID", DSP, serviceType.',
+          'Das Format wird automatisch erkannt. Unterstützt: 9 Felder pro '
+          'Route (dispatchTime, shiftEnd, routeCode, routeId, dispatchArea, '
+          'spur, "TID / DSP / TID", DSP, serviceType) oder die neuen '
+          '5 Felder (dispatchTime, routeCode, DispatchArea, '
+          'Waiting Area Spur, ASSIGN DA).',
       'waveplan_clear_dialog_title': 'Waveplan leeren?',
       'waveplan_clear_dialog_body':
           'Alle Routen und Zuweisungen werden gelöscht. Diese Aktion kann '
