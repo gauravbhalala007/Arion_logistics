@@ -1,0 +1,79 @@
+name: Deploy Firestore/Storage Rules
+
+# Bewusst NUR manuell startbar.
+# Grund: Es existieren zwei divergierende Rules-Saetze im Repo
+# (firebase/firestore.rules mit 28 match-Bloecken vs.
+#  flutter_app/kpi_admin/firestore.rules mit 20). Solange nicht geklaert ist,
+# welcher Stand live ist, waere ein automatischer Deploy ein Sicherheitsrisiko:
+# er koennte Zugriffsrechte still erweitern oder Nutzer aussperren.
+# Siehe DEPLOYMENT.md, Abschnitt "Offener Punkt: Firestore-Rules".
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Nur pruefen oder wirklich deployen?'
+        required: true
+        default: 'dry-run'
+        type: choice
+        options:
+          - dry-run
+          - deploy
+      targets:
+        description: 'Was deployen?'
+        required: true
+        default: 'firestore:rules'
+        type: choice
+        options:
+          - firestore:rules
+          - firestore:rules,firestore:indexes
+          - storage
+          - firestore:rules,firestore:indexes,storage
+
+concurrency:
+  group: rules-deploy
+  cancel-in-progress: false
+
+jobs:
+  rules:
+    name: ${{ inputs.mode }} — ${{ inputs.targets }}
+    runs-on: ubuntu-latest
+    # Optional: In den Repo-Settings eine Environment "production" mit
+    # Required Reviewers anlegen, dann muss ein Deploy bestaetigt werden.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Service-Account bereitstellen
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$SA" ]; then
+            echo "::error::Secret FIREBASE_SERVICE_ACCOUNT fehlt."
+            exit 1
+          fi
+          printf '%s' "$SA" > "$RUNNER_TEMP/sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
+
+      - name: Rules pruefen (dry-run)
+        if: inputs.mode == 'dry-run'
+        working-directory: firebase
+        run: |
+          npx -y firebase-tools@latest deploy \
+            --only "${{ inputs.targets }}" \
+            --project gaurav-arion-001-3d94a \
+            --dry-run \
+            --non-interactive
+
+      - name: Rules deployen
+        if: inputs.mode == 'deploy'
+        working-directory: firebase
+        run: |
+          npx -y firebase-tools@latest deploy \
+            --only "${{ inputs.targets }}" \
+            --project gaurav-arion-001-3d94a \
+            --non-interactive \
+            --force
+
+      - name: Service-Account entfernen
+        if: always()
+        run: rm -f "$RUNNER_TEMP/sa.json"

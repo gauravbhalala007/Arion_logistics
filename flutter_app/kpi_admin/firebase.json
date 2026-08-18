@@ -20,12 +20,6 @@
       }
     }
   },
-  "firestore": {
-    "database": "(default)",
-    "location": "nam5",
-    "rules": "firestore.rules",
-    "indexes": "firestore.indexes.json"
-  },
   "hosting": {
     "public": "build/web",
     "ignore": [
@@ -94,8 +88,5 @@
         "destination": "/index.html"
       }
     ]
-  },
-  "storage": {
-    "rules": "storage.rules"
   }
 }

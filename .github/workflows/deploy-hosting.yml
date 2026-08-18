@@ -1,0 +1,127 @@
+name: Deploy Web App
+
+# main            -> Live-Deploy auf die echte URL
+# jeder Branch    -> Preview-Channel mit eigener Test-URL (laeuft nach 7 Tagen ab)
+# workflow_dispatch -> manueller Start aus der GitHub-Oberflaeche
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'flutter_app/kpi_admin/**'
+      - '.github/workflows/deploy-hosting.yml'
+  pull_request:
+    paths:
+      - 'flutter_app/kpi_admin/**'
+  workflow_dispatch:
+
+# Nie zwei Deploys desselben Branches gleichzeitig -> kein Race, kein
+# halb ueberschriebener Live-Stand.
+concurrency:
+  group: hosting-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FIREBASE_PROJECT_ID: gaurav-arion-001-3d94a
+  APP_DIR: flutter_app/kpi_admin
+
+jobs:
+  build-and-deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Secret vorhanden?
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$SA" ]; then
+            echo "::error::Das GitHub-Secret FIREBASE_SERVICE_ACCOUNT fehlt."
+            echo "::error::Anleitung: siehe DEPLOYMENT.md, Abschnitt 'Einmalige Einrichtung'."
+            exit 1
+          fi
+
+      - name: Flutter-Version aus .fvmrc lesen
+        id: fvm
+        run: |
+          VERSION=$(jq -r '.flutter' "$APP_DIR/.fvmrc")
+          echo "Flutter-Version laut .fvmrc: $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Flutter einrichten
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ steps.fvm.outputs.version }}
+          channel: stable
+          cache: true
+
+      - name: Abhaengigkeiten holen
+        working-directory: ${{ env.APP_DIR }}
+        run: flutter pub get
+
+      # Nur Bericht, blockiert den Deploy nicht. Der Build unten ist die
+      # eigentliche Sicherung: kompiliert er nicht, wird nichts deployed.
+      - name: Statische Analyse
+        working-directory: ${{ env.APP_DIR }}
+        continue-on-error: true
+        run: flutter analyze --no-fatal-infos
+
+      - name: Web-Build (Release)
+        working-directory: ${{ env.APP_DIR }}
+        run: flutter build web --release
+
+      # --- Live: nur von main ---
+      - name: Live-Deploy (main)
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: ${{ env.FIREBASE_PROJECT_ID }}
+          entryPoint: ${{ env.APP_DIR }}
+          channelId: live
+
+      # --- Preview: alle anderen Branches ---
+      - name: Channel-ID aus Branchnamen bilden
+        if: github.ref != 'refs/heads/main' && github.event_name != 'pull_request'
+        id: channel
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          # Firebase-Channel-IDs erlauben nur [a-z0-9-]; Slashes aus
+          # Branchnamen wie claude/xyz muessen ersetzt werden.
+          ID=$(printf '%s' "$REF_NAME" \
+                | tr '[:upper:]' '[:lower:]' \
+                | sed 's/[^a-z0-9-]/-/g' \
+                | cut -c1-40 \
+                | sed 's/-*$//')
+          echo "Preview-Channel: $ID"
+          echo "id=$ID" >> "$GITHUB_OUTPUT"
+
+      - name: Preview-Deploy (Branch)
+        if: github.ref != 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: ${{ env.FIREBASE_PROJECT_ID }}
+          entryPoint: ${{ env.APP_DIR }}
+          channelId: ${{ steps.channel.outputs.id }}
+          expires: 7d
+
+      # --- Preview: Pull Requests (kommentiert die URL in den PR) ---
+      - name: Preview-Deploy (Pull Request)
+        if: github.event_name == 'pull_request'
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: ${{ env.FIREBASE_PROJECT_ID }}
+          entryPoint: ${{ env.APP_DIR }}
+          expires: 7d
