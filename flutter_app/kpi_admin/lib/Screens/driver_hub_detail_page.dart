@@ -1230,9 +1230,12 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
       ));
     }
 
+    // Führerschein-Zeilen als eigener Block mit eigener Überschrift.
+    final licenseRows = <Widget>[];
+
     // Führerschein-Art (`onboarding.licenseType`) als eigene Zeile — der
     // Wert ist der Einstieg in den Bestands-Editor `_adminEditLicenseType`.
-    rows.add(_valueRow(
+    licenseRows.add(_valueRow(
       label: _tr('Führerschein-Art', 'Licence type'),
       value: isNonEu ? _tr('Nicht-EU', 'Non-EU') : 'EU',
       onEdit: () => widget.actions.editLicenseType(licenseType),
@@ -1244,7 +1247,7 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
       // Einreise — das Datum wird deshalb aus `firstDayInGermany` gerechnet
       // (und beim Speichern zusätzlich in `licenseExpiry` gespiegelt, damit
       // die Ablauf-Benachrichtigungen es sehen).
-      rows.add(_expiryRow(
+      licenseRows.add(_expiryRow(
         label: _tr('Führerschein gültig bis', 'Licence valid until'),
         date: firstDay == null ? null : _addMonths(firstDay, 6),
         warnMonths: 2,
@@ -1260,7 +1263,7 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
           'Edit entry date (6 months validity)',
         ),
       ));
-      rows.add(_valueRow(
+      licenseRows.add(_valueRow(
         label: _tr('In Deutschland seit', 'In Germany since'),
         value: firstDay == null ? '—' : _fmtDate(firstDay),
         muted: firstDay == null,
@@ -1273,7 +1276,7 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
         ),
       ));
     } else {
-      rows.add(_expiryRow(
+      licenseRows.add(_expiryRow(
         label: _tr('Führerschein gültig bis', 'Licence valid until'),
         date: parseFlexibleDate(onboarding['licenseExpiry']),
         noExpiry: onboarding['licenseNoExpiry'] == true,
@@ -1288,14 +1291,26 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _blockTitle(
-          isVisa
-              ? _tr('Ablaufdaten · Working Visa', 'Expiry dates · working visa')
-              : _tr('Ablaufdaten', 'Expiry dates'),
-        ),
-        for (var i = 0; i < rows.length; i++) ...[
+        if (rows.isNotEmpty) ...[
+          _blockTitle(
+            isVisa
+                ? _tr(
+                    'Ablaufdaten · Working Visa',
+                    'Expiry dates · working visa',
+                  )
+                : _tr('Ablaufdaten', 'Expiry dates'),
+          ),
+          for (var i = 0; i < rows.length; i++) ...[
+            if (i > 0) const SizedBox(height: 6),
+            rows[i],
+          ],
+          const SizedBox(height: 14),
+        ],
+        // Eigene Überschrift für den Führerschein-Block.
+        _blockTitle(_tr('Führerschein', 'Driving licence')),
+        for (var i = 0; i < licenseRows.length; i++) ...[
           if (i > 0) const SizedBox(height: 6),
-          rows[i],
+          licenseRows[i],
         ],
       ],
     );
