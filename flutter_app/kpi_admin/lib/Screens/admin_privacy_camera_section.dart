@@ -2,12 +2,19 @@
 //
 // Admin-Abschnitt der DA Academy für „Kameras im Fahrzeug – Datenschutz".
 //
-// Zwei Reiter:
-//   NACHWEISE     — je Fahrer: bestätigt / nicht bestätigt / offen, mit
-//                   Datum, Fassung, Prüfsumme, Quiz-Ergebnis und dem
-//                   Vermerk nach Spec §7 bei Verweigerung.
-//   WIDERSPRÜCHE  — Eingang, Grund (falls angegeben), Rücknahme, und der
-//                   Button „Als bearbeitet markieren" (setzt processedAt).
+// Zeigt je Fahrer den Nachweis der Kenntnisnahme: bestätigt / nicht
+// bestätigt / offen, mit Datum, Fassung, Prüfsumme, gelesener Sprache
+// und Lesedauer — und bei Verweigerung den Vermerk nach Spec §7.
+//
+// KEIN QUIZ: Der Kurs hat keine Testfragen mehr, entsprechend gibt es
+// keine Quiz-Spalte. Belegt wird die Kenntnisnahme über die
+// durchlaufenen Module, das Scroll-Gate im Volltext und die Lesedauer.
+//
+// KEINE WIDERSPRUCHS-VERWALTUNG: Der In-App-Widerspruch wurde auf
+// Kundenwunsch entfernt, deshalb gibt es hier keinen Widersprüche-Reiter
+// mehr. Die gesetzliche Information über das Widerspruchsrecht bleibt in
+// den Volltext-Dokumenten und im Rechte-Modul erhalten; die Ausübung
+// läuft über die dort genannte Kontaktadresse.
 //
 // WARUM EIGENER ABSCHNITT statt eines Eintrags in `kAcademyTrainings`:
 // Die generische Schulungskarte rechnet mit `passedAt` bzw. einer
@@ -58,35 +65,13 @@ class _AckRow {
   }
 }
 
-class _ObjectionRow {
-  final String transporterId;
-  final String name;
-  final PrivacyCameraObjection objection;
-
-  const _ObjectionRow({
-    required this.transporterId,
-    required this.name,
-    required this.objection,
-  });
-}
-
 class _SectionData {
   final List<_AckRow> ackRows;
-  final List<_ObjectionRow> objectionRows;
   final PrivacyCourseBundle bundle;
 
-  const _SectionData({
-    required this.ackRows,
-    required this.objectionRows,
-    required this.bundle,
-  });
+  const _SectionData({required this.ackRows, required this.bundle});
 
   int count(_AckStatus s) => ackRows.where((r) => r.status == s).length;
-
-  /// Offene Widersprüche = aktiv und noch nicht als bearbeitet vermerkt.
-  int get openObjections => objectionRows
-      .where((r) => r.objection.isActive && r.objection.processedAt == null)
-      .length;
 }
 
 class AdminPrivacyCameraSection extends StatefulWidget {
@@ -117,9 +102,7 @@ class _AdminPrivacyCameraSectionState extends State<AdminPrivacyCameraSection> {
       PrivacyCameraAdminRepository(dspUid: widget.dspUid);
 
   Future<_SectionData>? _future;
-  int _tab = 0;
   String _query = '';
-  bool _busy = false;
 
   String get _lang => widget.de ? 'de' : 'en';
 
@@ -141,12 +124,12 @@ class _AdminPrivacyCameraSectionState extends State<AdminPrivacyCameraSection> {
   void _reload() => setState(() => _future = _load());
 
   Future<_SectionData> _load() async {
-    final bundle = await PrivacyCourseBundle.load(
-      kPrivacyCourseFallbackLanguage,
-    );
+    // Die Admin-Ansicht vergleicht gegen die DEUTSCHE Fassung — sie ist
+    // die verbindliche, unabhängig davon, in welcher Sprache der Fahrer
+    // den Kurs gelesen hat.
+    final bundle = await PrivacyCourseBundle.load(kPrivacyBindingLanguage);
     final acks = await _repo.loadAcks();
-    final objections = await _repo.loadObjections();
-    final doc = bundle.primaryDocument;
+    final doc = bundle.bindingDocument;
 
     final ackRows = <_AckRow>[];
     for (final driver in widget.drivers) {
@@ -184,67 +167,7 @@ class _AdminPrivacyCameraSectionState extends State<AdminPrivacyCameraSection> {
       return a.name.toLowerCase().compareTo(b.name.toLowerCase());
     });
 
-    final nameByTid = {
-      for (final r in ackRows) r.transporterId.toUpperCase(): r.name,
-    };
-    final objectionRows = <_ObjectionRow>[];
-    for (final entry in objections.entries) {
-      objectionRows.add(
-        _ObjectionRow(
-          // entry.key ist die Dokument-ID — genau die braucht der
-          // Schreibvorgang für `processedAt`.
-          transporterId: entry.key,
-          name: entry.value.driverName.trim().isNotEmpty
-              ? entry.value.driverName.trim()
-              : (nameByTid[entry.key.toUpperCase()] ?? entry.key),
-          objection: entry.value,
-        ),
-      );
-    }
-    objectionRows.sort((a, b) {
-      // Unbearbeitete aktive Widersprüche zuerst — sie sind die Arbeit.
-      int rank(_ObjectionRow r) {
-        if (r.objection.isActive && r.objection.processedAt == null) return 0;
-        if (r.objection.isActive) return 1;
-        return 2;
-      }
-
-      final byRank = rank(a).compareTo(rank(b));
-      if (byRank != 0) return byRank;
-      return b.objection.createdAt.compareTo(a.objection.createdAt);
-    });
-
-    return _SectionData(
-      ackRows: ackRows,
-      objectionRows: objectionRows,
-      bundle: bundle,
-    );
-  }
-
-  Future<void> _markProcessed(String transporterId) async {
-    setState(() => _busy = true);
-    try {
-      await _repo.markObjectionProcessed(
-        transporterId: transporterId,
-        processedBy: widget.dspUid,
-      );
-      _reload();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            privacyCameraText(
-              _lang,
-              'admin_processed_error',
-              vars: {'error': '$e'},
-            ),
-          ),
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    return _SectionData(ackRows: ackRows, bundle: bundle);
   }
 
   @override
@@ -294,138 +217,55 @@ class _AdminPrivacyCameraSectionState extends State<AdminPrivacyCameraSection> {
   }
 
   Widget _content(_SectionData data) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _header(data),
-        const SizedBox(height: 14),
-        _tabs(data),
-        const SizedBox(height: 14),
-        if (_tab == 0) _acksTab(data) else _objectionsTab(data),
-      ],
-    );
-  }
-
-  Widget _header(_SectionData data) {
-    final doc = data.bundle.primaryDocument;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: const Color(0xFFEAF1FB),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Icon(
-            Icons.photo_camera_outlined,
-            size: 21,
-            color: _kAccent,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                privacyCameraText(_lang, 'admin_title'),
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: _kText,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                privacyCameraText(_lang, 'admin_subtitle'),
-                style: const TextStyle(
-                  fontSize: 13,
-                  height: 1.4,
-                  color: _kSub,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                privacyCameraText(
-                  _lang,
-                  'admin_detail_version',
-                  vars: {
-                    'version': doc.ref.version,
-                    'hash': doc.contentSha256.substring(0, 12),
-                  },
-                ),
-                style: const TextStyle(fontSize: 11.5, color: _kMuted),
-              ),
-            ],
-          ),
-        ),
-        IconButton(
-          onPressed: _busy ? null : _reload,
-          icon: const Icon(Icons.refresh_rounded, size: 20),
-          color: _kMuted,
-          tooltip: privacyCameraText(_lang, 'admin_refresh'),
-        ),
-      ],
-    );
-  }
-
-  Widget _tabs(_SectionData data) {
-    final labels = [
-      '${privacyCameraText(_lang, 'admin_tab_acks')} (${data.ackRows.length})',
-      '${privacyCameraText(_lang, 'admin_tab_objections')} '
-          '(${data.objectionRows.length})',
-    ];
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF1F3F5),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          for (var i = 0; i < labels.length; i++)
-            Expanded(
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(9),
-                  onTap: () => setState(() => _tab = i),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 9),
-                    decoration: BoxDecoration(
-                      color: _tab == i ? Colors.white : Colors.transparent,
-                      borderRadius: BorderRadius.circular(9),
-                      border: _tab == i
-                          ? Border.all(color: _kBorder)
-                          : null,
-                    ),
-                    child: Text(
-                      labels[i],
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        color: _tab == i ? _kText : _kMuted,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  // ── Reiter: Nachweise ─────────────────────────────────────────────
-
-  Widget _acksTab(_SectionData data) {
     final rows = data.ackRows.where((r) => r.matches(_query)).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        _header(data),
+        // Solange das Modul für Fahrer gesperrt ist, sagt die Ansicht das
+        // offen — sonst wirkt eine Liste voller „Offen" wie ein Rückstand.
+        if (!kPrivacyCameraDriverEnabled) ...[
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(11),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF3E0),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFFFD9A0)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.lock_outline_rounded,
+                  size: 17,
+                  color: Color(0xFF9A5B00),
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Text(
+                    widget.de
+                        ? 'Dieses Modul ist für Fahrer noch nicht '
+                              'freigeschaltet. In der DA Academy erscheint es '
+                              'als „Kommt bald"; es entstehen daher noch keine '
+                              'neuen Nachweise.'
+                        : 'This module has not been released to drivers yet. '
+                              'It shows as "Coming soon" in the DA Academy, so '
+                              'no new records are being created.',
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      height: 1.45,
+                      color: Color(0xFF9A5B00),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        const SizedBox(height: 14),
         Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -436,23 +276,21 @@ class _AdminPrivacyCameraSectionState extends State<AdminPrivacyCameraSection> {
               const Color(0xFF16704F),
               const Color(0xFFE4F5EC),
             ),
-            _stat(
-              privacyCameraText(_lang, 'admin_count_declined'),
-              data.count(_AckStatus.declined),
-              _kSub,
-              const Color(0xFFF1F3F5),
-            ),
+            // „Nicht bestätigt" kann nur noch aus Bestandsdaten stammen —
+            // der Fahrer-Flow erzeugt diesen Ausgang nicht mehr. Deshalb
+            // nur einblenden, wenn es solche Datensätze überhaupt gibt.
+            if (data.count(_AckStatus.declined) > 0)
+              _stat(
+                privacyCameraText(_lang, 'admin_count_declined'),
+                data.count(_AckStatus.declined),
+                _kSub,
+                const Color(0xFFF1F3F5),
+              ),
             _stat(
               privacyCameraText(_lang, 'admin_count_open'),
               data.count(_AckStatus.open) + data.count(_AckStatus.outdated),
               const Color(0xFF9A5B00),
               const Color(0xFFFFF3E0),
-            ),
-            _stat(
-              privacyCameraText(_lang, 'admin_count_objections'),
-              data.openObjections,
-              const Color(0xFF14538C),
-              const Color(0xFFEAF1FB),
             ),
           ],
         ),
@@ -495,6 +333,67 @@ class _AdminPrivacyCameraSectionState extends State<AdminPrivacyCameraSection> {
           )
         else
           for (final row in rows) _ackTile(row, data),
+      ],
+    );
+  }
+
+  Widget _header(_SectionData data) {
+    final doc = data.bundle.bindingDocument;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: const Color(0xFFEAF1FB),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Icon(
+            Icons.photo_camera_outlined,
+            size: 21,
+            color: _kAccent,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                privacyCameraText(_lang, 'admin_title'),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: _kText,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                privacyCameraText(_lang, 'admin_subtitle'),
+                style: const TextStyle(fontSize: 13, height: 1.4, color: _kSub),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                privacyCameraText(
+                  _lang,
+                  'admin_detail_version',
+                  vars: {
+                    'version': doc.ref.version,
+                    'hash': doc.contentSha256.substring(0, 12),
+                  },
+                ),
+                style: const TextStyle(fontSize: 11.5, color: _kMuted),
+              ),
+            ],
+          ),
+        ),
+        IconButton(
+          onPressed: _reload,
+          icon: const Icon(Icons.refresh_rounded, size: 20),
+          color: _kMuted,
+          tooltip: privacyCameraText(_lang, 'admin_refresh'),
+        ),
       ],
     );
   }
@@ -571,15 +470,12 @@ class _AdminPrivacyCameraSectionState extends State<AdminPrivacyCameraSection> {
           },
         ),
       );
-      if (ack.quizTotal > 0) {
+      if (ack.statementLocale.isNotEmpty) {
         details.add(
           privacyCameraText(
             _lang,
-            'admin_detail_quiz',
-            vars: {
-              'correct': '${ack.quizCorrect}',
-              'total': '${ack.quizTotal}',
-            },
+            'admin_detail_language',
+            vars: {'lang': ack.statementLocale.toUpperCase()},
           ),
         );
       }
@@ -663,7 +559,11 @@ class _AdminPrivacyCameraSectionState extends State<AdminPrivacyCameraSection> {
             const SizedBox(height: 8),
             Text(
               details.join(' · '),
-              style: const TextStyle(fontSize: 11.5, height: 1.45, color: _kMuted),
+              style: const TextStyle(
+                fontSize: 11.5,
+                height: 1.45,
+                color: _kMuted,
+              ),
             ),
           ],
           // Vermerk bei Verweigerung — verbindlicher Wortlaut aus Spec §7.
@@ -690,7 +590,7 @@ class _AdminPrivacyCameraSectionState extends State<AdminPrivacyCameraSection> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    data.bundle.course.acknowledgement.declineNoteFor(
+                    data.bundle.bindingAck.declineNoteFor(
                       _fmt(ack.occurredAt),
                     ),
                     style: const TextStyle(
@@ -700,174 +600,6 @@ class _AdminPrivacyCameraSectionState extends State<AdminPrivacyCameraSection> {
                     ),
                   ),
                 ],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  // ── Reiter: Widersprüche ──────────────────────────────────────────
-
-  Widget _objectionsTab(_SectionData data) {
-    if (data.objectionRows.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 22),
-        child: Center(
-          child: Text(
-            privacyCameraText(_lang, 'admin_empty_objections'),
-            style: const TextStyle(color: _kMuted, fontSize: 13.5),
-          ),
-        ),
-      );
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (final row in data.objectionRows) _objectionTile(row),
-      ],
-    );
-  }
-
-  Widget _objectionTile(_ObjectionRow row) {
-    final o = row.objection;
-    final unprocessed = o.isActive && o.processedAt == null;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(13),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: unprocessed ? const Color(0xFFB9D4F0) : _kBorder,
-          width: unprocessed ? 1.4 : 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      row.name,
-                      style: const TextStyle(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w800,
-                        color: _kText,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      row.transporterId,
-                      style: const TextStyle(fontSize: 12, color: _kMuted),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ),
-                decoration: BoxDecoration(
-                  color: unprocessed
-                      ? const Color(0xFFEAF1FB)
-                      : const Color(0xFFF1F3F5),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  o.isActive
-                      ? (o.processedAt != null
-                            ? privacyCameraText(
-                                _lang,
-                                'admin_processed',
-                                vars: {'date': _fmt(o.processedAt!)},
-                              )
-                            : privacyCameraText(_lang, 'admin_unprocessed'))
-                      : privacyCameraText(
-                          _lang,
-                          'admin_withdrawn',
-                          vars: {
-                            'date': o.withdrawnAt == null
-                                ? '-'
-                                : _fmt(o.withdrawnAt!),
-                          },
-                        ),
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w800,
-                    color: unprocessed ? const Color(0xFF14538C) : _kMuted,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            privacyCameraText(
-              _lang,
-              'admin_objection_since',
-              vars: {'date': _fmt(o.createdAt)},
-            ),
-            style: const TextStyle(fontSize: 12, color: _kMuted),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(9),
-              border: Border.all(color: _kBorder),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  o.statement,
-                  style: const TextStyle(
-                    fontSize: 12.5,
-                    height: 1.45,
-                    color: _kSub,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '${privacyCameraText(_lang, 'admin_reason')}: '
-                  '${o.reason ?? privacyCameraText(_lang, 'admin_no_reason')}',
-                  style: const TextStyle(fontSize: 12, color: _kMuted),
-                ),
-              ],
-            ),
-          ),
-          if (unprocessed) ...[
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              height: 42,
-              child: FilledButton.icon(
-                onPressed: _busy ? null : () => _markProcessed(row.transporterId),
-                icon: const Icon(Icons.task_alt_rounded, size: 18),
-                label: Text(privacyCameraText(_lang, 'admin_mark_processed')),
-                style: FilledButton.styleFrom(
-                  backgroundColor: _kAccent,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(11),
-                  ),
-                  textStyle: const TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
               ),
             ),
           ],

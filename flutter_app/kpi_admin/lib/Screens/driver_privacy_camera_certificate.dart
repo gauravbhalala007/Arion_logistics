@@ -20,6 +20,9 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../data/privacy_camera/privacy_camera_content.dart'
+    show kPrivacyBindingLanguage;
+
 const PdfColor _certGrey = PdfColor.fromInt(0xFF6B7280);
 const PdfColor _certDark = PdfColor.fromInt(0xFF111827);
 const PdfColor _certAccent = PdfColor.fromInt(0xFF2A5FB0);
@@ -252,8 +255,13 @@ pw.Widget _certLegalBox(String text) => pw.Container(
   ),
 );
 
-/// Unterschriftenzeile. [sig] ist optional — die Unterschrift ist nach
-/// Spec §7 freiwillig; ohne sie steht dort ein Vermerk statt eines Bildes.
+/// Unterschriftenzeile.
+///
+/// Die Unterschrift ist im Fahrer-Flow VERPFLICHTEND — ohne sie lässt
+/// sich nicht bestätigen, es entsteht also auch keine Bescheinigung.
+/// [sig] bleibt trotzdem nullable: Sollte der PNG-Export einmal
+/// fehlschlagen, wird die Bescheinigung lieber mit einem sachlichen
+/// Vermerk erstellt als gar nicht.
 pw.Widget _certSignatures({
   required pw.MemoryImage? sig,
   required String leftText,
@@ -296,7 +304,7 @@ pw.Widget _certSignatures({
                 ? pw.Text(
                     _pdfSafe(
                       'Kenntnisnahme in der App bestätigt\n'
-                      '(ohne Unterschrift - freiwillig)',
+                      '(Unterschriftsbild nicht verfügbar)',
                     ),
                     style: const pw.TextStyle(fontSize: 8, color: _certGrey),
                   )
@@ -347,8 +355,15 @@ Future<Uint8List> buildPrivacyCameraCertificatePdf({
   required String documentVersion,
   required String contentSha256,
   required List<String> moduleTitles,
+  // Verbindlicher deutscher Wortlaut (Spec §7) — steht IMMER auf der
+  // Bescheinigung, unabhängig von der Sprache des Fahrers.
   required String statementShown,
   required String clarification,
+  // Zusätzlich die gelesene Übersetzung, falls der Fahrer die App nicht
+  // auf Deutsch nutzt. Ergänzt den deutschen Text, ersetzt ihn nie.
+  String? statementLocalized,
+  String? clarificationLocalized,
+  String languageCode = kPrivacyBindingLanguage,
 }) async {
   final doc = pw.Document();
   final sigImage = signaturePng == null ? null : pw.MemoryImage(signaturePng);
@@ -390,10 +405,13 @@ Future<Uint8List> buildPrivacyCameraCertificatePdf({
       pw.SizedBox(height: 5),
       _certTopicList(moduleTitles),
       pw.SizedBox(height: 11),
-      // Verbindlicher Wortlaut aus Spec §7 — unverändert übernommen.
+      // Verbindlicher Wortlaut aus Spec §7 — unverändert übernommen,
+      // in jeder Sprachfassung auf Deutsch. Die gelesene Übersetzung
+      // steht ergänzend darunter.
       _certLegalBox(
         '$statementShown\n\n'
         '$clarification\n\n'
+        '${(statementLocalized ?? '').isEmpty ? '' : '--- Übersetzung (${languageCode.toUpperCase()}) ---\n$statementLocalized\n\n${clarificationLocalized ?? ''}\n\n'}'
         'Diese Bescheinigung belegt ausschließlich die Aushändigung und '
         'Kenntnisnahme der genannten Datenschutzerklärung. Sie ist weder ein '
         'Prüfungs- oder Schulungszertifikat noch eine Einwilligung in die '

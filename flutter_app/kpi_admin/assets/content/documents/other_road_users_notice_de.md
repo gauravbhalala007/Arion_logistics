@@ -14,10 +14,10 @@ Sie können unseren Datenschutzbeauftragten unter [E-Mail-Adresse des Datenschut
 
 Wir können folgende Kategorien personenbezogener Daten über Sie verarbeiten:
 
-Bildaufnahmen des Verkehrsunfalls, einschließlich Metadaten (z. B. Datum, Uhrzeit und Ort der Aufnahme); und
+Bildaufnahmen des Verkehrsunfalls ohne Ton, einschließlich Metadaten (z. B. Datum, Uhrzeit und Ort der Aufnahme); und
 
 am Unfallort erhobene personenbezogene Daten (z. B. Ihr Name, Ihre Adresse, Ihre Kontaktdaten, das Kennzeichen Ihres Fahrzeugs und Versicherungsdaten).
-- Die Fahrzeuge sind mit kamerabasierter Verkehrssicherheitstechnologie und Fahrsicherheitstools ausgestattet. Das System zeichnet nicht dauerhaft auf: Bildaufnahmen entstehen ausschließlich anlassbezogen, wenn ein sicherheitsrelevantes Ereignis oder ein Unfall erkannt wird. Dabei können nach außen gerichtete Kameras beiläufig Bilder anderer Verkehrsteilnehmer erfassen. Gesichter von Personen und Kennzeichen anderer Fahrzeuge werden in diesem Bildmaterial jedoch automatisch unkenntlich gemacht (verpixelt). Unverpixeltes Bildmaterial wird nur dann aufbewahrt und ausgewertet, wenn sich ein Verkehrsunfall ereignet hat oder vergleichbare Umstände vorliegen.
+- Die Fahrzeuge sind mit kamerabasierter Verkehrssicherheitstechnologie und Fahrsicherheitstools ausgestattet. Das System zeichnet nicht dauerhaft auf: Bildaufnahmen entstehen ausschließlich anlassbezogen und ohne Ton, wenn ein sicherheitsrelevantes Ereignis oder ein Unfall erkannt wird. Eine Tonaufnahme findet zu keinem Zeitpunkt statt. Dabei können nach außen gerichtete Kameras beiläufig Bilder anderer Verkehrsteilnehmer erfassen. Gesichter von Personen und Kennzeichen anderer Fahrzeuge werden in diesem Bildmaterial jedoch automatisch unkenntlich gemacht (verpixelt). Unverpixeltes Bildmaterial wird nur dann aufbewahrt und ausgewertet, wenn sich ein Verkehrsunfall ereignet hat oder vergleichbare Umstände vorliegen.
 
 ## 3. Zwecke
 

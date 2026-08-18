@@ -1,0 +1,339 @@
+{
+  "courseId": "privacy_camera",
+  "locale": "hr",
+  "contentVersion": "1.0.0",
+  "title": "Kamere u vozilu – zaštita podataka",
+  "subtitle": "Što se snima, zašto i koja prava imate",
+  "estimatedMinutes": 10,
+  "requiresAcknowledgement": true,
+  "documentRefs": [
+    "driver_privacy_notice",
+    "other_road_users_notice"
+  ],
+  "documents": {
+    "driver_privacy_notice": {
+      "documentKey": "driver_privacy_notice",
+      "title": "Izjava o zaštiti podataka za primjenu tehnologija za sigurnost u prometu",
+      "shortTitle": "Izjava o zaštiti podataka – vozači",
+      "version": "2026-08-18",
+      "validFrom": "2026-08-18",
+      "locale": "hr",
+      "asset": "assets/content/documents/driver_privacy_notice_hr.md"
+    },
+    "other_road_users_notice": {
+      "documentKey": "other_road_users_notice",
+      "title": "Izjava o zaštiti podataka o prometnim nesrećama",
+      "shortTitle": "Izjava o zaštiti podataka – prometne nesreće",
+      "version": "2026-08-18",
+      "validFrom": "2026-08-18",
+      "locale": "hr",
+      "asset": "assets/content/documents/other_road_users_notice_hr.md"
+    }
+  },
+  "modules": [
+    {
+      "id": "intro",
+      "title": "O čemu je ovdje riječ",
+      "icon": "info",
+      "estimatedSeconds": 60,
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "U našim dostavnim vozilima ugrađen je sustav za sigurnost u prometu koji se temelji na kamerama. On ne snima neprekidno, nego izrađuje fotografije isključivo povodom događaja – dakle samo onda kada se prepozna događaj bitan za sigurnost. U ovom vam tečaju jednostavnim jezikom objašnjavamo što se snima, tko vidi podatke, koliko se dugo pohranjuju i koja prava imate."
+        },
+        {
+          "type": "callout",
+          "style": "info",
+          "title": "Važno unaprijed",
+          "text": "Na kraju potvrđujete da ste izjavu o zaštiti podataka primili i primili na znanje. To nije privola i nije suglasnost."
+        },
+        {
+          "type": "bullets",
+          "title": "Tečaj traje otprilike 10 minuta i obrađuje",
+          "items": [
+            "kako kamere rade i kada uopće nastaje snimka",
+            "koji se podaci o vama obrađuju",
+            "zašto to radimo i na kojoj pravnoj osnovi",
+            "tko može vidjeti podatke",
+            "koliko se dugo podaci pohranjuju",
+            "vaša prava kao ispitanika"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "system",
+      "title": "Kako kamere rade",
+      "icon": "videocam",
+      "estimatedSeconds": 120,
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Sustav se sastoji od kamera usmjerenih prema van na cestu i prema unutra u prostor vozača te od senzora koji mjere način vožnje. Ključno je sljedeće: senzorika prepoznaje određene sigurnosne događaje – i tek takav događaj pokreće snimanje."
+        },
+        {
+          "type": "factCard",
+          "style": "positive",
+          "title": "Što se NE događa",
+          "items": [
+            "Ne postoji prijenos uživo. Nitko vas ne promatra u stvarnom vremenu dok vozite.",
+            "Ne provodi se nadzor bez prekida. Vaša se vožnja ne promatra i ne ocjenjuje neprekidno.",
+            "Nema trajnog snimanja ni trajnog slanja podataka – ni s ceste ni iz prostora vozača.",
+            "NE SNIMA SE ZVUK. Sustav ne bilježi razgovore ni zvukove – ni u prostoru vozača ni izvan njega, ni trajno ni povodom događaja.",
+            "Sustav vas ne ocjenjuje automatski s posljedicama iz radnog odnosa. Svaki događaj provjerava čovjek."
+          ]
+        },
+        {
+          "type": "factCard",
+          "style": "neutral",
+          "title": "Što se događa",
+          "items": [
+            "Sustav izrađuje fotografije isključivo povodom događaja – bez zvuka – dakle samo onda kada se prepozna događaj bitan za sigurnost (npr. naglo kočenje, prekratak razmak do vozila ispred, nepažnja).",
+            "Sve dok se ne prepozna događaj, ne nastaje nikakva snimka koja bi se pohranila ili prenijela.",
+            "Tek nakon prepoznatog događaja pripadajuće se fotografije prenose i mogu se analizirati.",
+            "Te događaje i sami vidite u aplikaciji – zajedno s pripadajućim snimkama."
+          ]
+        },
+        {
+          "type": "callout",
+          "style": "warning",
+          "title": "Ne prekrivajte kameru",
+          "text": "Prekrivanje ili pomicanje kamere sustav bilježi kao događaj. Molimo vas da kameru ostavite slobodnom. Ako imate pitanja o obradi svojih podataka, obratite se kontaktnoj službi navedenoj u području Zaštita podataka."
+        }
+      ]
+    },
+    {
+      "id": "data",
+      "title": "Koji se podaci o vama obrađuju",
+      "icon": "dataset",
+      "estimatedSeconds": 120,
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "O vama se mogu obrađivati sljedeće kategorije osobnih podataka:"
+        },
+        {
+          "type": "keyValue",
+          "items": [
+            {
+              "key": "Identifikacijski podaci",
+              "value": "ime, slike"
+            },
+            {
+              "key": "Podaci za kontakt",
+              "value": "adresa e-pošte"
+            },
+            {
+              "key": "Fotografije snimljene povodom događaja (bez zvuka)",
+              "value": "fotografije okoline ceste i unutrašnjosti vozila koje nastaju isključivo pri prepoznatom sigurnosnom događaju – bez neprekidnog snimanja i bez snimanja zvuka"
+            },
+            {
+              "key": "Podaci o radu vozila",
+              "value": "lokacija, brzina, ubrzanje, kočenja, vožnja u zavojima, razmak do vozila ispred"
+            },
+            {
+              "key": "Podaci o sigurnosnim incidentima",
+              "value": "prekoračenje brzine, naglo kočenje i ubrzavanje, sudari, prekratak razmak do vozila ispred, nepažljiva vožnja, pospanost, ometanje kamere, upozorenja na čelni sudar, nepotpuna zaustavljanja, kršenja prometnih znakova ili svjetlosne signalizacije"
+            },
+            {
+              "key": "Podaci o interakciji",
+              "value": "vaše interakcije sa sustavom i s aplikacijom"
+            }
+          ]
+        },
+        {
+          "type": "callout",
+          "style": "warning",
+          "title": "Podaci o zdravlju – samo iznimno",
+          "text": "U slučaju teške prometne nesreće iznimno se mogu obrađivati podaci o zdravlju, primjerice vidljive ozljede na snimkama. Pravna je osnova tada članak 9. stavak 2. točka (f) GDPR-a – postavljanje ili obrana pravnih zahtjeva."
+        }
+      ]
+    },
+    {
+      "id": "purpose",
+      "title": "Zašto to radimo",
+      "icon": "shield",
+      "estimatedSeconds": 120,
+      "blocks": [
+        {
+          "type": "bullets",
+          "title": "Svrhe obrade",
+          "items": [
+            "poboljšanje sigurnosti u prometu – za vas i za druge sudionike u prometu",
+            "analiza događaja u cestovnom prometu i provjera pravnih zahtjeva",
+            "ispunjavanje zakonskih obveza"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Pravna je osnova naš legitimni interes prema članku 6. stavku 1. točki (f) GDPR-a. Konkretno je riječ o zaštiti zdravlja i tjelesnog integriteta, o smanjenju pravnih, financijskih i reputacijskih rizika koji proizlaze iz prometnih nesreća te o rasvjetljavanju nesreća. Ako ispunjavamo zakonske obveze, oslanjamo se na članak 6. stavak 1. točku (c) GDPR-a."
+        },
+        {
+          "type": "callout",
+          "style": "info",
+          "title": "Nema privole",
+          "text": "Ne oslanjamo se na vašu privolu. U radnom odnosu privola bi bila pravno osporiva. Umjesto toga proveli smo procjenu učinka na zaštitu podataka i dokumentirali odvagivanje interesa."
+        }
+      ]
+    },
+    {
+      "id": "recipients",
+      "title": "Tko može vidjeti podatke",
+      "icon": "group",
+      "estimatedSeconds": 90,
+      "blocks": [
+        {
+          "type": "bullets",
+          "title": "Primatelji",
+          "items": [
+            "naš pružatelj tehnologije za sigurnost u prometu (hardver kamera, platforma u oblaku, aplikacija za vozače)",
+            "tijela javne vlasti i javna tijela, primjerice sudovi ili tijela kaznenog progona, u okviru postupaka",
+            "osiguratelji i ugovorni partneri zajedno s njihovim odvjetnicima, ako je riječ o događajima ili pravnim zahtjevima"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Interno podatke vide samo one osobe kojima su potrebni za obavljanje njihova zadatka – primjerice za naknadni razgovor o sigurnosnom događaju ili za obradu prometne nesreće."
+        },
+        {
+          "type": "callout",
+          "style": "info",
+          "title": "Prijenos u treće zemlje",
+          "text": "U pravilu vaši podaci ostaju u EU-u odnosno u EGP-u. Kada podatke prenosimo našem pružatelju usluga u SAD-u, oslanjamo se na standardne ugovorne klauzule EU-a prema članku 46. stavku 2. točki (c) GDPR-a. Osim toga, podaci su šifrirani pri prijenosu i pri pohrani."
+        }
+      ]
+    },
+    {
+      "id": "retention",
+      "title": "Koliko se dugo podaci pohranjuju",
+      "icon": "schedule",
+      "estimatedSeconds": 60,
+      "blocks": [
+        {
+          "type": "keyValue",
+          "items": [
+            {
+              "key": "Snimke nastale povodom događaja, lokalno u vozilu",
+              "value": "nekoliko dana, nakon toga automatski se prebrisuju"
+            },
+            {
+              "key": "Fotografije sigurnosnih događaja u oblaku",
+              "value": "nekoliko tjedana, nakon toga automatsko brisanje"
+            },
+            {
+              "key": "Materijal o prometnim nesrećama i pravnim zahtjevima",
+              "value": "do isteka zastarnog roka odnosno do okončanja postupka"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Nakon isteka rokova podaci se brišu ili anonimiziraju."
+        }
+      ]
+    },
+    {
+      "id": "rights",
+      "title": "Vaša prava",
+      "icon": "gavel",
+      "estimatedSeconds": 90,
+      "blocks": [
+        {
+          "type": "keyValue",
+          "items": [
+            {
+              "key": "Pristup (članak 15.)",
+              "value": "Možete saznati koje podatke o vama obrađujemo."
+            },
+            {
+              "key": "Ispravak (članak 16.)",
+              "value": "Netočni podaci moraju se ispraviti."
+            },
+            {
+              "key": "Brisanje (članak 17.)",
+              "value": "Možete zatražiti brisanje svojih podataka."
+            },
+            {
+              "key": "Ograničenje (članak 18.)",
+              "value": "Možete zatražiti ograničenje obrade."
+            },
+            {
+              "key": "Prigovor (članak 21.)",
+              "value": "Obradi možete prigovoriti u skladu s člankom 21. GDPR-a."
+            },
+            {
+              "key": "Pritužba (članak 77.)",
+              "value": "Možete podnijeti pritužbu nadležnom nadzornom tijelu."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Sva ta prava možete u svakom trenutku ostvariti putem područja \"Zaštita podataka\" u aplikaciji. Ondje ćete pronaći kontaktne podatke nadležne službe. Vaš će zahtjev biti obrađen u zakonskom roku."
+        }
+      ]
+    },
+    {
+      "id": "others",
+      "title": "Drugi sudionici u prometu",
+      "icon": "directions_walk",
+      "estimatedSeconds": 60,
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Kada događaj pokrene snimanje, na fotografijama usmjerenima prema van usputno se mogu vidjeti i drugi sudionici u prometu. Lica i registarske pločice u tom se materijalu automatski zamućuju (pikselizacija). Nezamućeni materijal čuva se i analizira samo ako je došlo do prometne nesreće ili do usporedivih okolnosti."
+        },
+        {
+          "type": "callout",
+          "style": "info",
+          "title": "Ako vas na mjestu nesreće netko pita",
+          "text": "Uputite sudionike nesreće na našu izjavu o zaštiti podataka o prometnim nesrećama. Nalazi se u aplikaciji u području Zaštita podataka i možete je odmah pokazati."
+        }
+      ]
+    },
+    {
+      "id": "document",
+      "title": "Pročitajte izjavu o zaštiti podataka",
+      "icon": "description",
+      "estimatedSeconds": 240,
+      "requiresFullScroll": true,
+      "blocks": [
+        {
+          "type": "documentEmbed",
+          "documentKey": "driver_privacy_notice",
+          "title": "Izjava o zaštiti podataka za primjenu tehnologija za sigurnost u prometu"
+        }
+      ]
+    }
+  ],
+  "acknowledgement": {
+    "headline": "Potvrda o primitku",
+    "intro": "Molimo potvrdite da ste izjavu o zaštiti podataka primili i primili na znanje.",
+    "statement": "Potvrđujem da sam primio/primila i primio/primila na znanje Izjavu o zaštiti podataka za primjenu tehnologija za sigurnost u prometu i alata za sigurnost vožnje, u verziji od {{documentDate}}.",
+    "clarification": "Poznato mi je da ova potvrda ne predstavlja privolu za obradu podataka. Obrada se provodi na temelju legitimnih interesa.",
+    "systemNote": "Radi razumijevanja: sustav ne snima neprekidno. Nastaju isključivo fotografije povodom događaja i bez zvuka, pri prepoznatim događajima bitnima za sigurnost – nema prijenosa uživo, nema nadzora bez prekida, nema trajnog snimanja, nema snimanja zvuka.",
+    "checkboxLabel": "Primljeno i primljeno na znanje",
+    "signatureHint": "Potpis",
+    "signatureOptional": false,
+    "signatureLegalNote": "Vaš potpis potvrđuje isključivo primitak izjave o zaštiti podataka i to da ste je primili na znanje – on nije privola za obradu podataka.",
+    "submitLabel": "Potvrdi",
+    "declineLabel": "Ne želim potvrditi",
+    "declineExplanation": "To je u redu. U tom slučaju samo bilježimo da vam je izjava o zaštiti podataka uručena i da niste potpisali potvrdu.",
+    "declineNote": "Izjava o zaštiti podataka uručena dana {{datum}} putem aplikacije CoDriver. Vozač nije potpisao potvrdu o primitku.",
+    "successTitle": "Hvala, sve je obavljeno",
+    "successText": "Vaša je potvrda o primitku pohranjena. Izjavu o zaštiti podataka i svoj dokaz u svakom trenutku pronalazite u području Zaštita podataka.",
+    "declinedTitle": "Zabilježeno",
+    "declinedText": "Zabilježili smo da vam je izjava o zaštiti podataka uručena i da niste potpisali potvrdu."
+  },
+  "privacyCenter": {
+    "headline": "Zaštita podataka",
+    "intro": "Ovdje u svakom trenutku pronalazite izjave o zaštiti podataka za sustav kamera, svoj dokaz i kontaktne podatke za ostvarivanje svojih prava ispitanika.",
+    "documentsTitle": "Izjave o zaštiti podataka",
+    "courseTitle": "Tečaj i potvrda o primitku",
+    "contactTitle": "Pristup, ispravak, brisanje",
+    "contactIntro": "Za pristup (članak 15.), ispravak (članak 16.), brisanje (članak 17.) ili ograničenje (članak 18.) obratite se nadležnoj službi:",
+    "contactEmail": "[E-Mail-Adresse des Datenschutzbeauftragten]",
+    "contactPlaceholderHint": "Kontaktna adresa još nije upisana. Molimo obratite se svom disponentu ili upravi.",
+    "contactMailSubject": "Prava ispitanika – tehnologija za sigurnost u prometu"
+  }
+}

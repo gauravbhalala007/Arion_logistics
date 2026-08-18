@@ -1,0 +1,339 @@
+{
+  "courseId": "privacy_camera",
+  "locale": "sq",
+  "contentVersion": "1.0.0",
+  "title": "Kamerat në automjet – mbrojtja e të dhënave",
+  "subtitle": "Çfarë regjistrohet, pse, dhe cilat të drejta keni",
+  "estimatedMinutes": 10,
+  "requiresAcknowledgement": true,
+  "documentRefs": [
+    "driver_privacy_notice",
+    "other_road_users_notice"
+  ],
+  "documents": {
+    "driver_privacy_notice": {
+      "documentKey": "driver_privacy_notice",
+      "title": "Deklaratë privatësie për përdorimin e teknologjive për sigurinë rrugore",
+      "shortTitle": "Deklaratë privatësie për shoferët",
+      "version": "2026-08-18",
+      "validFrom": "2026-08-18",
+      "locale": "sq",
+      "asset": "assets/content/documents/driver_privacy_notice_sq.md"
+    },
+    "other_road_users_notice": {
+      "documentKey": "other_road_users_notice",
+      "title": "Deklaratë privatësie për aksidentet rrugore",
+      "shortTitle": "Deklaratë privatësie – aksidentet rrugore",
+      "version": "2026-08-18",
+      "validFrom": "2026-08-18",
+      "locale": "sq",
+      "asset": "assets/content/documents/other_road_users_notice_sq.md"
+    }
+  },
+  "modules": [
+    {
+      "id": "intro",
+      "title": "Për çfarë bëhet fjalë këtu",
+      "icon": "info",
+      "estimatedSeconds": 60,
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Në automjetet tona të shpërndarjes është instaluar një sistem sigurie rrugore i bazuar në kamera. Ai nuk regjistron në mënyrë të vazhdueshme, por bën fotografi vetëm të nxitura nga një ngjarje – pra vetëm atëherë kur zbulohet një ngjarje me rëndësi për sigurinë. Në këtë kurs ju shpjegojmë me gjuhë të thjeshtë çfarë regjistrohet, kush i sheh të dhënat, sa gjatë ruhen ato dhe cilat të drejta keni."
+        },
+        {
+          "type": "callout",
+          "style": "info",
+          "title": "E rëndësishme që në fillim",
+          "text": "Në fund ju konfirmoni se e keni marrë dhe e keni marrë në dijeni deklaratën e privatësisë. Ky nuk është pëlqim dhe nuk është miratim."
+        },
+        {
+          "type": "bullets",
+          "title": "Kursi zgjat rreth 10 minuta dhe trajton",
+          "items": [
+            "si funksionojnë kamerat dhe kur krijohet fare një regjistrim",
+            "cilat të dhëna përpunohen për ju",
+            "pse e bëjmë këtë dhe mbi cilën bazë ligjore",
+            "kush mund t'i shohë të dhënat",
+            "sa gjatë ruhen ato",
+            "të drejtat tuaja si subjekt i të dhënave"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "system",
+      "title": "Si funksionojnë kamerat",
+      "icon": "videocam",
+      "estimatedSeconds": 120,
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Sistemi përbëhet nga kamera të drejtuara nga jashtë drejt rrugës dhe nga brenda drejt kabinës së shoferit, si dhe nga sensorë që matin sjelljen gjatë drejtimit. Vendimtare është kjo: sensorët zbulojnë ngjarje të caktuara sigurie – dhe vetëm një ngjarje e tillë e nxit një regjistrim."
+        },
+        {
+          "type": "factCard",
+          "style": "positive",
+          "title": "Çfarë NUK ndodh",
+          "items": [
+            "Nuk ka asnjë transmetim të drejtpërdrejtë (livestream). Askush nuk ju vëzhgon në kohë reale ndërsa drejtoni automjetin.",
+            "Nuk kryhet asnjë mbikëqyrje e pandërprerë. Udhëtimi juaj nuk vëzhgohet dhe nuk vlerësohet vazhdimisht.",
+            "Nuk ka asnjë regjistrim të vazhdueshëm dhe asnjë ngarkim të vazhdueshëm – as nga rruga, as nga kabina e shoferit.",
+            "NUK REGJISTROHET ASNJË ZË. Sistemi nuk regjistron biseda dhe as tinguj – as në kabinën e shoferit, as jashtë saj, as në mënyrë të vazhdueshme, as në rast ngjarjeje.",
+            "Sistemi nuk ju vlerëson automatikisht me pasoja në marrëdhënien e punës. Çdo incident shqyrtohet nga një person."
+          ]
+        },
+        {
+          "type": "factCard",
+          "style": "neutral",
+          "title": "Çfarë ndodh",
+          "items": [
+            "Sistemi bën fotografi vetëm të nxitura nga një ngjarje – pa zë – pra vetëm atëherë kur zbulohet një ngjarje me rëndësi për sigurinë (p.sh. frenim i fortë, distancë shumë e afërt me automjetin përpara, shpërqendrim).",
+            "Për sa kohë që nuk zbulohet asnjë ngjarje, nuk krijohet asnjë regjistrim që të ruhet ose të transmetohet.",
+            "Vetëm pas një ngjarjeje të zbuluar transmetohen fotografitë përkatëse dhe mund të analizohen.",
+            "Këto ngjarje i shihni edhe vetë në aplikacion – bashkë me regjistrimet përkatëse."
+          ]
+        },
+        {
+          "type": "callout",
+          "style": "warning",
+          "title": "Mos e mbuloni kamerën",
+          "text": "Mbulimi ose zhvendosja e kamerës regjistrohet nga sistemi si ngjarje. Ju lutemi mbajeni kamerën të lirë. Për pyetje lidhur me përpunimin e të dhënave tuaja, drejtohuni te pika e kontaktit e përmendur në seksionin Mbrojtja e të dhënave."
+        }
+      ]
+    },
+    {
+      "id": "data",
+      "title": "Cilat të dhëna përpunohen për ju",
+      "icon": "dataset",
+      "estimatedSeconds": 120,
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Kategoritë e mëposhtme të të dhënave personale mund të përpunohen për ju:"
+        },
+        {
+          "type": "keyValue",
+          "items": [
+            {
+              "key": "Të dhëna identifikuese",
+              "value": "Emri, imazhet"
+            },
+            {
+              "key": "Të dhëna kontakti",
+              "value": "Adresa e e-mailit"
+            },
+            {
+              "key": "Fotografi të nxitura nga ngjarje (pa zë)",
+              "value": "Fotografi të mjedisit rrugor dhe të brendësisë së automjetit, të cilat krijohen vetëm në rastin e një ngjarjeje sigurie të zbuluar – asnjë regjistrim i vazhdueshëm dhe asnjë regjistrim zëri"
+            },
+            {
+              "key": "Të dhëna të funksionimit të automjetit",
+              "value": "Vendndodhja, shpejtësia, nxitimi, frenimet, marrja e kthesave, distanca nga automjeti përpara"
+            },
+            {
+              "key": "Të dhëna për incidente sigurie",
+              "value": "Tejkalim i shpejtësisë, frenim dhe nxitim i papritur, përplasje, distancë shumë e afërt me automjetin përpara, drejtim i shpërqendruar, përgjumje, pengim i kamerës, paralajmërime për përplasje ballore, ndalime jo të plota (rolling stop), shkelje të sinjalistikës rrugore ose të semaforëve"
+            },
+            {
+              "key": "Të dhëna ndërveprimi",
+              "value": "Ndërveprimet tuaja me sistemin dhe me aplikacionin"
+            }
+          ]
+        },
+        {
+          "type": "callout",
+          "style": "warning",
+          "title": "Të dhëna shëndetësore – vetëm në raste përjashtimore",
+          "text": "Në rastin e një aksidenti të rëndë rrugor mund të përpunohen, në mënyrë përjashtimore, të dhëna shëndetësore, për shembull lëndime të dukshme në fotografi. Baza ligjore është atëherë neni 9, paragrafi 2, shkronja f i GDPR-së – ushtrimi ose mbrojtja e pretendimeve ligjore."
+        }
+      ]
+    },
+    {
+      "id": "purpose",
+      "title": "Pse e bëjmë këtë",
+      "icon": "shield",
+      "estimatedSeconds": 120,
+      "blocks": [
+        {
+          "type": "bullets",
+          "title": "Qëllimet e përpunimit",
+          "items": [
+            "Përmirësimi i sigurisë rrugore – për ju dhe për pjesëmarrësit e tjerë në trafik",
+            "Analiza e incidenteve në trafikun rrugor dhe shqyrtimi i pretendimeve ligjore",
+            "Përmbushja e detyrimeve ligjore"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Baza ligjore është interesi ynë legjitim sipas nenit 6, paragrafi 1, shkronja f i GDPR-së. Konkretisht bëhet fjalë për mbrojtjen e shëndetit dhe të integritetit fizik, për uljen e rreziqeve ligjore, financiare dhe reputacionale që rrjedhin nga aksidentet rrugore, si dhe për sqarimin e aksidenteve. Për aq sa përmbushim detyrime ligjore, mbështetemi në nenin 6, paragrafi 1, shkronja c i GDPR-së."
+        },
+        {
+          "type": "callout",
+          "style": "info",
+          "title": "Asnjë pëlqim",
+          "text": "Ne nuk mbështetemi në pëlqimin tuaj. Në një marrëdhënie pune një pëlqim do të ishte juridikisht i kontestueshëm. Në vend të kësaj kemi kryer një vlerësim të ndikimit në mbrojtjen e të dhënave dhe kemi dokumentuar peshimin e interesave."
+        }
+      ]
+    },
+    {
+      "id": "recipients",
+      "title": "Kush mund t'i shohë të dhënat",
+      "icon": "group",
+      "estimatedSeconds": 90,
+      "blocks": [
+        {
+          "type": "bullets",
+          "title": "Marrësit",
+          "items": [
+            "ofruesi ynë i teknologjisë për sigurinë rrugore (pajisjet e kamerave, platforma cloud, aplikacioni për shoferin)",
+            "autoritetet dhe organet publike, si gjykatat ose organet e ndjekjes penale, në kuadër të procedurave",
+            "siguruesit dhe partnerët kontraktualë së bashku me avokatët e tyre, për aq sa bëhet fjalë për incidente ose pretendime ligjore"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Brenda ndërmarrjes i shohin të dhënat vetëm ata persona që u nevojiten për detyrën e tyre – për shembull për diskutimin pasues të një ngjarjeje sigurie ose për trajtimin e një aksidenti."
+        },
+        {
+          "type": "callout",
+          "style": "info",
+          "title": "Transferimi në vende të treta",
+          "text": "Si rregull të dhënat tuaja mbeten brenda BE-së, përkatësisht brenda ZEE-së. Kur transferojmë të dhëna te ofruesi ynë në SHBA, mbështetemi në klauzolat standarde kontraktuale të BE-së sipas nenit 46, paragrafi 2, shkronja c i GDPR-së. Përveç kësaj, të dhënat janë të enkriptuara gjatë transmetimit dhe gjatë ruajtjes."
+        }
+      ]
+    },
+    {
+      "id": "retention",
+      "title": "Sa gjatë ruhen të dhënat",
+      "icon": "schedule",
+      "estimatedSeconds": 60,
+      "blocks": [
+        {
+          "type": "keyValue",
+          "items": [
+            {
+              "key": "Regjistrimet e nxitura nga ngjarje, lokalisht në automjet",
+              "value": "pak ditë, më pas mbishkruhen automatikisht"
+            },
+            {
+              "key": "Fotografitë e ngjarjeve të sigurisë në cloud",
+              "value": "pak javë, më pas fshihen automatikisht"
+            },
+            {
+              "key": "Materiali për aksidentet dhe pretendimet ligjore",
+              "value": "deri në skadimin e afatit të parashkrimit, përkatësisht deri në përfundimin e procedurës"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Pas skadimit të afateve, të dhënat fshihen ose anonimizohen."
+        }
+      ]
+    },
+    {
+      "id": "rights",
+      "title": "Të drejtat tuaja",
+      "icon": "gavel",
+      "estimatedSeconds": 90,
+      "blocks": [
+        {
+          "type": "keyValue",
+          "items": [
+            {
+              "key": "E drejta e informimit (neni 15)",
+              "value": "Ju mund të mësoni cilat të dhëna përpunojmë për ju."
+            },
+            {
+              "key": "Korrigjimi (neni 16)",
+              "value": "Të dhënat e pasakta duhet të korrigjohen."
+            },
+            {
+              "key": "Fshirja (neni 17)",
+              "value": "Ju mund të kërkoni fshirjen e të dhënave tuaja."
+            },
+            {
+              "key": "Kufizimi (neni 18)",
+              "value": "Ju mund të kërkoni kufizimin e përpunimit."
+            },
+            {
+              "key": "Kundërshtimi (neni 21)",
+              "value": "Ju mund të kundërshtoni përpunimin sipas nenit 21 të GDPR-së."
+            },
+            {
+              "key": "Ankesa (neni 77)",
+              "value": "Ju mund të paraqisni ankesë pranë autoritetit mbikëqyrës kompetent."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Të gjitha këto të drejta mund t'i ushtroni në çdo kohë përmes seksionit \"Mbrojtja e të dhënave\" në aplikacion. Aty gjeni të dhënat e kontaktit të zyrës përgjegjëse. Kërkesa juaj do të trajtohet brenda afatit ligjor."
+        }
+      ]
+    },
+    {
+      "id": "others",
+      "title": "Pjesëmarrësit e tjerë në trafik",
+      "icon": "directions_walk",
+      "estimatedSeconds": 60,
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Kur një ngjarje nxit një regjistrim, në fotografitë e drejtuara nga jashtë mund të shfaqen rastësisht edhe pjesëmarrës të tjerë në trafik. Fytyrat dhe targat në këtë material bëhen automatikisht të panjohshme (piksëlohen). Materiali i papiksëluar ruhet dhe analizohet vetëm nëse ka ndodhur një aksident rrugor ose ekzistojnë rrethana të krahasueshme."
+        },
+        {
+          "type": "callout",
+          "style": "info",
+          "title": "Nëse ju pyesin në vendin e aksidentit",
+          "text": "Drejtojini personat e përfshirë në aksident te deklarata jonë e privatësisë për aksidentet rrugore. Ju e gjeni atë në aplikacion, në seksionin Mbrojtja e të dhënave, dhe mund ta tregoni drejtpërdrejt."
+        }
+      ]
+    },
+    {
+      "id": "document",
+      "title": "Lexoni deklaratën e privatësisë",
+      "icon": "description",
+      "estimatedSeconds": 240,
+      "requiresFullScroll": true,
+      "blocks": [
+        {
+          "type": "documentEmbed",
+          "documentKey": "driver_privacy_notice",
+          "title": "Deklaratë privatësie për përdorimin e teknologjive për sigurinë rrugore"
+        }
+      ]
+    }
+  ],
+  "acknowledgement": {
+    "headline": "Konfirmim marrjeje",
+    "intro": "Ju lutemi konfirmoni se e keni marrë dhe e keni marrë në dijeni deklaratën e privatësisë.",
+    "statement": "Konfirmoj se e kam marrë dhe e kam marrë në dijeni deklaratën e privatësisë për përdorimin e teknologjive për sigurinë rrugore dhe të mjeteve për sigurinë gjatë drejtimit, në versionin e datës {{documentDate}}.",
+    "clarification": "Jam në dijeni se ky konfirmim nuk përbën pëlqim për përpunimin e të dhënave. Përpunimi kryhet mbi bazën e interesave legjitime.",
+    "systemNote": "Për orientim: sistemi nuk regjistron në mënyrë të vazhdueshme. Krijohen vetëm fotografi të nxitura nga ngjarje, pa zë, kur zbulohen ngjarje me rëndësi për sigurinë – asnjë transmetim i drejtpërdrejtë, asnjë mbikëqyrje e pandërprerë, asnjë regjistrim i vazhdueshëm, asnjë regjistrim zëri.",
+    "checkboxLabel": "Marrë dhe marrë në dijeni",
+    "signatureHint": "Nënshkrimi",
+    "signatureOptional": false,
+    "signatureLegalNote": "Nënshkrimi juaj konfirmon vetëm marrjen dhe marrjen në dijeni të deklaratës së privatësisë – ai nuk është pëlqim për përpunimin e të dhënave.",
+    "submitLabel": "Konfirmo",
+    "declineLabel": "Nuk dëshiroj të konfirmoj",
+    "declineExplanation": "Kjo është në rregull. Në këtë rast ne shënojmë thjesht se deklarata e privatësisë ju është dorëzuar dhe se ju nuk e keni nënshkruar konfirmimin.",
+    "declineNote": "Deklarata e privatësisë u dorëzua më {{datum}} nëpërmjet aplikacionit CoDriver. Shoferi nuk e nënshkroi konfirmimin e marrjes.",
+    "successTitle": "Faleminderit, gjithçka u krye",
+    "successText": "Konfirmimi juaj i marrjes u ruajt. Deklaratën e privatësisë dhe dëshminë tuaj i gjeni në çdo kohë në seksionin Mbrojtja e të dhënave.",
+    "declinedTitle": "Shënuar",
+    "declinedText": "Ne kemi mbajtur shënim se deklarata e privatësisë ju është dorëzuar dhe se ju nuk e keni nënshkruar konfirmimin."
+  },
+  "privacyCenter": {
+    "headline": "Mbrojtja e të dhënave",
+    "intro": "Këtu gjeni në çdo kohë deklaratat e privatësisë për sistemin e kamerave, dëshminë tuaj dhe të dhënat e kontaktit për të drejtat tuaja si subjekt i të dhënave.",
+    "documentsTitle": "Deklaratat e privatësisë",
+    "courseTitle": "Kursi & konfirmimi i marrjes",
+    "contactTitle": "Informimi, korrigjimi, fshirja",
+    "contactIntro": "Për informim (neni 15), korrigjim (neni 16), fshirje (neni 17) ose kufizim (neni 18), ju lutemi drejtohuni zyrës përgjegjëse:",
+    "contactEmail": "[E-Mail-Adresse des Datenschutzbeauftragten]",
+    "contactPlaceholderHint": "Adresa e kontaktit ende nuk është e regjistruar. Ju lutemi drejtohuni te dispeçeri juaj ose te administrata.",
+    "contactMailSubject": "Të drejtat e subjektit të të dhënave – teknologjia për sigurinë rrugore"
+  }
+}

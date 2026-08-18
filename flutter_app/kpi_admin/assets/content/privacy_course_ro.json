@@ -1,0 +1,339 @@
+{
+  "courseId": "privacy_camera",
+  "locale": "ro",
+  "contentVersion": "1.0.0",
+  "title": "Camere în vehicul – protecția datelor",
+  "subtitle": "Ce se înregistrează, de ce și ce drepturi aveți",
+  "estimatedMinutes": 10,
+  "requiresAcknowledgement": true,
+  "documentRefs": [
+    "driver_privacy_notice",
+    "other_road_users_notice"
+  ],
+  "documents": {
+    "driver_privacy_notice": {
+      "documentKey": "driver_privacy_notice",
+      "title": "Notă de informare privind prelucrarea datelor pentru utilizarea tehnologiilor de siguranță rutieră",
+      "shortTitle": "Notă de informare – șoferi",
+      "version": "2026-08-18",
+      "validFrom": "2026-08-18",
+      "locale": "ro",
+      "asset": "assets/content/documents/driver_privacy_notice_ro.md"
+    },
+    "other_road_users_notice": {
+      "documentKey": "other_road_users_notice",
+      "title": "Notă de informare privind prelucrarea datelor în caz de accidente rutiere",
+      "shortTitle": "Notă de informare – accidente rutiere",
+      "version": "2026-08-18",
+      "validFrom": "2026-08-18",
+      "locale": "ro",
+      "asset": "assets/content/documents/other_road_users_notice_ro.md"
+    }
+  },
+  "modules": [
+    {
+      "id": "intro",
+      "title": "Despre ce este vorba",
+      "icon": "info",
+      "estimatedSeconds": 60,
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "În vehiculele noastre de livrare este montat un sistem de siguranță rutieră bazat pe camere. Sistemul nu înregistrează permanent, ci realizează exclusiv fotografii declanșate de un eveniment – adică numai atunci când este detectat un eveniment relevant pentru siguranță. În acest curs vă explicăm, într-un limbaj simplu, ce se înregistrează, cine vede datele, cât timp sunt păstrate și ce drepturi aveți."
+        },
+        {
+          "type": "callout",
+          "style": "info",
+          "title": "Important de la bun început",
+          "text": "La final confirmați că ați primit și ați luat la cunoștință nota de informare privind prelucrarea datelor. Aceasta nu este un consimțământ și nici o aprobare."
+        },
+        {
+          "type": "bullets",
+          "title": "Cursul durează aproximativ 10 minute și acoperă",
+          "items": [
+            "cum funcționează camerele și când ia naștere efectiv o înregistrare",
+            "ce date despre dumneavoastră sunt prelucrate",
+            "de ce facem acest lucru și pe ce temei juridic",
+            "cine poate vedea datele",
+            "cât timp sunt stocate datele",
+            "drepturile dumneavoastră ca persoană vizată"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "system",
+      "title": "Cum funcționează camerele",
+      "icon": "videocam",
+      "estimatedSeconds": 120,
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Sistemul este format din camere orientate spre exterior, către drum, și spre interior, către habitaclul șoferului, precum și din senzori care măsoară comportamentul de conducere. Esențial este următorul aspect: senzorii detectează anumite evenimente de siguranță – și abia un astfel de eveniment declanșează o înregistrare."
+        },
+        {
+          "type": "factCard",
+          "style": "positive",
+          "title": "Ce NU se întâmplă",
+          "items": [
+            "Nu există transmisie live. Nimeni nu vă urmărește în timp real în timp ce conduceți.",
+            "Nu are loc o supraveghere fără întrerupere. Cursa dumneavoastră nu este observată sau evaluată în mod continuu.",
+            "Nu există înregistrare permanentă și nici transmitere permanentă – nici de pe drum, nici din habitaclul șoferului.",
+            "NU SE ÎNREGISTREAZĂ SUNET. Sistemul nu înregistrează conversații și nici zgomote – nici în habitaclul șoferului, nici în exterior, nici permanent, nici la producerea unui eveniment.",
+            "Sistemul nu vă evaluează automat cu consecințe de dreptul muncii. Fiecare incident este verificat de o persoană."
+          ]
+        },
+        {
+          "type": "factCard",
+          "style": "neutral",
+          "title": "Ce se întâmplă",
+          "items": [
+            "Sistemul realizează exclusiv fotografii declanșate de un eveniment – fără sunet – adică numai atunci când este detectat un eveniment relevant pentru siguranță (de exemplu frânare puternică, distanță prea mică față de vehiculul din față, distragerea atenției).",
+            "Atât timp cât nu este detectat niciun eveniment, nu ia naștere nicio înregistrare care să fie stocată sau transmisă.",
+            "Abia după detectarea unui eveniment sunt transmise fotografiile aferente, care pot fi apoi analizate.",
+            "Vedeți chiar dumneavoastră aceste evenimente în aplicație – împreună cu înregistrările aferente."
+          ]
+        },
+        {
+          "type": "callout",
+          "style": "warning",
+          "title": "Nu acoperiți camera",
+          "text": "Acoperirea sau reorientarea camerei este înregistrată de sistem ca eveniment. Vă rugăm să lăsați camera liberă. Pentru întrebări privind prelucrarea datelor dumneavoastră, adresați-vă punctului de contact indicat în secțiunea Protecția datelor."
+        }
+      ]
+    },
+    {
+      "id": "data",
+      "title": "Ce date despre dumneavoastră sunt prelucrate",
+      "icon": "dataset",
+      "estimatedSeconds": 120,
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Următoarele categorii de date cu caracter personal pot fi prelucrate despre dumneavoastră:"
+        },
+        {
+          "type": "keyValue",
+          "items": [
+            {
+              "key": "Date de identificare",
+              "value": "nume, imagini"
+            },
+            {
+              "key": "Date de contact",
+              "value": "adresă de e-mail"
+            },
+            {
+              "key": "Fotografii declanșate de un eveniment (fără sunet)",
+              "value": "fotografii ale mediului rutier și ale habitaclului vehiculului, care iau naștere exclusiv la detectarea unui eveniment de siguranță – fără înregistrare continuă și fără înregistrare audio"
+            },
+            {
+              "key": "Date de funcționare a vehiculului",
+              "value": "locație, viteză, accelerație, frânări, viraje, distanța față de vehiculul din față"
+            },
+            {
+              "key": "Date privind incidentele de siguranță",
+              "value": "depășirea vitezei legale, frânări și accelerări bruște, coliziuni, distanță prea mică față de vehiculul din față, conducere cu atenția distrasă, somnolență, obturarea camerei, avertizări de coliziune frontală, opriri incomplete (rolling stop), nerespectarea indicatoarelor rutiere sau a semafoarelor"
+            },
+            {
+              "key": "Date de interacțiune",
+              "value": "interacțiunile dumneavoastră cu sistemul și cu aplicația"
+            }
+          ]
+        },
+        {
+          "type": "callout",
+          "style": "warning",
+          "title": "Date privind sănătatea – numai în cazuri excepționale",
+          "text": "În cazul unui accident rutier grav pot fi prelucrate, în mod excepțional, date privind sănătatea, de exemplu leziuni vizibile în imagini. Temeiul juridic este în acest caz art. 9 alin. (2) lit. (f) din GDPR – constatarea, exercitarea sau apărarea unui drept în instanță."
+        }
+      ]
+    },
+    {
+      "id": "purpose",
+      "title": "De ce facem acest lucru",
+      "icon": "shield",
+      "estimatedSeconds": 120,
+      "blocks": [
+        {
+          "type": "bullets",
+          "title": "Scopurile prelucrării",
+          "items": [
+            "îmbunătățirea siguranței rutiere – pentru dumneavoastră și pentru ceilalți participanți la trafic",
+            "analiza incidentelor din traficul rutier și examinarea pretențiilor juridice",
+            "îndeplinirea obligațiilor legale"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Temeiul juridic este interesul nostru legitim, conform art. 6 alin. (1) lit. (f) din GDPR. Concret, este vorba despre protecția sănătății și a integrității corporale, despre reducerea riscurilor juridice, financiare și de reputație care decurg din accidentele rutiere, precum și despre clarificarea accidentelor. În măsura în care îndeplinim obligații legale, ne întemeiem pe art. 6 alin. (1) lit. (c) din GDPR."
+        },
+        {
+          "type": "callout",
+          "style": "info",
+          "title": "Fără consimțământ",
+          "text": "Nu ne întemeiem pe consimțământul dumneavoastră. În cadrul raportului de muncă, un consimțământ ar fi contestabil din punct de vedere juridic. În schimb, am efectuat o evaluare a impactului asupra protecției datelor și am documentat punerea în balanță a intereselor."
+        }
+      ]
+    },
+    {
+      "id": "recipients",
+      "title": "Cine poate vedea datele",
+      "icon": "group",
+      "estimatedSeconds": 90,
+      "blocks": [
+        {
+          "type": "bullets",
+          "title": "Destinatari",
+          "items": [
+            "furnizorul nostru de tehnologie pentru siguranță rutieră (hardware-ul camerelor, platforma cloud, aplicația pentru șoferi)",
+            "autorități și instituții publice, precum instanțe sau organe de urmărire penală, în cadrul procedurilor",
+            "asigurători și parteneri contractuali, inclusiv avocații acestora, în măsura în care este vorba despre incidente sau pretenții juridice"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Pe plan intern, datele sunt vizibile numai pentru persoanele care au nevoie de ele pentru sarcinile lor – de exemplu pentru discuția ulterioară a unui eveniment de siguranță sau pentru soluționarea unui accident."
+        },
+        {
+          "type": "callout",
+          "style": "info",
+          "title": "Transferul către țări terțe",
+          "text": "De regulă, datele dumneavoastră rămân în UE, respectiv în SEE. Atunci când transferăm date către furnizorul nostru din Statele Unite, ne întemeiem pe clauzele contractuale standard ale UE, conform art. 46 alin. (2) lit. (c) din GDPR. În plus, datele sunt criptate atât în timpul transmiterii, cât și la stocare."
+        }
+      ]
+    },
+    {
+      "id": "retention",
+      "title": "Cât timp sunt stocate datele",
+      "icon": "schedule",
+      "estimatedSeconds": 60,
+      "blocks": [
+        {
+          "type": "keyValue",
+          "items": [
+            {
+              "key": "Înregistrări declanșate de evenimente, local în vehicul",
+              "value": "câteva zile, apoi suprascrise automat"
+            },
+            {
+              "key": "Fotografii aferente evenimentelor de siguranță, în cloud",
+              "value": "câteva săptămâni, apoi ștergere automată"
+            },
+            {
+              "key": "Materiale privind accidente și pretenții juridice",
+              "value": "până la împlinirea termenului de prescripție, respectiv până la finalizarea procedurii"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "După expirarea termenelor, datele sunt șterse sau anonimizate."
+        }
+      ]
+    },
+    {
+      "id": "rights",
+      "title": "Drepturile dumneavoastră",
+      "icon": "gavel",
+      "estimatedSeconds": 90,
+      "blocks": [
+        {
+          "type": "keyValue",
+          "items": [
+            {
+              "key": "Acces (art. 15)",
+              "value": "Puteți afla ce date prelucrăm despre dumneavoastră."
+            },
+            {
+              "key": "Rectificare (art. 16)",
+              "value": "Datele incorecte trebuie corectate."
+            },
+            {
+              "key": "Ștergere (art. 17)",
+              "value": "Puteți solicita ștergerea datelor dumneavoastră."
+            },
+            {
+              "key": "Restricționare (art. 18)",
+              "value": "Puteți solicita restricționarea prelucrării."
+            },
+            {
+              "key": "Opoziție (art. 21)",
+              "value": "Vă puteți opune prelucrării în condițiile prevăzute la art. 21 din GDPR."
+            },
+            {
+              "key": "Plângere (art. 77)",
+              "value": "Puteți depune o plângere la autoritatea de supraveghere competentă."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Puteți exercita oricând toate aceste drepturi din secțiunea \"Protecția datelor\" a aplicației. Acolo găsiți datele de contact ale entității competente. Cererea dumneavoastră va fi soluționată în termenul legal."
+        }
+      ]
+    },
+    {
+      "id": "others",
+      "title": "Ceilalți participanți la trafic",
+      "icon": "directions_walk",
+      "estimatedSeconds": 60,
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Atunci când un eveniment declanșează o înregistrare, în fotografiile orientate spre exterior pot apărea incidental și alți participanți la trafic. În acest material, fețele și numerele de înmatriculare sunt pixelate automat. Materialul nepixelat este păstrat și analizat numai dacă s-a produs un accident rutier sau împrejurări comparabile."
+        },
+        {
+          "type": "callout",
+          "style": "info",
+          "title": "Dacă sunteți întrebat la locul accidentului",
+          "text": "Îndrumați persoanele implicate în accident către nota noastră de informare privind prelucrarea datelor în caz de accidente rutiere. O găsiți în aplicație, în secțiunea Protecția datelor, și o puteți arăta direct."
+        }
+      ]
+    },
+    {
+      "id": "document",
+      "title": "Citiți nota de informare",
+      "icon": "description",
+      "estimatedSeconds": 240,
+      "requiresFullScroll": true,
+      "blocks": [
+        {
+          "type": "documentEmbed",
+          "documentKey": "driver_privacy_notice",
+          "title": "Notă de informare privind prelucrarea datelor pentru utilizarea tehnologiilor de siguranță rutieră"
+        }
+      ]
+    }
+  ],
+  "acknowledgement": {
+    "headline": "Confirmare de primire",
+    "intro": "Vă rugăm să confirmați că ați primit și ați luat la cunoștință nota de informare privind prelucrarea datelor.",
+    "statement": "Confirm că am primit și am luat la cunoștință nota de informare privind prelucrarea datelor pentru utilizarea tehnologiilor de siguranță rutieră și a instrumentelor de siguranță în conducere, în versiunea din {{documentDate}}.",
+    "clarification": "Îmi este cunoscut faptul că această confirmare nu reprezintă un consimțământ pentru prelucrarea datelor. Prelucrarea are loc în temeiul intereselor legitime.",
+    "systemNote": "Pentru context: sistemul nu înregistrează permanent. Iau naștere exclusiv fotografii declanșate de un eveniment, fără sunet, la detectarea unor evenimente relevante pentru siguranță – fără transmisie live, fără supraveghere fără întrerupere, fără înregistrare permanentă, fără înregistrare audio.",
+    "checkboxLabel": "Primită și luată la cunoștință",
+    "signatureHint": "Semnătură",
+    "signatureOptional": false,
+    "signatureLegalNote": "Semnătura dumneavoastră confirmă exclusiv primirea și luarea la cunoștință a notei de informare privind prelucrarea datelor – ea nu reprezintă un consimțământ pentru prelucrarea datelor.",
+    "submitLabel": "Confirmă",
+    "declineLabel": "Nu doresc să confirm",
+    "declineExplanation": "Este în regulă. În acest caz consemnăm doar că nota de informare privind prelucrarea datelor v-a fost înmânată și că nu ați semnat confirmarea.",
+    "declineNote": "Nota de informare privind prelucrarea datelor a fost înmânată la data de {{datum}} prin aplicația CoDriver. Șoferul nu a semnat confirmarea de primire.",
+    "successTitle": "Mulțumim, totul este rezolvat",
+    "successText": "Confirmarea dumneavoastră de primire a fost salvată. Găsiți oricând nota de informare și dovada dumneavoastră în secțiunea Protecția datelor.",
+    "declinedTitle": "Consemnat",
+    "declinedText": "Am consemnat că nota de informare privind prelucrarea datelor v-a fost înmânată și că nu ați semnat confirmarea."
+  },
+  "privacyCenter": {
+    "headline": "Protecția datelor",
+    "intro": "Aici găsiți oricând notele de informare privind prelucrarea datelor pentru sistemul de camere, dovada dumneavoastră și datele de contact pentru exercitarea drepturilor dumneavoastră ca persoană vizată.",
+    "documentsTitle": "Note de informare privind prelucrarea datelor",
+    "courseTitle": "Curs și confirmare de primire",
+    "contactTitle": "Acces, rectificare, ștergere",
+    "contactIntro": "Pentru acces (art. 15), rectificare (art. 16), ștergere (art. 17) sau restricționare (art. 18) vă rugăm să vă adresați entității competente:",
+    "contactEmail": "[E-Mail-Adresse des Datenschutzbeauftragten]",
+    "contactPlaceholderHint": "Adresa de contact nu este încă înregistrată. Vă rugăm să vă adresați dispecerului dumneavoastră sau administrației.",
+    "contactMailSubject": "Drepturile persoanei vizate – tehnologia de siguranță rutieră"
+  }
+}

@@ -4,7 +4,7 @@ Zuletzt aktualisiert: [Datum – vor Go-live eintragen]
 
 Mit dieser Datenschutzerklärung informieren wir Sie darüber, wie wir Ihre personenbezogenen Daten im Zusammenhang mit unserem in Lieferfahrzeugen installierten kamerabasierten Verkehrssicherheitssystem und Fahrsicherheitstools („Verkehrssicherheitstechnologien“) verarbeiten.
 
-Das System zeichnet nicht dauerhaft auf. Es erstellt ausschließlich anlassbezogene Bildaufnahmen (Fotos), die durch ein erkanntes sicherheitsrelevantes Ereignis ausgelöst werden. Es findet kein Livestream, keine lückenlose Überwachung und keine durchgehende Aufzeichnung oder Übertragung statt.
+Das System zeichnet nicht dauerhaft auf. Es erstellt ausschließlich anlassbezogene Bildaufnahmen (Fotos) ohne Ton, die durch ein erkanntes sicherheitsrelevantes Ereignis ausgelöst werden. Es findet kein Livestream, keine lückenlose Überwachung und keine durchgehende Aufzeichnung oder Übertragung statt. Eine Tonaufnahme findet zu keinem Zeitpunkt statt – weder dauerhaft noch anlassbezogen.
 
 ## 1. Verantwortlichkeit und Kontaktdaten
 
@@ -17,7 +17,7 @@ Sie können unseren Datenschutzbeauftragten über [E-Mail-Adresse des Datenschut
 Wir können die folgenden Arten personenbezogener Daten über Sie verarbeiten:
 - Identifikationsdaten (z. B. Namen, Bilder);
 - Kontaktdaten (z. B. E-Mail-Adresse);
-- Anlassbezogene Bildaufnahmen (Fotos), die durch ein erkanntes sicherheitsrelevantes Ereignis ausgelöst werden (z. B. Außenansichten der Straßenumgebung und Innenansichten des Fahrzeuginnenraums); eine durchgehende Video- oder Tonaufzeichnung findet nicht statt;
+- Anlassbezogene Bildaufnahmen (Fotos) ohne Ton, die durch ein erkanntes sicherheitsrelevantes Ereignis ausgelöst werden (z. B. Außenansichten der Straßenumgebung und Innenansichten des Fahrzeuginnenraums); eine durchgehende Videoaufzeichnung findet nicht statt, eine Tonaufnahme findet zu keinem Zeitpunkt statt;
 - Fahrzeugbetriebsdaten (z. B. Standort, Geschwindigkeit, Beschleunigung, Bremsvorgänge, Kurvenfahrten, Abstand zum vorausfahrenden Fahrzeug);
 - Daten zu Sicherheitsvorfällen (z. B. festgestelltes unsicheres Fahrverhalten, einschließlich Geschwindigkeitsüberschreitungen, abruptes Bremsen, Beschleunigen und Abbiegen, Kollisionen, zu dichtes Auffahren, abgelenktes Fahren, Schläfrigkeit, Kamerabehinderung, Vorwärtskollisionswarnungen, Erkennung von Rollstopps sowie Verstöße gegen Verkehrszeichen oder Ampeln);
 - Interaktionsdaten (z. B. Ihre Interaktionen mit dem Verkehrssicherheitstechnologien-System und der App, einschließlich etwaiger Behinderungen der Kamera).

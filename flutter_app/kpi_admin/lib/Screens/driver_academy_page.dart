@@ -92,8 +92,10 @@ class _DriverAcademyPageState extends State<DriverAcademyPage> {
         .doc(uid)
         .collection('academy_test_results');
     try {
+      // Verglichen wird gegen die deutsche (verbindliche) Fassung — ein
+      // Sprachwechsel des Fahrers darf keine Wiedervorlage auslösen.
       _privacyCameraBundle ??= await PrivacyCourseBundle.load(
-        kPrivacyCourseFallbackLanguage,
+        kPrivacyBindingLanguage,
       );
     } catch (_) {
       // Ohne Inhalte keine Statuszeile für das Kameramodul.
@@ -406,6 +408,10 @@ class _DriverAcademyPageState extends State<DriverAcademyPage> {
                   // Kameras im Fahrzeug – Datenschutz. Kenntnisnahme der
                   // Datenschutzerklärung zur Verkehrssicherheits-
                   // technologie — KEINE Einwilligung, kein App-Gate.
+                  //
+                  // Solange [kPrivacyCameraDriverEnabled] false ist, sind
+                  // beide Kacheln wie die übrigen noch nicht
+                  // freigeschalteten Trainings als „Kommt bald" gesperrt.
                   Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: _AcademyTile(
@@ -414,19 +420,27 @@ class _DriverAcademyPageState extends State<DriverAcademyPage> {
                       icon: Icons.photo_camera_outlined,
                       iconColor: const Color(0xFF2A5FB0),
                       iconBg: const Color(0xFFEAF1FB),
-                      status: _privacyCameraStatus(locale),
-                      onTap: () => _open(
-                        (ctx) => DriverPrivacyCameraCoursePage(
-                          dspUid: widget.dspUid,
-                          driverTransporterId: widget.driverTransporterId,
-                          onBack: () => Navigator.of(ctx).pop(),
-                        ),
-                      ),
+                      disabled: !kPrivacyCameraDriverEnabled,
+                      badge: kPrivacyCameraDriverEnabled
+                          ? null
+                          : academyText(locale, 'badge_coming_soon'),
+                      status: kPrivacyCameraDriverEnabled
+                          ? _privacyCameraStatus(locale)
+                          : null,
+                      onTap: !kPrivacyCameraDriverEnabled
+                          ? null
+                          : () => _open(
+                              (ctx) => DriverPrivacyCameraCoursePage(
+                                dspUid: widget.dspUid,
+                                driverTransporterId:
+                                    widget.driverTransporterId,
+                                onBack: () => Navigator.of(ctx).pop(),
+                              ),
+                            ),
                     ),
                   ),
-                  // Dauerhafter Datenschutz-Bereich: Volltexte, Widerspruch
-                  // und Kontakt — jederzeit erreichbar, zwei Taps vom
-                  // Fahrer-Home (Spec §6 Nr. 1).
+                  // Dauerhafter Datenschutz-Bereich: Volltexte und
+                  // Kontakt — zwei Taps vom Fahrer-Home.
                   Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: _AcademyTile(
@@ -438,13 +452,20 @@ class _DriverAcademyPageState extends State<DriverAcademyPage> {
                       icon: Icons.shield_outlined,
                       iconColor: const Color(0xFF3B5A80),
                       iconBg: const Color(0xFFEFF4FA),
-                      onTap: () => _open(
-                        (ctx) => DriverPrivacyCenterPage(
-                          dspUid: widget.dspUid,
-                          driverTransporterId: widget.driverTransporterId,
-                          onBack: () => Navigator.of(ctx).pop(),
-                        ),
-                      ),
+                      disabled: !kPrivacyCameraDriverEnabled,
+                      badge: kPrivacyCameraDriverEnabled
+                          ? null
+                          : academyText(locale, 'badge_coming_soon'),
+                      onTap: !kPrivacyCameraDriverEnabled
+                          ? null
+                          : () => _open(
+                              (ctx) => DriverPrivacyCenterPage(
+                                dspUid: widget.dspUid,
+                                driverTransporterId:
+                                    widget.driverTransporterId,
+                                onBack: () => Navigator.of(ctx).pop(),
+                              ),
+                            ),
                     ),
                   ),
                   // Fahrsicherheitstraining — eigenständige Schulung mit

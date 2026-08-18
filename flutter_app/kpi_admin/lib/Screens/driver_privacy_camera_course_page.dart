@@ -2,19 +2,31 @@
 //
 // DA Academy — Kurs „Kameras im Fahrzeug – Datenschutz".
 //
-// Ablauf (Spec §2): 10 Module als Pager → Modul 10 ist der Volltext mit
-// Scroll-Gate → Empfangsbestätigung.
+// Ablauf: 9 Lese-/Infomodule als Pager → das letzte Modul ist der
+// Volltext mit Scroll-Gate → Empfangsbestätigung.
 //
-// GATES:
-//   - Quiz: jede Frage muss BEANTWORTET sein, um weiterzukommen. Eine
-//     falsche Antwort blockiert NICHT, sie zeigt die Erklärung. Das Quiz
-//     ist kein Bestehens-Gate; der Punktestand wandert in den Nachweis.
-//   - Modul „document": der Volltext muss geöffnet und bis ans Ende
-//     gescrollt worden sein.
+// KEIN QUIZ: Die Module sind reine Informationsseiten mit „Weiter".
+//
+// EINZIGES GATE: Im Modul „document" muss der Volltext geöffnet und bis
+// ans Ende gelesen worden sein.
+//
+// ABSCHLUSS: Die Empfangsbestätigung ist der VERPFLICHTENDE letzte
+// Schritt. Der Kurs gilt erst mit ihr als abgeschlossen; es gibt keinen
+// Weg am Bestätigungsschritt vorbei.
+//
+// KEIN WEIGERUNGS-EINDRUCK: Es gibt keinen Ablehnen-Weg mehr. Wer noch
+// nicht bestätigen möchte, wählt den zurückhaltenden Textlink „Später" —
+// dann wird NICHTS gespeichert und nichts vermerkt, der Kurs bleibt
+// einfach offen. Der Ausgang `declined` entsteht im Fahrer-Flow nicht
+// mehr; der Enum-Wert bleibt nur erhalten, um Bestandsdaten aus früheren
+// Fassungen weiterhin lesen und anzeigen zu können.
 //
 // KEIN APP-GATE: Der Kurs lässt sich jederzeit verlassen und blockiert
-// nichts. Das ist keine Nachlässigkeit, sondern Voraussetzung dafür,
-// dass die Freiwilligkeitsargumentation der DSFA trägt.
+// die App nie.
+//
+// SPRACHE: Der Kurs läuft in der App-Sprache des Fahrers. Der
+// VERBINDLICHE Wortlaut der Empfangsbestätigung (Spec §7) bleibt in
+// jeder Sprache zusätzlich auf Deutsch sichtbar und wird so gespeichert.
 
 import 'dart:convert';
 
@@ -81,35 +93,62 @@ class _DriverPrivacyCameraCoursePageState
   _Step _step = _Step.modules;
   int _index = 0;
 
+  /// Kenntnisnahme-Beleg: durchlaufene Module, Scroll-Gate im Volltext
+  /// und Lesedauer. Ein Quiz gibt es in diesem Kurs bewusst nicht.
   final Set<String> _completedModuleIds = <String>{};
-  final Map<String, int> _answers = <String, int>{};
   bool _docScrolledToEnd = false;
   int _docReadSeconds = 0;
 
   bool _checkboxConfirmed = false;
+
+  /// Ob im Unterschriftsfeld etwas steht. Die Unterschrift ist
+  /// VERPFLICHTEND — sie belegt zusammen mit der Checkbox den Empfang
+  /// und die Kenntnisnahme (keine Einwilligung, siehe
+  /// `signatureLegalNote` direkt am Feld).
+  bool _hasSignature = false;
   bool _busy = false;
-  PrivacyAckOutcome? _outcome;
 
   String get _lang =>
       Localizations.localeOf(context).languageCode.toLowerCase();
 
+  bool _loadStarted = false;
+
   @override
   void initState() {
     super.initState();
-    _load();
+    // Der SignatureController meldet jeden Strich — daran hängt, ob der
+    // Bestätigen-Button aktiv wird.
+    _signatureCtrl.addListener(_onSignatureChanged);
+  }
+
+  void _onSignatureChanged() {
+    final has = _signatureCtrl.isNotEmpty;
+    if (has != _hasSignature && mounted) {
+      setState(() => _hasSignature = has);
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Erst hier ist `Localizations` verfügbar — der Kurs wird in der
+    // App-Sprache des Fahrers geladen.
+    if (!_loadStarted) {
+      _loadStarted = true;
+      _load();
+    }
   }
 
   @override
   void dispose() {
+    _signatureCtrl.removeListener(_onSignatureChanged);
     _signatureCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _load() async {
     try {
-      // Kursinhalte werden v1 nur auf Deutsch ausgeliefert; der Loader
-      // fällt automatisch zurück, sobald keine Übersetzung existiert.
-      final state = await _repo.load(kPrivacyCourseFallbackLanguage);
+      final state = await _repo.load(_lang);
       final driver = await _repo.loadDriverInfo();
       if (!mounted) return;
       setState(() {
@@ -128,25 +167,10 @@ class _DriverPrivacyCameraCoursePageState
 
   // ── Gates ─────────────────────────────────────────────────────────
 
-  bool _canAdvance(PrivacyModule module) {
-    for (final q in module.quiz) {
-      if (!_answers.containsKey(q.id)) return false;
-    }
-    if (module.requiresFullScroll && !_docScrolledToEnd) return false;
-    return true;
-  }
-
-  int get _quizCorrect {
-    final course = _state?.bundle.course;
-    if (course == null) return 0;
-    var n = 0;
-    for (final m in course.modules) {
-      for (final q in m.quiz) {
-        if (_answers[q.id] == q.correctIndex) n++;
-      }
-    }
-    return n;
-  }
+  /// Einziges verbleibendes Gate: der Volltext muss im Modul
+  /// „document" geöffnet und bis ans Ende gelesen worden sein.
+  bool _canAdvance(PrivacyModule module) =>
+      !module.requiresFullScroll || _docScrolledToEnd;
 
   void _next(PrivacyCourse course) {
     final module = course.modules[_index];
@@ -172,43 +196,59 @@ class _DriverPrivacyCameraCoursePageState
 
   // ── Nachweis speichern ────────────────────────────────────────────
 
-  Future<void> _submit(PrivacyAckOutcome outcome) async {
+  /// Speichert die Empfangsbestätigung.
+  ///
+  /// Es gibt im Fahrer-Flow nur noch DIESEN Ausgang: `acknowledged`.
+  /// Wer noch nicht bestätigen will, wählt „Später" — dann wird gar
+  /// nichts geschrieben und der Kurs bleibt schlicht offen. Ein
+  /// ausdrücklicher Verweigerungs-Nachweis („declined") entsteht nicht
+  /// mehr; der Wert bleibt nur zum Lesen von Bestandsdaten erhalten.
+  Future<void> _submit() async {
+    const outcome = PrivacyAckOutcome.acknowledged;
     final state = _state;
     if (state == null) return;
     setState(() => _busy = true);
     try {
       Uint8List? signatureBytes;
       String? signature;
-      if (outcome == PrivacyAckOutcome.acknowledged &&
-          _signatureCtrl.isNotEmpty) {
+      if (_signatureCtrl.isNotEmpty) {
         signatureBytes = await _signatureCtrl.toPngBytes(height: 160);
         if (signatureBytes != null) signature = base64Encode(signatureBytes);
       }
 
       final doc = state.document;
+      final binding = state.bindingDocument;
       final copy = state.bundle.course.acknowledgement;
-      final statement = copy.statementFor(
-        privacyCameraFormatDate(doc.ref.validFrom),
-      );
+      final bindingCopy = state.bundle.bindingAck;
+      final dateText = privacyCameraFormatDate(binding.ref.validFrom);
+
+      // Verbindlich ist der DEUTSCHE Wortlaut (Spec §7). Die Übersetzung
+      // wird zusätzlich angezeigt und zusätzlich gespeichert.
+      final statementDe = bindingCopy.statementFor(dateText);
+      final statementLocalized = state.bundle.needsBindingTranslationBlock
+          ? copy.statementFor(dateText)
+          : null;
 
       final ack = PrivacyCameraAck(
         driverTransporterId: widget.driverTransporterId.trim(),
         driverName: _driver.name,
         courseId: state.bundle.course.courseId,
         contentVersion: state.bundle.course.contentVersion,
-        documentKey: doc.ref.documentKey,
-        documentVersion: doc.ref.version,
-        documentContentSha256: doc.contentSha256,
-        statementShown: statement,
+        documentKey: binding.ref.documentKey,
+        documentVersion: binding.ref.version,
+        documentContentSha256: binding.contentSha256,
+        documentDisplayLocale: state.bundle.languageCode,
+        documentDisplaySha256: doc.contentSha256,
+        statementShown: statementDe,
+        statementShownLocalized: statementLocalized,
+        statementLocale: state.bundle.languageCode,
         outcome: outcome,
         occurredAt: DateTime.now(),
-        checkboxConfirmed: outcome == PrivacyAckOutcome.acknowledged,
+        checkboxConfirmed: true,
         signaturePngBase64: signature,
         documentScrolledToEnd: _docScrolledToEnd,
         documentReadSeconds: _docReadSeconds,
         completedModuleIds: _completedModuleIds.toList()..sort(),
-        quizCorrect: _quizCorrect,
-        quizTotal: state.bundle.course.quizTotal,
         appVersion: kPrivacyCameraAppVersion,
         platform: privacyCameraPlatform(),
         locale: state.bundle.course.locale,
@@ -216,41 +256,43 @@ class _DriverPrivacyCameraCoursePageState
 
       await _repo.submitAcknowledgement(ack, previous: state.ack);
 
-      // Bescheinigung nur bei Kenntnisnahme. Bewusst NACH dem Nachweis
-      // und in eigenem try: schlägt die PDF-Erzeugung fehl, bleibt die
-      // Kenntnisnahme trotzdem gespeichert — der Nachweis ist das
-      // rechtlich Entscheidende, das PDF nur seine Ausfertigung.
-      if (outcome == PrivacyAckOutcome.acknowledged) {
-        try {
-          final pdf = await buildPrivacyCameraCertificatePdf(
-            signaturePng: signatureBytes,
-            driverName: _driver.name,
-            employeeNumber: _driver.employeeNumber,
-            companyName: _driver.companyName,
-            occurredAt: ack.occurredAt,
-            documentTitle: doc.ref.title,
-            documentVersion: doc.ref.version,
-            contentSha256: doc.contentSha256,
-            moduleTitles: [
-              for (final m in state.bundle.course.modules) m.title,
-            ],
-            statementShown: statement,
-            clarification: copy.clarification,
-          );
-          await _repo.storeCertificate(
-            pdfBytes: pdf,
-            occurredAt: ack.occurredAt,
-            documentVersion: doc.ref.version,
-            contentSha256: doc.contentSha256,
-          );
-        } catch (_) {
-          // Kein harter Fehler für den Fahrer — die Kenntnisnahme steht.
-        }
+      // Bescheinigung. Bewusst NACH dem Nachweis und in eigenem try:
+      // schlägt die PDF-Erzeugung fehl, bleibt die Kenntnisnahme
+      // trotzdem gespeichert — der Nachweis ist das rechtlich
+      // Entscheidende, das PDF nur seine Ausfertigung.
+      try {
+        final pdf = await buildPrivacyCameraCertificatePdf(
+          signaturePng: signatureBytes,
+          driverName: _driver.name,
+          employeeNumber: _driver.employeeNumber,
+          companyName: _driver.companyName,
+          occurredAt: ack.occurredAt,
+          documentTitle: binding.ref.title,
+          documentVersion: binding.ref.version,
+          contentSha256: binding.contentSha256,
+          moduleTitles: [for (final m in state.bundle.course.modules) m.title],
+          // Auf der Bescheinigung steht IMMER der deutsche Wortlaut …
+          statementShown: statementDe,
+          clarification: bindingCopy.clarification,
+          // … und darunter die gelesene Übersetzung, falls abweichend.
+          statementLocalized: statementLocalized,
+          clarificationLocalized: state.bundle.needsBindingTranslationBlock
+              ? copy.clarification
+              : null,
+          languageCode: state.bundle.languageCode,
+        );
+        await _repo.storeCertificate(
+          pdfBytes: pdf,
+          occurredAt: ack.occurredAt,
+          documentVersion: binding.ref.version,
+          contentSha256: binding.contentSha256,
+        );
+      } catch (_) {
+        // Kein harter Fehler für den Fahrer — die Kenntnisnahme steht.
       }
 
       if (!mounted) return;
       setState(() {
-        _outcome = outcome;
         _step = _Step.done;
         _busy = false;
       });
@@ -267,29 +309,13 @@ class _DriverPrivacyCameraCoursePageState
     }
   }
 
-  /// „Ich möchte nicht bestätigen" — gleichwertiger Weg, kein Fehlerfall.
-  /// Der Dialog erklärt nur die Folge; er warnt nicht und drängt nicht.
-  Future<void> _confirmDecline() async {
-    final copy = _state!.bundle.course.acknowledgement;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(copy.declineLabel),
-        content: Text(copy.declineExplanation),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(privacyCameraText(_lang, 'ack_back')),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(privacyCameraText(_lang, 'ack_decline_confirm')),
-          ),
-        ],
-      ),
-    );
-    if (ok == true) await _submit(PrivacyAckOutcome.declined);
-  }
+  /// „Später" — schließt den Kurs, ohne irgendetwas zu schreiben.
+  ///
+  /// Bewusst ohne Rückfrage, ohne Warnung und ohne Vermerk: Es soll nicht
+  /// der Eindruck einer Weigerung entstehen, sondern der einer schlicht
+  /// verschobenen Aufgabe. Der Kurs bleibt danach offen und kann
+  /// jederzeit erneut gestartet werden.
+  void _later() => widget.onBack();
 
   // ── Build ─────────────────────────────────────────────────────────
 
@@ -415,26 +441,6 @@ class _DriverPrivacyCameraCoursePageState
               block: block,
               onOpenDocument: (key) => _openDocument(state, key),
             ),
-          if (module.quiz.isNotEmpty) ...[
-            const SizedBox(height: 14),
-            const Divider(color: kPcBorder),
-            const SizedBox(height: 10),
-            Text(
-              privacyCameraText(_lang, 'quiz_headline'),
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w900,
-                color: kPcText,
-              ),
-            ),
-            const SizedBox(height: 10),
-            for (final q in module.quiz)
-              _QuizCard(
-                question: q,
-                selected: _answers[q.id],
-                onSelect: (i) => setState(() => _answers[q.id] = i),
-              ),
-          ],
           if (module.requiresFullScroll && !_docScrolledToEnd)
             Padding(
               padding: const EdgeInsets.only(top: 6),
@@ -489,13 +495,15 @@ class _DriverPrivacyCameraCoursePageState
 
   Widget _buildAcknowledgement(PrivacyCameraState state) {
     final copy = state.bundle.course.acknowledgement;
-    final doc = state.document;
-    final statement = copy.statementFor(
-      privacyCameraFormatDate(doc.ref.validFrom),
-    );
-    final hash = doc.contentSha256.length > 12
-        ? '${doc.contentSha256.substring(0, 12)}…'
-        : doc.contentSha256;
+    final bindingCopy = state.bundle.bindingAck;
+    final binding = state.bindingDocument;
+    final translated = state.bundle.needsBindingTranslationBlock;
+    final dateText = privacyCameraFormatDate(binding.ref.validFrom);
+    final statementDe = bindingCopy.statementFor(dateText);
+    final statementLocalized = copy.statementFor(dateText);
+    final hash = binding.contentSha256.length > 12
+        ? '${binding.contentSha256.substring(0, 12)}…'
+        : binding.contentSha256;
 
     return Scaffold(
       backgroundColor: kPcBg,
@@ -518,9 +526,22 @@ class _DriverPrivacyCameraCoursePageState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Verbindlicher Wortlaut aus Spec §7 — nicht umformulieren.
+                // VERBINDLICHER Wortlaut aus Spec §7 — immer auf Deutsch,
+                // in jeder Sprachfassung, nicht umformulieren.
+                if (translated) ...[
+                  Text(
+                    privacyCameraText(_lang, 'binding_label'),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                      color: kPcMuted,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                ],
                 Text(
-                  statement,
+                  statementDe,
                   style: const TextStyle(
                     fontSize: 14.5,
                     height: 1.55,
@@ -530,13 +551,48 @@ class _DriverPrivacyCameraCoursePageState
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  copy.clarification,
+                  bindingCopy.clarification,
                   style: const TextStyle(
                     fontSize: 13.5,
                     height: 1.55,
                     color: Color(0xFF4B5563),
                   ),
                 ),
+                // Übersetzung ergänzend darunter — sie ersetzt den
+                // deutschen Wortlaut nicht, sie erklärt ihn.
+                if (translated) ...[
+                  const SizedBox(height: 14),
+                  const Divider(color: kPcBorder, height: 1),
+                  const SizedBox(height: 12),
+                  Text(
+                    privacyCameraText(_lang, 'translation_label'),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                      color: kPcMuted,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    statementLocalized,
+                    style: const TextStyle(
+                      fontSize: 14.5,
+                      height: 1.55,
+                      fontWeight: FontWeight.w700,
+                      color: kPcText,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    copy.clarification,
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      height: 1.55,
+                      color: Color(0xFF4B5563),
+                    ),
+                  ),
+                ],
                 if (copy.systemNote.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Container(
@@ -557,7 +613,7 @@ class _DriverPrivacyCameraCoursePageState
                 ],
                 const SizedBox(height: 12),
                 Text(
-                  '${privacyCameraText(_lang, 'doc_version', vars: {'version': doc.ref.version})} · '
+                  '${privacyCameraText(_lang, 'doc_version', vars: {'version': binding.ref.version})} · '
                   '${privacyCameraText(_lang, 'doc_checksum', vars: {'hash': hash})}',
                   style: const TextStyle(fontSize: 11, color: kPcMuted),
                 ),
@@ -601,35 +657,8 @@ class _DriverPrivacyCameraCoursePageState
                   color: kPcText,
                 ),
               ),
-              const SizedBox(width: 8),
-              if (copy.signatureOptional)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1F3F5),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    _lang == 'de' ? 'freiwillig' : 'optional',
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                      color: kPcMuted,
-                    ),
-                  ),
-                ),
             ],
           ),
-          if (copy.signatureOptionalHint.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              copy.signatureOptionalHint,
-              style: const TextStyle(fontSize: 13, color: kPcMuted, height: 1.4),
-            ),
-          ],
           if (copy.signatureLegalNote.isNotEmpty) ...[
             const SizedBox(height: 10),
             // Klarstellung UNMITTELBAR am Unterschriftsfeld: Die
@@ -679,21 +708,41 @@ class _DriverPrivacyCameraCoursePageState
               backgroundColor: Colors.white,
             ),
           ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              onPressed: _busy ? null : () => _signatureCtrl.clear(),
-              icon: const Icon(Icons.backspace_outlined, size: 16),
-              label: Text(privacyCameraText(_lang, 'ack_signature_clear')),
-            ),
+          Row(
+            children: [
+              // Solange nicht unterschrieben ist, erklärt dieser Hinweis
+              // den noch inaktiven Bestätigen-Button. Sachlich, keine
+              // Warnung.
+              Expanded(
+                child: _hasSignature
+                    ? const SizedBox.shrink()
+                    : Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          privacyCameraText(_lang, 'signature_required_hint'),
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            height: 1.4,
+                            color: kPcMuted,
+                          ),
+                        ),
+                      ),
+              ),
+              TextButton.icon(
+                onPressed: _busy ? null : () => _signatureCtrl.clear(),
+                icon: const Icon(Icons.backspace_outlined, size: 16),
+                label: Text(privacyCameraText(_lang, 'ack_signature_clear')),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           SizedBox(
             height: 50,
             child: FilledButton(
-              onPressed: _busy || !_checkboxConfirmed
+              // Bestätigen erst mit Checkbox UND Unterschrift.
+              onPressed: _busy || !_checkboxConfirmed || !_hasSignature
                   ? null
-                  : () => _submit(PrivacyAckOutcome.acknowledged),
+                  : _submit,
               style: _primaryButtonStyle,
               child: _busy
                   ? const SizedBox(
@@ -707,24 +756,22 @@ class _DriverPrivacyCameraCoursePageState
                   : Text(copy.submitLabel),
             ),
           ),
-          const SizedBox(height: 8),
-          // Gleichwertig gestalteter Weg — sichtbar, nicht versteckt.
-          SizedBox(
-            height: 50,
-            child: OutlinedButton(
-              onPressed: _busy ? null : _confirmDecline,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: kPcText,
-                side: const BorderSide(color: kPcBorder, width: 1.4),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+          const SizedBox(height: 4),
+          // „Später" — zurückhaltender Textlink, kein gleichwertiger
+          // Button. Er verschiebt nur; es wird nichts gespeichert und
+          // nichts vermerkt, damit kein Eindruck einer Weigerung
+          // entsteht.
+          Center(
+            child: TextButton(
+              onPressed: _busy ? null : _later,
+              style: TextButton.styleFrom(
+                foregroundColor: kPcMuted,
                 textStyle: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-              child: Text(copy.declineLabel),
+              child: Text(privacyCameraText(_lang, 'later_label')),
             ),
           ),
         ],
@@ -734,7 +781,6 @@ class _DriverPrivacyCameraCoursePageState
 
   Widget _buildDone(PrivacyCameraState state) {
     final copy = state.bundle.course.acknowledgement;
-    final acknowledged = _outcome == PrivacyAckOutcome.acknowledged;
     return Scaffold(
       backgroundColor: kPcBg,
       body: SafeArea(
@@ -746,25 +792,19 @@ class _DriverPrivacyCameraCoursePageState
               Container(
                 width: 68,
                 height: 68,
-                decoration: BoxDecoration(
-                  color: acknowledged
-                      ? const Color(0xFFE4F5EC)
-                      : const Color(0xFFF1F3F5),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFE4F5EC),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
-                  acknowledged
-                      ? Icons.check_rounded
-                      : Icons.assignment_turned_in_outlined,
+                child: const Icon(
+                  Icons.check_rounded,
                   size: 32,
-                  color: acknowledged
-                      ? const Color(0xFF16704F)
-                      : const Color(0xFF6B7280),
+                  color: Color(0xFF16704F),
                 ),
               ),
               const SizedBox(height: 18),
               Text(
-                acknowledged ? copy.successTitle : copy.declinedTitle,
+                copy.successTitle,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 19,
@@ -774,7 +814,7 @@ class _DriverPrivacyCameraCoursePageState
               ),
               const SizedBox(height: 10),
               Text(
-                acknowledged ? copy.successText : copy.declinedText,
+                copy.successText,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 14.5,
@@ -821,123 +861,6 @@ class _BottomBar extends StatelessWidget {
           border: Border(top: BorderSide(color: kPcBorder)),
         ),
         child: SizedBox(width: double.infinity, child: child),
-      ),
-    );
-  }
-}
-
-/// Quizkarte. Nach der Antwort wird die Erklärung gezeigt — auch bei
-/// einer falschen Antwort geht es weiter.
-class _QuizCard extends StatelessWidget {
-  const _QuizCard({
-    required this.question,
-    required this.selected,
-    required this.onSelect,
-  });
-
-  final PrivacyQuizQuestion question;
-  final int? selected;
-  final ValueChanged<int> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    final answered = selected != null;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(13),
-        border: Border.all(color: kPcBorder),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            question.question,
-            style: const TextStyle(
-              fontSize: 14.5,
-              fontWeight: FontWeight.w800,
-              color: kPcText,
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 11),
-          for (var i = 0; i < question.options.length; i++)
-            _option(i, answered),
-          if (answered && question.explanation.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              question.explanation,
-              style: const TextStyle(
-                fontSize: 13,
-                height: 1.5,
-                color: Color(0xFF4B5563),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _option(int i, bool answered) {
-    final isSelected = selected == i;
-    final isCorrect = i == question.correctIndex;
-    Color border = kPcBorder;
-    Color bg = Colors.white;
-    if (answered && isCorrect) {
-      border = const Color(0xFF16704F);
-      bg = const Color(0xFFE4F5EC);
-    } else if (answered && isSelected) {
-      border = const Color(0xFFB3261E);
-      bg = const Color(0xFFFDECEA);
-    }
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(11),
-          onTap: answered ? null : () => onSelect(i),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-            decoration: BoxDecoration(
-              color: bg,
-              borderRadius: BorderRadius.circular(11),
-              border: Border.all(
-                color: border,
-                width: border == kPcBorder ? 1 : 1.6,
-              ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    question.options[i],
-                    style: const TextStyle(
-                      fontSize: 14,
-                      height: 1.4,
-                      color: kPcText,
-                    ),
-                  ),
-                ),
-                if (answered && isCorrect)
-                  const Icon(
-                    Icons.check_rounded,
-                    size: 18,
-                    color: Color(0xFF16704F),
-                  )
-                else if (answered && isSelected)
-                  const Icon(
-                    Icons.close_rounded,
-                    size: 18,
-                    color: Color(0xFFB3261E),
-                  ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }

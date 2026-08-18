@@ -53,11 +53,28 @@ class PrivacyCameraAck {
   final String courseId;
   final String contentVersion;
 
-  /// Welchen Wortlaut der Fahrer gesehen hat.
+  /// Welchen Wortlaut der Fahrer gesehen hat. Fassung und Prüfsumme
+  /// beziehen sich IMMER auf den deutschen Volltext — er ist der
+  /// verbindliche. Sonst würde ein Sprachwechsel des Fahrers als neue
+  /// Fassung gelten und fälschlich eine Wiedervorlage auslösen.
   final String documentKey;
   final String documentVersion;
   final String documentContentSha256;
+
+  /// Tatsächlich angezeigte Sprachfassung und deren Prüfsumme.
+  final String documentDisplayLocale;
+  final String documentDisplaySha256;
+
+  /// Verbindlicher deutscher Wortlaut der Empfangsbestätigung (Spec §7).
   final String statementShown;
+
+  /// Zusätzlich angezeigte Übersetzung. `null`, wenn der Fahrer die App
+  /// auf Deutsch nutzt — dann ist [statementShown] bereits die
+  /// angezeigte Fassung.
+  final String? statementShownLocalized;
+
+  /// Sprache, in der der Fahrer den Kurs gesehen hat.
+  final String statementLocale;
 
   final PrivacyAckOutcome outcome;
 
@@ -70,11 +87,12 @@ class PrivacyCameraAck {
   /// Freiwillig. Base64-PNG; nie in Logs, nie in Listenansichten.
   final String? signaturePngBase64;
 
+  // Kenntnisnahme-Beleg. Der Kurs hat kein Quiz mehr; belegt wird die
+  // Kenntnisnahme über die durchlaufenen Module, das Scroll-Gate im
+  // Volltext und die Lesedauer.
   final bool documentScrolledToEnd;
   final int documentReadSeconds;
   final List<String> completedModuleIds;
-  final int quizCorrect;
-  final int quizTotal;
 
   final String appVersion;
   final String platform;
@@ -88,7 +106,11 @@ class PrivacyCameraAck {
     required this.documentKey,
     required this.documentVersion,
     required this.documentContentSha256,
+    required this.documentDisplayLocale,
+    required this.documentDisplaySha256,
     required this.statementShown,
+    this.statementShownLocalized,
+    required this.statementLocale,
     required this.outcome,
     required this.occurredAt,
     this.receivedAt,
@@ -97,8 +119,6 @@ class PrivacyCameraAck {
     required this.documentScrolledToEnd,
     required this.documentReadSeconds,
     required this.completedModuleIds,
-    required this.quizCorrect,
-    required this.quizTotal,
     required this.appVersion,
     required this.platform,
     required this.locale,
@@ -126,7 +146,11 @@ class PrivacyCameraAck {
       documentKey: '${doc['documentKey'] ?? ''}',
       documentVersion: '${doc['version'] ?? ''}',
       documentContentSha256: '${doc['contentSha256'] ?? ''}',
+      documentDisplayLocale: '${doc['displayLocale'] ?? ''}',
+      documentDisplaySha256: '${doc['displayContentSha256'] ?? ''}',
       statementShown: '${m['statementShown'] ?? ''}',
+      statementShownLocalized: m['statementShownLocalized'] as String?,
+      statementLocale: '${m['statementLocale'] ?? ''}',
       outcome: '${m['outcome']}' == PrivacyAckOutcome.declined.name
           ? PrivacyAckOutcome.declined
           : PrivacyAckOutcome.acknowledged,
@@ -139,8 +163,6 @@ class PrivacyCameraAck {
       completedModuleIds:
           (m['completedModuleIds'] as List?)?.map((e) => '$e').toList() ??
           const [],
-      quizCorrect: (m['quizCorrect'] as num?)?.toInt() ?? 0,
-      quizTotal: (m['quizTotal'] as num?)?.toInt() ?? 0,
       appVersion: '${m['appVersion'] ?? ''}',
       platform: '${m['platform'] ?? ''}',
       locale: '${m['locale'] ?? ''}',
@@ -158,9 +180,17 @@ class PrivacyCameraAck {
     'document': {
       'documentKey': documentKey,
       'version': documentVersion,
+      // Verbindlich: Prüfsumme des DEUTSCHEN Volltextes.
       'contentSha256': documentContentSha256,
+      // Zusätzlich: was der Fahrer tatsächlich gelesen hat.
+      'displayLocale': documentDisplayLocale,
+      'displayContentSha256': documentDisplaySha256,
     },
+    // Verbindlicher deutscher Wortlaut …
     'statementShown': statementShown,
+    // … und die zusätzlich angezeigte Übersetzung.
+    'statementShownLocalized': statementShownLocalized,
+    'statementLocale': statementLocale,
     'outcome': outcome.name,
     'occurredAt': Timestamp.fromDate(occurredAt),
     'checkboxConfirmed': checkboxConfirmed,
@@ -168,8 +198,6 @@ class PrivacyCameraAck {
     'documentScrolledToEnd': documentScrolledToEnd,
     'documentReadSeconds': documentReadSeconds,
     'completedModuleIds': completedModuleIds,
-    'quizCorrect': quizCorrect,
-    'quizTotal': quizTotal,
     'appVersion': appVersion,
     'platform': platform,
     'locale': locale,
@@ -183,8 +211,7 @@ class PrivacyCameraAck {
     'documentVersion': documentVersion,
     'documentContentSha256': documentContentSha256,
     'contentVersion': contentVersion,
-    'quizCorrect': quizCorrect,
-    'quizTotal': quizTotal,
+    'statementLocale': statementLocale,
     'hadSignature': (signaturePngBase64 ?? '').isNotEmpty,
   };
 }
@@ -273,16 +300,23 @@ class PrivacyCameraState {
     this.objection,
   });
 
+  /// Volltext in der Anzeigesprache des Fahrers.
   PrivacyDocument get document => bundle.primaryDocument;
+
+  /// Deutscher Volltext — maßgeblich für Fassung und Prüfsumme.
+  PrivacyDocument get bindingDocument => bundle.bindingDocument;
 
   /// Kenntnisnahme fällig — kein Nachweis oder Nachweis zu einer alten
   /// Fassung. Eine Verweigerung (`declined`) ist ein gültiger Nachweis
   /// und macht NICHT erneut fällig.
+  ///
+  /// Verglichen wird gegen die DEUTSCHE Fassung: ein Sprachwechsel des
+  /// Fahrers darf keine Wiedervorlage auslösen.
   bool get acknowledgementDue {
     if (!bundle.course.requiresAcknowledgement) return false;
     final a = ack;
     if (a == null) return true;
-    return !a.matchesDocument(document);
+    return !a.matchesDocument(bindingDocument);
   }
 }
 

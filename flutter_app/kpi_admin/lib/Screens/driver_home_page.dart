@@ -11,8 +11,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../data/privacy_camera/privacy_camera_content.dart'
     show
         PrivacyCourseBundle,
-        kPrivacyCameraTestId,
-        kPrivacyCourseFallbackLanguage;
+        kPrivacyBindingLanguage,
+        kPrivacyCameraDriverEnabled,
+        kPrivacyCameraTestId;
 import '../data/privacy_camera/privacy_camera_repository.dart'
     show PrivacyCameraAck;
 import '../data/safety_training/operating_instructions.dart'
@@ -291,27 +292,31 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
       // Kameras im Fahrzeug – Datenschutz. Eigene Prüfung, weil dieses
       // Modul kein `passedAt` kennt, sondern eine Kenntnisnahme: offen
       // ist es, solange für die AKTUELLE Fassung kein Nachweis vorliegt.
-      // Eine Verweigerung („declined") ist ein gültiger Nachweis der
-      // Aushändigung und zählt deshalb NICHT als offen.
-      try {
-        final bundle = await PrivacyCourseBundle.load(
-          kPrivacyCourseFallbackLanguage,
-        );
-        final camSnap = await base
-            .doc(kPrivacyCameraTestId)
-            .collection('drivers')
-            .doc(tid)
-            .get();
-        final camData = camSnap.data();
-        if (camData == null || camData['outcome'] == null) {
-          open++;
-        } else if (!PrivacyCameraAck.fromMap(
-          camData,
-        ).matchesDocument(bundle.primaryDocument)) {
-          open++;
+      //
+      // Solange das Modul für Fahrer nicht freigeschaltet ist, darf es
+      // den roten Zähler NICHT hochtreiben — sonst zeigt die Kachel eine
+      // offene Aufgabe an, die der Fahrer gar nicht öffnen kann.
+      if (kPrivacyCameraDriverEnabled) {
+        try {
+          final bundle = await PrivacyCourseBundle.load(
+            kPrivacyBindingLanguage,
+          );
+          final camSnap = await base
+              .doc(kPrivacyCameraTestId)
+              .collection('drivers')
+              .doc(tid)
+              .get();
+          final camData = camSnap.data();
+          if (camData == null || camData['outcome'] == null) {
+            open++;
+          } else if (!PrivacyCameraAck.fromMap(
+            camData,
+          ).matchesDocument(bundle.bindingDocument)) {
+            open++;
+          }
+        } catch (_) {
+          // Ohne Inhalte/Daten lieber nicht mitzählen als falsch zählen.
         }
-      } catch (_) {
-        // Ohne Inhalte/Daten lieber nicht mitzählen als falsch zählen.
       }
 
       if (mounted && open != _academyOpenCount) {

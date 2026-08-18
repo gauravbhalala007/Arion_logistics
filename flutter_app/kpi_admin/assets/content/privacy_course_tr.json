@@ -1,0 +1,339 @@
+{
+  "courseId": "privacy_camera",
+  "locale": "tr",
+  "contentVersion": "1.0.0",
+  "title": "Araç İçi Kameralar – Veri Koruma",
+  "subtitle": "Neyin kaydedildiği, nedeni ve sahip olduğunuz haklar",
+  "estimatedMinutes": 10,
+  "requiresAcknowledgement": true,
+  "documentRefs": [
+    "driver_privacy_notice",
+    "other_road_users_notice"
+  ],
+  "documents": {
+    "driver_privacy_notice": {
+      "documentKey": "driver_privacy_notice",
+      "title": "Trafik Güvenliği Teknolojilerinin Kullanımına İlişkin Aydınlatma Metni",
+      "shortTitle": "Aydınlatma Metni – Sürücü",
+      "version": "2026-08-18",
+      "validFrom": "2026-08-18",
+      "locale": "tr",
+      "asset": "assets/content/documents/driver_privacy_notice_tr.md"
+    },
+    "other_road_users_notice": {
+      "documentKey": "other_road_users_notice",
+      "title": "Trafik Kazalarına İlişkin Aydınlatma Metni",
+      "shortTitle": "Aydınlatma Metni – Trafik Kazaları",
+      "version": "2026-08-18",
+      "validFrom": "2026-08-18",
+      "locale": "tr",
+      "asset": "assets/content/documents/other_road_users_notice_tr.md"
+    }
+  },
+  "modules": [
+    {
+      "id": "intro",
+      "title": "Konu nedir",
+      "icon": "info",
+      "estimatedSeconds": 60,
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Dağıtım araçlarımızda kamera tabanlı bir trafik güvenliği sistemi bulunmaktadır. Bu sistem sürekli kayıt yapmaz; yalnızca olay tetiklemeli fotoğraf çeker – yani sadece güvenlik açısından önemli bir olay algılandığında. Bu kursta neyin kaydedildiğini, verileri kimin gördüğünü, ne kadar süreyle saklandığını ve hangi haklara sahip olduğunuzu sade bir dille anlatıyoruz."
+        },
+        {
+          "type": "callout",
+          "style": "info",
+          "title": "Önce şunu bilin",
+          "text": "Kursun sonunda aydınlatma metnini teslim aldığınızı ve bilgi edindiğinizi teyit edeceksiniz. Bu bir rıza veya muvafakat değildir."
+        },
+        {
+          "type": "bullets",
+          "title": "Kurs yaklaşık 10 dakika sürer ve şunları kapsar",
+          "items": [
+            "kameraların nasıl çalıştığı ve bir kaydın hangi durumda oluştuğu",
+            "hakkınızda hangi verilerin işlendiği",
+            "bunu neden yaptığımız ve hangi hukuki sebebe dayandığımız",
+            "verileri kimlerin görebileceği",
+            "verilerin ne kadar süreyle saklandığı",
+            "veri sahibi olarak haklarınız"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "system",
+      "title": "Kameralar nasıl çalışır",
+      "icon": "videocam",
+      "estimatedSeconds": 120,
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Sistem, dışarıya yola ve içeriye sürücü bölümüne yönelmiş kameralar ile sürüş davranışını ölçen sensörlerden oluşur. Belirleyici olan şudur: Sensörler belirli güvenlik olaylarını algılar – ve kayıt ancak böyle bir olay gerçekleştiğinde tetiklenir."
+        },
+        {
+          "type": "factCard",
+          "style": "positive",
+          "title": "Ne OLMAZ",
+          "items": [
+            "Canlı yayın yoktur. Hiç kimse sürüşünüzü gerçek zamanlı olarak izlemez.",
+            "Kesintisiz gözetim yapılmaz. Sürüşünüz baştan sona izlenmez veya değerlendirilmez.",
+            "Sürekli kayıt ve sürekli veri aktarımı yoktur – ne yoldan ne de sürücü bölümünden.",
+            "SES KAYDI YAPILMAZ. Sistem hiçbir konuşmayı ve hiçbir sesi kaydetmez – ne sürücü bölümünde ne dışarıda, ne sürekli olarak ne de bir olay anında.",
+            "Sistem sizi iş hukuku sonuçları doğuracak şekilde otomatik olarak değerlendirmez. Her olayı bir insan inceler."
+          ]
+        },
+        {
+          "type": "factCard",
+          "style": "neutral",
+          "title": "Ne olur",
+          "items": [
+            "Sistem yalnızca olay tetiklemeli fotoğraf çeker – sessiz, yani ses olmadan – dolayısıyla sadece güvenlik açısından önemli bir olay algılandığında (ör. sert fren, takip mesafesinin ihlali, dikkat dağınıklığı).",
+            "Herhangi bir olay algılanmadığı sürece, saklanan veya aktarılan bir kayıt oluşmaz.",
+            "Fotoğraflar ancak algılanan bir olaydan sonra aktarılır ve değerlendirilebilir.",
+            "Bu olayları ilgili kayıtlarıyla birlikte uygulamada kendiniz de görürsünüz."
+          ]
+        },
+        {
+          "type": "callout",
+          "style": "warning",
+          "title": "Kamerayı kapatmayın",
+          "text": "Kameranın üzerinin kapatılması veya yönünün değiştirilmesi sistem tarafından bir olay olarak kaydedilir. Lütfen kameranın görüş alanını kapatmayın. Verilerinizin işlenmesine ilişkin sorularınız için Veri Koruma bölümünde belirtilen iletişim birimine başvurun."
+        }
+      ]
+    },
+    {
+      "id": "data",
+      "title": "Hakkınızda hangi veriler işlenir",
+      "icon": "dataset",
+      "estimatedSeconds": 120,
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Hakkınızda aşağıdaki kişisel veri kategorileri işlenebilir:"
+        },
+        {
+          "type": "keyValue",
+          "items": [
+            {
+              "key": "Kimlik verileri",
+              "value": "Ad, görüntüler"
+            },
+            {
+              "key": "İletişim verileri",
+              "value": "E-posta adresi"
+            },
+            {
+              "key": "Olay tetiklemeli fotoğraf kayıtları (sessiz)",
+              "value": "Yalnızca algılanan bir güvenlik olayında oluşan yol çevresi ve araç içi fotoğrafları – kesintisiz kayıt yoktur, ses kaydı yoktur"
+            },
+            {
+              "key": "Araç işletim verileri",
+              "value": "Konum, hız, ivmelenme, fren manevraları, viraj alma, öndeki araca mesafe"
+            },
+            {
+              "key": "Güvenlik olaylarına ilişkin veriler",
+              "value": "Hız sınırı ihlali, ani fren ve ani hızlanma, çarpışmalar, takip mesafesinin ihlali, dikkati dağınık sürüş, uyku hâli, kameranın engellenmesi, öne çarpma uyarıları, tam durmadan geçiş, trafik işaretlerine veya trafik ışıklarına uymama"
+            },
+            {
+              "key": "Etkileşim verileri",
+              "value": "Sistem ve uygulama ile olan etkileşimleriniz"
+            }
+          ]
+        },
+        {
+          "type": "callout",
+          "style": "warning",
+          "title": "Sağlık verileri – yalnızca istisnai hâllerde",
+          "text": "Ağır bir trafik kazası hâlinde istisnaen sağlık verileri işlenebilir; örneğin kayıtlarda görünen yaralanmalar. Bu durumda hukuki sebep GDPR md. 9/2-(f)'dir – bir hukuki talebin ileri sürülmesi veya bu tür taleplere karşı savunma."
+        }
+      ]
+    },
+    {
+      "id": "purpose",
+      "title": "Bunu neden yapıyoruz",
+      "icon": "shield",
+      "estimatedSeconds": 120,
+      "blocks": [
+        {
+          "type": "bullets",
+          "title": "İşleme amaçları",
+          "items": [
+            "Trafik güvenliğinin artırılması – hem sizin hem de diğer yol kullanıcıları için",
+            "Trafikteki olayların analizi ve hukuki taleplerin incelenmesi",
+            "Yasal yükümlülüklerin yerine getirilmesi"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Hukuki sebep, GDPR md. 6/1-(f) uyarınca meşru menfaatimizdir. Somut olarak bu; sağlığın ve beden bütünlüğünün korunmasını, trafik kazalarından doğan hukuki, mali ve itibari risklerin azaltılmasını ve kazaların aydınlatılmasını kapsar. Yasal yükümlülükleri yerine getirdiğimiz ölçüde ise GDPR md. 6/1-(c)'ye dayanırız."
+        },
+        {
+          "type": "callout",
+          "style": "info",
+          "title": "Rızaya dayanmıyoruz",
+          "text": "Rızanıza dayanmıyoruz. İş ilişkisinde bir rıza hukuken itiraza açık olurdu. Bunun yerine bir veri koruma etki değerlendirmesi yaptık ve menfaat dengesi analizini belgeledik."
+        }
+      ]
+    },
+    {
+      "id": "recipients",
+      "title": "Verileri kimler görebilir",
+      "icon": "group",
+      "estimatedSeconds": 90,
+      "blocks": [
+        {
+          "type": "bullets",
+          "title": "Alıcılar",
+          "items": [
+            "trafik güvenliği teknolojisi sağlayıcımız (kamera donanımı, bulut platformu, sürücü uygulaması)",
+            "yargı süreçleri kapsamında kamu kurumları ve resmî makamlar, örneğin mahkemeler veya kolluk birimleri",
+            "olaylar veya hukuki talepler söz konusu olduğu ölçüde sigortacılar ve sözleşme tarafları ile bunların avukatları"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Şirket içinde verileri yalnızca görevi için ihtiyaç duyan kişiler görür – örneğin bir güvenlik olayının değerlendirilmesi veya bir kazanın işleme alınması için."
+        },
+        {
+          "type": "callout",
+          "style": "info",
+          "title": "Üçüncü ülkelere aktarım",
+          "text": "Kural olarak verileriniz AB veya AEA içinde kalır. Verileri ABD'deki sağlayıcımıza aktardığımızda, GDPR md. 46/2-(c) uyarınca AB Standart Sözleşme Hükümlerine dayanırız. Ayrıca veriler hem aktarım sırasında hem de saklanırken şifrelenir."
+        }
+      ]
+    },
+    {
+      "id": "retention",
+      "title": "Ne kadar süreyle saklanır",
+      "icon": "schedule",
+      "estimatedSeconds": 60,
+      "blocks": [
+        {
+          "type": "keyValue",
+          "items": [
+            {
+              "key": "Araç içinde yerel olarak saklanan olay tetiklemeli kayıtlar",
+              "value": "birkaç gün, ardından otomatik olarak üzerine yazılır"
+            },
+            {
+              "key": "Bulutta saklanan güvenlik olayı fotoğrafları",
+              "value": "birkaç hafta, ardından otomatik olarak silinir"
+            },
+            {
+              "key": "Kazalara ve hukuki taleplere ilişkin materyal",
+              "value": "zamanaşımı süresi dolana veya süreç sonuçlanana kadar"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Süreler dolduktan sonra veriler silinir veya anonim hâle getirilir."
+        }
+      ]
+    },
+    {
+      "id": "rights",
+      "title": "Haklarınız",
+      "icon": "gavel",
+      "estimatedSeconds": 90,
+      "blocks": [
+        {
+          "type": "keyValue",
+          "items": [
+            {
+              "key": "Erişim hakkı (GDPR md. 15)",
+              "value": "Hakkınızda hangi verileri işlediğimizi öğrenebilirsiniz."
+            },
+            {
+              "key": "Düzeltme hakkı (GDPR md. 16)",
+              "value": "Yanlış veriler düzeltilmek zorundadır."
+            },
+            {
+              "key": "Silme hakkı (GDPR md. 17)",
+              "value": "Verilerinizin silinmesini talep edebilirsiniz."
+            },
+            {
+              "key": "Kısıtlama hakkı (GDPR md. 18)",
+              "value": "İşlemenin kısıtlanmasını sağlayabilirsiniz."
+            },
+            {
+              "key": "İtiraz hakkı (GDPR md. 21)",
+              "value": "İşlemeye GDPR md. 21 uyarınca itiraz edebilirsiniz."
+            },
+            {
+              "key": "Şikâyet hakkı (GDPR md. 77)",
+              "value": "Yetkili denetim makamına şikâyette bulunabilirsiniz."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Bu hakların tamamını uygulamadaki \"Veri Koruma\" bölümünden dilediğiniz zaman kullanabilirsiniz. Yetkili birimin iletişim bilgilerini orada bulursunuz. Talebiniz yasal süre içinde işleme alınır."
+        }
+      ]
+    },
+    {
+      "id": "others",
+      "title": "Diğer yol kullanıcıları",
+      "icon": "directions_walk",
+      "estimatedSeconds": 60,
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Bir olay kaydı tetiklediğinde, dışarıya yönelik fotoğraflarda tesadüfen diğer yol kullanıcıları da görünebilir. Bu materyalde yüzler ve plakalar otomatik olarak bulanıklaştırılır. Bulanıklaştırılmamış materyal yalnızca bir trafik kazası veya benzeri koşullar meydana geldiğinde saklanır ve değerlendirilir."
+        },
+        {
+          "type": "callout",
+          "style": "info",
+          "title": "Kaza yerinde size soru sorulursa",
+          "text": "Kazaya karışan kişileri trafik kazalarına ilişkin aydınlatma metnimize yönlendirin. Bu metni uygulamanın Veri Koruma bölümünde bulabilir ve doğrudan gösterebilirsiniz."
+        }
+      ]
+    },
+    {
+      "id": "document",
+      "title": "Aydınlatma metnini okuyun",
+      "icon": "description",
+      "estimatedSeconds": 240,
+      "requiresFullScroll": true,
+      "blocks": [
+        {
+          "type": "documentEmbed",
+          "documentKey": "driver_privacy_notice",
+          "title": "Trafik Güvenliği Teknolojilerinin Kullanımına İlişkin Aydınlatma Metni"
+        }
+      ]
+    }
+  ],
+  "acknowledgement": {
+    "headline": "Alındı teyidi",
+    "intro": "Lütfen aydınlatma metnini teslim aldığınızı ve bilgi edindiğinizi teyit edin.",
+    "statement": "{{documentDate}} tarihli sürümüyle Trafik Güvenliği Teknolojilerinin ve Sürüş Güvenliği Araçlarının Kullanımına İlişkin Aydınlatma Metni'ni teslim aldığımı ve bilgi edindiğimi teyit ederim.",
+    "clarification": "Bu teyidin, veri işlemeye verilmiş bir rıza anlamına gelmediğini biliyorum. İşleme, meşru menfaatlere dayanılarak gerçekleştirilmektedir.",
+    "systemNote": "Bilgi için: Sistem sürekli kayıt yapmaz. Yalnızca algılanan, güvenlik açısından önemli olaylarda olay tetiklemeli ve sessiz fotoğraf kayıtları oluşur – canlı yayın yoktur, kesintisiz gözetim yoktur, sürekli kayıt yoktur, ses kaydı yoktur.",
+    "checkboxLabel": "Teslim aldım ve bilgi edindim",
+    "signatureHint": "İmza",
+    "signatureOptional": false,
+    "signatureLegalNote": "İmzanız yalnızca aydınlatma metnini teslim aldığınızı ve bilgi edindiğinizi teyit eder – veri işlemeye verilmiş bir rıza değildir.",
+    "submitLabel": "Teyit et",
+    "declineLabel": "Teyit etmek istemiyorum",
+    "declineExplanation": "Bu tamamen sizin tercihiniz. Bu durumda yalnızca aydınlatma metninin size teslim edildiğini ve teyit belgesini imzalamadığınızı kayda geçiririz.",
+    "declineNote": "Aydınlatma metni {{datum}} tarihinde CoDriver uygulaması üzerinden teslim edilmiştir. Sürücü alındı teyidini imzalamamıştır.",
+    "successTitle": "Teşekkürler, her şey tamam",
+    "successText": "Alındı teyidiniz kaydedildi. Aydınlatma metnini ve belgenizi dilediğiniz zaman Veri Koruma bölümünde bulabilirsiniz.",
+    "declinedTitle": "Kayda geçirildi",
+    "declinedText": "Aydınlatma metninin size teslim edildiğini ve teyit belgesini imzalamadığınızı kayda geçirdik."
+  },
+  "privacyCenter": {
+    "headline": "Veri Koruma",
+    "intro": "Kamera sistemine ilişkin aydınlatma metinlerini, belgenizi ve veri sahibi haklarınız için iletişim bilgilerini burada her zaman bulabilirsiniz.",
+    "documentsTitle": "Aydınlatma metinleri",
+    "courseTitle": "Kurs ve alındı teyidi",
+    "contactTitle": "Erişim, düzeltme, silme",
+    "contactIntro": "Erişim (GDPR md. 15), düzeltme (GDPR md. 16), silme (GDPR md. 17) veya kısıtlama (GDPR md. 18) talepleriniz için lütfen yetkili birime başvurun:",
+    "contactEmail": "[E-Mail-Adresse des Datenschutzbeauftragten]",
+    "contactPlaceholderHint": "İletişim adresi henüz tanımlanmamıştır. Lütfen sevkiyat sorumlunuza veya idari birime başvurun.",
+    "contactMailSubject": "Veri sahibi hakları – Trafik güvenliği teknolojisi"
+  }
+}

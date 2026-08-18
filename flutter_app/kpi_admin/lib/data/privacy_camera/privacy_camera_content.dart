@@ -14,21 +14,31 @@
 //     „Ich stimme zu".
 //   - „Ich möchte nicht bestätigen" ist ein sichtbarer, gleichwertiger
 //     Weg und KEIN Fehlerfall.
-//   - Der Kurs blockiert die App NIEMALS. Erinnerung ja, Aussperrung
-//     nein — sonst wird aus der Kenntnisnahme faktisch ein Zwang und die
-//     Freiwilligkeitsargumentation der DSFA fällt in sich zusammen.
+//   - Der Kurs blockiert die App NIEMALS.
 //
 // INHALTLICHE KLARSTELLUNG (Kundenvorgabe):
-// Das System nimmt AUSSCHLIESSLICH ANLASSBEZOGEN FOTOS auf — ausgelöst
-// durch ein erkanntes sicherheitsrelevantes Ereignis. Kein Livestream,
-// keine lückenlose Überwachung, keine Daueraufzeichnung, kein
-// Dauerupload. Diese Aussage trägt die Verhältnismäßigkeit der DSFA und
-// darf in den Inhalten nicht verwässert werden.
+// Das System nimmt AUSSCHLIESSLICH ANLASSBEZOGEN FOTOS OHNE TON auf —
+// ausgelöst durch ein erkanntes sicherheitsrelevantes Ereignis. Kein
+// Livestream, keine lückenlose Überwachung, keine Daueraufzeichnung,
+// kein Dauerupload, KEINE TONAUFNAHME.
 //
-// Inhalte liegen als Asset-JSON (`assets/content/privacy_course_de.json`)
-// plus zwei Markdown-Volltexten unter `assets/content/documents/`. Damit
-// lassen sich Texte ohne Code-Änderung pflegen, und weitere Sprachen
-// docken später als `privacy_course_{lang}.json` an.
+// WIDERSPRUCHSRECHT — bewusste Grenze (Kundenvorgabe + Gesetz):
+// Der Kurs BETONT das Widerspruchsrecht nicht mehr: es gibt kein eigenes
+// Modul und kein In-App-Formular. Die gesetzliche Mindestinformation
+// bleibt aber erhalten, weil ein Art.-13-Hinweis ohne Angabe des
+// Widerspruchsrechts fehlerhaft wäre (Art. 13 Abs. 2 lit. b DSGVO):
+//   - in beiden Volltext-Dokumenten unverändert,
+//   - im Rechte-Modul als EIN nüchterner Punkt neben Art. 15–18 und 77.
+//
+// KEIN QUIZ: Die Module sind reine Lese-/Informationsseiten. Der
+// Kenntnisnahme-Beleg besteht aus completedModuleIds, dem Scroll-Gate im
+// Volltext (documentScrolledToEnd) und der Lesedauer.
+//
+// MEHRSPRACHIGKEIT: Inhalte liegen als `privacy_course_{lang}.json` plus
+// `documents/{key}_{lang}.md` für alle 11 App-Sprachen. Der VERBINDLICHE
+// Wortlaut der Empfangsbestätigung (Spec §7) bleibt in JEDER Sprache
+// zusätzlich auf Deutsch sichtbar — deshalb lädt das Bundle immer auch
+// die deutsche Fassung als [bindingAck] / [bindingDocument].
 
 import 'dart:convert';
 
@@ -44,7 +54,8 @@ import 'package:flutter/services.dart' show rootBundle;
 /// `'privacy_notice'` (Art.-13-Information beim Login).
 const String kPrivacyCameraTestId = 'privacy_camera';
 
-/// Ablage der Widersprüche — gleiche Regelmechanik, eigener Zweig.
+/// Ablage der Widersprüche. Der In-App-Flow ist auf Kundenwunsch
+/// abgeschaltet; Pfad und Code bleiben für Bestandsdaten erhalten.
 const String kPrivacyCameraObjectionTestId = 'privacy_camera_objection';
 
 /// Dokumenttyp der Bescheinigung im Drivers Hub unter
@@ -53,17 +64,52 @@ const String kPrivacyCameraObjectionTestId = 'privacy_camera_objection';
 const String kPrivacyCameraCertificateDocType =
     'camera_privacy_ack_certificate';
 
+/// Version der App, die in den Nachweis geschrieben wird (Kontextfeld
+/// nach Spec §5).
+const String kPrivacyCameraAppVersion = '1.0.0';
+
+/// FREISCHALTUNG FÜR FAHRER.
+///
+/// `false` = das Modul ist in der Fahrer-App gesperrt: Die Kacheln in der
+/// DA Academy erscheinen als „Kommt bald", der Datenschutz-Bereich ist
+/// nicht erreichbar, und das Modul zählt NICHT im roten Academy-Zähler
+/// auf der Home-Kachel mit. Die Admin-Ansicht bleibt sichtbar.
+///
+/// Auf `true` setzen, sobald der Kunde die Inhalte final abgestimmt hat —
+/// mehr ist für die Freischaltung nicht nötig.
+const bool kPrivacyCameraDriverEnabled = false;
+
+/// Sprache des VERBINDLICHEN Wortlauts. Bleibt in jeder Sprachfassung
+/// zusätzlich sichtbar und wird immer mitgespeichert.
+const String kPrivacyBindingLanguage = 'de';
+
+/// Alle Sprachen, für die Kursinhalte ausgeliefert werden — identisch
+/// zu `AppLocalizations.supportedLocales`.
+const List<String> kPrivacyCourseLanguages = <String>[
+  'de',
+  'en',
+  'sq',
+  'hu',
+  'ro',
+  'hr',
+  'ar',
+  'tr',
+  'ru',
+  'bg',
+  'es',
+];
+
 /// Asset-Pfad der Kursinhalte je Sprache.
 String privacyCourseAssetFor(String languageCode) =>
-    'assets/content/privacy_course_${languageCode.toLowerCase()}.json';
+    'assets/content/privacy_course_$languageCode.json';
 
-/// Sprache, die als Inhalt v1 ausgeliefert wird. Weitere Sprachen
-/// brauchen nur eine weitere JSON-Datei mit gleicher Struktur.
-const String kPrivacyCourseFallbackLanguage = 'de';
-
-/// Version der App, die in den Nachweis geschrieben wird (Kontextfeld
-/// nach Spec §5). Bei Releases mit geänderten Inhalten mitziehen.
-const String kPrivacyCameraAppVersion = '1.0.0';
+/// Normalisiert einen Locale-Code auf eine ausgelieferte Sprache.
+String privacyCourseLanguageFor(String languageCode) {
+  final lang = languageCode.trim().toLowerCase().split(RegExp('[-_]')).first;
+  return kPrivacyCourseLanguages.contains(lang)
+      ? lang
+      : kPrivacyBindingLanguage;
+}
 
 // ── Inhaltsmodell ───────────────────────────────────────────────────
 
@@ -80,7 +126,6 @@ class PrivacyCourse {
   final Map<String, PrivacyDocumentRef> documents;
   final List<PrivacyModule> modules;
   final PrivacyAckCopy acknowledgement;
-  final PrivacyObjectionCopy objectionForm;
   final PrivacyCenterCopy center;
 
   const PrivacyCourse({
@@ -95,20 +140,17 @@ class PrivacyCourse {
     required this.documents,
     required this.modules,
     required this.acknowledgement,
-    required this.objectionForm,
     required this.center,
   });
 
   /// Das Dokument, dessen Fassung im Nachweis festgehalten wird.
-  PrivacyDocumentRef get primaryDocument => documents[documentRefs.first]!;
-
-  int get quizTotal => modules.fold(0, (sum, m) => sum + m.quiz.length);
+  PrivacyDocumentRef get primaryDocumentRef => documents[documentRefs.first]!;
 
   factory PrivacyCourse.fromJson(Map<String, dynamic> j) {
     final rawDocs = (j['documents'] as Map?)?.cast<String, dynamic>() ?? {};
     return PrivacyCourse(
       courseId: j['courseId'] as String,
-      locale: j['locale'] as String? ?? 'de-DE',
+      locale: j['locale'] as String? ?? kPrivacyBindingLanguage,
       contentVersion: j['contentVersion'] as String? ?? '1.0.0',
       title: j['title'] as String? ?? '',
       subtitle: j['subtitle'] as String? ?? '',
@@ -128,9 +170,6 @@ class PrivacyCourse {
       ],
       acknowledgement: PrivacyAckCopy.fromJson(
         (j['acknowledgement'] as Map).cast<String, dynamic>(),
-      ),
-      objectionForm: PrivacyObjectionCopy.fromJson(
-        (j['objectionForm'] as Map).cast<String, dynamic>(),
       ),
       center: PrivacyCenterCopy.fromJson(
         (j['privacyCenter'] as Map?)?.cast<String, dynamic>() ?? const {},
@@ -172,7 +211,7 @@ class PrivacyDocumentRef {
         validFrom:
             DateTime.tryParse(j['validFrom'] as String? ?? '') ??
             DateTime(1970),
-        locale: j['locale'] as String? ?? 'de-DE',
+        locale: j['locale'] as String? ?? kPrivacyBindingLanguage,
         asset: j['asset'] as String,
       );
 }
@@ -191,6 +230,7 @@ class PrivacyDocument {
   });
 }
 
+/// Ein Kursmodul — reine Lese-/Informationsseite, ohne Quiz.
 @immutable
 class PrivacyModule {
   final String id;
@@ -199,9 +239,9 @@ class PrivacyModule {
   final int estimatedSeconds;
 
   /// `true` = der Volltext muss geöffnet und bis ans Ende gelesen sein.
+  /// Das ist das einzige verbleibende Gate im Kurs.
   final bool requiresFullScroll;
   final List<PrivacyBlock> blocks;
-  final List<PrivacyQuizQuestion> quiz;
 
   const PrivacyModule({
     required this.id,
@@ -210,7 +250,6 @@ class PrivacyModule {
     required this.estimatedSeconds,
     required this.requiresFullScroll,
     required this.blocks,
-    required this.quiz,
   });
 
   factory PrivacyModule.fromJson(Map<String, dynamic> j) => PrivacyModule(
@@ -222,10 +261,6 @@ class PrivacyModule {
     blocks: [
       for (final b in (j['blocks'] as List? ?? const []))
         PrivacyBlock.fromJson((b as Map).cast<String, dynamic>()),
-    ],
-    quiz: [
-      for (final q in (j['quiz'] as List? ?? const []))
-        PrivacyQuizQuestion.fromJson((q as Map).cast<String, dynamic>()),
     ],
   );
 }
@@ -283,35 +318,6 @@ class PrivacyKeyValue {
       PrivacyKeyValue(key: '${j['key']}', value: '${j['value']}');
 }
 
-/// Quizfrage. Das Quiz ist KEIN Bestehens-Gate: eine falsche Antwort
-/// blockiert nicht, sondern zeigt die Erklärung. Der Punktestand wandert
-/// in den Nachweis und belegt „es wurde informiert, nicht weggeklickt".
-@immutable
-class PrivacyQuizQuestion {
-  final String id;
-  final String question;
-  final List<String> options;
-  final int correctIndex;
-  final String explanation;
-
-  const PrivacyQuizQuestion({
-    required this.id,
-    required this.question,
-    required this.options,
-    required this.correctIndex,
-    required this.explanation,
-  });
-
-  factory PrivacyQuizQuestion.fromJson(Map<String, dynamic> j) =>
-      PrivacyQuizQuestion(
-        id: j['id'] as String,
-        question: j['question'] as String,
-        options: (j['options'] as List).map((e) => '$e').toList(),
-        correctIndex: (j['correctIndex'] as num).toInt(),
-        explanation: j['explanation'] as String? ?? '',
-      );
-}
-
 @immutable
 class PrivacyAckCopy {
   final String headline;
@@ -321,8 +327,8 @@ class PrivacyAckCopy {
   final String systemNote;
   final String checkboxLabel;
   final String signatureHint;
+  /// `false` = die Unterschrift ist Pflicht (aktueller Stand).
   final bool signatureOptional;
-  final String signatureOptionalHint;
 
   /// Klarstellung DIREKT am Unterschriftsfeld: Die Unterschrift belegt
   /// den Erhalt und die Kenntnisnahme — sie ist keine Einwilligung.
@@ -347,7 +353,6 @@ class PrivacyAckCopy {
     required this.checkboxLabel,
     required this.signatureHint,
     required this.signatureOptional,
-    required this.signatureOptionalHint,
     required this.signatureLegalNote,
     required this.submitLabel,
     required this.declineLabel,
@@ -364,7 +369,8 @@ class PrivacyAckCopy {
       statement.replaceAll('{{documentDate}}', documentDate);
 
   /// Vermerk bei Verweigerung — kein Fahrertext, nur Admin-Ansicht.
-  String declineNoteFor(String date) => declineNote.replaceAll('{{datum}}', date);
+  String declineNoteFor(String date) =>
+      declineNote.replaceAll('{{datum}}', date);
 
   factory PrivacyAckCopy.fromJson(Map<String, dynamic> j) => PrivacyAckCopy(
     headline: j['headline'] as String? ?? '',
@@ -374,8 +380,7 @@ class PrivacyAckCopy {
     systemNote: j['systemNote'] as String? ?? '',
     checkboxLabel: j['checkboxLabel'] as String? ?? '',
     signatureHint: j['signatureHint'] as String? ?? '',
-    signatureOptional: j['signatureOptional'] as bool? ?? true,
-    signatureOptionalHint: j['signatureOptionalHint'] as String? ?? '',
+    signatureOptional: j['signatureOptional'] as bool? ?? false,
     signatureLegalNote: j['signatureLegalNote'] as String? ?? '',
     submitLabel: j['submitLabel'] as String? ?? '',
     declineLabel: j['declineLabel'] as String? ?? '',
@@ -389,62 +394,11 @@ class PrivacyAckCopy {
 }
 
 @immutable
-class PrivacyObjectionCopy {
-  final String headline;
-  final String intro;
-  final String statement;
-  final String reasonLabel;
-  final String reasonHint;
-  final String consequences;
-  final String submitLabel;
-  final String withdrawLabel;
-  final String successTitle;
-  final String successText;
-  final String activeTitle;
-  final String withdrawnTitle;
-  final String withdrawnText;
-
-  const PrivacyObjectionCopy({
-    required this.headline,
-    required this.intro,
-    required this.statement,
-    required this.reasonLabel,
-    required this.reasonHint,
-    required this.consequences,
-    required this.submitLabel,
-    required this.withdrawLabel,
-    required this.successTitle,
-    required this.successText,
-    required this.activeTitle,
-    required this.withdrawnTitle,
-    required this.withdrawnText,
-  });
-
-  factory PrivacyObjectionCopy.fromJson(Map<String, dynamic> j) =>
-      PrivacyObjectionCopy(
-        headline: j['headline'] as String? ?? '',
-        intro: j['intro'] as String? ?? '',
-        statement: j['statement'] as String? ?? '',
-        reasonLabel: j['reasonLabel'] as String? ?? '',
-        reasonHint: j['reasonHint'] as String? ?? '',
-        consequences: j['consequences'] as String? ?? '',
-        submitLabel: j['submitLabel'] as String? ?? '',
-        withdrawLabel: j['withdrawLabel'] as String? ?? '',
-        successTitle: j['successTitle'] as String? ?? '',
-        successText: j['successText'] as String? ?? '',
-        activeTitle: j['activeTitle'] as String? ?? '',
-        withdrawnTitle: j['withdrawnTitle'] as String? ?? '',
-        withdrawnText: j['withdrawnText'] as String? ?? '',
-      );
-}
-
-@immutable
 class PrivacyCenterCopy {
   final String headline;
   final String intro;
   final String documentsTitle;
   final String courseTitle;
-  final String objectionTitle;
   final String contactTitle;
   final String contactIntro;
   final String contactEmail;
@@ -456,7 +410,6 @@ class PrivacyCenterCopy {
     required this.intro,
     required this.documentsTitle,
     required this.courseTitle,
-    required this.objectionTitle,
     required this.contactTitle,
     required this.contactIntro,
     required this.contactEmail,
@@ -477,7 +430,6 @@ class PrivacyCenterCopy {
         intro: j['intro'] as String? ?? '',
         documentsTitle: j['documentsTitle'] as String? ?? '',
         courseTitle: j['courseTitle'] as String? ?? '',
-        objectionTitle: j['objectionTitle'] as String? ?? '',
         contactTitle: j['contactTitle'] as String? ?? '',
         contactIntro: j['contactIntro'] as String? ?? '',
         contactEmail: j['contactEmail'] as String? ?? '',
@@ -488,42 +440,59 @@ class PrivacyCenterCopy {
 
 // ── Laden ───────────────────────────────────────────────────────────
 
-/// Lädt Kurs + Volltexte einmal und hält sie im Speicher. Die Inhalte
-/// sind Assets und ändern sich zur Laufzeit nicht.
+/// Kurs + Volltexte in der Anzeigesprache, PLUS die deutsche Fassung als
+/// verbindliche Referenz.
+///
+/// Warum die deutsche Fassung immer mitgeladen wird:
+///  1. Der verbindliche Wortlaut der Empfangsbestätigung (Spec §7) muss
+///     in jeder Sprache zusätzlich auf Deutsch sichtbar sein und wird so
+///     gespeichert.
+///  2. Die Prüfsumme im Nachweis wird über den DEUTSCHEN Volltext
+///     gebildet. Sonst würde ein Sprachwechsel des Fahrers fälschlich
+///     als „neue Fassung" gelten und eine Wiedervorlage auslösen.
 class PrivacyCourseBundle {
+  final String languageCode;
   final PrivacyCourse course;
   final Map<String, PrivacyDocument> documents;
 
-  const PrivacyCourseBundle({required this.course, required this.documents});
+  /// Deutscher Volltext — maßgeblich für Fassung und Prüfsumme.
+  final PrivacyDocument bindingDocument;
 
-  PrivacyDocument get primaryDocument =>
-      documents[course.documentRefs.first]!;
+  /// Deutsche Empfangsbestätigungs-Texte — verbindlicher Wortlaut.
+  final PrivacyAckCopy bindingAck;
+
+  const PrivacyCourseBundle({
+    required this.languageCode,
+    required this.course,
+    required this.documents,
+    required this.bindingDocument,
+    required this.bindingAck,
+  });
+
+  /// Volltext in der Anzeigesprache.
+  PrivacyDocument get primaryDocument => documents[course.documentRefs.first]!;
+
+  /// `true`, wenn die Anzeigesprache nicht die verbindliche Sprache ist —
+  /// dann wird der deutsche Wortlaut zusätzlich eingeblendet.
+  bool get needsBindingTranslationBlock =>
+      languageCode != kPrivacyBindingLanguage;
 
   static final Map<String, PrivacyCourseBundle> _cache = {};
 
-  /// Lädt die Inhalte für [languageCode] und fällt auf Deutsch zurück,
-  /// solange keine Übersetzung ausgeliefert wird.
-  static Future<PrivacyCourseBundle> load(String languageCode) async {
-    final lang = languageCode.trim().toLowerCase();
-    final cached = _cache[lang];
-    if (cached != null) return cached;
-
-    String raw;
-    try {
-      raw = await rootBundle.loadString(privacyCourseAssetFor(lang));
-    } catch (_) {
-      raw = await rootBundle.loadString(
-        privacyCourseAssetFor(kPrivacyCourseFallbackLanguage),
-      );
-    }
-    final course = PrivacyCourse.fromJson(
+  static Future<PrivacyCourse> _loadCourse(String lang) async {
+    final raw = await rootBundle.loadString(privacyCourseAssetFor(lang));
+    return PrivacyCourse.fromJson(
       (jsonDecode(raw) as Map).cast<String, dynamic>(),
     );
+  }
 
-    final docs = <String, PrivacyDocument>{};
+  static Future<Map<String, PrivacyDocument>> _loadDocuments(
+    PrivacyCourse course,
+  ) async {
+    final out = <String, PrivacyDocument>{};
     for (final entry in course.documents.entries) {
       final text = await rootBundle.loadString(entry.value.asset);
-      docs[entry.key] = PrivacyDocument(
+      out[entry.key] = PrivacyDocument(
         ref: entry.value,
         markdown: text,
         // Prüfsumme des exakt ausgelieferten Textes — belegt später,
@@ -531,8 +500,40 @@ class PrivacyCourseBundle {
         contentSha256: sha256.convert(utf8.encode(text)).toString(),
       );
     }
+    return out;
+  }
 
-    final bundle = PrivacyCourseBundle(course: course, documents: docs);
+  /// Lädt die Inhalte für [languageCode]; fehlt eine Sprachfassung,
+  /// wird auf Deutsch zurückgefallen.
+  static Future<PrivacyCourseBundle> load(String languageCode) async {
+    final lang = privacyCourseLanguageFor(languageCode);
+    final cached = _cache[lang];
+    if (cached != null) return cached;
+
+    PrivacyCourse course;
+    var effective = lang;
+    try {
+      course = await _loadCourse(lang);
+    } catch (_) {
+      effective = kPrivacyBindingLanguage;
+      course = await _loadCourse(kPrivacyBindingLanguage);
+    }
+    final documents = await _loadDocuments(course);
+
+    PrivacyCourse bindingCourse = course;
+    Map<String, PrivacyDocument> bindingDocs = documents;
+    if (effective != kPrivacyBindingLanguage) {
+      bindingCourse = await _loadCourse(kPrivacyBindingLanguage);
+      bindingDocs = await _loadDocuments(bindingCourse);
+    }
+
+    final bundle = PrivacyCourseBundle(
+      languageCode: effective,
+      course: course,
+      documents: documents,
+      bindingDocument: bindingDocs[bindingCourse.documentRefs.first]!,
+      bindingAck: bindingCourse.acknowledgement,
+    );
     _cache[lang] = bundle;
     return bundle;
   }
@@ -555,8 +556,6 @@ IconData privacyModuleIcon(String name) {
       return Icons.schedule_rounded;
     case 'gavel':
       return Icons.gavel_rounded;
-    case 'block':
-      return Icons.block_flipped;
     case 'directions_walk':
       return Icons.directions_walk_rounded;
     case 'description':

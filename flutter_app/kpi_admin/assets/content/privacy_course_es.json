@@ -1,0 +1,339 @@
+{
+  "courseId": "privacy_camera",
+  "locale": "es",
+  "contentVersion": "1.0.0",
+  "title": "Cámaras en el vehículo – Protección de datos",
+  "subtitle": "Qué se registra, por qué y qué derechos tiene usted",
+  "estimatedMinutes": 10,
+  "requiresAcknowledgement": true,
+  "documentRefs": [
+    "driver_privacy_notice",
+    "other_road_users_notice"
+  ],
+  "documents": {
+    "driver_privacy_notice": {
+      "documentKey": "driver_privacy_notice",
+      "title": "Declaración de protección de datos sobre el uso de tecnologías de seguridad vial",
+      "shortTitle": "Protección de datos – conductores",
+      "version": "2026-08-18",
+      "validFrom": "2026-08-18",
+      "locale": "es",
+      "asset": "assets/content/documents/driver_privacy_notice_es.md"
+    },
+    "other_road_users_notice": {
+      "documentKey": "other_road_users_notice",
+      "title": "Declaración de protección de datos sobre accidentes de tráfico",
+      "shortTitle": "Protección de datos – accidentes de tráfico",
+      "version": "2026-08-18",
+      "validFrom": "2026-08-18",
+      "locale": "es",
+      "asset": "assets/content/documents/other_road_users_notice_es.md"
+    }
+  },
+  "modules": [
+    {
+      "id": "intro",
+      "title": "De qué se trata",
+      "icon": "info",
+      "estimatedSeconds": 60,
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "En nuestros vehículos de reparto hay instalado un sistema de seguridad vial basado en cámaras. No graba de forma permanente, sino que toma fotos únicamente cuando se produce un incidente, es decir, solo cuando se detecta un evento relevante para la seguridad. En este curso le explicamos en lenguaje sencillo qué se registra, quién ve los datos, cuánto tiempo se conservan y qué derechos tiene usted."
+        },
+        {
+          "type": "callout",
+          "style": "info",
+          "title": "Importante antes de empezar",
+          "text": "Al final confirmará usted que ha recibido la declaración de protección de datos. Esto no es un consentimiento ni una aprobación."
+        },
+        {
+          "type": "bullets",
+          "title": "El curso dura unos 10 minutos y trata sobre",
+          "items": [
+            "cómo funcionan las cámaras y cuándo se genera realmente una toma",
+            "qué datos suyos se tratan",
+            "por qué lo hacemos y sobre qué base jurídica",
+            "quién puede ver los datos",
+            "cuánto tiempo se conservan",
+            "sus derechos como interesado"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "system",
+      "title": "Cómo funcionan las cámaras",
+      "icon": "videocam",
+      "estimatedSeconds": 120,
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "El sistema se compone de cámaras orientadas hacia el exterior, a la calzada, y hacia el interior, a la cabina, así como de sensores que miden el comportamiento de conducción. Lo decisivo es lo siguiente: los sensores detectan determinados eventos de seguridad, y solo un evento de ese tipo desencadena una toma."
+        },
+        {
+          "type": "factCard",
+          "style": "positive",
+          "title": "Lo que NO ocurre",
+          "items": [
+            "No hay retransmisión en directo. Nadie le observa en tiempo real mientras conduce.",
+            "No se realiza ninguna vigilancia ininterrumpida. Su trayecto no se observa ni se valora de forma continua.",
+            "No hay grabación permanente ni transmisión permanente de datos, ni de la calzada ni de la cabina.",
+            "NO SE GRABA NINGÚN SONIDO. El sistema no registra conversaciones ni ruidos, ni en la cabina ni en el exterior, ni de forma permanente ni al producirse un evento.",
+            "El sistema no le evalúa automáticamente con consecuencias laborales. Una persona revisa cada incidente."
+          ]
+        },
+        {
+          "type": "factCard",
+          "style": "neutral",
+          "title": "Lo que sí ocurre",
+          "items": [
+            "El sistema toma fotos únicamente cuando se produce un incidente y sin sonido, es decir, solo cuando se detecta un evento relevante para la seguridad (p. ej., frenada brusca, distancia de seguridad demasiado corta, distracción).",
+            "Mientras no se detecte ningún evento, no se genera ninguna toma que se almacene o se transmita.",
+            "Solo después de detectarse un evento se transmiten las fotos correspondientes y pueden ser analizadas.",
+            "Usted mismo ve estos eventos en la aplicación, junto con las tomas correspondientes."
+          ]
+        },
+        {
+          "type": "callout",
+          "style": "warning",
+          "title": "No cubra la cámara",
+          "text": "Cubrir o desajustar la cámara queda registrado por el sistema como un evento. Mantenga por favor la cámara despejada. Si tiene preguntas sobre el tratamiento de sus datos, diríjase al punto de contacto indicado en la sección Protección de datos."
+        }
+      ]
+    },
+    {
+      "id": "data",
+      "title": "Qué datos suyos se tratan",
+      "icon": "dataset",
+      "estimatedSeconds": 120,
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Pueden tratarse las siguientes categorías de datos personales sobre usted:"
+        },
+        {
+          "type": "keyValue",
+          "items": [
+            {
+              "key": "Datos identificativos",
+              "value": "Nombre, imágenes"
+            },
+            {
+              "key": "Datos de contacto",
+              "value": "Dirección de correo electrónico"
+            },
+            {
+              "key": "Fotos tomadas con motivo de un incidente (sin sonido)",
+              "value": "Fotos del entorno de la vía y del interior del vehículo que se generan exclusivamente al detectarse un evento de seguridad; no hay grabación continua ni grabación de sonido"
+            },
+            {
+              "key": "Datos de funcionamiento del vehículo",
+              "value": "Ubicación, velocidad, aceleración, frenadas, tomas de curva, distancia con el vehículo precedente"
+            },
+            {
+              "key": "Datos sobre incidentes de seguridad",
+              "value": "Exceso de velocidad, frenadas y aceleraciones bruscas, colisiones, distancia de seguridad demasiado corta, conducción distraída, somnolencia, obstrucción de la cámara, avisos de colisión frontal, paradas sin detención completa, infracciones de señales de tráfico o de semáforos"
+            },
+            {
+              "key": "Datos de interacción",
+              "value": "Sus interacciones con el sistema y con la aplicación"
+            }
+          ]
+        },
+        {
+          "type": "callout",
+          "style": "warning",
+          "title": "Datos de salud: solo con carácter excepcional",
+          "text": "En caso de accidente de tráfico grave pueden tratarse excepcionalmente datos de salud, por ejemplo lesiones visibles en las tomas. En ese caso la base jurídica es el art. 9.2.f) del RGPD: la formulación, el ejercicio o la defensa de reclamaciones."
+        }
+      ]
+    },
+    {
+      "id": "purpose",
+      "title": "Por qué lo hacemos",
+      "icon": "shield",
+      "estimatedSeconds": 120,
+      "blocks": [
+        {
+          "type": "bullets",
+          "title": "Fines del tratamiento",
+          "items": [
+            "Mejora de la seguridad vial, para usted y para los demás usuarios de la vía",
+            "Análisis de incidentes en la circulación y examen de reclamaciones",
+            "Cumplimiento de obligaciones legales"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "La base jurídica es nuestro interés legítimo con arreglo al art. 6.1.f) del RGPD. En concreto se trata de proteger la salud y la integridad física, de reducir los riesgos jurídicos, económicos y reputacionales derivados de los accidentes de tráfico, así como de esclarecer los accidentes. En la medida en que cumplimos obligaciones legales, nos basamos en el art. 6.1.c) del RGPD."
+        },
+        {
+          "type": "callout",
+          "style": "info",
+          "title": "Sin consentimiento",
+          "text": "No nos basamos en su consentimiento. En una relación laboral un consentimiento sería jurídicamente impugnable. En su lugar hemos realizado una evaluación de impacto relativa a la protección de datos y hemos documentado la ponderación de intereses."
+        }
+      ]
+    },
+    {
+      "id": "recipients",
+      "title": "Quién puede ver los datos",
+      "icon": "group",
+      "estimatedSeconds": 90,
+      "blocks": [
+        {
+          "type": "bullets",
+          "title": "Destinatarios",
+          "items": [
+            "nuestro proveedor de tecnología de seguridad vial (hardware de las cámaras, plataforma en la nube, aplicación para conductores)",
+            "autoridades y organismos públicos, como juzgados o autoridades de persecución penal, en el marco de procedimientos",
+            "aseguradoras y socios contractuales, junto con sus abogados, cuando se trate de incidentes o de reclamaciones"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Internamente solo ven los datos las personas que los necesitan para su tarea, por ejemplo para comentar posteriormente un evento de seguridad o para tramitar un accidente."
+        },
+        {
+          "type": "callout",
+          "style": "info",
+          "title": "Transferencias a terceros países",
+          "text": "Por regla general sus datos permanecen en la UE o en el EEE. Cuando transferimos datos a nuestro proveedor en Estados Unidos, nos basamos en las cláusulas contractuales tipo de la UE conforme al art. 46.2.c) del RGPD. Además, los datos están cifrados tanto durante la transmisión como en el almacenamiento."
+        }
+      ]
+    },
+    {
+      "id": "retention",
+      "title": "Cuánto tiempo se conservan",
+      "icon": "schedule",
+      "estimatedSeconds": 60,
+      "blocks": [
+        {
+          "type": "keyValue",
+          "items": [
+            {
+              "key": "Tomas con motivo de un incidente, en local en el vehículo",
+              "value": "unos pocos días; después se sobrescriben automáticamente"
+            },
+            {
+              "key": "Fotos de eventos de seguridad en la nube",
+              "value": "unas pocas semanas; después se suprimen automáticamente"
+            },
+            {
+              "key": "Material relativo a accidentes y reclamaciones",
+              "value": "hasta que expire el plazo de prescripción o hasta la conclusión del procedimiento"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Una vez transcurridos los plazos, los datos se suprimen o se anonimizan."
+        }
+      ]
+    },
+    {
+      "id": "rights",
+      "title": "Sus derechos",
+      "icon": "gavel",
+      "estimatedSeconds": 90,
+      "blocks": [
+        {
+          "type": "keyValue",
+          "items": [
+            {
+              "key": "Acceso (art. 15)",
+              "value": "Puede saber qué datos suyos tratamos."
+            },
+            {
+              "key": "Rectificación (art. 16)",
+              "value": "Los datos incorrectos deben corregirse."
+            },
+            {
+              "key": "Supresión (art. 17)",
+              "value": "Puede solicitar la supresión de sus datos."
+            },
+            {
+              "key": "Limitación (art. 18)",
+              "value": "Puede solicitar que se limite el tratamiento."
+            },
+            {
+              "key": "Oposición (art. 21)",
+              "value": "Puede oponerse al tratamiento con arreglo al art. 21 del RGPD."
+            },
+            {
+              "key": "Reclamación (art. 77)",
+              "value": "Puede presentar una reclamación ante la autoridad de control competente."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Puede ejercer todos estos derechos en cualquier momento desde la sección «Protección de datos» de la aplicación. Allí encontrará los datos de contacto del organismo competente. Su solicitud se tramitará dentro del plazo legal."
+        }
+      ]
+    },
+    {
+      "id": "others",
+      "title": "Otros usuarios de la vía",
+      "icon": "directions_walk",
+      "estimatedSeconds": 60,
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Cuando un evento activa una toma, en las fotos orientadas hacia el exterior pueden aparecer de forma incidental otros usuarios de la vía. En ese material, los rostros y las matrículas se pixelan automáticamente. El material sin pixelar solo se conserva y se analiza cuando se ha producido un accidente de tráfico o concurren circunstancias comparables."
+        },
+        {
+          "type": "callout",
+          "style": "info",
+          "title": "Si le preguntan en el lugar del accidente",
+          "text": "Remita a las personas implicadas en el accidente a nuestra declaración de protección de datos sobre accidentes de tráfico. La encontrará en la aplicación, en la sección Protección de datos, y puede mostrarla directamente."
+        }
+      ]
+    },
+    {
+      "id": "document",
+      "title": "Leer la declaración de protección de datos",
+      "icon": "description",
+      "estimatedSeconds": 240,
+      "requiresFullScroll": true,
+      "blocks": [
+        {
+          "type": "documentEmbed",
+          "documentKey": "driver_privacy_notice",
+          "title": "Declaración de protección de datos sobre el uso de tecnologías de seguridad vial"
+        }
+      ]
+    }
+  ],
+  "acknowledgement": {
+    "headline": "Confirmación de recepción",
+    "intro": "Confirme, por favor, que ha recibido la declaración de protección de datos y que ha tomado conocimiento de ella.",
+    "statement": "Confirmo que he recibido la declaración de protección de datos sobre el uso de tecnologías de seguridad vial y de herramientas de seguridad en la conducción, en su versión de {{documentDate}}, y que he tomado conocimiento de ella.",
+    "clarification": "Soy consciente de que esta confirmación no constituye un consentimiento para el tratamiento de datos. El tratamiento se realiza sobre la base de intereses legítimos.",
+    "systemNote": "Para situarlo: el sistema no graba de forma permanente. Únicamente se generan fotos sin sonido, tomadas con motivo de eventos relevantes para la seguridad que hayan sido detectados: sin retransmisión en directo, sin vigilancia ininterrumpida, sin grabación permanente y sin grabación de sonido.",
+    "checkboxLabel": "He recibido y he tomado conocimiento",
+    "signatureHint": "Firma",
+    "signatureOptional": false,
+    "signatureLegalNote": "Su firma confirma exclusivamente la recepción y la toma de conocimiento de la declaración de protección de datos; no constituye un consentimiento para el tratamiento de datos.",
+    "submitLabel": "Confirmar",
+    "declineLabel": "No deseo confirmar",
+    "declineExplanation": "No hay ningún problema. En ese caso simplemente dejaremos constancia de que se le entregó la declaración de protección de datos y de que no firmó la confirmación.",
+    "declineNote": "Declaración de protección de datos entregada el {{datum}} a través de la aplicación CoDriver. El conductor no ha firmado la confirmación de recepción.",
+    "successTitle": "Gracias, todo listo",
+    "successText": "Se ha guardado su confirmación de recepción. Encontrará la declaración de protección de datos y su justificante en cualquier momento en la sección Protección de datos.",
+    "declinedTitle": "Anotado",
+    "declinedText": "Hemos dejado constancia de que se le entregó la declaración de protección de datos y de que no firmó la confirmación."
+  },
+  "privacyCenter": {
+    "headline": "Protección de datos",
+    "intro": "Aquí encontrará en todo momento las declaraciones de protección de datos relativas al sistema de cámaras, su justificante y los datos de contacto para ejercer sus derechos como interesado.",
+    "documentsTitle": "Declaraciones de protección de datos",
+    "courseTitle": "Curso y confirmación de recepción",
+    "contactTitle": "Acceso, rectificación, supresión",
+    "contactIntro": "Para el acceso (art. 15), la rectificación (art. 16), la supresión (art. 17) o la limitación (art. 18), diríjase por favor al organismo competente:",
+    "contactEmail": "[E-Mail-Adresse des Datenschutzbeauftragten]",
+    "contactPlaceholderHint": "La dirección de contacto todavía no está registrada. Diríjase por favor a su coordinador o a la administración.",
+    "contactMailSubject": "Derechos del interesado – Tecnología de seguridad vial"
+  }
+}

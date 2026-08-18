@@ -1,0 +1,339 @@
+{
+  "courseId": "privacy_camera",
+  "locale": "en",
+  "contentVersion": "1.0.0",
+  "title": "In-vehicle cameras – data protection",
+  "subtitle": "What is recorded, why, and what rights you have",
+  "estimatedMinutes": 10,
+  "requiresAcknowledgement": true,
+  "documentRefs": [
+    "driver_privacy_notice",
+    "other_road_users_notice"
+  ],
+  "documents": {
+    "driver_privacy_notice": {
+      "documentKey": "driver_privacy_notice",
+      "title": "Privacy notice for the use of road safety technologies",
+      "shortTitle": "Privacy notice for drivers",
+      "version": "2026-08-18",
+      "validFrom": "2026-08-18",
+      "locale": "en",
+      "asset": "assets/content/documents/driver_privacy_notice_en.md"
+    },
+    "other_road_users_notice": {
+      "documentKey": "other_road_users_notice",
+      "title": "Privacy notice on road traffic accidents",
+      "shortTitle": "Privacy notice on traffic accidents",
+      "version": "2026-08-18",
+      "validFrom": "2026-08-18",
+      "locale": "en",
+      "asset": "assets/content/documents/other_road_users_notice_en.md"
+    }
+  },
+  "modules": [
+    {
+      "id": "intro",
+      "title": "What this is about",
+      "icon": "info",
+      "estimatedSeconds": 60,
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Our delivery vehicles are fitted with a camera-based road safety system. It does not record continuously; it only takes event-triggered photos – that is, only when a safety-relevant event is detected. In this course we explain in plain language what is recorded, who sees the data, how long it is stored and what rights you have."
+        },
+        {
+          "type": "callout",
+          "style": "info",
+          "title": "Important upfront",
+          "text": "At the end you confirm that you have received the privacy notice. This is not a consent and not an approval."
+        },
+        {
+          "type": "bullets",
+          "title": "The course takes about 10 minutes and covers",
+          "items": [
+            "how the cameras work and when a recording is created in the first place",
+            "which data about you is processed",
+            "why we do this and on what legal basis",
+            "who can see the data",
+            "how long it is stored",
+            "your rights as a data subject"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "system",
+      "title": "How the cameras work",
+      "icon": "videocam",
+      "estimatedSeconds": 120,
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "The system consists of cameras facing outwards towards the road and inwards into the driver's cab, plus sensors that measure driving behaviour. The key point is: the sensors detect certain safety events – and only such an event triggers a recording."
+        },
+        {
+          "type": "factCard",
+          "style": "positive",
+          "title": "What does NOT happen",
+          "items": [
+            "There is no livestream. Nobody watches you drive in real time.",
+            "There is no gapless surveillance. Your trip is not continuously observed or assessed.",
+            "There is no continuous recording and no continuous upload – neither of the road nor of the driver's cab.",
+            "NO AUDIO IS RECORDED. The system does not record any conversations and no sounds – neither in the driver's cab nor outside, neither continuously nor on an event.",
+            "The system does not assess you automatically with consequences under employment law. A human being reviews every incident."
+          ]
+        },
+        {
+          "type": "factCard",
+          "style": "neutral",
+          "title": "What does happen",
+          "items": [
+            "The system only takes event-triggered photos – without audio – that is, only when a safety-relevant event is detected (e.g. hard braking, tailgating, distraction).",
+            "As long as no event is detected, no recording is created that would be stored or transmitted.",
+            "Only after a detected event are the associated photos transmitted and available for review.",
+            "You can see these events yourself in the app – together with the associated images."
+          ]
+        },
+        {
+          "type": "callout",
+          "style": "warning",
+          "title": "Do not cover the camera",
+          "text": "Covering or repositioning the camera is registered by the system as an event. Please keep the camera clear. If you have questions about the processing of your data, please contact the office named in the data protection section."
+        }
+      ]
+    },
+    {
+      "id": "data",
+      "title": "Which data about you is processed",
+      "icon": "dataset",
+      "estimatedSeconds": 120,
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "The following categories of personal data may be processed about you:"
+        },
+        {
+          "type": "keyValue",
+          "items": [
+            {
+              "key": "Identification data",
+              "value": "name, images"
+            },
+            {
+              "key": "Contact data",
+              "value": "email address"
+            },
+            {
+              "key": "Event-triggered photos (without audio)",
+              "value": "photos of the road environment and of the vehicle interior that are created exclusively upon a detected safety event – no continuous recording and no audio recording"
+            },
+            {
+              "key": "Vehicle operating data",
+              "value": "location, speed, acceleration, braking, cornering, distance to the vehicle ahead"
+            },
+            {
+              "key": "Safety incident data",
+              "value": "speeding, harsh braking and acceleration, collisions, tailgating, distracted driving, drowsiness, camera obstruction, forward collision warnings, rolling stops, violations of traffic signs or traffic lights"
+            },
+            {
+              "key": "Interaction data",
+              "value": "your interactions with the system and the app"
+            }
+          ]
+        },
+        {
+          "type": "callout",
+          "style": "warning",
+          "title": "Health data – only in exceptional cases",
+          "text": "In the event of a serious road traffic accident, health data may exceptionally be processed, for example visible injuries in the images. The legal basis in that case is Art. 9(2)(f) GDPR – the establishment or defence of legal claims."
+        }
+      ]
+    },
+    {
+      "id": "purpose",
+      "title": "Why we do this",
+      "icon": "shield",
+      "estimatedSeconds": 120,
+      "blocks": [
+        {
+          "type": "bullets",
+          "title": "Purposes of the processing",
+          "items": [
+            "improving road safety – for you and for other road users",
+            "analysing road traffic incidents and assessing legal claims",
+            "complying with legal obligations"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "The legal basis is our legitimate interest under Art. 6(1)(f) GDPR. Specifically, this concerns the protection of health and physical integrity, the reduction of legal, financial and reputational risks arising from road traffic accidents, and the investigation of accidents. Where we comply with legal obligations, we rely on Art. 6(1)(c) GDPR."
+        },
+        {
+          "type": "callout",
+          "style": "info",
+          "title": "No consent",
+          "text": "We do not rely on your consent. In an employment relationship, consent would be legally challengeable. Instead we have carried out a data protection impact assessment and documented the balancing of interests."
+        }
+      ]
+    },
+    {
+      "id": "recipients",
+      "title": "Who can see the data",
+      "icon": "group",
+      "estimatedSeconds": 90,
+      "blocks": [
+        {
+          "type": "bullets",
+          "title": "Recipients",
+          "items": [
+            "our road safety technology provider (camera hardware, cloud platform, driver app)",
+            "authorities and public bodies, such as courts or law enforcement agencies, in the context of proceedings",
+            "insurers and contractual partners, including their lawyers, where incidents or legal claims are concerned"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Internally, only those people see the data who need it for their task – for example to debrief a safety event or to handle an accident."
+        },
+        {
+          "type": "callout",
+          "style": "info",
+          "title": "Transfers to third countries",
+          "text": "As a rule, your data stays within the EU or the EEA. Where we transfer data to our provider in the USA, we rely on the EU standard contractual clauses pursuant to Art. 46(2)(c) GDPR. In addition, the data is encrypted in transit and at rest."
+        }
+      ]
+    },
+    {
+      "id": "retention",
+      "title": "How long data is stored",
+      "icon": "schedule",
+      "estimatedSeconds": 60,
+      "blocks": [
+        {
+          "type": "keyValue",
+          "items": [
+            {
+              "key": "Event-triggered images stored locally in the vehicle",
+              "value": "a few days, then automatically overwritten"
+            },
+            {
+              "key": "Photos relating to safety events in the cloud",
+              "value": "a few weeks, then automatically deleted"
+            },
+            {
+              "key": "Material relating to accidents and legal claims",
+              "value": "until the limitation period expires or the proceedings are concluded"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Once the retention periods have expired, the data is deleted or anonymised."
+        }
+      ]
+    },
+    {
+      "id": "rights",
+      "title": "Your rights",
+      "icon": "gavel",
+      "estimatedSeconds": 90,
+      "blocks": [
+        {
+          "type": "keyValue",
+          "items": [
+            {
+              "key": "Access (Art. 15)",
+              "value": "You can find out which data we process about you."
+            },
+            {
+              "key": "Rectification (Art. 16)",
+              "value": "Incorrect data must be corrected."
+            },
+            {
+              "key": "Erasure (Art. 17)",
+              "value": "You can request the erasure of your data."
+            },
+            {
+              "key": "Restriction (Art. 18)",
+              "value": "You can have the processing restricted."
+            },
+            {
+              "key": "Objection (Art. 21)",
+              "value": "You can object to the processing in accordance with Art. 21 GDPR."
+            },
+            {
+              "key": "Complaint (Art. 77)",
+              "value": "You can lodge a complaint with the competent supervisory authority."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "You can exercise all of these rights at any time via the \"Data protection\" section of the app. There you will find the contact details of the responsible office. Your request will be handled within the statutory time limit."
+        }
+      ]
+    },
+    {
+      "id": "others",
+      "title": "Other road users",
+      "icon": "directions_walk",
+      "estimatedSeconds": 60,
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "When an event triggers a recording, other road users may also incidentally appear on the outward-facing photos. Faces and licence plates are automatically pixelated in this material. Non-pixelated material is only retained and reviewed if a road traffic accident or comparable circumstances have occurred."
+        },
+        {
+          "type": "callout",
+          "style": "info",
+          "title": "If you are asked at the scene of an accident",
+          "text": "Refer the parties involved in the accident to our privacy notice on road traffic accidents. You will find it in the app in the data protection section and can show it to them directly."
+        }
+      ]
+    },
+    {
+      "id": "document",
+      "title": "Read the privacy notice",
+      "icon": "description",
+      "estimatedSeconds": 240,
+      "requiresFullScroll": true,
+      "blocks": [
+        {
+          "type": "documentEmbed",
+          "documentKey": "driver_privacy_notice",
+          "title": "Privacy notice for the use of road safety technologies"
+        }
+      ]
+    }
+  ],
+  "acknowledgement": {
+    "headline": "Acknowledgement of receipt",
+    "intro": "Please confirm that you have received and noted the privacy notice.",
+    "statement": "I confirm that I have received and noted the privacy notice for the use of road safety technologies and driver safety tools in the version dated {{documentDate}}.",
+    "clarification": "I am aware that this confirmation does not constitute consent to the data processing. The processing takes place on the basis of legitimate interests.",
+    "systemNote": "For context: the system does not record continuously. Only event-triggered photos without audio are created when safety-relevant events are detected – no livestream, no gapless surveillance, no continuous recording, no audio recording.",
+    "checkboxLabel": "Received and noted",
+    "signatureHint": "Signature",
+    "signatureOptional": false,
+    "signatureLegalNote": "Your signature confirms solely the receipt and acknowledgement of the privacy notice – it is not a consent to the data processing.",
+    "submitLabel": "Confirm",
+    "declineLabel": "I do not wish to confirm",
+    "declineExplanation": "That is fine. In that case we will simply record that the privacy notice was handed over to you and that you did not sign the confirmation.",
+    "declineNote": "Privacy notice handed over on {{datum}} via the CoDriver app. The driver did not sign the acknowledgement of receipt.",
+    "successTitle": "Thank you, all done",
+    "successText": "Your acknowledgement of receipt has been saved. You can find the privacy notice and your record at any time in the data protection section.",
+    "declinedTitle": "Noted",
+    "declinedText": "We have recorded that the privacy notice was handed over to you and that you did not sign the confirmation."
+  },
+  "privacyCenter": {
+    "headline": "Data protection",
+    "intro": "Here you will find, at any time, the privacy notices on the camera system, your record and the contact details for exercising your data subject rights.",
+    "documentsTitle": "Privacy notices",
+    "courseTitle": "Course & acknowledgement of receipt",
+    "contactTitle": "Access, rectification, erasure",
+    "contactIntro": "For access (Art. 15), rectification (Art. 16), erasure (Art. 17) or restriction (Art. 18), please contact the responsible office:",
+    "contactEmail": "[E-Mail-Adresse des Datenschutzbeauftragten]",
+    "contactPlaceholderHint": "The contact address has not been entered yet. Please contact your dispatcher or the administration.",
+    "contactMailSubject": "Data subject rights – road safety technology"
+  }
+}

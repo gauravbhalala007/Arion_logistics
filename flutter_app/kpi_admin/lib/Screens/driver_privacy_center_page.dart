@@ -1,19 +1,18 @@
 // lib/Screens/driver_privacy_center_page.dart
 //
-// Dauerhafter Bereich „Datenschutz" für Fahrer (Spec §2 und §6).
+// Dauerhafter Bereich „Datenschutz" für Fahrer.
 //
 // Erreichbar in zwei Taps: Fahrer-Home → DA Academy → Datenschutz.
 // Bietet jederzeit — nicht nur am Ende des Kurses:
 //   - Status der Empfangsbestätigung + Kurs starten/wiederholen
 //   - beide Datenschutzerklärungen im Volltext
-//   - Widerspruch einlegen und zurücknehmen
 //   - Kontakt für Auskunft / Berichtigung / Löschung
 //
-// Der Widerspruch ist bewusst OHNE Dark Pattern gebaut: Grundfeld
-// optional, keine Warnbanner, keine Mehrfachbestätigung, keine
-// Verzögerung, Rücknahme genauso einfach wie die Abgabe. Jede
-// Formulierung, die Konsequenzen andeutet, würde die von der DSFA
-// zugesagte Nachteilsfreiheit unterlaufen.
+// WIDERSPRUCH: Auf Kundenwunsch gibt es hier KEIN In-App-Formular mehr.
+// Die gesetzliche Information über das Widerspruchsrecht bleibt davon
+// unberührt — sie steht weiterhin in beiden Volltext-Dokumenten und als
+// ein Punkt im Rechte-Modul des Kurses (Art. 13 Abs. 2 lit. b DSGVO).
+// Der Weg zur Ausübung ist die hier genannte Kontaktadresse.
 
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -48,27 +47,27 @@ class _DriverPrivacyCenterPageState extends State<DriverPrivacyCenterPage> {
   );
 
   PrivacyCameraState? _state;
-  String _driverName = '';
   bool _loading = true;
-  bool _busy = false;
+  bool _loadStarted = false;
 
   String get _lang =>
       Localizations.localeOf(context).languageCode.toLowerCase();
 
   @override
-  void initState() {
-    super.initState();
-    _load();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_loadStarted) {
+      _loadStarted = true;
+      _load();
+    }
   }
 
   Future<void> _load() async {
     try {
-      final state = await _repo.load(kPrivacyCourseFallbackLanguage);
-      final driver = await _repo.loadDriverInfo();
+      final state = await _repo.load(_lang);
       if (!mounted) return;
       setState(() {
         _state = state;
-        _driverName = driver.name;
         _loading = false;
       });
     } catch (_) {
@@ -97,32 +96,6 @@ class _DriverPrivacyCenterPageState extends State<DriverPrivacyCenterPage> {
         builder: (_) => PrivacyDocumentReaderPage(document: doc),
       ),
     );
-  }
-
-  Future<void> _openObjection() async {
-    final state = _state;
-    if (state == null) return;
-    final changed = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => DriverPrivacyObjectionPage(
-          repo: _repo,
-          copy: state.bundle.course.objectionForm,
-          driverName: _driverName,
-        ),
-      ),
-    );
-    if (!mounted) return;
-    if (changed == true) await _load();
-  }
-
-  Future<void> _withdrawObjection() async {
-    setState(() => _busy = true);
-    try {
-      await _repo.withdrawObjection();
-      await _load();
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
   }
 
   Future<void> _openMail(PrivacyCenterCopy copy) async {
@@ -196,9 +169,6 @@ class _DriverPrivacyCenterPageState extends State<DriverPrivacyCenterPage> {
           for (final key in state.bundle.course.documentRefs)
             if (state.bundle.documents[key] != null)
               _documentTile(state.bundle.documents[key]!),
-          const SizedBox(height: 18),
-          _sectionTitle(copy.objectionTitle),
-          _objectionCard(state),
           const SizedBox(height: 18),
           _sectionTitle(copy.contactTitle),
           _contactCard(copy),
@@ -395,97 +365,6 @@ class _DriverPrivacyCenterPageState extends State<DriverPrivacyCenterPage> {
     ),
   );
 
-  Widget _objectionCard(PrivacyCameraState state) {
-    final objection = state.objection;
-    final active = objection?.isActive ?? false;
-
-    return _card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (active && objection != null) ...[
-            Text(
-              privacyCameraText(
-                _lang,
-                'center_objection_active',
-                vars: {'date': privacyCameraFormatDate(objection.createdAt)},
-              ),
-              style: const TextStyle(
-                fontSize: 14.5,
-                fontWeight: FontWeight.w800,
-                color: kPcText,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              objection.processedAt != null
-                  ? privacyCameraText(
-                      _lang,
-                      'center_objection_processed',
-                      vars: {
-                        'date': privacyCameraFormatDate(objection.processedAt!),
-                      },
-                    )
-                  : privacyCameraText(_lang, 'center_objection_pending'),
-              style: const TextStyle(fontSize: 13, color: kPcMuted),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              height: 46,
-              child: OutlinedButton(
-                onPressed: _busy ? null : _withdrawObjection,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: kPcText,
-                  side: const BorderSide(color: kPcBorder, width: 1.4),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  textStyle: const TextStyle(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                child: Text(
-                  privacyCameraText(_lang, 'center_objection_withdraw'),
-                ),
-              ),
-            ),
-          ] else ...[
-            Text(
-              state.bundle.course.objectionForm.intro,
-              style: const TextStyle(
-                fontSize: 13.5,
-                height: 1.5,
-                color: Color(0xFF4B5563),
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              height: 46,
-              child: OutlinedButton(
-                onPressed: _openObjection,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: kPcText,
-                  side: const BorderSide(color: kPcBorder, width: 1.4),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  textStyle: const TextStyle(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                child: Text(privacyCameraText(_lang, 'center_objection_open')),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
   Widget _contactCard(PrivacyCenterCopy copy) {
     final placeholder = copy.contactIsPlaceholder;
     return _card(
@@ -550,178 +429,6 @@ class _DriverPrivacyCenterPageState extends State<DriverPrivacyCenterPage> {
                 ),
               ),
             ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Widerspruchsformular — neutral, ohne Warnungen, ohne Pflichtbegründung.
-class DriverPrivacyObjectionPage extends StatefulWidget {
-  const DriverPrivacyObjectionPage({
-    super.key,
-    required this.repo,
-    required this.copy,
-    required this.driverName,
-  });
-
-  final PrivacyCameraRepository repo;
-  final PrivacyObjectionCopy copy;
-  final String driverName;
-
-  @override
-  State<DriverPrivacyObjectionPage> createState() =>
-      _DriverPrivacyObjectionPageState();
-}
-
-class _DriverPrivacyObjectionPageState
-    extends State<DriverPrivacyObjectionPage> {
-  final TextEditingController _reason = TextEditingController();
-  bool _busy = false;
-
-  @override
-  void dispose() {
-    _reason.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    final lang = Localizations.localeOf(context).languageCode.toLowerCase();
-    setState(() => _busy = true);
-    try {
-      await widget.repo.submitObjection(
-        driverName: widget.driverName,
-        statement: widget.copy.statement,
-        reason: _reason.text,
-      );
-      if (!mounted) return;
-      await showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(widget.copy.successTitle),
-          content: Text(widget.copy.successText),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: Text(privacyCameraText(lang, 'ok')),
-            ),
-          ],
-        ),
-      );
-      if (mounted) Navigator.of(context).pop(true);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _busy = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            privacyCameraText(lang, 'ack_save_error', vars: {'error': '$e'}),
-          ),
-        ),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final copy = widget.copy;
-    return Scaffold(
-      backgroundColor: kPcBg,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-          color: kPcText,
-          onPressed: () => Navigator.of(context).pop(false),
-        ),
-        title: Text(
-          copy.headline,
-          style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w800,
-            color: kPcText,
-          ),
-        ),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-        children: [
-          Text(
-            copy.intro,
-            style: const TextStyle(fontSize: 14.5, height: 1.55, color: kPcText),
-          ),
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.all(15),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(13),
-              border: Border.all(color: kPcBorder),
-            ),
-            child: Text(
-              copy.statement,
-              style: const TextStyle(
-                fontSize: 14.5,
-                height: 1.5,
-                fontWeight: FontWeight.w700,
-                color: kPcText,
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _reason,
-            maxLines: 4,
-            decoration: InputDecoration(
-              labelText: copy.reasonLabel,
-              helperText: copy.reasonHint,
-              helperMaxLines: 3,
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            copy.consequences,
-            style: const TextStyle(
-              fontSize: 13,
-              height: 1.55,
-              color: Color(0xFF4B5563),
-            ),
-          ),
-          const SizedBox(height: 20),
-          SizedBox(
-            height: 50,
-            child: FilledButton(
-              onPressed: _busy ? null : _submit,
-              style: FilledButton.styleFrom(
-                backgroundColor: kPcAccent,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                textStyle: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              child: _busy
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : Text(copy.submitLabel),
-            ),
-          ),
         ],
       ),
     );
