@@ -8,6 +8,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../data/privacy_camera/privacy_camera_content.dart'
+    show
+        PrivacyCourseBundle,
+        kPrivacyCameraTestId,
+        kPrivacyCourseFallbackLanguage;
+import '../data/privacy_camera/privacy_camera_repository.dart'
+    show PrivacyCameraAck;
 import '../data/safety_training/operating_instructions.dart'
     show kOperatingInstructionsTestId;
 import '../data/safety_training/privacy_data.dart' show kPrivacyTestId;
@@ -251,7 +258,10 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
   /// abgelaufen) — gleiche Ergebnis-Dokumente wie die Academy-Seite.
   Future<void> _loadAcademyOpenCount() async {
     final dsp = widget.dspUid.trim();
-    final tid = widget.driverTransporterId.trim().toUpperCase();
+    // Roh belassen (kein toUpperCase): alle Schreibpfade der Trainings
+    // (academy_test_results/{testId}/drivers/{tid}) verwenden die
+    // unveränderte TID — sonst zeigt das Badge dauerhaft "offen".
+    final tid = widget.driverTransporterId.trim();
     if (dsp.isEmpty || tid.isEmpty) return;
     try {
       final base = FirebaseFirestore.instance
@@ -277,6 +287,33 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
           open++;
         }
       }
+
+      // Kameras im Fahrzeug – Datenschutz. Eigene Prüfung, weil dieses
+      // Modul kein `passedAt` kennt, sondern eine Kenntnisnahme: offen
+      // ist es, solange für die AKTUELLE Fassung kein Nachweis vorliegt.
+      // Eine Verweigerung („declined") ist ein gültiger Nachweis der
+      // Aushändigung und zählt deshalb NICHT als offen.
+      try {
+        final bundle = await PrivacyCourseBundle.load(
+          kPrivacyCourseFallbackLanguage,
+        );
+        final camSnap = await base
+            .doc(kPrivacyCameraTestId)
+            .collection('drivers')
+            .doc(tid)
+            .get();
+        final camData = camSnap.data();
+        if (camData == null || camData['outcome'] == null) {
+          open++;
+        } else if (!PrivacyCameraAck.fromMap(
+          camData,
+        ).matchesDocument(bundle.primaryDocument)) {
+          open++;
+        }
+      } catch (_) {
+        // Ohne Inhalte/Daten lieber nicht mitzählen als falsch zählen.
+      }
+
       if (mounted && open != _academyOpenCount) {
         setState(() => _academyOpenCount = open);
       }

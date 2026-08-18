@@ -1,0 +1,476 @@
+{
+  "courseId": "privacy_camera",
+  "locale": "de-DE",
+  "contentVersion": "1.0.0",
+  "title": "Kameras im Fahrzeug – Datenschutz",
+  "subtitle": "Was aufgenommen wird, warum, und welche Rechte Sie haben",
+  "estimatedMinutes": 12,
+  "requiresAcknowledgement": true,
+  "documentRefs": [
+    "driver_privacy_notice_de",
+    "other_road_users_notice_de"
+  ],
+  "documents": {
+    "driver_privacy_notice_de": {
+      "documentKey": "driver_privacy_notice_de",
+      "title": "Datenschutzerklärung für den Einsatz von Verkehrssicherheitstechnologien",
+      "shortTitle": "Datenschutzerklärung Fahrer",
+      "version": "2026-08-18",
+      "validFrom": "2026-08-18",
+      "locale": "de-DE",
+      "asset": "assets/content/documents/driver_privacy_notice_de.md"
+    },
+    "other_road_users_notice_de": {
+      "documentKey": "other_road_users_notice_de",
+      "title": "Datenschutzerklärung zu Verkehrsunfällen",
+      "shortTitle": "Datenschutzerklärung Verkehrsunfälle",
+      "version": "2026-08-18",
+      "validFrom": "2026-08-18",
+      "locale": "de-DE",
+      "asset": "assets/content/documents/other_road_users_notice_de.md"
+    }
+  },
+  "modules": [
+    {
+      "id": "intro",
+      "title": "Worum es hier geht",
+      "icon": "info",
+      "estimatedSeconds": 60,
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "In unseren Lieferfahrzeugen ist ein kamerabasiertes Verkehrssicherheitssystem verbaut. Es zeichnet nicht dauerhaft auf, sondern nimmt ausschließlich anlassbezogen Fotos auf – also nur dann, wenn ein sicherheitsrelevantes Ereignis erkannt wird. In diesem Kurs erklären wir Ihnen in einfacher Sprache, was aufgenommen wird, wer die Daten sieht, wie lange sie gespeichert werden und welche Rechte Sie haben."
+        },
+        {
+          "type": "callout",
+          "style": "info",
+          "title": "Wichtig vorab",
+          "text": "Am Ende bestätigen Sie, dass Sie die Datenschutzerklärung erhalten haben. Das ist keine Einwilligung und keine Zustimmung. Sie können der Nutzung des Systems jederzeit widersprechen – ohne Begründung und ohne Nachteile."
+        },
+        {
+          "type": "bullets",
+          "title": "Der Kurs dauert etwa 12 Minuten und behandelt",
+          "items": [
+            "wie die Kameras arbeiten und wann überhaupt eine Aufnahme entsteht",
+            "welche Daten über Sie verarbeitet werden",
+            "warum wir das tun und auf welcher Rechtsgrundlage",
+            "wer die Daten sehen kann",
+            "wie lange gespeichert wird",
+            "Ihre Rechte, insbesondere Ihr Widerspruchsrecht"
+          ]
+        }
+      ],
+      "quiz": []
+    },
+    {
+      "id": "system",
+      "title": "Wie die Kameras arbeiten",
+      "icon": "videocam",
+      "estimatedSeconds": 120,
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Das System besteht aus Kameras, die nach außen auf die Straße und nach innen in den Fahrerraum gerichtet sind, sowie aus Sensoren, die das Fahrverhalten messen. Entscheidend ist: Die Sensorik erkennt bestimmte Sicherheitsereignisse – und erst ein solches Ereignis löst eine Aufnahme aus."
+        },
+        {
+          "type": "factCard",
+          "style": "positive",
+          "title": "Was NICHT passiert",
+          "items": [
+            "Es gibt keinen Livestream. Niemand sieht Ihnen in Echtzeit beim Fahren zu.",
+            "Es findet keine lückenlose Überwachung statt. Ihre Fahrt wird nicht durchgehend beobachtet oder bewertet.",
+            "Es gibt keine Daueraufzeichnung und keinen Dauerupload – weder von der Straße noch aus dem Fahrerraum.",
+            "Es wird kein Ton in der Fahrerkabine dauerhaft mitgeschnitten und ausgewertet.",
+            "Das System bewertet Sie nicht automatisch mit arbeitsrechtlichen Folgen. Ein Mensch prüft jeden Vorfall."
+          ]
+        },
+        {
+          "type": "factCard",
+          "style": "neutral",
+          "title": "Was passiert",
+          "items": [
+            "Das System nimmt ausschließlich anlassbezogen Fotos auf – also nur dann, wenn ein sicherheitsrelevantes Ereignis erkannt wird (z. B. starkes Bremsen, zu dichtes Auffahren, Ablenkung).",
+            "Solange kein Ereignis erkannt wird, entsteht keine Aufnahme, die gespeichert oder übertragen wird.",
+            "Erst nach einem erkannten Ereignis werden die zugehörigen Fotos übertragen und können ausgewertet werden.",
+            "Sie sehen diese Ereignisse selbst in der App – mit den zugehörigen Aufnahmen."
+          ]
+        },
+        {
+          "type": "callout",
+          "style": "warning",
+          "title": "Kamera nicht abdecken",
+          "text": "Das Abdecken oder Verstellen der Kamera wird vom System als Ereignis erfasst. Wenn Sie nicht möchten, dass Ihre Daten verarbeitet werden, nutzen Sie bitte den Widerspruch in der App – nicht das Abkleben der Kamera."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "q_system_1",
+          "question": "Kann jemand live sehen, wie Sie gerade fahren?",
+          "options": [
+            "Ja, die Disposition hat jederzeit Zugriff auf einen Livestream.",
+            "Nein, es gibt keinen Livestream.",
+            "Nur an Wochenenden."
+          ],
+          "correctIndex": 1,
+          "explanation": "Es gibt keinen Livestream und keine lückenlose Überwachung. Aufnahmen entstehen nur anlassbezogen, wenn das System ein sicherheitsrelevantes Ereignis erkennt."
+        },
+        {
+          "id": "q_system_2",
+          "question": "Wann nimmt das System Fotos auf?",
+          "options": [
+            "Durchgehend während der gesamten Fahrt.",
+            "Nur anlassbezogen, wenn ein sicherheitsrelevantes Ereignis erkannt wird.",
+            "Immer, sobald der Motor läuft."
+          ],
+          "correctIndex": 1,
+          "explanation": "Das System nimmt ausschließlich anlassbezogen Fotos auf. Zwischen den Ereignissen wird nichts aufgezeichnet, gespeichert oder übertragen."
+        }
+      ]
+    },
+    {
+      "id": "data",
+      "title": "Welche Daten über Sie verarbeitet werden",
+      "icon": "dataset",
+      "estimatedSeconds": 120,
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Folgende Kategorien personenbezogener Daten können über Sie verarbeitet werden:"
+        },
+        {
+          "type": "keyValue",
+          "items": [
+            {
+              "key": "Identifikationsdaten",
+              "value": "Name, Bilder"
+            },
+            {
+              "key": "Kontaktdaten",
+              "value": "E-Mail-Adresse"
+            },
+            {
+              "key": "Anlassbezogene Fotoaufnahmen",
+              "value": "Fotos der Straßenumgebung und des Fahrzeuginnenraums, die ausschließlich bei einem erkannten Sicherheitsereignis entstehen – keine durchgehende Aufzeichnung"
+            },
+            {
+              "key": "Fahrzeugbetriebsdaten",
+              "value": "Standort, Geschwindigkeit, Beschleunigung, Bremsvorgänge, Kurvenfahrten, Abstand zum Vordermann"
+            },
+            {
+              "key": "Daten zu Sicherheitsvorfällen",
+              "value": "Geschwindigkeitsüberschreitung, abruptes Bremsen und Beschleunigen, Kollisionen, zu dichtes Auffahren, abgelenktes Fahren, Schläfrigkeit, Kamerabehinderung, Vorwärtskollisionswarnungen, Rollstopps, Verstöße gegen Verkehrszeichen oder Ampeln"
+            },
+            {
+              "key": "Interaktionsdaten",
+              "value": "Ihre Interaktionen mit dem System und der App"
+            }
+          ]
+        },
+        {
+          "type": "callout",
+          "style": "warning",
+          "title": "Gesundheitsdaten – nur im Ausnahmefall",
+          "text": "Bei einem schweren Verkehrsunfall können ausnahmsweise Gesundheitsdaten verarbeitet werden, zum Beispiel sichtbare Verletzungen auf den Aufnahmen. Rechtsgrundlage ist dann Art. 9 Abs. 2 lit. f DSGVO – die Geltendmachung oder Abwehr von Rechtsansprüchen."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "q_data_1",
+          "question": "Werden im Normalbetrieb Gesundheitsdaten über Sie verarbeitet?",
+          "options": [
+            "Ja, laufend.",
+            "Nein, nur ausnahmsweise bei einem schweren Verkehrsunfall.",
+            "Ja, bei jedem Sicherheitsereignis."
+          ],
+          "correctIndex": 1,
+          "explanation": "Gesundheitsdaten werden nur im Ausnahmefall verarbeitet, etwa bei sichtbaren Verletzungen nach einem Unfall."
+        }
+      ]
+    },
+    {
+      "id": "purpose",
+      "title": "Warum wir das tun",
+      "icon": "shield",
+      "estimatedSeconds": 120,
+      "blocks": [
+        {
+          "type": "bullets",
+          "title": "Zwecke der Verarbeitung",
+          "items": [
+            "Verbesserung der Verkehrssicherheit – für Sie und für andere Verkehrsteilnehmer",
+            "Analyse von Vorfällen im Straßenverkehr und Prüfung von Rechtsansprüchen",
+            "Erfüllung gesetzlicher Verpflichtungen"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Rechtsgrundlage ist unser berechtigtes Interesse nach Art. 6 Abs. 1 lit. f DSGVO. Konkret geht es um den Schutz von Gesundheit und körperlicher Unversehrtheit, um die Verringerung rechtlicher, finanzieller und Reputationsrisiken aus Verkehrsunfällen sowie um die Aufklärung von Unfällen. Soweit wir gesetzliche Pflichten erfüllen, stützen wir uns auf Art. 6 Abs. 1 lit. c DSGVO."
+        },
+        {
+          "type": "callout",
+          "style": "info",
+          "title": "Keine Einwilligung – und das ist gut so",
+          "text": "Wir stützen uns bewusst nicht auf Ihre Einwilligung. Im Arbeitsverhältnis wäre eine Einwilligung schwer wirklich freiwillig. Stattdessen haben wir eine Datenschutz-Folgenabschätzung durchgeführt und eine Interessenabwägung dokumentiert – und geben Ihnen dafür ein Widerspruchsrecht ohne Begründung."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "q_purpose_1",
+          "question": "Auf welcher Rechtsgrundlage werden Ihre Daten verarbeitet?",
+          "options": [
+            "Auf Grundlage Ihrer Einwilligung.",
+            "Auf Grundlage des berechtigten Interesses (Art. 6 Abs. 1 lit. f DSGVO).",
+            "Auf Grundlage des Arbeitsvertrags allein."
+          ],
+          "correctIndex": 1,
+          "explanation": "Grundlage ist das berechtigte Interesse. Deshalb ist Ihre Bestätigung am Ende auch keine Einwilligung, sondern nur eine Empfangsbestätigung."
+        }
+      ]
+    },
+    {
+      "id": "recipients",
+      "title": "Wer die Daten sehen kann",
+      "icon": "group",
+      "estimatedSeconds": 90,
+      "blocks": [
+        {
+          "type": "bullets",
+          "title": "Empfänger",
+          "items": [
+            "unser Anbieter für Verkehrssicherheitstechnologie (Kamerahardware, Cloud-Plattform, Fahrer-App)",
+            "Behörden und öffentliche Stellen, etwa Gerichte oder Strafverfolgungsbehörden, im Rahmen von Verfahren",
+            "Versicherer und Vertragspartner samt deren Rechtsanwälten, soweit es um Vorfälle oder Rechtsansprüche geht"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Intern sehen nur die Personen die Daten, die sie für ihre Aufgabe brauchen – etwa für die Nachbesprechung eines Sicherheitsereignisses oder die Bearbeitung eines Unfalls."
+        },
+        {
+          "type": "callout",
+          "style": "info",
+          "title": "Übermittlung in Drittländer",
+          "text": "In der Regel bleiben Ihre Daten in der EU bzw. im EWR. Wenn wir Daten an unseren Anbieter in den USA übermitteln, stützen wir uns auf die EU-Standardvertragsklauseln nach Art. 46 Abs. 2 lit. c DSGVO. Zusätzlich sind die Daten bei der Übertragung und bei der Speicherung verschlüsselt."
+        }
+      ],
+      "quiz": []
+    },
+    {
+      "id": "retention",
+      "title": "Wie lange gespeichert wird",
+      "icon": "schedule",
+      "estimatedSeconds": 60,
+      "blocks": [
+        {
+          "type": "keyValue",
+          "items": [
+            {
+              "key": "Anlassbezogene Aufnahmen lokal im Fahrzeug",
+              "value": "wenige Tage, danach automatisch überschrieben"
+            },
+            {
+              "key": "Fotos zu Sicherheitsereignissen in der Cloud",
+              "value": "wenige Wochen, danach automatische Löschung"
+            },
+            {
+              "key": "Material zu Unfällen und Rechtsansprüchen",
+              "value": "bis zum Ablauf der Verjährungsfrist bzw. bis zum Abschluss des Verfahrens"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Nach Ablauf der Fristen werden die Daten gelöscht oder anonymisiert."
+        }
+      ],
+      "quiz": []
+    },
+    {
+      "id": "rights",
+      "title": "Ihre Rechte",
+      "icon": "gavel",
+      "estimatedSeconds": 90,
+      "blocks": [
+        {
+          "type": "keyValue",
+          "items": [
+            {
+              "key": "Auskunft (Art. 15)",
+              "value": "Sie können erfahren, welche Daten wir über Sie verarbeiten."
+            },
+            {
+              "key": "Berichtigung (Art. 16)",
+              "value": "Falsche Daten müssen korrigiert werden."
+            },
+            {
+              "key": "Löschung (Art. 17)",
+              "value": "Sie können die Löschung Ihrer Daten verlangen."
+            },
+            {
+              "key": "Einschränkung (Art. 18)",
+              "value": "Sie können die Verarbeitung einschränken lassen."
+            },
+            {
+              "key": "Widerspruch (Art. 21)",
+              "value": "Sie können der Verarbeitung jederzeit widersprechen."
+            },
+            {
+              "key": "Beschwerde (Art. 77)",
+              "value": "Sie können sich bei der zuständigen Aufsichtsbehörde beschweren."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Alle diese Rechte können Sie jederzeit über den Bereich \"Datenschutz\" in der App geltend machen. Dort finden Sie die Kontaktdaten der zuständigen Stelle. Ihre Anfrage wird innerhalb der gesetzlichen Frist bearbeitet."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "q_rights_1",
+          "question": "Wie erfahren Sie, welche Daten über Sie gespeichert sind?",
+          "options": [
+            "Gar nicht, das ist vertraulich.",
+            "Über eine Auskunftsanfrage nach Art. 15 DSGVO – die Kontaktdaten finden Sie in der App im Bereich Datenschutz.",
+            "Nur über einen Anwalt."
+          ],
+          "correctIndex": 1,
+          "explanation": "Sie finden die zuständige Kontaktadresse jederzeit in der App im Bereich Datenschutz."
+        }
+      ]
+    },
+    {
+      "id": "objection",
+      "title": "Ihr Widerspruchsrecht",
+      "icon": "block",
+      "estimatedSeconds": 120,
+      "blocks": [
+        {
+          "type": "callout",
+          "style": "success",
+          "title": "Die Teilnahme ist freiwillig",
+          "text": "Sie können der Nutzung der Verkehrssicherheitstechnologie jederzeit widersprechen. Sie müssen dafür keine Gründe angeben. Ihnen entstehen dadurch keine Nachteile in Ihrem Beschäftigungsverhältnis."
+        },
+        {
+          "type": "bullets",
+          "title": "Was passiert nach einem Widerspruch",
+          "items": [
+            "Wir stellen die Verarbeitung Ihrer personenbezogenen Daten aus der Verkehrssicherheitstechnologie ein.",
+            "Ausnahme: Daten, die zur Geltendmachung, Ausübung oder Abwehr von Rechtsansprüchen erforderlich sind – etwa nach einem Unfall –, dürfen wir weiter verarbeiten.",
+            "Ihr Widerspruch wird dokumentiert. Sie erhalten eine Bestätigung in der App.",
+            "Sie können Ihren Widerspruch jederzeit wieder zurücknehmen."
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Den Widerspruch finden Sie jederzeit im Bereich \"Datenschutz\" der App – nicht nur hier im Kurs."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "q_objection_1",
+          "question": "Müssen Sie einen Widerspruch begründen?",
+          "options": [
+            "Ja, mit einer besonderen persönlichen Situation.",
+            "Nein, ein Widerspruch ist ohne Begründung möglich.",
+            "Nur schriftlich per Einschreiben."
+          ],
+          "correctIndex": 1,
+          "explanation": "Wir gewähren Ihnen ein Widerspruchsrecht ohne Begründung – über Art. 21 DSGVO hinaus."
+        },
+        {
+          "id": "q_objection_2",
+          "question": "Hat ein Widerspruch Nachteile für Ihr Arbeitsverhältnis?",
+          "options": [
+            "Ja, er wird in der Personalakte vermerkt.",
+            "Nein, es entstehen keine Nachteile.",
+            "Ja, es gibt weniger Touren."
+          ],
+          "correctIndex": 1,
+          "explanation": "Die Ausübung des Widerspruchsrechts ist ausdrücklich nachteilsfrei."
+        }
+      ]
+    },
+    {
+      "id": "others",
+      "title": "Andere Verkehrsteilnehmer",
+      "icon": "directions_walk",
+      "estimatedSeconds": 60,
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Wenn ein Ereignis eine Aufnahme auslöst, können auf den nach außen gerichteten Fotos beiläufig auch andere Verkehrsteilnehmer zu sehen sein. Gesichter und Kennzeichen werden in diesem Material automatisch verpixelt. Unverpixeltes Material wird nur aufbewahrt und ausgewertet, wenn es zu einem Verkehrsunfall oder vergleichbaren Umständen gekommen ist."
+        },
+        {
+          "type": "callout",
+          "style": "info",
+          "title": "Wenn Sie am Unfallort gefragt werden",
+          "text": "Verweisen Sie Unfallbeteiligte auf unsere Datenschutzerklärung zu Verkehrsunfällen. Sie finden sie in der App im Bereich Datenschutz und können sie direkt vorzeigen."
+        }
+      ],
+      "quiz": []
+    },
+    {
+      "id": "document",
+      "title": "Datenschutzerklärung lesen",
+      "icon": "description",
+      "estimatedSeconds": 240,
+      "requiresFullScroll": true,
+      "blocks": [
+        {
+          "type": "documentEmbed",
+          "documentKey": "driver_privacy_notice_de",
+          "title": "Datenschutzerklärung für den Einsatz von Verkehrssicherheitstechnologien"
+        }
+      ],
+      "quiz": []
+    }
+  ],
+  "acknowledgement": {
+    "headline": "Empfangsbestätigung",
+    "intro": "Bitte bestätigen Sie, dass Sie die Datenschutzerklärung erhalten und zur Kenntnis genommen haben.",
+    "statement": "Ich bestätige, dass ich die Datenschutzerklärung für den Einsatz von Verkehrssicherheitstechnologien und Fahrsicherheitstools in der Fassung vom {{documentDate}} erhalten und zur Kenntnis genommen habe.",
+    "clarification": "Mir ist bekannt, dass diese Bestätigung keine Einwilligung in die Datenverarbeitung darstellt. Die Verarbeitung erfolgt auf Grundlage berechtigter Interessen. Ich kann der Nutzung der Verkehrssicherheitstechnologie jederzeit und ohne Angabe von Gründen widersprechen, ohne dass mir daraus Nachteile entstehen.",
+    "systemNote": "Zur Einordnung: Das System zeichnet nicht dauerhaft auf. Es entstehen ausschließlich anlassbezogene Fotoaufnahmen bei erkannten sicherheitsrelevanten Ereignissen – kein Livestream, keine lückenlose Überwachung, keine Daueraufzeichnung.",
+    "checkboxLabel": "Erhalten und zur Kenntnis genommen",
+    "signatureHint": "Unterschrift",
+    "signatureOptional": true,
+    "signatureOptionalHint": "Die Unterschrift ist freiwillig. Sie können auch nur bestätigen.",
+    "signatureLegalNote": "Ihre Unterschrift bestätigt ausschließlich den Erhalt und die Kenntnisnahme der Datenschutzerklärung – sie ist keine Einwilligung in die Datenverarbeitung. Sie können der Nutzung der Verkehrssicherheitstechnologie jederzeit und ohne Angabe von Gründen widersprechen.",
+    "submitLabel": "Bestätigen",
+    "declineLabel": "Ich möchte nicht bestätigen",
+    "declineExplanation": "Das ist in Ordnung. Wir vermerken dann lediglich, dass Ihnen die Datenschutzerklärung ausgehändigt wurde und Sie die Bestätigung nicht unterzeichnet haben. Auf den Betrieb des Systems hat das keinen Einfluss – wenn Sie die Verarbeitung beenden möchten, nutzen Sie bitte den Widerspruch.",
+    "declineNote": "Datenschutzerklärung am {{datum}} über die CoDriver-App ausgehändigt. Der Fahrer hat die Empfangsbestätigung nicht unterzeichnet.",
+    "successTitle": "Danke, alles erledigt",
+    "successText": "Ihre Empfangsbestätigung wurde gespeichert. Sie finden die Datenschutzerklärung und Ihren Nachweis jederzeit im Bereich Datenschutz.",
+    "declinedTitle": "Vermerkt",
+    "declinedText": "Wir haben festgehalten, dass Ihnen die Datenschutzerklärung ausgehändigt wurde und Sie die Bestätigung nicht unterzeichnet haben."
+  },
+  "objectionForm": {
+    "headline": "Widerspruch gegen die Verkehrssicherheitstechnologie",
+    "intro": "Sie können der Verarbeitung Ihrer personenbezogenen Daten durch die Verkehrssicherheitstechnologie jederzeit widersprechen. Eine Begründung ist nicht erforderlich.",
+    "statement": "Ich widerspreche hiermit der Verarbeitung meiner personenbezogenen Daten durch die Verkehrssicherheitstechnologie.",
+    "reasonLabel": "Grund (freiwillig)",
+    "reasonHint": "Sie müssen nichts angeben. Eine Rückmeldung hilft uns aber, das System zu verbessern.",
+    "consequences": "Nach Eingang stellen wir die Verarbeitung ein. Ausgenommen sind Daten, die zur Geltendmachung, Ausübung oder Abwehr von Rechtsansprüchen erforderlich sind. Ihnen entstehen durch den Widerspruch keine Nachteile.",
+    "submitLabel": "Widerspruch absenden",
+    "withdrawLabel": "Widerspruch zurücknehmen",
+    "successTitle": "Widerspruch eingegangen",
+    "successText": "Wir haben Ihren Widerspruch dokumentiert und leiten ihn intern weiter.",
+    "activeTitle": "Ihr Widerspruch ist aktiv",
+    "withdrawnTitle": "Widerspruch zurückgenommen",
+    "withdrawnText": "Ihr Widerspruch wurde zurückgenommen. Sie können jederzeit erneut widersprechen."
+  },
+  "privacyCenter": {
+    "headline": "Datenschutz",
+    "intro": "Hier finden Sie jederzeit die Datenschutzerklärungen zum Kamerasystem, Ihren Nachweis, den Widerspruch und die Kontaktdaten für Ihre Betroffenenrechte.",
+    "documentsTitle": "Datenschutzerklärungen",
+    "courseTitle": "Kurs & Empfangsbestätigung",
+    "objectionTitle": "Widerspruch",
+    "contactTitle": "Auskunft, Berichtigung, Löschung",
+    "contactIntro": "Für Auskunft (Art. 15), Berichtigung (Art. 16), Löschung (Art. 17) oder Einschränkung (Art. 18) wenden Sie sich bitte an die zuständige Stelle:",
+    "contactEmail": "[E-Mail-Adresse des Datenschutzbeauftragten]",
+    "contactPlaceholderHint": "Die Kontaktadresse ist noch nicht hinterlegt. Bitte wenden Sie sich an Ihren Disponenten oder die Verwaltung.",
+    "contactMailSubject": "Betroffenenrechte – Verkehrssicherheitstechnologie"
+  }
+}

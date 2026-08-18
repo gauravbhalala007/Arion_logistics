@@ -134,3 +134,8 @@ flutter:
     - assets/academy/safety/
     - assets/academy/driving/
     - assets/da_academy/activity1/
+    # DA Academy – Modul "Kameras im Fahrzeug – Datenschutz":
+    # Kurstexte als JSON + die beiden Rechtstexte als Markdown.
+    # Asset-Verzeichnisse sind NICHT rekursiv — beide Zeilen nötig.
+    - assets/content/
+    - assets/content/documents/

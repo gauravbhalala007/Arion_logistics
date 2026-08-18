@@ -2,6 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../data/privacy_camera/privacy_camera_content.dart';
+import '../data/privacy_camera/privacy_camera_repository.dart';
+import '../data/privacy_camera/privacy_camera_texts.dart';
 import '../data/safety_training/academy_texts.dart';
 import '../data/safety_training/operating_instructions.dart';
 import '../data/safety_training/privacy_data.dart';
@@ -10,6 +13,8 @@ import 'driver_driving_safety_page.dart';
 import 'driver_green_book_page.dart';
 import 'driver_green_book_training_page.dart';
 import 'driver_operating_instructions_page.dart';
+import 'driver_privacy_camera_course_page.dart';
+import 'driver_privacy_center_page.dart';
 import 'driver_privacy_training_page.dart';
 import 'driver_ride_along_page.dart';
 import 'driver_safety_training_page.dart';
@@ -48,11 +53,17 @@ class _DriverAcademyPageState extends State<DriverAcademyPage> {
     kPrivacyTestId,
     kDrivingSafetyTrainingId,
     kOperatingInstructionsTestId,
+    kPrivacyCameraTestId,
   ];
 
   /// testId -> Ergebnisdokument. `null` = noch nicht geladen bzw. Ladefehler;
   /// dann bleiben die Statuszeilen aus, statt „Noch offen" zu behaupten.
   Map<String, Map<String, dynamic>>? _results;
+
+  /// Kursinhalte des Kamera-Datenschutzmoduls — gebraucht wird daraus nur
+  /// die Prüfsumme der aktuellen Fassung, um „neue Fassung" zu erkennen.
+  /// Assets, daher nach dem ersten Laden im Prozess gecacht.
+  PrivacyCourseBundle? _privacyCameraBundle;
 
   @override
   void initState() {
@@ -80,6 +91,13 @@ class _DriverAcademyPageState extends State<DriverAcademyPage> {
         .collection('users')
         .doc(uid)
         .collection('academy_test_results');
+    try {
+      _privacyCameraBundle ??= await PrivacyCourseBundle.load(
+        kPrivacyCourseFallbackLanguage,
+      );
+    } catch (_) {
+      // Ohne Inhalte keine Statuszeile für das Kameramodul.
+    }
     try {
       final snaps = await Future.wait(
         _statusTestIds.map(
@@ -200,6 +218,39 @@ class _DriverAcademyPageState extends State<DriverAcademyPage> {
       vars: {'n': '$done', 'total': '${ids.length}'},
     );
     return done == 0 ? _StatusInfo.neutral(label) : _StatusInfo.warn(label);
+  }
+
+  /// Kameras im Fahrzeug — Kenntnisnahme statt Test.
+  ///
+  /// Wiedervorlage NUR bei geänderter Fassung/Prüfsumme, bewusst ohne
+  /// Jahresfrist. Eine Verweigerung („declined") ist ein gültiger
+  /// Nachweis der Aushändigung und deshalb NEUTRAL, nicht rot — sie ist
+  /// kein Fehlerfall.
+  _StatusInfo? _privacyCameraStatus(String locale) {
+    final results = _results;
+    final bundle = _privacyCameraBundle;
+    if (results == null || bundle == null) return null;
+
+    final data = results[kPrivacyCameraTestId];
+    if (data == null || data['outcome'] == null) {
+      return _StatusInfo.neutral(
+        privacyCameraText(locale, 'status_open'),
+      );
+    }
+
+    final ack = PrivacyCameraAck.fromMap(data);
+    if (!ack.matchesDocument(bundle.primaryDocument)) {
+      return _StatusInfo.warn(privacyCameraText(locale, 'status_update'));
+    }
+    final date = _fmt(ack.occurredAt);
+    if (ack.isAcknowledged) {
+      return _StatusInfo.ok(
+        privacyCameraText(locale, 'status_ack', vars: {'date': date}),
+      );
+    }
+    return _StatusInfo.neutral(
+      privacyCameraText(locale, 'status_declined', vars: {'date': date}),
+    );
   }
 
   @override
@@ -348,6 +399,50 @@ class _DriverAcademyPageState extends State<DriverAcademyPage> {
                           dspUid: widget.dspUid,
                           driverTransporterId: widget.driverTransporterId,
                           onBack: () => Navigator.of(context).pop(),
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Kameras im Fahrzeug – Datenschutz. Kenntnisnahme der
+                  // Datenschutzerklärung zur Verkehrssicherheits-
+                  // technologie — KEINE Einwilligung, kein App-Gate.
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _AcademyTile(
+                      title: privacyCameraText(locale, 'tile_title'),
+                      subtitle: privacyCameraText(locale, 'tile_subtitle'),
+                      icon: Icons.photo_camera_outlined,
+                      iconColor: const Color(0xFF2A5FB0),
+                      iconBg: const Color(0xFFEAF1FB),
+                      status: _privacyCameraStatus(locale),
+                      onTap: () => _open(
+                        (ctx) => DriverPrivacyCameraCoursePage(
+                          dspUid: widget.dspUid,
+                          driverTransporterId: widget.driverTransporterId,
+                          onBack: () => Navigator.of(ctx).pop(),
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Dauerhafter Datenschutz-Bereich: Volltexte, Widerspruch
+                  // und Kontakt — jederzeit erreichbar, zwei Taps vom
+                  // Fahrer-Home (Spec §6 Nr. 1).
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _AcademyTile(
+                      title: privacyCameraText(locale, 'center_tile_title'),
+                      subtitle: privacyCameraText(
+                        locale,
+                        'center_tile_subtitle',
+                      ),
+                      icon: Icons.shield_outlined,
+                      iconColor: const Color(0xFF3B5A80),
+                      iconBg: const Color(0xFFEFF4FA),
+                      onTap: () => _open(
+                        (ctx) => DriverPrivacyCenterPage(
+                          dspUid: widget.dspUid,
+                          driverTransporterId: widget.driverTransporterId,
+                          onBack: () => Navigator.of(ctx).pop(),
                         ),
                       ),
                     ),

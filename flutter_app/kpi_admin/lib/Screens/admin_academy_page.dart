@@ -31,6 +31,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../data/academy_catalog.dart';
 import '../utils/driver_activity.dart';
 import '../widgets/admin_scope.dart';
+import 'admin_privacy_camera_section.dart';
 
 const Color _kGreen = Color(0xFF1D7F5A);
 const Color _kGreenBg = Color(0xFFE4F5EC);
@@ -430,6 +431,18 @@ class _AdminAcademyPageState extends State<AdminAcademyPage> {
                       narrow: narrow,
                       stats: s,
                     ),
+                  ),
+                // Kameras im Fahrzeug – Datenschutz. Eigener Abschnitt
+                // statt eines Eintrags in `kAcademyTrainings`: dieses
+                // Modul kennt kein Bestehen und keinen Ablauf, sondern
+                // Kenntnisnahme / Verweigerung — und Verweigerung ist
+                // kein Rückstand. Siehe admin_privacy_camera_section.dart.
+                if (_loadedForUid != null)
+                  AdminPrivacyCameraSection(
+                    dspUid: _loadedForUid!,
+                    drivers: data.drivers,
+                    de: de,
+                    narrow: narrow,
                   ),
               ],
             );
