@@ -77,6 +77,11 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
   bool _rankingByPercent = false;
   bool _rankingExpanded = false;
 
+  /// Historie: standardmäßig nur [_kPreviewLimit] Einträge, der Rest
+  /// klappt über „Mehr anzeigen" direkt in der Karte auf (gleiche
+  /// Mechanik wie beim Kranktage-Ranking oben).
+  bool _historyExpanded = false;
+
   void _refreshRanking() {
     if (widget.requestType != 'sick_leave') return;
     if (_scopeUid == null) return;
@@ -674,6 +679,128 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
       driverId: item.driverId,
       status: 'cancelled',
     );
+  }
+
+  /// Ticket „History löschen" — einzelne Historien-Einträge entfernen.
+  ///
+  /// Bewusst SOFT-DELETE statt `delete()`, weil die Einträge
+  /// abrechnungsrelevant sind:
+  ///  * `computeMonthlyAccount` liest
+  ///    `drivers/{id}/absence_requests` mit
+  ///    `where('status','==','approved')` und schreibt daraus
+  ///    Urlaubs-/Kranktage ins Zeitkonto. Ein reines `deleted`-Flag
+  ///    würde die Function NICHT erreichen — der gelöschte Eintrag
+  ///    zählte im Überstundenkonto stillschweigend weiter.
+  ///  * `onAbsenceUpdated` steigt bei einem echten Löschen sofort aus
+  ///    (`if (!after) return; // gelöscht — nichts zu tun`). Ein
+  ///    Hard-Delete würde also KEINE Neuberechnung auslösen und das
+  ///    `time_account` des Monats veraltet zurücklassen.
+  ///
+  /// Deshalb: genehmigte Einträge werden zusätzlich auf `cancelled`
+  /// gesetzt. Das läuft in den bestehenden Trigger-Pfad
+  /// (`statusChanged && oldStatus == 'approved'`) und rechnet alle
+  /// betroffenen Monate sauber zurück — ohne eine Zeile in den
+  /// Functions oder den Rules zu ändern. Das `deleted`-Flag blendet den
+  /// Eintrag danach nur noch in der UI aus; die Historie bleibt für
+  /// Audit/DSGVO-Export vollständig.
+  Future<void> _confirmDeleteAbsence(_AbsenceAdminItem item) async {
+    final de = _de;
+    final wasApproved = item.status == 'approved';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Text(
+          de ? 'Eintrag löschen?' : 'Delete entry?',
+          style: const TextStyle(fontWeight: FontWeight.w900),
+        ),
+        content: Text(
+          de
+              ? '${item.driverName} · ${item.typeLabel(de)}\n'
+                  '${item.fromDateText} – ${item.toDateText} · ${item.daysLabel(de)}\n\n'
+                  'Der Eintrag verschwindet aus der Historie.'
+                  '${wasApproved ? ' Das Zeitkonto des betroffenen Monats wird automatisch neu berechnet.' : ''}'
+              : '${item.driverName} · ${item.typeLabel(de)}\n'
+                  '${item.fromDateText} – ${item.toDateText} · ${item.daysLabel(de)}\n\n'
+                  'The entry disappears from the history.'
+                  '${wasApproved ? ' The time account of the affected month is recalculated automatically.' : ''}',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(de ? 'Abbrechen' : 'Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: _kRed),
+            child: Text(de ? 'Löschen' : 'Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await _softDeleteAbsence(item);
+  }
+
+  Future<void> _softDeleteAbsence(_AbsenceAdminItem item) async {
+    final scope = _scopeUid;
+    if (scope == null) {
+      _showSnack(
+        _de ? 'DSP-Zuordnung fehlt.' : 'Missing DSP scope.',
+        error: true,
+      );
+      return;
+    }
+
+    try {
+      final db = FirebaseFirestore.instance;
+      final rootRef = db
+          .collection('users')
+          .doc(scope)
+          .collection('absence_requests')
+          .doc(item.requestId);
+      final driverRef = db
+          .collection('users')
+          .doc(scope)
+          .collection('drivers')
+          .doc(item.driverId.toUpperCase())
+          .collection('absence_requests')
+          .doc(item.requestId);
+
+      final payload = <String, dynamic>{
+        'deleted': true,
+        'deletedBy': _uid,
+        'deletedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+        // Nur `approved` zählt irgendwo mit (App-Aggregationen wie auch
+        // `computeMonthlyAccount`). Genehmigte Einträge müssen deshalb
+        // aus diesem Status heraus — das stößt zugleich den Recompute
+        // an. `rejected`/`cancelled` bleiben unangetastet, damit die
+        // ursprüngliche Entscheidung im Audit erhalten bleibt.
+        if (item.status == 'approved') ...{
+          'status': 'cancelled',
+          'cancelledBy': _uid,
+          'cancelledAt': FieldValue.serverTimestamp(),
+        },
+      };
+
+      final batch = db.batch();
+      batch.set(rootRef, payload, SetOptions(merge: true));
+      batch.set(driverRef, payload, SetOptions(merge: true));
+      await batch.commit();
+
+      _showSnack(_de ? 'Eintrag gelöscht.' : 'Entry deleted.');
+      _refreshRanking();
+    } catch (e) {
+      _showSnack(
+        _de
+            ? 'Eintrag konnte nicht gelöscht werden: $e'
+            : 'Failed to delete entry: $e',
+        error: true,
+      );
+    }
   }
 
   Future<void> _addManualPastLeave({
@@ -2085,6 +2212,14 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
     required bool embedded,
   }) {
     final de = _de;
+    // Ticket „History Show more": standardmäßig nur die jüngsten
+    // [_kPreviewLimit] Einträge; der Rest klappt in der Karte selbst auf.
+    final visible = _historyExpanded
+        ? items
+        : items.take(_kPreviewLimit).toList(growable: false);
+    final hidden = items.length - visible.length;
+    final canExpand = items.length > _kPreviewLimit;
+
     return _SectionCard(
       emphasized: true,
       title: de ? 'Historie' : 'History',
@@ -2094,15 +2229,34 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
       icon: Icons.history_rounded,
       countLabel: '${items.length}',
       countAccent: const Color(0xFF475569),
-      // Ticket b9roqxo: auch die Historie bekommt ein „Mehr anzeigen"-
-      // Popup mit allen Einträgen.
       footer: items.isEmpty
           ? null
-          : _ShowMoreButton(
-              label: de
-                  ? 'Mehr anzeigen (${items.length})'
-                  : 'Show more (${items.length})',
-              onTap: () => _openAllRequests(_AbsenceBucket.history),
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (canExpand)
+                  _ExpandToggleButton(
+                    expanded: _historyExpanded,
+                    label: _historyExpanded
+                        ? (de ? 'Weniger anzeigen' : 'Show less')
+                        : (de
+                            ? 'Mehr anzeigen (+$hidden)'
+                            : 'Show more (+$hidden)'),
+                    onTap: () => setState(
+                      () => _historyExpanded = !_historyExpanded,
+                    ),
+                  ),
+                // Ticket b9roqxo: das Popup mit ALLEN Einträgen (eigene
+                // Suche, deutlich größeres Ladelimit) bleibt erhalten —
+                // eindeutig beschriftet, damit es sich nicht mit dem
+                // Aufklappen oben beißt.
+                _ShowMoreButton(
+                  label: de
+                      ? 'Alle anzeigen & suchen (${items.length})'
+                      : 'Show all & search (${items.length})',
+                  onTap: () => _openAllRequests(_AbsenceBucket.history),
+                ),
+              ],
             ),
       child: items.isEmpty
           ? _EmptyState(
@@ -2117,13 +2271,14 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
               physics: embedded
                   ? const NeverScrollableScrollPhysics()
                   : const AlwaysScrollableScrollPhysics(),
-              itemCount: items.length,
+              itemCount: visible.length,
               separatorBuilder: (_, __) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
                 return _HistoryAbsenceTile(
-                  item: items[index],
-                  onEdit: _editOf(items[index]),
-                  onCancel: _cancelOf(items[index]),
+                  item: visible[index],
+                  onEdit: _editOf(visible[index]),
+                  onCancel: _cancelOf(visible[index]),
+                  onDelete: _deleteOf(visible[index]),
                 );
               },
             ),
@@ -2175,6 +2330,15 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
   VoidCallback? _cancelOf(_AbsenceAdminItem item) =>
       _isLocked(item) ? null : () => _confirmCancelAbsence(item);
 
+  /// Löschen ist bewusst NICHT an [_isLocked] gekoppelt: gerade
+  /// abgelehnte und stornierte Einträge sind die, die der Admin aus der
+  /// Historie räumen will. Einzige Voraussetzung ist eine bekannte
+  /// Fahrer-ID — ohne sie ist die Fahrer-Kopie nicht adressierbar und
+  /// die Function-Seite bliebe auf dem alten Stand.
+  VoidCallback? _deleteOf(_AbsenceAdminItem item) => item.driverId.isEmpty
+      ? null
+      : () => _confirmDeleteAbsence(item);
+
   String _bucketTitle(_AbsenceBucket bucket, bool de) {
     switch (bucket) {
       case _AbsenceBucket.pending:
@@ -2218,6 +2382,7 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
             onSetPaidOf: _setPaidOf,
             onEditOf: _editOf,
             onCancelOf: _cancelOf,
+            onDeleteOf: _deleteOf,
           ),
         );
       },
@@ -2642,10 +2807,17 @@ class _HistoryAbsenceTile extends StatelessWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onCancel;
 
+  /// Ticket „History löschen": Papierkorb direkt an der Zeile —
+  /// bewusst sichtbar statt im ⋮-Menü, weil abgelehnte/stornierte
+  /// Einträge gar kein Menü bekommen (dort sind Bearbeiten und
+  /// Stornieren gesperrt), genau sie aber weggeräumt werden sollen.
+  final VoidCallback? onDelete;
+
   const _HistoryAbsenceTile({
     required this.item,
     this.onEdit,
     this.onCancel,
+    this.onDelete,
   });
 
   @override
@@ -2675,6 +2847,28 @@ class _HistoryAbsenceTile extends StatelessWidget {
               _StatusChip(status: item.status),
               if (onEdit != null || onCancel != null)
                 _AbsenceActionsMenu(onEdit: onEdit, onCancel: onCancel),
+              if (onDelete != null)
+                Builder(
+                  builder: (context) {
+                    final de =
+                        Localizations.localeOf(context).languageCode == 'de';
+                    return IconButton(
+                      tooltip: de ? 'Eintrag löschen' : 'Delete entry',
+                      onPressed: onDelete,
+                      padding: EdgeInsets.zero,
+                      splashRadius: 18,
+                      constraints: const BoxConstraints(
+                        minWidth: 34,
+                        minHeight: 34,
+                      ),
+                      icon: const Icon(
+                        Icons.delete_outline_rounded,
+                        size: 18,
+                        color: Color(0xFFB91C1C),
+                      ),
+                    );
+                  },
+                ),
             ],
           ),
           const SizedBox(height: 8),
@@ -3140,6 +3334,53 @@ class _ShowMoreButton extends StatelessWidget {
   }
 }
 
+/// „Mehr anzeigen" / „Weniger anzeigen" — klappt eine Liste an Ort und
+/// Stelle auf bzw. wieder zu (im Gegensatz zu [_ShowMoreButton], der ein
+/// Popup öffnet).
+class _ExpandToggleButton extends StatelessWidget {
+  final String label;
+  final bool expanded;
+  final VoidCallback onTap;
+
+  const _ExpandToggleButton({
+    required this.label,
+    required this.expanded,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: TextButton.icon(
+        onPressed: onTap,
+        icon: Icon(
+          expanded
+              ? Icons.keyboard_arrow_up_rounded
+              : Icons.keyboard_arrow_down_rounded,
+          size: 18,
+        ),
+        label: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        style: TextButton.styleFrom(
+          foregroundColor: const Color(0xFF1D7F5A),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          textStyle: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Platzsparende Zeile für die Vorschau-Bereiche.
 class _CompactAbsenceTile extends StatelessWidget {
   final _AbsenceAdminItem item;
@@ -3435,6 +3676,7 @@ class _AbsenceAllRequestsView extends StatefulWidget {
     required this.onSetPaidOf,
     required this.onEditOf,
     required this.onCancelOf,
+    required this.onDeleteOf,
   });
 
   final CollectionReference<Map<String, dynamic>> collection;
@@ -3447,6 +3689,7 @@ class _AbsenceAllRequestsView extends StatefulWidget {
   final ValueChanged<bool>? Function(_AbsenceAdminItem) onSetPaidOf;
   final VoidCallback? Function(_AbsenceAdminItem) onEditOf;
   final VoidCallback? Function(_AbsenceAdminItem) onCancelOf;
+  final VoidCallback? Function(_AbsenceAdminItem) onDeleteOf;
 
   @override
   State<_AbsenceAllRequestsView> createState() =>
@@ -3608,6 +3851,10 @@ class _AbsenceAllRequestsViewState extends State<_AbsenceAllRequestsView> {
                         item: item,
                         onEdit: widget.onEditOf(item),
                         onCancel: widget.onCancelOf(item),
+                        // Löschen nur in der Historie — Bevorstehendes
+                        // wird storniert, nicht weggeräumt.
+                        onDelete:
+                            isHistory ? widget.onDeleteOf(item) : null,
                       );
                     }
                     return _PendingAbsenceCard(
@@ -3663,6 +3910,9 @@ _AbsenceBuckets _splitAbsenceBuckets({
   final needle = search.trim().toLowerCase();
   final items = docs
       .map(_AbsenceAdminItem.fromDoc)
+      // Soft-gelöschte Einträge sind für den Admin nicht mehr da —
+      // eine Stelle für Seite UND „Alle Einträge"-Popup.
+      .where((it) => !it.deleted)
       .where((it) => requestType == null || it.type == requestType)
       .where((it) => _matchesAbsenceSearch(it, needle, de))
       .toList();
@@ -3767,6 +4017,11 @@ class _AbsenceAdminItem {
   /// ist `true` der Fallback (Abwärtskompatibilität).
   final bool paid;
 
+  /// Soft-Delete-Flag (Ticket „History löschen"). Gesetzte Einträge
+  /// werden in der Admin-UI ausgeblendet, bleiben aber in Firestore —
+  /// siehe `_softDeleteAbsence` für die Begründung.
+  final bool deleted;
+
   /// Krankmeldung-AU upload (Arbeitsunfähigkeitsbescheinigung), only
   /// set for sick-leave requests. Stored as base64 inline in Firestore.
   final String auFileBase64;
@@ -3786,6 +4041,7 @@ class _AbsenceAdminItem {
     required this.reviewedAt,
     this.cancelledAt,
     this.paid = true,
+    this.deleted = false,
     this.auFileBase64 = '',
     this.auFilename = '',
     this.auMimeType = '',
@@ -3829,6 +4085,7 @@ class _AbsenceAdminItem {
       cancelledAt: _toDate(data['cancelledAt']),
       // Fehlt das Feld (alle Bestandsdaten), gilt der Urlaub als bezahlt.
       paid: data['paid'] is bool ? data['paid'] as bool : true,
+      deleted: data['deleted'] == true,
       auFileBase64: _stringOf(data['auFileBase64']),
       auFilename: _stringOf(data['auFilename']),
       auMimeType: _stringOf(data['auMimeType']),
@@ -5479,6 +5736,9 @@ class _AbsenceDriversOverviewPageState
     final byDriver = <String, List<_AbsenceAdminItem>>{};
     for (final doc in absSnap.docs) {
       final data = doc.data();
+      // Soft-gelöschte Einträge zählen auch im DA-Balance-Blatt nicht
+      // mehr mit (gleiche Regel wie in `_splitAbsenceBuckets`).
+      if (data['deleted'] == true) continue;
       final tid = ((data['driverTransporterId'] ?? data['driverId'] ?? '')
               .toString())
           .trim()

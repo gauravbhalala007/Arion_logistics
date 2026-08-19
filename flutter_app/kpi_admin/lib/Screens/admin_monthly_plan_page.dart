@@ -12,6 +12,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -58,6 +59,22 @@ String _contractAbbr(DriverContractType? c) {
       return '';
   }
 }
+
+/// Vertragsgruppe für die Standard-Sortierung des Monatsplans (Ticket):
+/// 1. Minijob · 2. Teilzeit · 3. Dispatch · 4. Vollzeit ·
+/// 5. Austritt geplant · 6. Sonstige (kein Vertragstyp hinterlegt).
+/// Alle Teilzeit-Varianten (2d/3d/4d) bilden **eine** Gruppe.
+int _contractGroupRank(DriverContractType? c) => switch (c) {
+      DriverContractType.minijob => 0,
+      DriverContractType.parttime4d ||
+      DriverContractType.parttime3d ||
+      DriverContractType.parttime2d =>
+        1,
+      DriverContractType.dispatcher => 2,
+      DriverContractType.fulltime => 3,
+      DriverContractType.outSoon => 4,
+      null => 5,
+    };
 
 Color _codeColor(String code) {
   switch (code) {
@@ -413,17 +430,42 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
     await _saveSettings();
   }
 
-  /// Horizontal scroll of the pinned header row and the body are kept
-  /// in sync so the day columns always line up.
+  /// Horizontal scroll of the pinned header row, the body and the always
+  /// visible scrollbar strip below the matrix are kept in sync so the day
+  /// columns always line up.
   final ScrollController _hHeader = ScrollController();
   final ScrollController _hBody = ScrollController();
+  final ScrollController _hFoot = ScrollController();
+
+  /// Vertikaler Scroll des Matrix-Körpers (eigene Scrollbar) und der
+  /// Seite selbst, wenn die Shell zu wenig Höhe übrig lässt.
+  final ScrollController _vBody = ScrollController();
+  final ScrollController _vPage = ScrollController();
   bool _hSyncing = false;
   bool _rosterImporting = false;
 
-  void _syncScroll(ScrollController from, ScrollController to) {
-    if (_hSyncing || !to.hasClients) return;
+  /// Ticket „not scrollable": Maus-Drag als Scroll-Geste zulassen und die
+  /// automatischen Scrollbars abschalten — die Matrix bekommt stattdessen
+  /// eigene, dauerhaft sichtbare Scrollbars.
+  ScrollBehavior _dragScrollBehavior(BuildContext context) =>
+      ScrollConfiguration.of(context).copyWith(
+        scrollbars: false,
+        dragDevices: const {
+          PointerDeviceKind.touch,
+          PointerDeviceKind.mouse,
+          PointerDeviceKind.trackpad,
+          PointerDeviceKind.stylus,
+        },
+      );
+
+  void _syncScroll(ScrollController from) {
+    if (_hSyncing || !from.hasClients) return;
     _hSyncing = true;
-    to.jumpTo(from.offset.clamp(0.0, to.position.maxScrollExtent));
+    for (final to in [_hHeader, _hBody, _hFoot]) {
+      if (identical(to, from) || !to.hasClients) continue;
+      final target = from.offset.clamp(0.0, to.position.maxScrollExtent);
+      if ((to.offset - target).abs() > 0.5) to.jumpTo(target);
+    }
     _hSyncing = false;
   }
 
@@ -438,8 +480,9 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
     super.initState();
     final now = DateTime.now();
     _month = DateTime(now.year, now.month);
-    _hHeader.addListener(() => _syncScroll(_hHeader, _hBody));
-    _hBody.addListener(() => _syncScroll(_hBody, _hHeader));
+    _hHeader.addListener(() => _syncScroll(_hHeader));
+    _hBody.addListener(() => _syncScroll(_hBody));
+    _hFoot.addListener(() => _syncScroll(_hFoot));
     HardwareKeyboard.instance.addHandler(_onGlobalKey);
   }
 
@@ -449,6 +492,9 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
     _searchFocus.dispose();
     _hHeader.dispose();
     _hBody.dispose();
+    _hFoot.dispose();
+    _vBody.dispose();
+    _vPage.dispose();
     super.dispose();
   }
 
@@ -468,6 +514,89 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
 
   bool get _de => Localizations.localeOf(context).languageCode == 'de';
   String _tr(String de, String en) => _de ? de : en;
+
+  /// Beschriftung einer Vertragsgruppe (DE/EN) für die Gruppen-Kopfzeilen.
+  String _groupLabel(int rank) => switch (rank) {
+        0 => 'Minijob',
+        1 => _tr('Teilzeit', 'Part-time'),
+        2 => _tr('Dispatch', 'Dispatch'),
+        3 => _tr('Vollzeit', 'Full-time'),
+        4 => _tr('Austritt geplant', 'Leaving soon'),
+        _ => _tr('Sonstige', 'Other'),
+      };
+
+  /// Höhe einer Gruppen-Kopfzeile in der Matrix.
+  static const _groupRowH = 24.0;
+
+  /// Zeilenfolge von Liste und Matrix: In der Standard-Sortierung
+  /// („Vertragsgruppe") steht vor jeder Gruppe eine Kopfzeile, sonst
+  /// stehen nur die Fahrer in der Liste. `index < 0` = Kopfzeile.
+  List<({int index, int rank, int count})> _planRows(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> drivers,
+  ) {
+    int rankOf(QueryDocumentSnapshot<Map<String, dynamic>> d) =>
+        _contractGroupRank(
+            DriverContractType.fromValue(d.data()['contractType']));
+
+    final rows = <({int index, int rank, int count})>[];
+    final grouped = _sortMode == 'contract';
+    var prev = -1;
+    for (var i = 0; i < drivers.length; i++) {
+      final rank = rankOf(drivers[i]);
+      if (grouped && rank != prev) {
+        var count = 0;
+        for (var j = i; j < drivers.length && rankOf(drivers[j]) == rank; j++) {
+          count++;
+        }
+        rows.add((index: -1, rank: rank, count: count));
+        prev = rank;
+      }
+      rows.add((index: i, rank: rank, count: 0));
+    }
+    return rows;
+  }
+
+  /// Dezente Gruppen-Kopfzeile („Minijob · 3") für Matrix und Handy-Liste.
+  Widget _groupHeader(int rank, int count, {double? width}) {
+    return Container(
+      width: width,
+      height: _groupRowH,
+      alignment: Alignment.centerLeft,
+      padding: const EdgeInsets.only(left: 12, right: 10),
+      decoration: const BoxDecoration(
+        color: Color(0xFFEEF2F6),
+        border: Border(
+          top: BorderSide(color: Color(0xFFDDE3EA), width: 0.8),
+          bottom: BorderSide(color: Color(0xFFDDE3EA), width: 0.8),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            _groupLabel(rank).toUpperCase(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 9.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.6,
+              color: Color(0xFF475569),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '$count',
+            style: const TextStyle(
+              fontSize: 9.5,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF94A3B8),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   /// Zusatz für die Legende, solange die Vorbelegung aktiv ist.
   String _autoLegendSuffix() => _tr(
@@ -1675,17 +1804,28 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
     if (_autoFill) _loadApprovedAbsences();
 
     // Ticket: Handy-Ansicht. Oberhalb von [_kNarrow] läuft exakt der
-    // bisherige Code-Pfad (Matrix + Kopfzeile in einer Reihe).
-    final narrow = MediaQuery.sizeOf(context).width < _kNarrow;
-
+    // bisherige Code-Pfad (Matrix + Kopfzeile in einer Reihe). Die Breite
+    // kommt aus den echten Constraints der Shell (nicht aus der Fenster-
+    // breite), damit die Umschaltung auch neben der Sidebar stimmt.
     return Scaffold(
       backgroundColor: _kBg,
       body: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.all(narrow ? 10 : 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final narrow = constraints.maxWidth < _kNarrow;
+            final pad = narrow ? 10.0 : 16.0;
+            final legend = _tr(
+                    'A / AC / Ra = 14 € pro Tag · U = Urlaub bezahlt · '
+                        'X = Urlaub unbezahlt · K = Krank · '
+                        'U / X / K = keine Spesen · '
+                        'Poor/Fair-Woche = automatisch gestrichen',
+                    'A / AC / Ra = €14 per day · U = paid vacation · '
+                        'X = unpaid vacation · K = sick leave · '
+                        'U / X / K = no Spesen · '
+                        'poor/fair week = auto-cancelled') +
+                (_autoFill ? _autoLegendSuffix() : '');
+
+            final head = <Widget>[
               if (narrow) ..._narrowTopBar() else ...[
               // ── Header: title + month switcher ──
               Row(
@@ -1699,26 +1839,39 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
                     ),
                   ),
                   const SizedBox(width: 14),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFD1FAE5),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      _tr(
-                              'A / AC / Ra = 14 € pro Tag · U = Urlaub bezahlt · X = Urlaub unbezahlt · K = Krank · U / X / K = keine Spesen · Poor/Fair-Woche = automatisch gestrichen',
-                              'A / AC / Ra = €14 per day · U = paid vacation · X = unpaid vacation · K = sick leave · U / X / K = no Spesen · poor/fair week = auto-cancelled') +
-                          (_autoFill ? _autoLegendSuffix() : ''),
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF065F46),
+                  // Ticket „not scrollable": Die Legende darf die Kopfzeile
+                  // nicht mehr sprengen — sie schrumpft mit und kürzt bei
+                  // Bedarf (voller Text im Tooltip). Vorher wurden Monats-
+                  // navigation und Aktionen aus dem Fenster geschoben.
+                  Flexible(
+                    fit: FlexFit.tight,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Tooltip(
+                        message: legend,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD1FAE5),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            legend,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              height: 1.25,
+                              color: Color(0xFF065F46),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 8),
                   IconButton(
                     icon: const Icon(Icons.chevron_left_rounded),
                     onPressed: () => setState(() {
@@ -1832,9 +1985,11 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
               ),
               ],
               const SizedBox(height: 12),
-              // ── Grid ──
-              Expanded(
-                child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            ];
+
+            // ── Grid ──
+            final plan =
+                StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                   stream: FirebaseFirestore.instance
                       .collection('users')
                       .doc(uid)
@@ -1871,38 +2026,29 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
                         })
                         .toList()
                       ..sort((a, b) {
-                        // Ticket: group by contract type (MiniJob → Teilzeit
-                        // → Dispatcher → Vollzeit), then by work start date —
+                        // Ticket: group by contract type (Minijob → Teilzeit
+                        // → Dispatch → Vollzeit), then by work start date —
                         // not alphabetically.
-                        int rank(dynamic doc) {
-                          final c = DriverContractType.fromValue(
-                              doc.data()['contractType']);
-                          return switch (c) {
-                            DriverContractType.minijob => 0,
-                            DriverContractType.parttime4d ||
-                            DriverContractType.parttime3d ||
-                            DriverContractType.parttime2d =>
-                              1,
-                            DriverContractType.dispatcher => 2,
-                            DriverContractType.fulltime => 3,
-                            DriverContractType.outSoon => 5,
-                            null => 4,
-                          };
-                        }
+                        int rank(dynamic doc) => _contractGroupRank(
+                            DriverContractType.fromValue(
+                                doc.data()['contractType']));
 
+                        // Startdatum = derselbe Vertragsbeginn, der unter dem
+                        // Namen steht bzw. im Drivers Hub als „aktiv seit"
+                        // erscheint (employmentPeriods, sonst der Legacy-Wert
+                        // onboarding.workStartDate im Format dd/MM/yyyy).
+                        // Ohne Startdatum ans Ende der Gruppe.
                         DateTime startOf(dynamic doc) {
-                          final data = doc.data();
-                          final ob = data['onboarding'];
-                          final raw = ob is Map
-                              ? (ob['workStartDate'] ?? '').toString().trim()
-                              : '';
-                          final parsed = raw.isNotEmpty
-                              ? DateTime.tryParse(raw)
-                              : null;
-                          if (parsed != null) return parsed;
-                          final ts = data['createdAt'] ?? data['addedAt'];
-                          if (ts is Timestamp) return ts.toDate();
-                          return DateTime(2100);
+                          final data =
+                              Map<String, dynamic>.from(doc.data() as Map);
+                          final periods = employmentPeriodsOf(data);
+                          final start =
+                              employmentPeriodForMonth(periods, _month)
+                                      ?.startDate ??
+                                  (periods.isEmpty
+                                      ? null
+                                      : periods.first.startDate);
+                          return start ?? DateTime(2100);
                         }
 
                         String nameOf(dynamic doc) =>
@@ -2116,10 +2262,45 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
                       },
                     );
                   },
+                );
+
+            // Ticket „It's not scrollable": Reicht die von der Shell
+            // gelieferte Höhe nicht für Kopfbereich + Plan, wird die
+            // ganze Seite vertikal scrollbar (statt zu überlaufen) und der
+            // Planbereich behält seine Mindesthöhe.
+            const minPlanH = 320.0;
+            final roomForPlan =
+                constraints.maxHeight - 2 * pad - (narrow ? 300.0 : 120.0);
+            if (roomForPlan >= minPlanH) {
+              return Padding(
+                padding: EdgeInsets.all(pad),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [...head, Expanded(child: plan)],
+                ),
+              );
+            }
+            return ScrollConfiguration(
+              behavior: _dragScrollBehavior(context),
+              child: Scrollbar(
+              controller: _vPage,
+              thumbVisibility: true,
+              child: SingleChildScrollView(
+                controller: _vPage,
+                child: Padding(
+                  padding: EdgeInsets.all(pad),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ...head,
+                      SizedBox(height: minPlanH, child: plan),
+                    ],
+                  ),
                 ),
               ),
-            ],
-          ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -2632,11 +2813,25 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
     String Function(String tid, int day) codeOf,
     int Function(String tid) spesenDays,
   ) {
+    // Gleiche Gruppierung wie in der Matrix: Minijob → Teilzeit →
+    // Dispatch → Vollzeit, innerhalb der Gruppe nach Vertragsbeginn.
+    final planRows = _planRows(drivers);
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(10, 10, 10, 18),
-      itemCount: drivers.length,
+      itemCount: planRows.length,
       separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (context, i) {
+      itemBuilder: (context, index) {
+        final row = planRows[index];
+        if (row.index < 0) {
+          return Padding(
+            padding: EdgeInsets.only(top: index == 0 ? 0 : 6, bottom: 2),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: _groupHeader(row.rank, row.count),
+            ),
+          );
+        }
+        final i = row.index;
         final doc = drivers[i];
         final data = doc.data();
         final tid = (data['transporterId'] ?? doc.id).toString().trim();
@@ -3122,20 +3317,9 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
     // Ticket: laufende Nummer pro Vertragsgruppe — startet bei jedem
     // Gruppenwechsel neu bei 1. Gruppen wie in der Standard-Sortierung:
     // alle Teilzeit-Typen zählen als EINE Gruppe.
-    int numberGroup(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
-      final c = DriverContractType.fromValue(doc.data()['contractType']);
-      return switch (c) {
-        DriverContractType.minijob => 0,
-        DriverContractType.parttime4d ||
-        DriverContractType.parttime3d ||
-        DriverContractType.parttime2d =>
-          1,
-        DriverContractType.dispatcher => 2,
-        DriverContractType.fulltime => 3,
-        DriverContractType.outSoon => 5,
-        null => 4,
-      };
-    }
+    int numberGroup(QueryDocumentSnapshot<Map<String, dynamic>> doc) =>
+        _contractGroupRank(
+            DriverContractType.fromValue(doc.data()['contractType']));
 
     final groupNumbers = List<int>.filled(drivers.length, 0);
     var prevGroup = -1;
@@ -3150,6 +3334,12 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
       }
       groupNumbers[i] = groupCounter;
     }
+
+    // Zeilenfolge inkl. Gruppen-Kopfzeilen (Ticket: Minijob → Teilzeit →
+    // Dispatch → Vollzeit). Namen-, Tages- und Summenspalte laufen über
+    // dieselbe Liste, damit die Zeilen zeilengenau übereinanderliegen.
+    final planRows = _planRows(drivers);
+    final matrixW = daysInMonth * _cellW;
 
     const missRowH = 17.0;
     const freeRowH = 17.0;
@@ -3364,7 +3554,12 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
       ],
     );
 
-    return Column(
+    // Ticket „not scrollable": Ziehen mit der Maus scrollt die Matrix, die
+    // Scrollbars bleiben dauerhaft sichtbar — vorher war die Tages-Matrix
+    // mit einer Maus nur durch Vergrößern des Fensters erreichbar.
+    return ScrollConfiguration(
+      behavior: _dragScrollBehavior(context),
+      child: Column(
       children: [
         // ── Pinned header (always visible) ──
         Row(
@@ -3443,7 +3638,11 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
         ),
         // ── Scrollable body ──
         Expanded(
-          child: SingleChildScrollView(
+          child: Scrollbar(
+            controller: _vBody,
+            thumbVisibility: true,
+            child: SingleChildScrollView(
+            controller: _vBody,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -3457,8 +3656,12 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
                   ),
                   child: Column(
                     children: [
-                      for (var i = 0; i < drivers.length; i++)
+                      for (final row in planRows)
+                        if (row.index < 0)
+                          _groupHeader(row.rank, row.count, width: 228)
+                        else
                         Builder(builder: (context) {
+                          final i = row.index;
                           final contract = DriverContractType.fromValue(
                               drivers[i].data()['contractType']);
                     final abbr = _contractAbbr(contract);
@@ -3551,18 +3754,34 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
                     scrollDirection: Axis.horizontal,
                     child: Column(
                       children: [
-                        for (var i = 0; i < drivers.length; i++)
+                        for (final row in planRows)
+                          if (row.index < 0)
+                            // Gruppen-Kopfzeile über die volle Matrixbreite.
+                            Container(
+                              width: matrixW,
+                              height: _groupRowH,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFEEF2F6),
+                                border: Border(
+                                  top: BorderSide(
+                                      color: Color(0xFFDDE3EA), width: 0.8),
+                                  bottom: BorderSide(
+                                      color: Color(0xFFDDE3EA), width: 0.8),
+                                ),
+                              ),
+                            )
+                          else
                           Row(
                             children: [
                               for (var d = 1; d <= daysInMonth; d++)
                                 _dayCell(
-                                  drivers[i],
+                                  drivers[row.index],
                                   d,
                                   codeOf,
                                   isAuto,
                                   weekBlocked,
                                   monthBlocked,
-                                  zebra: i.isOdd,
+                                  zebra: row.index.isOdd,
                                   sunday: isSunday(d),
                                   monday: isMonday(d),
                                 ),
@@ -3577,8 +3796,23 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
                   width: 116,
                   child: Column(
                     children: [
-                      for (var i = 0; i < drivers.length; i++)
+                      for (final row in planRows)
+                        if (row.index < 0)
+                          Container(
+                            height: _groupRowH,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFEEF2F6),
+                              border: Border(
+                                top: BorderSide(
+                                    color: Color(0xFFDDE3EA), width: 0.8),
+                                bottom: BorderSide(
+                                    color: Color(0xFFDDE3EA), width: 0.8),
+                              ),
+                            ),
+                          )
+                        else
                         Builder(builder: (context) {
+                          final i = row.index;
                           final tid = (drivers[i]
                                       .data()['transporterId'] ??
                             drivers[i].id)
@@ -3635,8 +3869,41 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
               ],
             ),
           ),
+          ),
+        ),
+        // ── Dauerhaft sichtbare Horizontal-Scrollbar der Tages-Matrix ──
+        // Sie hängt an einem eigenen (leeren) Scrollbereich derselben
+        // Breite und ist mit Kopf- und Körper-Scroll gekoppelt.
+        Container(
+          height: 14,
+          decoration: const BoxDecoration(
+            color: Color(0xFFF9FAFB),
+            border: Border(
+              top: BorderSide(color: Color(0xFFE5E7EB), width: 0.8),
+            ),
+          ),
+          child: Row(
+            children: [
+              const SizedBox(width: 228),
+              Expanded(
+                child: Scrollbar(
+                  controller: _hFoot,
+                  thumbVisibility: true,
+                  thickness: 8,
+                  scrollbarOrientation: ScrollbarOrientation.bottom,
+                  child: SingleChildScrollView(
+                    controller: _hFoot,
+                    scrollDirection: Axis.horizontal,
+                    child: SizedBox(width: matrixW, height: 14),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 116),
+            ],
+          ),
         ),
       ],
+      ),
     );
   }
 
