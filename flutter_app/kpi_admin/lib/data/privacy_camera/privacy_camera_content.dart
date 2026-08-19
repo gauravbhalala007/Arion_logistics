@@ -77,7 +77,7 @@ const String kPrivacyCameraAppVersion = '1.0.0';
 ///
 /// Auf `true` setzen, sobald der Kunde die Inhalte final abgestimmt hat —
 /// mehr ist für die Freischaltung nicht nötig.
-const bool kPrivacyCameraDriverEnabled = false;
+const bool kPrivacyCameraDriverEnabled = true;
 
 /// Sprache des VERBINDLICHEN Wortlauts. Bleibt in jeder Sprachfassung
 /// zusätzlich sichtbar und wird immer mitgespeichert.
