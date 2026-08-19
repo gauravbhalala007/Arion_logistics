@@ -13,6 +13,7 @@ import '../localization/app_localizations.dart';
 import '../theme/app_colors.dart';
 import '../widgets/co_button.dart';
 import '../widgets/co_pressable.dart';
+import '../widgets/report_source_hint.dart';
 import 'pod_quality_week.dart';
 
 final _pct = NumberFormat.decimalPattern('de');
@@ -266,6 +267,12 @@ class _PodQualityOverviewPageState extends State<PodQualityOverviewPage> {
                     ),
                   ],
                 ),
+              const SizedBox(height: 12),
+              const ReportSourceHint(
+                expectedFileName:
+                    'z. B. DE-AION-DBY5-Week19-POD-Quality.pdf',
+                margin: EdgeInsets.zero,
+              ),
               const SizedBox(height: 16),
               Expanded(
                 child: StreamBuilder<List<_PodReportVM>>(

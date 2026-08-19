@@ -23,6 +23,7 @@ import '../services/parser_api.dart';
 import '../services/report_section_remover.dart';
 import '../services/report_writer.dart';
 import '../widgets/admin_scope.dart';
+import '../widgets/report_source_hint.dart';
 
 class CdfOverviewPage extends StatefulWidget {
   const CdfOverviewPage({super.key});
@@ -192,6 +193,10 @@ class _CdfOverviewPageState extends State<CdfOverviewPage> {
                   children: [
                     _hero(weeks),
                     const SizedBox(height: 18),
+                    const ReportSourceHint(
+                      expectedFileName:
+                          'z. B. DE-AION-DBY5-Week19-CDF-report.html',
+                    ),
                     _toolbar(),
                     const SizedBox(height: 12),
                     if (snap.connectionState == ConnectionState.waiting)

@@ -26,6 +26,7 @@ import '../widgets/admin_scope.dart';
 import '../widgets/co_button.dart';
 import '../widgets/co_pressable.dart';
 import '../widgets/driver_performance_sections.dart';
+import '../widgets/report_source_hint.dart';
 
 final _pct = NumberFormat.decimalPattern('de');
 final _int = NumberFormat.decimalPattern('de');
@@ -580,6 +581,15 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
                       ],
                     );
                   },
+                ),
+                const ReportSourceHint(
+                  sourceDe: 'Driver-CSV: Cortex → Leistung → '
+                      'Liefermitarbeiter → Woche auswählen → '
+                      'Download-Icon oben rechts',
+                  sourceEn: 'Driver CSV: Cortex → Performance → '
+                      'Delivery Associates → select week → '
+                      'download icon top right',
+                  expectedFileName: 'z. B. delivery-associates-week19.csv',
                 ),
                 _buildFilterBar(isMobile),
                 const SizedBox(height: 18),

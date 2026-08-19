@@ -21,6 +21,7 @@ import 'package:intl/intl.dart';
 import '../services/parser_api.dart';
 import '../services/report_section_remover.dart';
 import '../services/report_writer.dart';
+import '../widgets/report_source_hint.dart';
 
 // Theme accents (blue — distinct from CDF's amber).
 const _kAccent = Color(0xFF2563EB);
@@ -165,6 +166,10 @@ class _DwcOverviewPageState extends State<DwcOverviewPage> {
                   children: [
                     _hero(weeks),
                     const SizedBox(height: 18),
+                    const ReportSourceHint(
+                      expectedFileName:
+                          'z. B. DE-AION-DBY5-DWC-IADC-Report_2026-26.html',
+                    ),
                     _toolbar(),
                     const SizedBox(height: 12),
                     if (snap.connectionState == ConnectionState.waiting)

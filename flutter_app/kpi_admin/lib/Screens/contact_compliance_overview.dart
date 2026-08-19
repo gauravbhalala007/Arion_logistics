@@ -30,6 +30,7 @@ import 'package:intl/intl.dart';
 import '../services/parser_api.dart';
 import '../services/report_writer.dart';
 import '../widgets/admin_scope.dart';
+import '../widgets/report_source_hint.dart';
 
 // Theme accents (teal — distinct from CDF's amber and DWC's blue).
 const _kAccent = Color(0xFF0D9488);
@@ -240,6 +241,14 @@ class _ContactComplianceOverviewPageState
                   children: [
                     _hero(weeks),
                     const SizedBox(height: 18),
+                    const ReportSourceHint(
+                      expectedFileName:
+                          'z. B. DE-AION-DBY5-Week19-Scorecard.pdf',
+                      extraHintDe: 'Hinweis: Contact Compliance wird aus '
+                          'der wöchentlichen Amazon-Scorecard-PDF gelesen.',
+                      extraHintEn: 'Note: Contact Compliance is read from '
+                          'the weekly Amazon scorecard PDF.',
+                    ),
                     _toolbar(),
                     const SizedBox(height: 12),
                     if (snap.connectionState == ConnectionState.waiting)

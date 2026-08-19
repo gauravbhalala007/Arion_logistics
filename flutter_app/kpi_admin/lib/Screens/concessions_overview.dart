@@ -12,6 +12,7 @@ import '../services/report_writer.dart';
 import '../localization/app_localizations.dart';
 import '../widgets/admin_scope.dart';
 import '../widgets/co_button.dart';
+import '../widgets/report_source_hint.dart';
 import 'concessions_dashboard.dart';
 import 'concessions_week.dart';
 
@@ -391,6 +392,12 @@ class _ConcessionsOverviewPageState extends State<ConcessionsOverviewPage> {
                     ),
                   ],
                 ),
+              const SizedBox(height: 12),
+              const ReportSourceHint(
+                expectedFileName:
+                    'z. B. DE-AION-DBY5-Week19-Concessions.xlsx',
+                margin: EdgeInsets.zero,
+              ),
               const SizedBox(height: 16),
               // Hero-Stats: Gesamt-Verlust + Gesamt-DNRs + Betroffene
               _OverallTotalsCard(),

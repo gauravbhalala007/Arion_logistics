@@ -25,6 +25,7 @@ import '../widgets/admin_scope.dart';
 import '../widgets/co_button.dart';
 import '../widgets/co_pressable.dart';
 import '../widgets/pill_tab_bar.dart';
+import '../widgets/report_source_hint.dart';
 
 /// Simple German-style number formatting
 final _pct2 = NumberFormat.decimalPattern('de')
@@ -1416,15 +1417,22 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage>
                                 color: _UI.textSecondary,
                                 size: _sp(20, w),
                               ),
-                              child: _UploadDropZone(
-                                busy: _busyUpload,
-                                onPick: _uploadWeeklyPdf,
-                                promptText: _busyUpload
-                                    ? t.t('uploading')
-                                    : t.t(
-                                        'scorecard_overview_upload_prompt'),
-                                buttonLabel:
-                                    t.t('scorecard_overview_choose_file'),
+                              child: Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.stretch,
+                                children: [
+                                  const _ScorecardSourceHint(),
+                                  _UploadDropZone(
+                                    busy: _busyUpload,
+                                    onPick: _uploadWeeklyPdf,
+                                    promptText: _busyUpload
+                                        ? t.t('uploading')
+                                        : t.t(
+                                            'scorecard_overview_upload_prompt'),
+                                    buttonLabel:
+                                        t.t('scorecard_overview_choose_file'),
+                                  ),
+                                ],
                               ),
                             );
 
@@ -2864,6 +2872,31 @@ class _SummaryRow extends StatelessWidget {
 /// Label-Pille, deutlich getrennt, Apple-iOS-Pattern.
 /// Desktop: grüner "New"-Button (oben rechts) mit Popup-Menü für die
 /// Uploads (Scorecard-PDF + Driver-CSV).
+/// Quellen-Hinweis für die Scorecard-Upload-Stellen: Wochen-Scorecard-PDF
+/// plus die Driver-CSV aus dem Liefermitarbeiter-Bereich.
+class _ScorecardSourceHint extends StatelessWidget {
+  const _ScorecardSourceHint({this.compact = false, this.margin});
+
+  final bool compact;
+  final EdgeInsetsGeometry? margin;
+
+  @override
+  Widget build(BuildContext context) {
+    return ReportSourceHint(
+      compact: compact,
+      margin: margin ?? const EdgeInsets.only(bottom: 12),
+      sourceDe: 'Quelle: Cortex → Leistung → Scorecard',
+      sourceEn: 'Source: Cortex → Performance → Scorecard',
+      expectedFileName: 'z. B. DE-AION-DBY5-Week19-Scorecard.pdf',
+      extraHintDe: 'Driver-CSV: Cortex → Leistung → Liefermitarbeiter → '
+          'Woche auswählen → Download-Icon oben rechts',
+      extraHintEn: 'Driver CSV: Cortex → Performance → Delivery Associates → '
+          'select week → download icon top right',
+      extraFileName: 'z. B. delivery-associates-week19.csv',
+    );
+  }
+}
+
 class _UploadNewButton extends StatelessWidget {
   const _UploadNewButton({
     required this.onPickPdf,
@@ -2893,6 +2926,17 @@ class _UploadNewButton extends StatelessWidget {
         if (v == 1) onPickCsv();
       },
       itemBuilder: (_) => [
+        const PopupMenuItem<int>(
+          enabled: false,
+          padding: EdgeInsets.symmetric(horizontal: 12),
+          child: SizedBox(
+            width: 320,
+            child: _ScorecardSourceHint(
+              compact: true,
+              margin: EdgeInsets.symmetric(vertical: 6),
+            ),
+          ),
+        ),
         PopupMenuItem<int>(
           value: 0,
           child: Row(
@@ -2988,6 +3032,10 @@ class _UploadSpeedDial extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 320),
+                    child: const _ScorecardSourceHint(compact: true),
+                  ),
                   _MiniFab(
                     icon: Icons.picture_as_pdf_rounded,
                     label: pdfLabel,
