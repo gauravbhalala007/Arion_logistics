@@ -31,6 +31,13 @@ import '../widgets/report_source_hint.dart';
 final _pct = NumberFormat.decimalPattern('de');
 final _int = NumberFormat.decimalPattern('de');
 
+/// Ab dieser Viewport-Breite wird die Wochen-Ansicht zweispaltig:
+/// links fixierte Kennzahlen-Spalte, rechts die scrollende Fahrer-Liste.
+const double _kSplitBreakpoint = 1080;
+
+/// Feste Breite der linken Kennzahlen-Spalte im Desktop-Split.
+const double _kSplitLeftWidth = 360;
+
 // ---- tiny helpers ----
 String _s(dynamic v) => (v == null) ? '' : v.toString();
 String _normTid(dynamic v) => DriverCsvService.normalizeTransporterId(_s(v));
@@ -99,6 +106,12 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
   bool _companyExpanded = false;
   late final Stream<DocumentSnapshot<Map<String, dynamic>>> _reportStream;
 
+  /// Desktop-Split: eigene Scrollbereiche fuer linke Kennzahlen-Spalte
+  /// (nur intern, falls die Company-Karte aufgeklappt ist) und die
+  /// unabhaengig scrollende Fahrer-Liste rechts.
+  final ScrollController _leftScroll = ScrollController();
+  final ScrollController _listScroll = ScrollController();
+
   String _query = '';
   String _bucket = 'ALL';
 
@@ -164,6 +177,13 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
   void initState() {
     super.initState();
     _reportStream = widget.reportRef.snapshots();
+  }
+
+  @override
+  void dispose() {
+    _leftScroll.dispose();
+    _listScroll.dispose();
+    super.dispose();
   }
 
   String _prettyBucket(String raw) {
@@ -514,6 +534,10 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
   Widget build(BuildContext context) {
     final w = MediaQuery.of(context).size.width;
     final isMobile = w < 800;
+    // Ab dieser Breite: zweispaltiges Desktop-Layout — links fixierte
+    // Kennzahlen-Spalte (volle Hoehe, scrollt nicht mit), rechts die
+    // Fahrer-Liste in einem eigenen Scrollbereich.
+    final isSplit = w >= _kSplitBreakpoint;
     final padH = isMobile ? 16.0 : 24.0;
 
     return Scaffold(
@@ -557,48 +581,133 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
         ),
       ),
       body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1200),
-            child: ListView(
-              padding: EdgeInsets.fromLTRB(padH, isMobile ? 8 : 16, padH, 80),
+        child: isSplit
+            ? _splitBody(padH)
+            : Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1200),
+                  child: ListView(
+                    padding:
+                        EdgeInsets.fromLTRB(padH, isMobile ? 8 : 16, padH, 80),
+                    children: [
+                      // One stream for hero + company details so the score
+                      // can't flicker in and out from two competing
+                      // subscriptions.
+                      StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                        stream: _reportStream,
+                        builder: (context, snap) {
+                          final data =
+                              snap.data?.data() ?? const <String, dynamic>{};
+                          final summary = _strMap(data['summary']);
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _heroStrip(summary, data, stacked: isMobile),
+                              const SizedBox(height: 16),
+                              _companyDetails(summary,
+                                  singleColumn: isMobile),
+                              const SizedBox(height: 16),
+                            ],
+                          );
+                        },
+                      ),
+                      const _DriverCsvHint(),
+                      _buildFilterBar(isMobile),
+                      const SizedBox(height: 18),
+                      _buildDriversList(isMobile),
+                    ],
+                  ),
+                ),
+              ),
+      ),
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════════════════
+  //  Desktop-Split — links fixierte Kennzahlen-Spalte (volle Hoehe des
+  //  Seitenbereichs, kein Mitscrollen), rechts die Fahrer-Liste mit
+  //  eigenem ScrollController + duenner Scrollbar.
+  //  Muster: fleet_vehicle_detail_page._body / driver_hub_detail_page.
+  // ════════════════════════════════════════════════════════════════════════
+
+  Widget _splitBody(double padH) {
+    return Theme(
+      // Duenne, helle Scrollbar wie in den uebrigen Redesign-Seiten.
+      data: Theme.of(context).copyWith(
+        scrollbarTheme: const ScrollbarThemeData(
+          thickness: WidgetStatePropertyAll<double>(8),
+          thumbColor: WidgetStatePropertyAll<Color>(Color(0xFFD5DBE2)),
+          trackColor: WidgetStatePropertyAll<Color>(Colors.transparent),
+          trackBorderColor: WidgetStatePropertyAll<Color>(Colors.transparent),
+          radius: Radius.circular(99),
+          crossAxisMargin: 2,
+        ),
+      ),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1360),
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(padH, 16, padH, 16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // One stream for hero + company details so the score can't
-                // flicker in and out from two competing subscriptions.
-                StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                  stream: _reportStream,
-                  builder: (context, snap) {
-                    final data =
-                        snap.data?.data() ?? const <String, dynamic>{};
-                    final summary = _strMap(data['summary']);
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _heroStrip(summary, data, isMobile),
-                        const SizedBox(height: 16),
-                        _companyDetails(summary, isMobile),
-                        const SizedBox(height: 16),
-                      ],
-                    );
-                  },
-                ),
-                const ReportSourceHint(
-                  sourceDe: 'Driver-CSV: Cortex → Leistung → '
-                      'Liefermitarbeiter → Woche auswählen → '
-                      'Download-Icon oben rechts',
-                  sourceEn: 'Driver CSV: Cortex → Performance → '
-                      'Delivery Associates → select week → '
-                      'download icon top right',
-                  expectedFileName: 'z. B. delivery-associates-week19.csv',
-                ),
-                _buildFilterBar(isMobile),
-                const SizedBox(height: 18),
-                _buildDriversList(isMobile),
+                SizedBox(width: _kSplitLeftWidth, child: _splitLeftColumn()),
+                const SizedBox(width: 20),
+                Expanded(child: _splitRightColumn()),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  /// Linke Spalte: Kennzahlen-Kacheln + „Data as-Company" + CSV-Quelle.
+  /// Nimmt die volle verfuegbare Hoehe ein und scrollt nicht mit der Liste.
+  /// Nur die (optional aufgeklappte) Company-Karte bekommt einen eigenen
+  /// internen Scroll, damit sie nie ueberlaeuft.
+  Widget _splitLeftColumn() {
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: _reportStream,
+      builder: (context, snap) {
+        final data = snap.data?.data() ?? const <String, dynamic>{};
+        final summary = _strMap(data['summary']);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _heroStrip(summary, data, stacked: true, compact: true),
+            const SizedBox(height: 14),
+            Flexible(
+              child: SingleChildScrollView(
+                controller: _leftScroll,
+                padding: const EdgeInsets.only(right: 2),
+                child: _companyDetails(summary, singleColumn: true),
+              ),
+            ),
+            const SizedBox(height: 14),
+            const _DriverCsvHint(),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Rechte Spalte: Filterleiste fix oben, darunter die Fahrer-Liste in
+  /// einem eigenen, unabhaengig scrollenden Bereich.
+  Widget _splitRightColumn() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildFilterBar(false),
+        const SizedBox(height: 16),
+        Expanded(
+          child: SingleChildScrollView(
+            controller: _listScroll,
+            padding: const EdgeInsets.only(right: 6, bottom: 24),
+            child: _buildDriversList(false),
+          ),
+        ),
+      ],
     );
   }
 
@@ -608,7 +717,12 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
   //  Delivery Quality & SWC), value + coloured status per metric.
   // ════════════════════════════════════════════════════════════════════════
 
-  Widget _companyDetails(Map<String, dynamic> summary, bool isMobile) {
+  /// [singleColumn] = Gruppen untereinander statt zweispaltiger Masonry
+  /// (mobil sowie in der schmalen linken Desktop-Spalte).
+  Widget _companyDetails(
+    Map<String, dynamic> summary, {
+    required bool singleColumn,
+  }) {
     final cas = _strMap(summary['complianceAndSafety']);
     final dqs = _strMap(summary['deliveryQualitySwc']);
     if (cas.isEmpty && dqs.isEmpty) return const SizedBox.shrink();
@@ -639,7 +753,7 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
         _CoSummaryGroup(sectionKey: g.sectionKey, metrics: g.metrics);
 
     Widget layout;
-    if (isMobile) {
+    if (singleColumn) {
       layout = Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -767,8 +881,16 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
   //  Hero KPI strip (Company Score · Reliability · Rank)
   // ════════════════════════════════════════════════════════════════════════
 
+  /// [stacked] = Hero oben, Reliability + Rank darunter nebeneinander
+  /// (mobil sowie in der linken Desktop-Spalte).
+  /// [compact] = etwas flachere Kacheln (nur Desktop-Split; die Score-Zahl
+  /// bleibt prominent).
   Widget _heroStrip(
-      Map<String, dynamic> summary, Map<String, dynamic> data, bool isMobile) {
+    Map<String, dynamic> summary,
+    Map<String, dynamic> data, {
+    required bool stacked,
+    bool compact = false,
+  }) {
     final t = AppLocalizations.of(context);
     final overall = (summary['overallScore'] as num?)?.toDouble();
     final rawStatus = _s(summary['overallStatus']);
@@ -790,40 +912,45 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
       score: overall,
       statusLabel: overallStatus.isEmpty ? '' : _coPretty(overallStatus),
       statusColor: _coBucketColor(overallStatus),
+      compact: compact,
     );
     final relTile = _StatTile(
       label: t.t('scorecard_overview_reliability_score'),
       value: reliability == null ? '—' : '${_pct.format(reliability)} %',
       sub: '',
+      compact: compact,
     );
     final rankTile = _StatTile(
       label: t.t('dash_rank_in_station'),
       value: rankText,
       sub: station,
+      compact: compact,
     );
 
-    if (isMobile) {
+    if (stacked) {
+      final tilesRow = Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(child: relTile),
+          const SizedBox(width: 10),
+          Expanded(child: rankTile),
+        ],
+      );
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SizedBox(height: 84, child: heroCard),
-          const SizedBox(height: 10),
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(child: relTile),
-                const SizedBox(width: 10),
-                Expanded(child: rankTile),
-              ],
-            ),
-          ),
+          SizedBox(height: compact ? 72 : 84, child: heroCard),
+          SizedBox(height: compact ? 8 : 10),
+          if (compact)
+            SizedBox(height: 66, child: tilesRow)
+          else
+            IntrinsicHeight(child: tilesRow),
         ],
       );
     }
 
     return SizedBox(
-      height: 88,
+      height: compact ? 76 : 88,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1166,6 +1293,27 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
 }
 
 // ════════════════════════════════════════════════════════════════════════
+//  Driver-CSV-Quellenhinweis — identisch in Einspalten- und Split-Layout.
+// ════════════════════════════════════════════════════════════════════════
+
+class _DriverCsvHint extends StatelessWidget {
+  const _DriverCsvHint();
+
+  @override
+  Widget build(BuildContext context) {
+    return const ReportSourceHint(
+      sourceDe: 'Driver-CSV: Cortex → Leistung → '
+          'Liefermitarbeiter → Woche auswählen → '
+          'Download-Icon oben rechts',
+      sourceEn: 'Driver CSV: Cortex → Performance → '
+          'Delivery Associates → select week → '
+          'download icon top right',
+      expectedFileName: 'z. B. delivery-associates-week19.csv',
+    );
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════
 //  Hero Company Score Card (grüner Marken-Hero)
 // ════════════════════════════════════════════════════════════════════════
 
@@ -1173,10 +1321,15 @@ class _HeroCompanyCard extends StatelessWidget {
   final double? score;
   final String statusLabel;
   final Color statusColor;
+
+  /// Flachere Variante fuer die linke Desktop-Spalte: weniger Innenabstand,
+  /// die Score-Zahl bleibt unveraendert gross.
+  final bool compact;
   const _HeroCompanyCard({
     required this.score,
     required this.statusLabel,
     required this.statusColor,
+    this.compact = false,
   });
 
   @override
@@ -1185,7 +1338,10 @@ class _HeroCompanyCard extends StatelessWidget {
     return Container(
       width: double.infinity,
       height: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 14 : 16,
+        vertical: compact ? 8 : 12,
+      ),
       decoration: BoxDecoration(
         color: AppColors.codriverGreen,
         borderRadius: BorderRadius.circular(18),
@@ -1207,7 +1363,7 @@ class _HeroCompanyCard extends StatelessWidget {
                   ),
                 ),
                 if (statusLabel.isNotEmpty) ...[
-                  const SizedBox(height: 6),
+                  SizedBox(height: compact ? 4 : 6),
                   Container(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 9, vertical: 3),
@@ -1270,10 +1426,14 @@ class _StatTile extends StatelessWidget {
   final String label;
   final String value;
   final String sub;
+
+  /// Flachere Variante fuer die linke Desktop-Spalte.
+  final bool compact;
   const _StatTile({
     required this.label,
     required this.value,
     required this.sub,
+    this.compact = false,
   });
 
   @override
@@ -1281,7 +1441,10 @@ class _StatTile extends StatelessWidget {
     return Container(
       width: double.infinity,
       height: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 12 : 14,
+        vertical: compact ? 8 : 10,
+      ),
       decoration: BoxDecoration(
         color: AppColors.surfaceElevatedLight,
         borderRadius: BorderRadius.circular(16),
@@ -1302,7 +1465,7 @@ class _StatTile extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: compact ? 3 : 4),
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
