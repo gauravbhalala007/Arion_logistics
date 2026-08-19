@@ -3,7 +3,7 @@
 from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 import io, re
 import pdfplumber
 import pandas as pd
@@ -589,6 +589,167 @@ def get_col(df: pd.DataFrame, canonical: str) -> Optional[str]:
             return col
     return None
 
+# -------------------------------------------------------------------
+# FALLBACK: single-column ("columnless") driver tables
+#
+# Some Amazon Scorecard 3.0 PDFs are rendered without vertical rulings,
+# so pdfplumber's extract_tables() returns every visual row as ONE cell:
+#
+#   header : 'S DSC LoR CDF\nTransporter ID Delivered DCR POD CC CE\nNo. DPMO DPMO DPMO'
+#   data   : '1 A11QQXKOJRNZUJ 320 99.38% 3125 0 100.00% 100.00% 0 3125'
+#
+# The helpers below re-derive the real columns from the word geometry of
+# the page (x-positions) and split the data lines with a strict regex.
+# They are ONLY used when the regular column detection produced nothing.
+# -------------------------------------------------------------------
+_COLUMNLESS_DATA_RE = re.compile(r"^\s*(\d{1,4})\s+([A-Z0-9]{8,20})\s+(\S.*)$")
+_COLUMNLESS_VALUE_RE = re.compile(r"^(?:-|[+-]?\d[\d.,]*\s?%?)$")
+
+
+def _words_to_text_lines(words: List[Dict[str, Any]], tol: float = 1.6) -> List[Dict[str, Any]]:
+    """Group pdfplumber words into visual text lines (by their `top` coordinate)."""
+    lines: List[Dict[str, Any]] = []
+    for w in sorted(words, key=lambda w: (float(w.get("top", 0.0)), float(w.get("x0", 0.0)))):
+        top = float(w.get("top", 0.0))
+        if lines and abs(float(lines[-1]["top"]) - top) <= tol:
+            lines[-1]["words"].append(w)
+        else:
+            lines.append({"top": top, "words": [w]})
+    for ln in lines:
+        ln["words"].sort(key=lambda w: float(w.get("x0", 0.0)))
+        ln["text"] = re.sub(r"\s+", " ", " ".join(str(w.get("text", "")) for w in ln["words"])).strip()
+    return lines
+
+
+def _group_words_into_columns(words: List[Dict[str, Any]], gap: float) -> List[str]:
+    """Cluster header words horizontally; words of one column are joined top-to-bottom."""
+    cols: List[Dict[str, Any]] = []
+    for w in sorted(words, key=lambda w: float(w.get("x0", 0.0))):
+        x0 = float(w.get("x0", 0.0)); x1 = float(w.get("x1", 0.0))
+        if cols and x0 - cols[-1]["x1"] <= gap:
+            cols[-1]["x1"] = max(cols[-1]["x1"], x1)
+            cols[-1]["words"].append(w)
+        else:
+            cols.append({"x0": x0, "x1": x1, "words": [w]})
+    out: List[str] = []
+    for c in cols:
+        c["words"].sort(key=lambda w: (float(w.get("top", 0.0)), float(w.get("x0", 0.0))))
+        out.append(re.sub(r"\s+", " ", " ".join(str(w.get("text", "")) for w in c["words"])).strip())
+    return out
+
+
+def _reconstruct_columnless_header(page: Any, header_cell: Any, want_cols: int) -> Optional[List[str]]:
+    """
+    Rebuild the real column labels of a columnless table header.
+
+    The header cell text contains the stacked header lines (e.g. 'S DSC LoR CDF' /
+    'Transporter ID Delivered DCR POD CC CE' / 'No. DPMO DPMO DPMO'). We locate those
+    lines in the page's word geometry and regroup the words by x-position, so the
+    fragments become 'S No.', 'Transporter ID', ..., 'DSC DPMO', 'LoR DPMO', 'CDF DPMO'.
+
+    The result is only accepted when it yields exactly `want_cols` columns (the number
+    of values the data rows carry) - this self-validates the reconstruction.
+    """
+    raw_lines = [re.sub(r"\s+", " ", ln).strip() for ln in str(header_cell or "").split("\n")]
+    raw_lines = [ln for ln in raw_lines if ln]
+    if not raw_lines:
+        return None
+    try:
+        words = page.extract_words() or []
+    except Exception:
+        return None
+    if not words:
+        return None
+
+    plines = _words_to_text_lines(words)
+    n = len(raw_lines)
+    matched: Optional[List[Dict[str, Any]]] = None
+    for i in range(len(plines) - n + 1):
+        if all(plines[i + j]["text"] == raw_lines[j] for j in range(n)):
+            matched = plines[i:i + n]
+            break
+    if matched is None:
+        return None
+
+    hwords = [w for ln in matched for w in ln["words"]]
+    if not hwords:
+        return None
+
+    widths = []
+    for w in hwords:
+        t = str(w.get("text", ""))
+        if t:
+            widths.append((float(w.get("x1", 0.0)) - float(w.get("x0", 0.0))) / len(t))
+    base = sorted(widths)[len(widths) // 2] if widths else 3.0
+
+    # Try increasing word gaps; the first one that reproduces the data column count wins.
+    for factor in (1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0):
+        cols = _group_words_into_columns(hwords, max(3.0, base * factor))
+        if len(cols) == want_cols and all(c for c in cols):
+            return cols
+    return None
+
+
+def _parse_columnless_driver_table(
+    page: Any,
+    table: List[List[Any]],
+) -> Optional[Tuple[List[str], List[List[str]]]]:
+    """
+    Detect + parse a driver table whose rows come back as a single cell each.
+    Returns (header, data_rows) or None if the table is not such a driver table.
+    """
+    if not table or len(table) < 2:
+        return None
+    # every row must be a single-cell row (that is the whole point of this fallback)
+    if any(len(r or []) != 1 for r in table):
+        return None
+
+    header_cell = table[0][0]
+    if "transporter id" not in re.sub(r"\s+", " ", str(header_cell or "")).lower():
+        return None
+
+    parsed: List[List[str]] = []
+    for r in table[1:]:
+        cell = r[0]
+        if cell is None:
+            continue
+        for line in str(cell).split("\n"):
+            line = re.sub(r"[\u00A0\u2009\u202F]", " ", line)
+            line = re.sub(r"\s+", " ", line).strip()
+            if not line:
+                continue
+            m = _COLUMNLESS_DATA_RE.match(line)
+            if not m:
+                continue  # repeated header / footnote / non-driver line
+            values = m.group(3).split(" ")
+            if not all(_COLUMNLESS_VALUE_RE.match(v) for v in values):
+                continue  # e.g. the working-hours table ('No'/'Yes' cells)
+            parsed.append([m.group(1), m.group(2)] + values)
+
+    if not parsed:
+        return None
+
+    counts: Dict[int, int] = {}
+    for p in parsed:
+        counts[len(p)] = counts.get(len(p), 0) + 1
+    want_cols = max(counts.items(), key=lambda kv: (kv[1], kv[0]))[0]
+    rows = [p for p in parsed if len(p) == want_cols]
+    if not rows:
+        return None
+
+    header = _reconstruct_columnless_header(page, header_cell, want_cols)
+    if not header:
+        return None
+    if not any(keyize(h) == "transporterid" for h in header):
+        return None
+
+    dropped = len(parsed) - len(rows)
+    if dropped:
+        print(f"Columnless driver table: dropped {dropped} row(s) with unexpected column count")
+    print(f"Columnless driver table detected: {len(rows)} rows, header={header}")
+    return header, rows
+
+
 def extract_driver_rows(
     pdf: pdfplumber.PDF,
     week_number: Optional[int] = None,
@@ -691,6 +852,8 @@ def extract_driver_rows(
             if not table or len(table) < 1:
                 continue
 
+            data_rows_override: List[List[Any]] | None = None
+
             raw0 = [clean_str(h) for h in table[0]]
             raw1 = [clean_str(h) for h in table[1]] if len(table) > 1 else None
 
@@ -715,9 +878,18 @@ def extract_driver_rows(
                 data_start = 0
 
             if header is None:
-                continue
+                # FALLBACK: table without vertical rulings -> one cell per row.
+                # Only reached when the regular column detection found nothing,
+                # so PDFs with real columns keep their existing behaviour.
+                fb = _parse_columnless_driver_table(page, table)
+                if fb is None:
+                    continue
+                header, data_rows_override = fb
 
-            df = build_df_with_header(header, table[data_start:])
+            df = build_df_with_header(
+                header,
+                data_rows_override if data_rows_override is not None else table[data_start:],
+            )
 
             tid_col = get_col(df, "Transporter ID")
             if tid_col is None:
