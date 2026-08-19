@@ -4,7 +4,7 @@ Zuletzt aktualisiert: [Datum – vor Go-live eintragen]
 
 Mit dieser Datenschutzerklärung informieren wir Sie darüber, wie wir Ihre personenbezogenen Daten im Zusammenhang mit unserem in Lieferfahrzeugen installierten kamerabasierten Verkehrssicherheitssystem und Fahrsicherheitstools („Verkehrssicherheitstechnologien“) verarbeiten.
 
-Das System zeichnet nicht dauerhaft auf. Es erstellt ausschließlich anlassbezogene Bildaufnahmen (Fotos) ohne Ton, die durch ein erkanntes sicherheitsrelevantes Ereignis ausgelöst werden. Es findet kein Livestream, keine lückenlose Überwachung und keine durchgehende Aufzeichnung oder Übertragung statt. Eine Tonaufnahme findet zu keinem Zeitpunkt statt – weder dauerhaft noch anlassbezogen.
+Das System zeichnet nicht dauerhaft auf. Es erstellt ausschließlich anlassbezogene Aufnahmen, die durch ein erkanntes sicherheitsrelevantes Ereignis ausgelöst werden; bei einem Vorfall werden dabei Bild und Ton aufgezeichnet. Es findet kein Livestream, keine lückenlose Überwachung und keine durchgehende Bild- oder Tonaufzeichnung statt.
 
 ## 1. Verantwortlichkeit und Kontaktdaten
 
@@ -17,7 +17,7 @@ Sie können unseren Datenschutzbeauftragten über [E-Mail-Adresse des Datenschut
 Wir können die folgenden Arten personenbezogener Daten über Sie verarbeiten:
 - Identifikationsdaten (z. B. Namen, Bilder);
 - Kontaktdaten (z. B. E-Mail-Adresse);
-- Anlassbezogene Bildaufnahmen (Fotos) ohne Ton, die durch ein erkanntes sicherheitsrelevantes Ereignis ausgelöst werden (z. B. Außenansichten der Straßenumgebung und Innenansichten des Fahrzeuginnenraums); eine durchgehende Videoaufzeichnung findet nicht statt, eine Tonaufnahme findet zu keinem Zeitpunkt statt;
+- Anlassbezogene Bild- und Tonaufnahmen, die durch ein erkanntes sicherheitsrelevantes Ereignis ausgelöst werden (z. B. Außenansichten der Straßenumgebung und Innenansichten des Fahrzeuginnenraums, bei einem Vorfall einschließlich Ton); eine durchgehende Bild- oder Tonaufzeichnung findet nicht statt;
 - Fahrzeugbetriebsdaten (z. B. Standort, Geschwindigkeit, Beschleunigung, Bremsvorgänge, Kurvenfahrten, Abstand zum vorausfahrenden Fahrzeug);
 - Daten zu Sicherheitsvorfällen (z. B. festgestelltes unsicheres Fahrverhalten, einschließlich Geschwindigkeitsüberschreitungen, abruptes Bremsen, Beschleunigen und Abbiegen, Kollisionen, zu dichtes Auffahren, abgelenktes Fahren, Schläfrigkeit, Kamerabehinderung, Vorwärtskollisionswarnungen, Erkennung von Rollstopps sowie Verstöße gegen Verkehrszeichen oder Ampeln);
 - Interaktionsdaten (z. B. Ihre Interaktionen mit dem Verkehrssicherheitstechnologien-System und der App, einschließlich etwaiger Behinderungen der Kamera).
@@ -59,7 +59,7 @@ Für weitere Einzelheiten zu unserer Datenübermittlung an Drittländer oder fü
 ## 7. Aufbewahrungsfristen
 
 Wir speichern Ihre personenbezogenen Daten nicht länger, als es für die oben beschriebenen Zwecke erforderlich ist. Die konkreten Aufbewahrungsfristen hängen vom Zweck der Verarbeitung ab:
-- Zur Verbesserung der Verkehrssicherheit: Wir speichern alle auf den lokalen Geräten der Lieferfahrzeuge gespeicherten anlassbezogenen Bildaufnahmen für einige Tage [konkrete Frist – vor Go-live eintragen] und alle in der Cloud unseres Anbieters gespeicherten Bildaufnahmen (die sich ausschließlich auf erkannte Sicherheitsvorfälle beziehen) für einige Wochen [konkrete Frist – vor Go-live eintragen], bevor beide automatisch gelöscht werden.
+- Zur Verbesserung der Verkehrssicherheit: Wir speichern alle auf den lokalen Geräten der Lieferfahrzeuge gespeicherten anlassbezogenen Bild- und Tonaufnahmen für einige Tage [konkrete Frist – vor Go-live eintragen] und alle in der Cloud unseres Anbieters gespeicherten Bild- und Tonaufnahmen (die sich ausschließlich auf erkannte Sicherheitsvorfälle beziehen) für einige Wochen [konkrete Frist – vor Go-live eintragen], bevor beide automatisch gelöscht werden.
 - Zur Untersuchung von Verkehrsunfällen und zur Prüfung von Rechtsansprüchen: Wir speichern die entsprechenden personenbezogenen Daten für die Dauer der geltenden Verjährungsfrist, einschließlich bis zur vollständigen Beilegung damit verbundener Rechtsstreitigkeiten und etwaiger Berufungsverfahren, sowie für jeden weiteren Zeitraum, der gesetzlich vorgeschrieben oder für Angelegenheiten nach der Beilegung erforderlich ist.
 
 Nach Ablauf unserer geltenden Aufbewahrungsfristen werden wir Ihre personenbezogenen Daten löschen oder anonymisieren. Für weitere Informationen zu unseren Aufbewahrungsvorgehen wenden Sie sich bitte an uns unter der in Abschnitt 9 dieser Datenschutzerklärung angegebenen Kontaktdaten.

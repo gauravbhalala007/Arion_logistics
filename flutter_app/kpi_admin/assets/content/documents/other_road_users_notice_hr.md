@@ -14,10 +14,10 @@ Našeg službenika za zaštitu podataka možete kontaktirati na [E-Mail-Adresse 
 
 O vama možemo obrađivati sljedeće kategorije osobnih podataka:
 
-slikovni zapisi prometne nesreće bez zvuka, uključujući metapodatke (npr. datum, vrijeme i mjesto snimanja); i
+snimke slike i zvuka prometne nesreće, uključujući metapodatke (npr. datum, vrijeme i mjesto snimanja); i
 
 osobni podaci prikupljeni na mjestu nesreće (npr. vaše ime, vaša adresa, vaši kontaktni podaci, registarska oznaka vašeg vozila i podaci o osiguranju).
-- Vozila su opremljena tehnologijom za sigurnost u prometu koja se temelji na kamerama i alatima za sigurnost vožnje. Sustav ne snima neprekidno: slikovni zapisi nastaju isključivo povodom događaja i bez zvuka, kada se prepozna događaj bitan za sigurnost ili nesreća. Snimanje zvuka ne provodi se ni u jednom trenutku. Pritom kamere usmjerene prema van mogu usputno zabilježiti slike drugih sudionika u prometu. Lica osoba i registarske oznake drugih vozila u tom se slikovnom materijalu, međutim, automatski čine neprepoznatljivima (zamućuju se pikselizacijom). Nezamućeni slikovni materijal čuva se i analizira samo ako je došlo do prometne nesreće ili ako postoje usporedive okolnosti.
+- Vozila su opremljena tehnologijom za sigurnost u prometu koja se temelji na kamerama i alatima za sigurnost vožnje. Sustav ne snima neprekidno: snimke nastaju isključivo povodom događaja, kada se prepozna događaj bitan za sigurnost ili nesreća; pritom se snimaju slika i zvuk. Neprekidno snimanje slike ili zvuka ne provodi se. Pritom kamere usmjerene prema van mogu usputno zabilježiti slike drugih sudionika u prometu i snimiti njihove glasove. Lica osoba i registarske oznake drugih vozila u tom se slikovnom materijalu, međutim, automatski čine neprepoznatljivima (zamućuju se pikselizacijom). Nezamućeni slikovni materijal čuva se i analizira samo ako je došlo do prometne nesreće ili ako postoje usporedive okolnosti.
 
 ## 3. Svrhe
 
@@ -59,7 +59,7 @@ Za dodatne pojedinosti o našim prijenosima podataka u treće zemlje ili za pres
 
 Čim isteknu naši primjenjivi rokovi čuvanja, izbrisat ćemo ili anonimizirati vaše osobne podatke. Za dodatne pojedinosti o našim praksama čuvanja obratite nam se putem kontaktnih podataka navedenih u odjeljku 9. ove izjave o zaštiti podataka.
 
-Slikovni zapisi snimljeni povodom događaja koji nisu povezani s prometnom nesrećom ostaju lokalno na uređaju i automatski se prebrisuju u kratkom roku [konkrete Frist – vor Go-live eintragen].
+Snimke slike i zvuka nastale povodom događaja koje nisu povezane s prometnom nesrećom ostaju lokalno na uređaju i automatski se prebrisuju u kratkom roku [konkrete Frist – vor Go-live eintragen].
 
 ## 8. Izvori osobnih podataka
 

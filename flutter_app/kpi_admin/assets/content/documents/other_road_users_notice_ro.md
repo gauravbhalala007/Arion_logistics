@@ -14,10 +14,10 @@ Prin această notă de informare vă aducem la cunoștință modul în care prel
 
 Putem prelucra următoarele categorii de date cu caracter personal despre dumneavoastră:
 
-imagini ale accidentului rutier, fără sunet, inclusiv metadate (de exemplu data, ora și locul realizării imaginii); și
+înregistrări de imagine și de sunet ale accidentului rutier, inclusiv metadate (de exemplu data, ora și locul realizării înregistrării); și
 
 date cu caracter personal colectate la locul accidentului (de exemplu numele dumneavoastră, adresa, datele dumneavoastră de contact, numărul de înmatriculare al vehiculului dumneavoastră și datele de asigurare).
-- Vehiculele sunt echipate cu tehnologie de siguranță rutieră bazată pe camere și cu instrumente de siguranță în conducere. Sistemul nu înregistrează permanent: imaginile iau naștere exclusiv declanșate de un eveniment și fără sunet, atunci când este detectat un eveniment relevant pentru siguranță sau un accident. Nu are loc în niciun moment o înregistrare audio. În acest context, camerele orientate spre exterior pot capta incidental imagini ale altor participanți la trafic. Fețele persoanelor și numerele de înmatriculare ale altor vehicule sunt însă făcute automat de nerecunoscut (pixelate) în acest material de imagine. Materialul de imagine nepixelat este păstrat și analizat numai atunci când s-a produs un accident rutier sau atunci când există împrejurări comparabile.
+- Vehiculele sunt echipate cu tehnologie de siguranță rutieră bazată pe camere și cu instrumente de siguranță în conducere. Sistemul nu înregistrează permanent: înregistrările iau naștere exclusiv declanșate de un eveniment, atunci când este detectat un eveniment relevant pentru siguranță sau un accident; în acest caz sunt înregistrate atât imaginea, cât și sunetul. Nu are loc o înregistrare continuă a imaginii sau a sunetului. În acest context, camerele orientate spre exterior pot capta incidental imagini ale altor participanți la trafic și pot înregistra vocile acestora. Fețele persoanelor și numerele de înmatriculare ale altor vehicule sunt însă făcute automat de nerecunoscut (pixelate) în acest material de imagine. Materialul de imagine nepixelat este păstrat și analizat numai atunci când s-a produs un accident rutier sau atunci când există împrejurări comparabile.
 
 ## 3. Scopuri
 
@@ -59,7 +59,7 @@ Pentru detalii suplimentare privind transferurile noastre de date către țări 
 
 De îndată ce termenele noastre de păstrare aplicabile au expirat, vom șterge sau anonimiza datele dumneavoastră cu caracter personal. Pentru detalii suplimentare privind practicile noastre de păstrare, vă rugăm să ne contactați folosind datele de contact indicate în secțiunea 9 a acestei note de informare.
 
-Imaginile declanșate de evenimente care nu au legătură cu un accident rutier rămân local pe dispozitiv și sunt suprascrise automat într-un interval scurt de timp [konkrete Frist – vor Go-live eintragen].
+Înregistrările de imagine și de sunet declanșate de evenimente care nu au legătură cu un accident rutier rămân local pe dispozitiv și sunt suprascrise automat într-un interval scurt de timp [konkrete Frist – vor Go-live eintragen].
 
 ## 8. Sursele datelor cu caracter personal
 

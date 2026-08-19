@@ -4,7 +4,7 @@
 
 Mediante la presente declaración de protección de datos le informamos de cómo tratamos sus datos personales en relación con nuestro sistema de seguridad vial basado en cámaras instalado en los vehículos de reparto y con las herramientas de seguridad en la conducción («tecnologías de seguridad vial»).
 
-El sistema no graba de forma permanente. Genera exclusivamente tomas de imagen (fotos) sin sonido, activadas por la detección de un evento relevante para la seguridad. No existe retransmisión en directo, ni vigilancia ininterrumpida, ni grabación o transmisión continua. En ningún momento se realiza grabación de sonido, ni de forma permanente ni con motivo de un evento.
+El sistema no graba de forma permanente. Genera exclusivamente grabaciones activadas por la detección de un evento relevante para la seguridad; cuando se produce un incidente se registran tanto la imagen como el sonido. No existe retransmisión en directo, ni vigilancia ininterrumpida, ni grabación continua de imagen o de sonido.
 
 ## 1. Responsable y datos de contacto
 
@@ -17,7 +17,7 @@ Puede ponerse en contacto con nuestro delegado de protección de datos a través
 Podemos tratar los siguientes tipos de datos personales sobre usted:
 - datos identificativos (p. ej., nombres, imágenes);
 - datos de contacto (p. ej., dirección de correo electrónico);
-- tomas de imagen (fotos) sin sonido generadas con motivo de un evento, activadas por la detección de un evento relevante para la seguridad (p. ej., vistas exteriores del entorno de la vía y vistas interiores del habitáculo del vehículo); no se realiza grabación de vídeo continua y en ningún momento se realiza grabación de sonido;
+- grabaciones de imagen y sonido generadas con motivo de un evento, activadas por la detección de un evento relevante para la seguridad (p. ej., vistas exteriores del entorno de la vía y vistas interiores del habitáculo del vehículo, incluido el sonido cuando se produce un incidente); no se realiza grabación continua de imagen ni de sonido;
 - datos de funcionamiento del vehículo (p. ej., ubicación, velocidad, aceleración, frenadas, tomas de curva, distancia con el vehículo precedente);
 - datos sobre incidentes de seguridad (p. ej., comportamientos de conducción inseguros detectados, incluidos excesos de velocidad, frenadas, aceleraciones y giros bruscos, colisiones, distancia de seguridad demasiado corta, conducción distraída, somnolencia, obstrucción de la cámara, avisos de colisión frontal, detección de paradas sin detención completa, así como infracciones de señales de tráfico o de semáforos);
 - datos de interacción (p. ej., sus interacciones con el sistema de tecnologías de seguridad vial y con la aplicación, incluidas las eventuales obstrucciones de la cámara).
@@ -59,7 +59,7 @@ Para obtener más detalles sobre nuestras transferencias de datos a terceros pa�
 ## 7. Plazos de conservación
 
 No conservamos sus datos personales durante más tiempo del necesario para los fines descritos anteriormente. Los plazos concretos de conservación dependen del fin del tratamiento:
-- Para mejorar la seguridad vial: conservamos todas las tomas de imagen generadas con motivo de un evento y almacenadas en los dispositivos locales de los vehículos de reparto durante unos pocos días [konkrete Frist – vor Go-live eintragen] y todas las tomas de imagen almacenadas en la nube de nuestro proveedor (que se refieren exclusivamente a incidentes de seguridad detectados) durante unas pocas semanas [konkrete Frist – vor Go-live eintragen], antes de que ambas se supriman automáticamente.
+- Para mejorar la seguridad vial: conservamos todas las grabaciones de imagen y sonido generadas con motivo de un evento y almacenadas en los dispositivos locales de los vehículos de reparto durante unos pocos días [konkrete Frist – vor Go-live eintragen] y todas las grabaciones de imagen y sonido almacenadas en la nube de nuestro proveedor (que se refieren exclusivamente a incidentes de seguridad detectados) durante unas pocas semanas [konkrete Frist – vor Go-live eintragen], antes de que ambas se supriman automáticamente.
 - Para investigar accidentes de tráfico y examinar reclamaciones: conservamos los datos personales correspondientes durante el plazo de prescripción aplicable, incluido hasta la resolución completa de los litigios relacionados y de los eventuales recursos, así como durante cualquier otro periodo exigido por la ley o necesario para asuntos posteriores a la resolución.
 
 Una vez transcurridos nuestros plazos de conservación aplicables, suprimiremos o anonimizaremos sus datos personales. Para obtener más información sobre nuestras prácticas de conservación, póngase en contacto con nosotros utilizando los datos de contacto indicados en el apartado 9 de esta declaración de protección de datos.

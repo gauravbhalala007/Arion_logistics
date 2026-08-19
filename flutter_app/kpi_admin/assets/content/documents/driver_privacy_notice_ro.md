@@ -4,7 +4,7 @@ Ultima actualizare: [Datum – vor Go-live eintragen]
 
 Prin această notă de informare vă aducem la cunoștință modul în care prelucrăm datele dumneavoastră cu caracter personal în legătură cu sistemul nostru de siguranță rutieră bazat pe camere, instalat în vehiculele de livrare, și cu instrumentele de siguranță în conducere („tehnologii de siguranță rutieră”).
 
-Sistemul nu înregistrează permanent. El realizează exclusiv imagini (fotografii) declanșate de un eveniment, fără sunet, care sunt generate de detectarea unui eveniment relevant pentru siguranță. Nu are loc nicio transmisie live, nicio supraveghere fără întrerupere și nicio înregistrare sau transmitere continuă. Nu are loc în niciun moment o înregistrare audio – nici permanent, nici la producerea unui eveniment.
+Sistemul nu înregistrează permanent. El realizează exclusiv înregistrări declanșate de un eveniment, care sunt generate de detectarea unui eveniment relevant pentru siguranță; în cazul unui incident sunt înregistrate atât imaginea, cât și sunetul. Nu are loc nicio transmisie live, nicio supraveghere fără întrerupere și nicio înregistrare continuă a imaginii sau a sunetului.
 
 ## 1. Operatorul și datele de contact
 
@@ -17,7 +17,7 @@ Sistemul nu înregistrează permanent. El realizează exclusiv imagini (fotograf
 Putem prelucra următoarele categorii de date cu caracter personal despre dumneavoastră:
 - date de identificare (de exemplu nume, imagini);
 - date de contact (de exemplu adresa de e-mail);
-- imagini (fotografii) declanșate de un eveniment, fără sunet, generate de detectarea unui eveniment relevant pentru siguranță (de exemplu vederi exterioare ale mediului rutier și vederi interioare ale habitaclului vehiculului); nu are loc o înregistrare video continuă, iar o înregistrare audio nu are loc în niciun moment;
+- înregistrări de imagine și de sunet declanșate de un eveniment, generate de detectarea unui eveniment relevant pentru siguranță (de exemplu vederi exterioare ale mediului rutier și vederi interioare ale habitaclului vehiculului, iar în cazul unui incident inclusiv sunetul); nu are loc o înregistrare continuă a imaginii sau a sunetului;
 - date de funcționare a vehiculului (de exemplu locație, viteză, accelerație, frânări, viraje, distanța față de vehiculul care circulă în față);
 - date privind incidentele de siguranță (de exemplu comportamentul de conducere nesigur constatat, inclusiv depășirea vitezei legale, frânări, accelerări și viraje bruște, coliziuni, distanță prea mică față de vehiculul din față, conducere cu atenția distrasă, somnolență, obturarea camerei, avertizări de coliziune frontală, detectarea opririlor incomplete (rolling stop), precum și nerespectarea indicatoarelor rutiere sau a semafoarelor);
 - date de interacțiune (de exemplu interacțiunile dumneavoastră cu sistemul tehnologiilor de siguranță rutieră și cu aplicația, inclusiv eventualele obturări ale camerei).
@@ -59,7 +59,7 @@ Pentru detalii suplimentare privind transferurile noastre de date către țări 
 ## 7. Termene de păstrare
 
 Nu stocăm datele dumneavoastră cu caracter personal mai mult decât este necesar pentru scopurile descrise mai sus. Termenele concrete de păstrare depind de scopul prelucrării:
-- Pentru îmbunătățirea siguranței rutiere: stocăm toate imaginile declanșate de evenimente, salvate pe dispozitivele locale din vehiculele de livrare, timp de câteva zile [konkrete Frist – vor Go-live eintragen] și toate imaginile stocate în cloud-ul furnizorului nostru (care se referă exclusiv la incidentele de siguranță detectate) timp de câteva săptămâni [konkrete Frist – vor Go-live eintragen], înainte ca ambele să fie șterse automat.
+- Pentru îmbunătățirea siguranței rutiere: stocăm toate înregistrările de imagine și de sunet declanșate de evenimente, salvate pe dispozitivele locale din vehiculele de livrare, timp de câteva zile [konkrete Frist – vor Go-live eintragen] și toate înregistrările de imagine și de sunet stocate în cloud-ul furnizorului nostru (care se referă exclusiv la incidentele de siguranță detectate) timp de câteva săptămâni [konkrete Frist – vor Go-live eintragen], înainte ca ambele să fie șterse automat.
 - Pentru investigarea accidentelor rutiere și examinarea pretențiilor juridice: stocăm datele cu caracter personal aferente pe durata termenului de prescripție aplicabil, inclusiv până la soluționarea completă a litigiilor conexe și a eventualelor căi de atac, precum și pentru orice altă perioadă prevăzută de lege sau necesară pentru aspectele ulterioare soluționării.
 
 După expirarea termenelor noastre de păstrare aplicabile, vom șterge sau anonimiza datele dumneavoastră cu caracter personal. Pentru informații suplimentare privind practicile noastre de păstrare, vă rugăm să ne contactați folosind datele de contact indicate în secțiunea 9 a acestei note de informare.

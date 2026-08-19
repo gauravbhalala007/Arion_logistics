@@ -4,7 +4,7 @@ Përditësuar së fundi: [Datum – vor Go-live eintragen]
 
 Me këtë deklaratë privatësie ju informojmë se si i përpunojmë të dhënat tuaja personale në lidhje me sistemin tonë të sigurisë rrugore të bazuar në kamera, të instaluar në automjetet e shpërndarjes, dhe me mjetet për sigurinë gjatë drejtimit („teknologjitë për sigurinë rrugore“).
 
-Sistemi nuk regjistron në mënyrë të vazhdueshme. Ai krijon vetëm regjistrime pamore (fotografi) të nxitura nga ngjarje dhe pa zë, të cilat aktivizohen nga një ngjarje e zbuluar me rëndësi për sigurinë. Nuk ka asnjë transmetim të drejtpërdrejtë (livestream), asnjë mbikëqyrje të pandërprerë dhe asnjë regjistrim ose transmetim të vazhdueshëm. Regjistrim zëri nuk kryhet në asnjë moment – as në mënyrë të vazhdueshme, as të nxitur nga ngjarje.
+Sistemi nuk regjistron në mënyrë të vazhdueshme. Ai krijon vetëm regjistrime të nxitura nga ngjarje, të cilat aktivizohen nga një ngjarje e zbuluar me rëndësi për sigurinë; në rastin e një incidenti regjistrohen njëkohësisht pamja dhe zëri. Nuk ka asnjë transmetim të drejtpërdrejtë (livestream), asnjë mbikëqyrje të pandërprerë dhe asnjë regjistrim të vazhdueshëm pamor ose zanor.
 
 ## 1. Përgjegjësia dhe të dhënat e kontaktit
 
@@ -17,7 +17,7 @@ Ju mund të kontaktoni zyrtarin tonë për mbrojtjen e të dhënave në [E-Mail-
 Ne mund të përpunojmë llojet e mëposhtme të të dhënave personale për ju:
 - Të dhëna identifikuese (p.sh. emra, imazhe);
 - Të dhëna kontakti (p.sh. adresë e-maili);
-- Regjistrime pamore (fotografi) të nxitura nga ngjarje dhe pa zë, të cilat aktivizohen nga një ngjarje e zbuluar me rëndësi për sigurinë (p.sh. pamje nga jashtë të mjedisit rrugor dhe pamje nga brenda të hapësirës së automjetit); regjistrim i vazhdueshëm video nuk kryhet, regjistrim zëri nuk kryhet në asnjë moment;
+- Regjistrime pamore dhe zanore të nxitura nga ngjarje, të cilat aktivizohen nga një ngjarje e zbuluar me rëndësi për sigurinë (p.sh. pamje nga jashtë të mjedisit rrugor dhe pamje nga brenda të hapësirës së automjetit, në rastin e një incidenti përfshirë zërin); regjistrim i vazhdueshëm pamor ose zanor nuk kryhet;
 - Të dhëna të funksionimit të automjetit (p.sh. vendndodhja, shpejtësia, nxitimi, frenimet, marrja e kthesave, distanca nga automjeti përpara);
 - Të dhëna për incidente sigurie (p.sh. sjellje e pasigurt gjatë drejtimit e konstatuar, përfshirë tejkalime të shpejtësisë, frenim, nxitim dhe kthim të papritur, përplasje, distancë shumë e afërt me automjetin përpara, drejtim i shpërqendruar, përgjumje, pengim i kamerës, paralajmërime për përplasje ballore, zbulim i ndalimeve jo të plota (rolling stop), si dhe shkelje të sinjalistikës rrugore ose të semaforëve);
 - Të dhëna ndërveprimi (p.sh. ndërveprimet tuaja me sistemin e teknologjive për sigurinë rrugore dhe me aplikacionin, përfshirë çdo pengim të mundshëm të kamerës).
@@ -59,7 +59,7 @@ Për detaje të mëtejshme rreth transferimit tonë të të dhënave në vende t
 ## 7. Afatet e ruajtjes
 
 Ne nuk i ruajmë të dhënat tuaja personale më gjatë sesa është e nevojshme për qëllimet e përshkruara më sipër. Afatet konkrete të ruajtjes varen nga qëllimi i përpunimit:
-- Për përmirësimin e sigurisë rrugore: të gjitha regjistrimet pamore të nxitura nga ngjarje, të ruajtura në pajisjet lokale të automjeteve të shpërndarjes, i ruajmë për disa ditë [konkrete Frist – vor Go-live eintragen] dhe të gjitha regjistrimet pamore të ruajtura në cloud-in e ofruesit tonë (të cilat lidhen ekskluzivisht me incidente sigurie të zbuluara) për disa javë [konkrete Frist – vor Go-live eintragen], përpara se të dyja të fshihen automatikisht.
+- Për përmirësimin e sigurisë rrugore: të gjitha regjistrimet pamore dhe zanore të nxitura nga ngjarje, të ruajtura në pajisjet lokale të automjeteve të shpërndarjes, i ruajmë për disa ditë [konkrete Frist – vor Go-live eintragen] dhe të gjitha regjistrimet pamore dhe zanore të ruajtura në cloud-in e ofruesit tonë (të cilat lidhen ekskluzivisht me incidente sigurie të zbuluara) për disa javë [konkrete Frist – vor Go-live eintragen], përpara se të dyja të fshihen automatikisht.
 - Për hetimin e aksidenteve rrugore dhe për shqyrtimin e pretendimeve ligjore: të dhënat personale përkatëse i ruajmë për kohëzgjatjen e afatit të zbatueshëm të parashkrimit, përfshirë deri në zgjidhjen e plotë të mosmarrëveshjeve ligjore të lidhura me to dhe të procedurave të mundshme të apelimit, si dhe për çdo periudhë tjetër që parashikohet me ligj ose është e nevojshme për çështje pas zgjidhjes së tyre.
 
 Pas skadimit të afateve tona të zbatueshme të ruajtjes, ne do t'i fshijmë ose do t'i anonimizojmë të dhënat tuaja personale. Për informacione të mëtejshme rreth praktikave tona të ruajtjes, ju lutemi na kontaktoni në të dhënat e kontaktit të treguara në seksionin 9 të kësaj deklarate privatësie.

@@ -39,7 +39,7 @@
       "blocks": [
         {
           "type": "paragraph",
-          "text": "U našim dostavnim vozilima ugrađen je sustav za sigurnost u prometu koji se temelji na kamerama. On ne snima neprekidno, nego izrađuje fotografije isključivo povodom događaja – dakle samo onda kada se prepozna događaj bitan za sigurnost. U ovom vam tečaju jednostavnim jezikom objašnjavamo što se snima, tko vidi podatke, koliko se dugo pohranjuju i koja prava imate."
+          "text": "U našim dostavnim vozilima ugrađen je sustav za sigurnost u prometu koji se temelji na kamerama. On ne snima neprekidno, nego isključivo povodom događaja – snimka nastaje tek kada se prepozna događaj bitan za sigurnost. Pri incidentu se pritom snimaju slika i zvuk. U ovom vam tečaju jednostavnim jezikom objašnjavamo što se snima, tko vidi podatke, koliko se dugo pohranjuju i koja prava imate."
         },
         {
           "type": "callout",
@@ -78,8 +78,8 @@
           "items": [
             "Ne postoji prijenos uživo. Nitko vas ne promatra u stvarnom vremenu dok vozite.",
             "Ne provodi se nadzor bez prekida. Vaša se vožnja ne promatra i ne ocjenjuje neprekidno.",
-            "Nema trajnog snimanja ni trajnog slanja podataka – ni s ceste ni iz prostora vozača.",
-            "NE SNIMA SE ZVUK. Sustav ne bilježi razgovore ni zvukove – ni u prostoru vozača ni izvan njega, ni trajno ni povodom događaja.",
+            "Nema neprekidnog snimanja slike ni zvuka i nema trajnog slanja podataka – ni s ceste ni iz prostora vozača.",
+            "NE SLUŠA SE NEPREKIDNO. Zvuk se ne snima trajno, nego samo kada incident pokrene snimanje.",
             "Sustav vas ne ocjenjuje automatski s posljedicama iz radnog odnosa. Svaki događaj provjerava čovjek."
           ]
         },
@@ -88,9 +88,9 @@
           "style": "neutral",
           "title": "Što se događa",
           "items": [
-            "Sustav izrađuje fotografije isključivo povodom događaja – bez zvuka – dakle samo onda kada se prepozna događaj bitan za sigurnost (npr. naglo kočenje, prekratak razmak do vozila ispred, nepažnja).",
+            "Pri incidentu sustav povodom događaja snima sliku i zvuk – dakle samo onda kada se prepozna događaj bitan za sigurnost (npr. naglo kočenje, prekratak razmak do vozila ispred, nepažnja).",
             "Sve dok se ne prepozna događaj, ne nastaje nikakva snimka koja bi se pohranila ili prenijela.",
-            "Tek nakon prepoznatog događaja pripadajuće se fotografije prenose i mogu se analizirati.",
+            "Tek nakon prepoznatog događaja pripadajuće se snimke slike i zvuka prenose i mogu se analizirati.",
             "Te događaje i sami vidite u aplikaciji – zajedno s pripadajućim snimkama."
           ]
         },
@@ -124,8 +124,8 @@
               "value": "adresa e-pošte"
             },
             {
-              "key": "Fotografije snimljene povodom događaja (bez zvuka)",
-              "value": "fotografije okoline ceste i unutrašnjosti vozila koje nastaju isključivo pri prepoznatom sigurnosnom događaju – bez neprekidnog snimanja i bez snimanja zvuka"
+              "key": "Snimke slike i zvuka nastale povodom događaja (pri incidentima)",
+              "value": "snimke slike i zvuka okoline ceste i unutrašnjosti vozila koje nastaju isključivo pri prepoznatom sigurnosnom događaju – bez neprekidnog snimanja slike ili zvuka"
             },
             {
               "key": "Podaci o radu vozila",
@@ -217,7 +217,7 @@
               "value": "nekoliko dana, nakon toga automatski se prebrisuju"
             },
             {
-              "key": "Fotografije sigurnosnih događaja u oblaku",
+              "key": "Snimke slike i zvuka sigurnosnih događaja u oblaku",
               "value": "nekoliko tjedana, nakon toga automatsko brisanje"
             },
             {
@@ -281,7 +281,7 @@
       "blocks": [
         {
           "type": "paragraph",
-          "text": "Kada događaj pokrene snimanje, na fotografijama usmjerenima prema van usputno se mogu vidjeti i drugi sudionici u prometu. Lica i registarske pločice u tom se materijalu automatski zamućuju (pikselizacija). Nezamućeni materijal čuva se i analizira samo ako je došlo do prometne nesreće ili do usporedivih okolnosti."
+          "text": "Kada događaj pokrene snimanje, na snimkama usmjerenima prema van usputno se mogu vidjeti ili čuti i drugi sudionici u prometu. Lica i registarske pločice u tom se materijalu automatski zamućuju (pikselizacija). Nezamućeni materijal čuva se i analizira samo ako je došlo do prometne nesreće ili do usporedivih okolnosti."
         },
         {
           "type": "callout",
@@ -311,7 +311,7 @@
     "intro": "Molimo potvrdite da ste izjavu o zaštiti podataka primili i primili na znanje.",
     "statement": "Potvrđujem da sam primio/primila i primio/primila na znanje Izjavu o zaštiti podataka za primjenu tehnologija za sigurnost u prometu i alata za sigurnost vožnje, u verziji od {{documentDate}}.",
     "clarification": "Poznato mi je da ova potvrda ne predstavlja privolu za obradu podataka. Obrada se provodi na temelju legitimnih interesa.",
-    "systemNote": "Radi razumijevanja: sustav ne snima neprekidno. Nastaju isključivo fotografije povodom događaja i bez zvuka, pri prepoznatim događajima bitnima za sigurnost – nema prijenosa uživo, nema nadzora bez prekida, nema trajnog snimanja, nema snimanja zvuka.",
+    "systemNote": "Radi razumijevanja: sustav ne snima neprekidno. Snimke nastaju isključivo povodom prepoznatih događaja bitnih za sigurnost; pri incidentu se pritom snimaju slika i zvuk. Nema prijenosa uživo, nema nadzora bez prekida, nema neprekidnog snimanja slike ni zvuka.",
     "checkboxLabel": "Primljeno i primljeno na znanje",
     "signatureHint": "Potpis",
     "signatureOptional": false,

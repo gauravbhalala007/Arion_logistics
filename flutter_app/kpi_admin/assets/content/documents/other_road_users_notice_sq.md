@@ -14,10 +14,10 @@ Ju mund të kontaktoni zyrtarin tonë për mbrojtjen e të dhënave në [E-Mail-
 
 Ne mund të përpunojmë kategoritë e mëposhtme të të dhënave personale për ju:
 
-Regjistrime pamore të aksidentit rrugor pa zë, përfshirë metatë dhënat (p.sh. data, ora dhe vendi i regjistrimit); dhe
+Regjistrime pamore dhe zanore të aksidentit rrugor, përfshirë metatë dhënat (p.sh. data, ora dhe vendi i regjistrimit); dhe
 
 të dhëna personale të mbledhura në vendin e aksidentit (p.sh. emri juaj, adresa juaj, të dhënat tuaja të kontaktit, targa e automjetit tuaj dhe të dhënat e sigurimit).
-- Automjetet janë të pajisura me teknologji për sigurinë rrugore të bazuar në kamera dhe me mjete për sigurinë gjatë drejtimit. Sistemi nuk regjistron në mënyrë të vazhdueshme: regjistrimet pamore krijohen vetëm të nxitura nga ngjarje dhe pa zë, kur zbulohet një ngjarje me rëndësi për sigurinë ose një aksident. Regjistrim zëri nuk kryhet në asnjë moment. Gjatë kësaj, kamerat e drejtuara nga jashtë mund të kapin rastësisht imazhe të pjesëmarrësve të tjerë në trafik. Megjithatë, fytyrat e personave dhe targat e automjeteve të tjera bëhen automatikisht të panjohshme (piksëlohen) në këtë material pamor. Materiali pamor i papiksëluar ruhet dhe analizohet vetëm atëherë kur ka ndodhur një aksident rrugor ose kur ekzistojnë rrethana të krahasueshme.
+- Automjetet janë të pajisura me teknologji për sigurinë rrugore të bazuar në kamera dhe me mjete për sigurinë gjatë drejtimit. Sistemi nuk regjistron në mënyrë të vazhdueshme: regjistrimet krijohen vetëm të nxitura nga ngjarje, kur zbulohet një ngjarje me rëndësi për sigurinë ose një aksident; gjatë kësaj regjistrohen pamja dhe zëri. Regjistrim i vazhdueshëm pamor ose zanor nuk kryhet. Gjatë kësaj, kamerat e drejtuara nga jashtë mund të kapin rastësisht imazhe të pjesëmarrësve të tjerë në trafik dhe të regjistrojnë zërat e tyre. Megjithatë, fytyrat e personave dhe targat e automjeteve të tjera bëhen automatikisht të panjohshme (piksëlohen) në këtë material pamor. Materiali pamor i papiksëluar ruhet dhe analizohet vetëm atëherë kur ka ndodhur një aksident rrugor ose kur ekzistojnë rrethana të krahasueshme.
 
 ## 3. Qëllimet
 
@@ -59,7 +59,7 @@ Për detaje të mëtejshme rreth transferimeve tona të të dhënave në vende t
 
 Sapo të kenë skaduar afatet tona të zbatueshme të ruajtjes, ne do t'i fshijmë ose do t'i anonimizojmë të dhënat tuaja personale. Për detaje të mëtejshme rreth praktikave tona të ruajtjes, ju lutemi na kontaktoni nëpërmjet të dhënave të kontaktit të treguara në seksionin 9 të kësaj deklarate privatësie.
 
-Regjistrimet pamore të nxitura nga ngjarje, të cilat nuk lidhen me një aksident rrugor, mbeten lokalisht në pajisje dhe mbishkruhen automatikisht brenda një kohe të shkurtër [konkrete Frist – vor Go-live eintragen].
+Regjistrimet pamore dhe zanore të nxitura nga ngjarje, të cilat nuk lidhen me një aksident rrugor, mbeten lokalisht në pajisje dhe mbishkruhen automatikisht brenda një kohe të shkurtër [konkrete Frist – vor Go-live eintragen].
 
 ## 8. Burimet e të dhënave personale
 

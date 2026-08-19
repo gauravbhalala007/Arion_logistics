@@ -39,7 +39,7 @@
       "blocks": [
         {
           "type": "paragraph",
-          "text": "Our delivery vehicles are fitted with a camera-based road safety system. It does not record continuously; it only takes event-triggered photos – that is, only when a safety-relevant event is detected. In this course we explain in plain language what is recorded, who sees the data, how long it is stored and what rights you have."
+          "text": "Our delivery vehicles are fitted with a camera-based road safety system. It does not record continuously, but exclusively on an event-triggered basis – a recording is only created once a safety-relevant event is detected. When an incident occurs, both image and sound are recorded. In this course we explain in plain language what is recorded, who sees the data, how long it is stored and what rights you have."
         },
         {
           "type": "callout",
@@ -78,8 +78,8 @@
           "items": [
             "There is no livestream. Nobody watches you drive in real time.",
             "There is no gapless surveillance. Your trip is not continuously observed or assessed.",
-            "There is no continuous recording and no continuous upload – neither of the road nor of the driver's cab.",
-            "NO AUDIO IS RECORDED. The system does not record any conversations and no sounds – neither in the driver's cab nor outside, neither continuously nor on an event.",
+            "There is no continuous picture or sound recording and no continuous upload – neither of the road nor of the driver's cab.",
+            "There is NO CONTINUOUS LISTENING. Sound is not recorded permanently, but only when an incident triggers a recording.",
             "The system does not assess you automatically with consequences under employment law. A human being reviews every incident."
           ]
         },
@@ -88,10 +88,10 @@
           "style": "neutral",
           "title": "What does happen",
           "items": [
-            "The system only takes event-triggered photos – without audio – that is, only when a safety-relevant event is detected (e.g. hard braking, tailgating, distraction).",
+            "At an incident the system records image and sound on an event-triggered basis – that is, only when a safety-relevant event is detected (e.g. hard braking, tailgating, distraction).",
             "As long as no event is detected, no recording is created that would be stored or transmitted.",
-            "Only after a detected event are the associated photos transmitted and available for review.",
-            "You can see these events yourself in the app – together with the associated images."
+            "Only after a detected event are the associated image and sound recordings transmitted and available for review.",
+            "You can see these events yourself in the app – together with the associated recordings."
           ]
         },
         {
@@ -124,8 +124,8 @@
               "value": "email address"
             },
             {
-              "key": "Event-triggered photos (without audio)",
-              "value": "photos of the road environment and of the vehicle interior that are created exclusively upon a detected safety event – no continuous recording and no audio recording"
+              "key": "Event-triggered image and sound recordings (at incidents)",
+              "value": "image and sound recordings of the road environment and of the vehicle interior that are created exclusively upon a detected safety event – no continuous picture or sound recording"
             },
             {
               "key": "Vehicle operating data",
@@ -217,7 +217,7 @@
               "value": "a few days, then automatically overwritten"
             },
             {
-              "key": "Photos relating to safety events in the cloud",
+              "key": "Image and sound recordings of safety events in the cloud",
               "value": "a few weeks, then automatically deleted"
             },
             {
@@ -281,7 +281,7 @@
       "blocks": [
         {
           "type": "paragraph",
-          "text": "When an event triggers a recording, other road users may also incidentally appear on the outward-facing photos. Faces and licence plates are automatically pixelated in this material. Non-pixelated material is only retained and reviewed if a road traffic accident or comparable circumstances have occurred."
+          "text": "When an event triggers a recording, other road users may also incidentally be seen or heard on the outward-facing recordings. Faces and licence plates are automatically pixelated in this material. Non-pixelated material is only retained and reviewed if a road traffic accident or comparable circumstances have occurred."
         },
         {
           "type": "callout",
@@ -311,7 +311,7 @@
     "intro": "Please confirm that you have received and noted the privacy notice.",
     "statement": "I confirm that I have received and noted the privacy notice for the use of road safety technologies and driver safety tools in the version dated {{documentDate}}.",
     "clarification": "I am aware that this confirmation does not constitute consent to the data processing. The processing takes place on the basis of legitimate interests.",
-    "systemNote": "For context: the system does not record continuously. Only event-triggered photos without audio are created when safety-relevant events are detected – no livestream, no gapless surveillance, no continuous recording, no audio recording.",
+    "systemNote": "For context: the system does not record continuously. Recordings are created exclusively on an event-triggered basis when safety-relevant events are detected; at an incident, image and sound are recorded. No livestream, no gapless surveillance, no continuous picture or sound recording.",
     "checkboxLabel": "Received and noted",
     "signatureHint": "Signature",
     "signatureOptional": false,

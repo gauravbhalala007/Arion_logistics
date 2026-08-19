@@ -14,10 +14,10 @@ You can contact our data protection officer at [E-Mail-Adresse des Datenschutzbe
 
 We may process the following categories of personal data about you:
 
-image recordings of the road traffic accident without audio, including metadata (e.g. date, time and place of the recording); and
+image and sound recordings of the road traffic accident, including metadata (e.g. date, time and place of the recording); and
 
 personal data collected at the scene of the accident (e.g. your name, your address, your contact details, your vehicle's licence plate and insurance details).
-- The vehicles are equipped with camera-based road safety technology and driver safety tools. The system does not record continuously: image recordings are created exclusively on an event basis and without audio, when a safety-relevant event or an accident is detected. No audio recording takes place at any time. In doing so, outward-facing cameras may incidentally capture images of other road users. However, people's faces and other vehicles' licence plates are automatically obscured (pixelated) in this image material. Non-pixelated image material is only retained and reviewed if a road traffic accident has occurred or comparable circumstances exist.
+- The vehicles are equipped with camera-based road safety technology and driver safety tools. The system does not record continuously: recordings are created exclusively on an event-triggered basis, when a safety-relevant event or an accident is detected; image and sound are recorded in the process. No continuous picture or sound recording takes place. In doing so, outward-facing cameras may incidentally capture images of other road users and record their voices. However, people's faces and other vehicles' licence plates are automatically obscured (pixelated) in this image material. Non-pixelated image material is only retained and reviewed if a road traffic accident has occurred or comparable circumstances exist.
 
 ## 3. Purposes
 
@@ -59,7 +59,7 @@ For further details on our transfers of data to third countries, or for copies o
 
 Once our applicable retention periods have expired, we will delete or anonymise your personal data. For further details on our retention practices, please contact us using the contact details set out in section 9 of this privacy notice.
 
-Event-triggered image recordings that are not connected with a road traffic accident remain locally on the device and are automatically overwritten within a short period [konkrete Frist – vor Go-live eintragen].
+Event-triggered image and sound recordings that are not connected with a road traffic accident remain locally on the device and are automatically overwritten within a short period [konkrete Frist – vor Go-live eintragen].
 
 ## 8. Sources of personal data
 

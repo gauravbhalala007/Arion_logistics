@@ -4,7 +4,7 @@ Utoljára frissítve: [Datum – vor Go-live eintragen]
 
 Ezzel az adatvédelmi tájékoztatóval arról tájékoztatjuk Önt, hogyan kezeljük személyes adatait a kézbesítő járműveinkbe telepített, kamerán alapuló közlekedésbiztonsági rendszerrel és a vezetésbiztonsági eszközökkel („közlekedésbiztonsági technológiák”) összefüggésben.
 
-A rendszer nem rögzít folyamatosan. Kizárólag eseményvezérelt, hang nélküli képfelvételeket (fényképeket) készít, amelyeket egy észlelt, biztonsági szempontból releváns esemény vált ki. Nem történik élő közvetítés, nem történik hézagmentes megfigyelés, és nem történik folyamatos rögzítés vagy továbbítás. Hangfelvétel egyetlen időpontban sem készül – sem folyamatosan, sem eseményvezérelten.
+A rendszer nem rögzít folyamatosan. Kizárólag eseményvezérelt felvételeket készít, amelyeket egy észlelt, biztonsági szempontból releváns esemény vált ki; esemény esetén ilyenkor kép és hang egyaránt rögzítésre kerül. Nem történik élő közvetítés, nem történik hézagmentes megfigyelés, és nem történik folyamatos kép- vagy hangrögzítés.
 
 ## 1. Az adatkezelő és elérhetőségei
 
@@ -17,7 +17,7 @@ Adatvédelmi tisztviselőnkkel a következő címen léphet kapcsolatba: [E-Mail
 Az Önre vonatkozó személyes adatok alábbi fajtáit kezelhetjük:
 - azonosító adatok (pl. név, képek);
 - kapcsolattartási adatok (pl. e-mail-cím);
-- eseményvezérelt, hang nélküli képfelvételek (fényképek), amelyeket egy észlelt, biztonsági szempontból releváns esemény vált ki (pl. az útkörnyezet külső nézetei és a jármű belsejének belső nézetei); folyamatos videórögzítés nem történik, hangfelvétel pedig egyetlen időpontban sem készül;
+- eseményvezérelt kép- és hangfelvételek, amelyeket egy észlelt, biztonsági szempontból releváns esemény vált ki (pl. az útkörnyezet külső nézetei és a jármű belsejének belső nézetei, esemény esetén a hanggal együtt); folyamatos kép- vagy hangrögzítés nem történik;
 - a jármű üzemi adatai (pl. helyadat, sebesség, gyorsulás, fékezések, kanyarodások, az előttünk haladó járműtől mért távolság);
 - biztonsági eseményekre vonatkozó adatok (pl. a megállapított nem biztonságos vezetési magatartás, ideértve a sebességtúllépéseket, a hirtelen fékezést, gyorsítást és kanyarodást, az ütközéseket, a túl kis követési távolságot, a figyelemelterelt vezetést, az álmosságot, a kamera akadályozását, az előreirányuló ütközésre figyelmeztetéseket, a gördülő megállások felismerését, valamint a közúti jelzőtáblák vagy jelzőlámpák megsértését);
 - interakciós adatok (pl. az Ön interakciói a közlekedésbiztonsági technológiák rendszerével és az alkalmazással, ideértve a kamera esetleges akadályozását).
@@ -59,7 +59,7 @@ Az adatoknak harmadik országokba történő továbbításával kapcsolatos tov�
 ## 7. Megőrzési idők
 
 Személyes adatait nem tároljuk hosszabb ideig, mint amennyi a fent leírt célokhoz szükséges. A konkrét megőrzési idők az adatkezelés céljától függenek:
-- A közlekedésbiztonság javítása céljából: a kézbesítő járművek helyi eszközein tárolt valamennyi eseményvezérelt képfelvételt néhány napig [konkrete Frist – vor Go-live eintragen], a szolgáltatónk felhőjében tárolt valamennyi képfelvételt (amelyek kizárólag észlelt biztonsági eseményekhez kapcsolódnak) pedig néhány hétig [konkrete Frist – vor Go-live eintragen] tároljuk, mielőtt mindkettő automatikusan törlésre kerül.
+- A közlekedésbiztonság javítása céljából: a kézbesítő járművek helyi eszközein tárolt valamennyi eseményvezérelt kép- és hangfelvételt néhány napig [konkrete Frist – vor Go-live eintragen], a szolgáltatónk felhőjében tárolt valamennyi kép- és hangfelvételt (amelyek kizárólag észlelt biztonsági eseményekhez kapcsolódnak) pedig néhány hétig [konkrete Frist – vor Go-live eintragen] tároljuk, mielőtt mindkettő automatikusan törlésre kerül.
 - A közlekedési balesetek kivizsgálása és a jogi igények vizsgálata céljából: az érintett személyes adatokat az alkalmazandó elévülési idő tartamáig tároljuk, ideértve az ezzel összefüggő jogviták és esetleges fellebbezési eljárások teljes lezárásáig, valamint minden további olyan időtartamra, amelyet jogszabály előír, vagy amely a lezárást követő ügyintézéshez szükséges.
 
 Az alkalmazandó megőrzési időink lejárta után személyes adatait töröljük vagy anonimizáljuk. A megőrzési gyakorlatunkkal kapcsolatos további információkért kérjük, forduljon hozzánk a jelen adatvédelmi tájékoztató 9. szakaszában megadott elérhetőségeken.

@@ -17,10 +17,16 @@
 //   - Der Kurs blockiert die App NIEMALS.
 //
 // INHALTLICHE KLARSTELLUNG (Kundenvorgabe):
-// Das System nimmt AUSSCHLIESSLICH ANLASSBEZOGEN FOTOS OHNE TON auf —
-// ausgelöst durch ein erkanntes sicherheitsrelevantes Ereignis. Kein
-// Livestream, keine lückenlose Überwachung, keine Daueraufzeichnung,
-// kein Dauerupload, KEINE TONAUFNAHME.
+// Das System zeichnet AUSSCHLIESSLICH ANLASSBEZOGEN auf — ausgelöst
+// durch ein erkanntes sicherheitsrelevantes Ereignis. Bei einem Vorfall
+// werden dabei BILD UND TON aufgezeichnet. Kein Livestream, keine
+// lückenlose Überwachung, KEINE DURCHGEHENDE Bild- oder Tonaufzeichnung,
+// kein Dauerupload.
+//
+// Die frühere Aussage „keine Tonaufnahme" war sachlich falsch und wurde
+// korrigiert. Weil die Prüfsumme über den Volltext gebildet wird, löst
+// diese Korrektur bei allen Fahrern automatisch eine Wiedervorlage aus —
+// wer die falsche Fassung bestätigt hat, bestätigt die richtige erneut.
 //
 // WIDERSPRUCHSRECHT — bewusste Grenze (Kundenvorgabe + Gesetz):
 // Der Kurs BETONT das Widerspruchsrecht nicht mehr: es gibt kein eigenes

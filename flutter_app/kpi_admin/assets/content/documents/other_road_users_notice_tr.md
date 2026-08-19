@@ -14,10 +14,10 @@ Veri koruma görevlimize [E-Mail-Adresse des Datenschutzbeauftragten, z. B. date
 
 Hakkınızda aşağıdaki kişisel veri kategorilerini işleyebiliriz:
 
-Trafik kazasının sessiz görüntü kayıtları ve bunlara ait üst veriler (ör. kaydın tarihi, saati ve yeri); ve
+Trafik kazasının görüntü ve ses kayıtları ile bunlara ait üst veriler (ör. kaydın tarihi, saati ve yeri); ve
 
 kaza yerinde toplanan kişisel veriler (ör. adınız, adresiniz, iletişim bilgileriniz, aracınızın plakası ve sigorta bilgileri).
-- Araçlar kamera tabanlı trafik güvenliği teknolojisi ve sürüş güvenliği araçlarıyla donatılmıştır. Sistem sürekli kayıt yapmaz: Görüntü kayıtları yalnızca olay tetiklemeli olarak ve sessiz biçimde, güvenlik açısından önemli bir olay veya bir kaza algılandığında oluşur. Hiçbir zaman ses kaydı yapılmaz. Bu sırada dışarıya yönelik kameralar tesadüfen diğer yol kullanıcılarının görüntülerini de kaydedebilir. Ancak bu görüntü materyalinde kişilerin yüzleri ve diğer araçların plakaları otomatik olarak tanınmaz hâle getirilir (bulanıklaştırılır). Bulanıklaştırılmamış görüntü materyali yalnızca bir trafik kazası meydana geldiğinde veya benzeri koşullar bulunduğunda saklanır ve değerlendirilir.
+- Araçlar kamera tabanlı trafik güvenliği teknolojisi ve sürüş güvenliği araçlarıyla donatılmıştır. Sistem sürekli kayıt yapmaz: Kayıtlar yalnızca olay tetiklemeli olarak, güvenlik açısından önemli bir olay veya bir kaza algılandığında oluşur; bu sırada görüntü ve ses kaydedilir. Kesintisiz görüntü veya ses kaydı söz konusu değildir. Bu sırada dışarıya yönelik kameralar tesadüfen diğer yol kullanıcılarının görüntülerini de kaydedebilir ve seslerini alabilir. Ancak bu görüntü materyalinde kişilerin yüzleri ve diğer araçların plakaları otomatik olarak tanınmaz hâle getirilir (bulanıklaştırılır). Bulanıklaştırılmamış görüntü materyali yalnızca bir trafik kazası meydana geldiğinde veya benzeri koşullar bulunduğunda saklanır ve değerlendirilir.
 
 ## 3. Amaçlar
 
@@ -59,7 +59,7 @@ Kişisel verilerinizi kural olarak Avrupa Birliği (AB) ve Avrupa Ekonomik Alan�
 
 Yürürlükteki saklama sürelerimiz dolduğunda kişisel verilerinizi sileriz veya anonim hâle getiririz. Saklama uygulamalarımıza ilişkin daha fazla ayrıntı için lütfen bu aydınlatma metninin 9. bölümünde belirtilen iletişim bilgilerinden bize başvurun.
 
-Bir trafik kazasıyla ilgili olmayan olay tetiklemeli görüntü kayıtları cihazda yerel olarak kalır ve kısa bir süre içinde [konkrete Frist – vor Go-live eintragen] otomatik olarak üzerine yazılır.
+Bir trafik kazasıyla ilgili olmayan olay tetiklemeli görüntü ve ses kayıtları cihazda yerel olarak kalır ve kısa bir süre içinde [konkrete Frist – vor Go-live eintragen] otomatik olarak üzerine yazılır.
 
 ## 8. Kişisel verilerin kaynakları
 

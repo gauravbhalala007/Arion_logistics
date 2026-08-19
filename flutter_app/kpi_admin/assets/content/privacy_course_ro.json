@@ -39,7 +39,7 @@
       "blocks": [
         {
           "type": "paragraph",
-          "text": "În vehiculele noastre de livrare este montat un sistem de siguranță rutieră bazat pe camere. Sistemul nu înregistrează permanent, ci realizează exclusiv fotografii declanșate de un eveniment – adică numai atunci când este detectat un eveniment relevant pentru siguranță. În acest curs vă explicăm, într-un limbaj simplu, ce se înregistrează, cine vede datele, cât timp sunt păstrate și ce drepturi aveți."
+          "text": "În vehiculele noastre de livrare este montat un sistem de siguranță rutieră bazat pe camere. Sistemul nu înregistrează permanent, ci exclusiv declanșat de un eveniment – o înregistrare ia naștere abia atunci când este detectat un eveniment relevant pentru siguranță. În cazul unui incident sunt înregistrate atât imaginea, cât și sunetul. În acest curs vă explicăm, într-un limbaj simplu, ce se înregistrează, cine vede datele, cât timp sunt păstrate și ce drepturi aveți."
         },
         {
           "type": "callout",
@@ -78,8 +78,8 @@
           "items": [
             "Nu există transmisie live. Nimeni nu vă urmărește în timp real în timp ce conduceți.",
             "Nu are loc o supraveghere fără întrerupere. Cursa dumneavoastră nu este observată sau evaluată în mod continuu.",
-            "Nu există înregistrare permanentă și nici transmitere permanentă – nici de pe drum, nici din habitaclul șoferului.",
-            "NU SE ÎNREGISTREAZĂ SUNET. Sistemul nu înregistrează conversații și nici zgomote – nici în habitaclul șoferului, nici în exterior, nici permanent, nici la producerea unui eveniment.",
+            "Nu există înregistrare continuă a imaginii sau a sunetului și nici transmitere permanentă – nici de pe drum, nici din habitaclul șoferului.",
+            "NU SE ASCULTĂ ÎN MOD CONTINUU. Sunetul nu este înregistrat permanent, ci numai atunci când un incident declanșează o înregistrare.",
             "Sistemul nu vă evaluează automat cu consecințe de dreptul muncii. Fiecare incident este verificat de o persoană."
           ]
         },
@@ -88,9 +88,9 @@
           "style": "neutral",
           "title": "Ce se întâmplă",
           "items": [
-            "Sistemul realizează exclusiv fotografii declanșate de un eveniment – fără sunet – adică numai atunci când este detectat un eveniment relevant pentru siguranță (de exemplu frânare puternică, distanță prea mică față de vehiculul din față, distragerea atenției).",
+            "În cazul unui incident, sistemul înregistrează, declanșat de eveniment, imaginea și sunetul – adică numai atunci când este detectat un eveniment relevant pentru siguranță (de exemplu frânare puternică, distanță prea mică față de vehiculul din față, distragerea atenției).",
             "Atât timp cât nu este detectat niciun eveniment, nu ia naștere nicio înregistrare care să fie stocată sau transmisă.",
-            "Abia după detectarea unui eveniment sunt transmise fotografiile aferente, care pot fi apoi analizate.",
+            "Abia după detectarea unui eveniment sunt transmise înregistrările de imagine și de sunet aferente, care pot fi apoi analizate.",
             "Vedeți chiar dumneavoastră aceste evenimente în aplicație – împreună cu înregistrările aferente."
           ]
         },
@@ -124,8 +124,8 @@
               "value": "adresă de e-mail"
             },
             {
-              "key": "Fotografii declanșate de un eveniment (fără sunet)",
-              "value": "fotografii ale mediului rutier și ale habitaclului vehiculului, care iau naștere exclusiv la detectarea unui eveniment de siguranță – fără înregistrare continuă și fără înregistrare audio"
+              "key": "Înregistrări de imagine și de sunet declanșate de un eveniment (în caz de incidente)",
+              "value": "înregistrări de imagine și de sunet ale mediului rutier și ale habitaclului vehiculului, care iau naștere exclusiv la detectarea unui eveniment de siguranță – fără înregistrare continuă a imaginii sau a sunetului"
             },
             {
               "key": "Date de funcționare a vehiculului",
@@ -217,7 +217,7 @@
               "value": "câteva zile, apoi suprascrise automat"
             },
             {
-              "key": "Fotografii aferente evenimentelor de siguranță, în cloud",
+              "key": "Înregistrări de imagine și de sunet aferente evenimentelor de siguranță, în cloud",
               "value": "câteva săptămâni, apoi ștergere automată"
             },
             {
@@ -281,7 +281,7 @@
       "blocks": [
         {
           "type": "paragraph",
-          "text": "Atunci când un eveniment declanșează o înregistrare, în fotografiile orientate spre exterior pot apărea incidental și alți participanți la trafic. În acest material, fețele și numerele de înmatriculare sunt pixelate automat. Materialul nepixelat este păstrat și analizat numai dacă s-a produs un accident rutier sau împrejurări comparabile."
+          "text": "Atunci când un eveniment declanșează o înregistrare, în înregistrările orientate spre exterior pot apărea sau pot fi auziți incidental și alți participanți la trafic. În acest material, fețele și numerele de înmatriculare sunt pixelate automat. Materialul nepixelat este păstrat și analizat numai dacă s-a produs un accident rutier sau împrejurări comparabile."
         },
         {
           "type": "callout",
@@ -311,7 +311,7 @@
     "intro": "Vă rugăm să confirmați că ați primit și ați luat la cunoștință nota de informare privind prelucrarea datelor.",
     "statement": "Confirm că am primit și am luat la cunoștință nota de informare privind prelucrarea datelor pentru utilizarea tehnologiilor de siguranță rutieră și a instrumentelor de siguranță în conducere, în versiunea din {{documentDate}}.",
     "clarification": "Îmi este cunoscut faptul că această confirmare nu reprezintă un consimțământ pentru prelucrarea datelor. Prelucrarea are loc în temeiul intereselor legitime.",
-    "systemNote": "Pentru context: sistemul nu înregistrează permanent. Iau naștere exclusiv fotografii declanșate de un eveniment, fără sunet, la detectarea unor evenimente relevante pentru siguranță – fără transmisie live, fără supraveghere fără întrerupere, fără înregistrare permanentă, fără înregistrare audio.",
+    "systemNote": "Pentru context: sistemul nu înregistrează permanent. Înregistrările iau naștere exclusiv declanșate de un eveniment, la detectarea unor evenimente relevante pentru siguranță; în cazul unui incident sunt înregistrate atât imaginea, cât și sunetul. Fără transmisie live, fără supraveghere fără întrerupere, fără înregistrare continuă a imaginii sau a sunetului.",
     "checkboxLabel": "Primită și luată la cunoștință",
     "signatureHint": "Semnătură",
     "signatureOptional": false,

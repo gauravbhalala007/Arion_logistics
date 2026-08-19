@@ -14,10 +14,10 @@ Adatvédelmi tisztviselőnkkel a következő címen léphet kapcsolatba: [E-Mail
 
 Az Önre vonatkozó személyes adatok alábbi kategóriáit kezelhetjük:
 
-a közlekedési balesetről készült, hang nélküli képfelvételek, ideértve a metaadatokat is (pl. a felvétel dátuma, időpontja és helye); továbbá
+a közlekedési balesetről készült kép- és hangfelvételek, ideértve a metaadatokat is (pl. a felvétel dátuma, időpontja és helye); továbbá
 
 a baleset helyszínén gyűjtött személyes adatok (pl. az Ön neve, címe, elérhetőségei, járművének rendszáma és biztosítási adatai).
-- A járművek kamerán alapuló közlekedésbiztonsági technológiával és vezetésbiztonsági eszközökkel vannak felszerelve. A rendszer nem rögzít folyamatosan: képfelvételek kizárólag eseményvezérelten és hang nélkül keletkeznek, amikor a rendszer biztonsági szempontból releváns eseményt vagy balesetet észlel. Hangfelvétel egyetlen időpontban sem készül. Eközben a kifelé irányuló kamerák mellékesen más közlekedőkről is rögzíthetnek képeket. A személyek arcát és más járművek rendszámát azonban ebben a képanyagban automatikusan felismerhetetlenné tesszük (kipixelezzük). Kipixelezés nélküli képanyagot csak akkor őrzünk meg és értékelünk ki, ha közlekedési baleset következett be, vagy ahhoz hasonló körülmények állnak fenn.
+- A járművek kamerán alapuló közlekedésbiztonsági technológiával és vezetésbiztonsági eszközökkel vannak felszerelve. A rendszer nem rögzít folyamatosan: felvételek kizárólag eseményvezérelten keletkeznek, amikor a rendszer biztonsági szempontból releváns eseményt vagy balesetet észlel; ilyenkor kép és hang egyaránt rögzítésre kerül. Folyamatos kép- vagy hangrögzítés nem történik. Eközben a kifelé irányuló kamerák mellékesen más közlekedőkről is rögzíthetnek képeket, és rögzíthetik azok hangját. A személyek arcát és más járművek rendszámát azonban ebben a képanyagban automatikusan felismerhetetlenné tesszük (kipixelezzük). Kipixelezés nélküli képanyagot csak akkor őrzünk meg és értékelünk ki, ha közlekedési baleset következett be, vagy ahhoz hasonló körülmények állnak fenn.
 
 ## 3. Célok
 
@@ -59,7 +59,7 @@ A harmadik országokba történő adattovábbításainkkal kapcsolatos további 
 
 Amint az alkalmazandó megőrzési időink lejártak, személyes adatait töröljük vagy anonimizáljuk. A megőrzési gyakorlatunkkal kapcsolatos további részletekért kérjük, forduljon hozzánk a jelen adatvédelmi tájékoztató 9. szakaszában megadott elérhetőségeken.
 
-Azok az eseményvezérelt képfelvételek, amelyek nem állnak összefüggésben közlekedési balesettel, helyben, az eszközön maradnak, és rövid időn belül [konkrete Frist – vor Go-live eintragen] automatikusan felülíródnak.
+Azok az eseményvezérelt kép- és hangfelvételek, amelyek nem állnak összefüggésben közlekedési balesettel, helyben, az eszközön maradnak, és rövid időn belül [konkrete Frist – vor Go-live eintragen] automatikusan felülíródnak.
 
 ## 8. A személyes adatok forrásai
 

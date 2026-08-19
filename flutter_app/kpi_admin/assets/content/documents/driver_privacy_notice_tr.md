@@ -4,7 +4,7 @@ Son güncelleme: [Datum – vor Go-live eintragen]
 
 Bu aydınlatma metniyle, dağıtım araçlarımıza kurulu kamera tabanlı trafik güvenliği sistemimiz ve sürüş güvenliği araçlarımız (“trafik güvenliği teknolojileri”) kapsamında kişisel verilerinizi nasıl işlediğimiz hakkında sizi bilgilendiriyoruz.
 
-Sistem sürekli kayıt yapmaz. Yalnızca, algılanan ve güvenlik açısından önemli bir olay tarafından tetiklenen, olay tetiklemeli ve sessiz görüntü kayıtları (fotoğraflar) oluşturur. Canlı yayın, kesintisiz gözetim ve sürekli kayıt veya sürekli aktarım söz konusu değildir. Hiçbir zaman ses kaydı yapılmaz – ne sürekli olarak ne de olay tetiklemeli olarak.
+Sistem sürekli kayıt yapmaz. Yalnızca, algılanan ve güvenlik açısından önemli bir olay tarafından tetiklenen, olay tetiklemeli kayıtlar oluşturur; bir olay gerçekleştiğinde ise görüntü ve ses kaydedilir. Canlı yayın, kesintisiz gözetim ve kesintisiz görüntü veya ses kaydı söz konusu değildir.
 
 ## 1. Veri sorumlusu ve iletişim bilgileri
 
@@ -17,7 +17,7 @@ Veri koruma görevlimize [E-Mail-Adresse des Datenschutzbeauftragten, z. B. priv
 Hakkınızda aşağıdaki türde kişisel verileri işleyebiliriz:
 - Kimlik verileri (ör. ad, görüntüler);
 - İletişim verileri (ör. e-posta adresi);
-- Algılanan ve güvenlik açısından önemli bir olay tarafından tetiklenen, olay tetiklemeli ve sessiz görüntü kayıtları (fotoğraflar) (ör. yol çevresinin dış görüntüleri ve araç içinin iç görüntüleri); kesintisiz video kaydı yapılmaz, hiçbir zaman ses kaydı yapılmaz;
+- Algılanan ve güvenlik açısından önemli bir olay tarafından tetiklenen, olay tetiklemeli görüntü ve ses kayıtları (ör. yol çevresinin dış görüntüleri ve araç içinin iç görüntüleri; bir olay gerçekleştiğinde ses dâhil); kesintisiz görüntü veya ses kaydı söz konusu değildir;
 - Araç işletim verileri (ör. konum, hız, ivmelenme, fren manevraları, viraj alma, önde giden araca mesafe);
 - Güvenlik olaylarına ilişkin veriler (ör. tespit edilen güvensiz sürüş davranışı; hız sınırı ihlalleri, ani fren, ani hızlanma ve ani dönüş, çarpışmalar, takip mesafesinin ihlali, dikkati dağınık sürüş, uyku hâli, kameranın engellenmesi, öne çarpma uyarıları, tam durmadan geçişlerin tespiti ve trafik işaretlerine veya trafik ışıklarına uymama dâhil);
 - Etkileşim verileri (ör. trafik güvenliği teknolojileri sistemi ve uygulama ile olan etkileşimleriniz; kameranın engellenmesine yönelik davranışlar dâhil).
@@ -59,7 +59,7 @@ Kişisel verilerinizi kural olarak AB/AEA içinde işleriz. Kişisel verileriniz
 ## 7. Saklama süreleri
 
 Kişisel verilerinizi, yukarıda açıklanan amaçlar için gerekli olandan daha uzun süre saklamayız. Somut saklama süreleri işlemenin amacına bağlıdır:
-- Trafik güvenliğini artırmak için: Dağıtım araçlarındaki yerel cihazlarda saklanan tüm olay tetiklemeli görüntü kayıtlarını birkaç gün [konkrete Frist – vor Go-live eintragen], sağlayıcımızın bulutunda saklanan tüm görüntü kayıtlarını ise (bunlar yalnızca algılanan güvenlik olaylarına ilişkindir) birkaç hafta [konkrete Frist – vor Go-live eintragen] saklarız; ardından her ikisi de otomatik olarak silinir.
+- Trafik güvenliğini artırmak için: Dağıtım araçlarındaki yerel cihazlarda saklanan tüm olay tetiklemeli görüntü ve ses kayıtlarını birkaç gün [konkrete Frist – vor Go-live eintragen], sağlayıcımızın bulutunda saklanan tüm görüntü ve ses kayıtlarını ise (bunlar yalnızca algılanan güvenlik olaylarına ilişkindir) birkaç hafta [konkrete Frist – vor Go-live eintragen] saklarız; ardından her ikisi de otomatik olarak silinir.
 - Trafik kazalarının incelenmesi ve hukuki taleplerin değerlendirilmesi için: İlgili kişisel verileri, yürürlükteki zamanaşımı süresi boyunca; bununla bağlantılı hukuki uyuşmazlıkların ve olası temyiz süreçlerinin tamamen sonuçlanması dâhil olmak üzere ve ayrıca yasal olarak öngörülen veya sonuçlanma sonrası işlemler için gerekli olan her ek süre boyunca saklarız.
 
 Yürürlükteki saklama sürelerimiz dolduktan sonra kişisel verilerinizi sileriz veya anonim hâle getiririz. Saklama uygulamalarımız hakkında daha fazla bilgi için lütfen bu aydınlatma metninin 9. bölümünde belirtilen iletişim bilgilerinden bize başvurun.

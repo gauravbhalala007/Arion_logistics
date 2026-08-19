@@ -4,7 +4,7 @@ Last updated: [Datum – vor Go-live eintragen]
 
 With this privacy notice we inform you about how we process your personal data in connection with our camera-based road safety system installed in delivery vehicles and with driver safety tools ("road safety technologies").
 
-The system does not record continuously. It only creates event-triggered image recordings (photos) without audio, which are triggered by a detected safety-relevant event. There is no livestream, no gapless surveillance and no continuous recording or transmission. No audio recording takes place at any time – neither continuously nor on an event.
+The system does not record continuously. It creates exclusively event-triggered recordings, which are triggered by a detected safety-relevant event; at an incident, both image and sound are recorded. There is no livestream, no gapless surveillance and no continuous picture or sound recording.
 
 ## 1. Controller and contact details
 
@@ -17,7 +17,7 @@ You can contact our data protection officer at [E-Mail-Adresse des Datenschutzbe
 We may process the following categories of personal data about you:
 - identification data (e.g. names, images);
 - contact data (e.g. email address);
-- event-triggered image recordings (photos) without audio, triggered by a detected safety-relevant event (e.g. exterior views of the road environment and interior views of the vehicle cabin); no continuous video recording takes place, and no audio recording takes place at any time;
+- event-triggered image and sound recordings, triggered by a detected safety-relevant event (e.g. exterior views of the road environment and interior views of the vehicle cabin, including sound at an incident); no continuous picture or sound recording takes place;
 - vehicle operating data (e.g. location, speed, acceleration, braking, cornering, distance to the vehicle ahead);
 - safety incident data (e.g. detected unsafe driving behaviour, including speeding, harsh braking, acceleration and turning, collisions, tailgating, distracted driving, drowsiness, camera obstruction, forward collision warnings, rolling stop detection, as well as violations of traffic signs or traffic lights);
 - interaction data (e.g. your interactions with the road safety technologies system and the app, including any obstruction of the camera).
@@ -59,7 +59,7 @@ For further details on our data transfers to third countries, or for an extract 
 ## 7. Retention periods
 
 We do not store your personal data for longer than is necessary for the purposes described above. The specific retention periods depend on the purpose of the processing:
-- To improve road safety: we store all event-triggered image recordings held on the local devices in the delivery vehicles for a few days [konkrete Frist – vor Go-live eintragen], and all image recordings stored in our provider's cloud (which relate exclusively to detected safety incidents) for a few weeks [konkrete Frist – vor Go-live eintragen], before both are deleted automatically.
+- To improve road safety: we store all event-triggered image and sound recordings held on the local devices in the delivery vehicles for a few days [konkrete Frist – vor Go-live eintragen], and all image and sound recordings stored in our provider's cloud (which relate exclusively to detected safety incidents) for a few weeks [konkrete Frist – vor Go-live eintragen], before both are deleted automatically.
 - To investigate road traffic accidents and to assess legal claims: we store the relevant personal data for the duration of the applicable limitation period, including until the full settlement of any related legal disputes and any appeal proceedings, as well as for any further period required by law or necessary for post-settlement matters.
 
 Once our applicable retention periods have expired, we will delete or anonymise your personal data. For further information about our retention practices, please contact us using the contact details set out in section 9 of this privacy notice.

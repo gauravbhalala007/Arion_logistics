@@ -39,7 +39,7 @@
       "blocks": [
         {
           "type": "paragraph",
-          "text": "Në automjetet tona të shpërndarjes është instaluar një sistem sigurie rrugore i bazuar në kamera. Ai nuk regjistron në mënyrë të vazhdueshme, por bën fotografi vetëm të nxitura nga një ngjarje – pra vetëm atëherë kur zbulohet një ngjarje me rëndësi për sigurinë. Në këtë kurs ju shpjegojmë me gjuhë të thjeshtë çfarë regjistrohet, kush i sheh të dhënat, sa gjatë ruhen ato dhe cilat të drejta keni."
+          "text": "Në automjetet tona të shpërndarjes është instaluar një sistem sigurie rrugore i bazuar në kamera. Ai nuk regjistron në mënyrë të vazhdueshme, por vetëm i nxitur nga një ngjarje – regjistrimi krijohet vetëm atëherë kur zbulohet një ngjarje me rëndësi për sigurinë. Në rastin e një incidenti regjistrohen njëkohësisht pamja dhe zëri. Në këtë kurs ju shpjegojmë me gjuhë të thjeshtë çfarë regjistrohet, kush i sheh të dhënat, sa gjatë ruhen ato dhe cilat të drejta keni."
         },
         {
           "type": "callout",
@@ -78,8 +78,8 @@
           "items": [
             "Nuk ka asnjë transmetim të drejtpërdrejtë (livestream). Askush nuk ju vëzhgon në kohë reale ndërsa drejtoni automjetin.",
             "Nuk kryhet asnjë mbikëqyrje e pandërprerë. Udhëtimi juaj nuk vëzhgohet dhe nuk vlerësohet vazhdimisht.",
-            "Nuk ka asnjë regjistrim të vazhdueshëm dhe asnjë ngarkim të vazhdueshëm – as nga rruga, as nga kabina e shoferit.",
-            "NUK REGJISTROHET ASNJË ZË. Sistemi nuk regjistron biseda dhe as tinguj – as në kabinën e shoferit, as jashtë saj, as në mënyrë të vazhdueshme, as në rast ngjarjeje.",
+            "Nuk ka asnjë regjistrim të vazhdueshëm pamor ose zanor dhe asnjë ngarkim të vazhdueshëm – as nga rruga, as nga kabina e shoferit.",
+            "NUK PËRGJOHET NË MËNYRË TË VAZHDUESHME. Zëri nuk regjistrohet në mënyrë të përhershme, por vetëm atëherë kur një incident nxit një regjistrim.",
             "Sistemi nuk ju vlerëson automatikisht me pasoja në marrëdhënien e punës. Çdo incident shqyrtohet nga një person."
           ]
         },
@@ -88,9 +88,9 @@
           "style": "neutral",
           "title": "Çfarë ndodh",
           "items": [
-            "Sistemi bën fotografi vetëm të nxitura nga një ngjarje – pa zë – pra vetëm atëherë kur zbulohet një ngjarje me rëndësi për sigurinë (p.sh. frenim i fortë, distancë shumë e afërt me automjetin përpara, shpërqendrim).",
+            "Në rastin e një incidenti sistemi regjistron, i nxitur nga ngjarja, pamje dhe zë – pra vetëm atëherë kur zbulohet një ngjarje me rëndësi për sigurinë (p.sh. frenim i fortë, distancë shumë e afërt me automjetin përpara, shpërqendrim).",
             "Për sa kohë që nuk zbulohet asnjë ngjarje, nuk krijohet asnjë regjistrim që të ruhet ose të transmetohet.",
-            "Vetëm pas një ngjarjeje të zbuluar transmetohen fotografitë përkatëse dhe mund të analizohen.",
+            "Vetëm pas një ngjarjeje të zbuluar transmetohen regjistrimet përkatëse pamore dhe zanore dhe mund të analizohen.",
             "Këto ngjarje i shihni edhe vetë në aplikacion – bashkë me regjistrimet përkatëse."
           ]
         },
@@ -124,8 +124,8 @@
               "value": "Adresa e e-mailit"
             },
             {
-              "key": "Fotografi të nxitura nga ngjarje (pa zë)",
-              "value": "Fotografi të mjedisit rrugor dhe të brendësisë së automjetit, të cilat krijohen vetëm në rastin e një ngjarjeje sigurie të zbuluar – asnjë regjistrim i vazhdueshëm dhe asnjë regjistrim zëri"
+              "key": "Regjistrime pamore dhe zanore të nxitura nga ngjarje (në rastet e incidenteve)",
+              "value": "Regjistrime pamore dhe zanore të mjedisit rrugor dhe të brendësisë së automjetit, të cilat krijohen vetëm në rastin e një ngjarjeje sigurie të zbuluar – asnjë regjistrim i vazhdueshëm pamor ose zanor"
             },
             {
               "key": "Të dhëna të funksionimit të automjetit",
@@ -145,7 +145,7 @@
           "type": "callout",
           "style": "warning",
           "title": "Të dhëna shëndetësore – vetëm në raste përjashtimore",
-          "text": "Në rastin e një aksidenti të rëndë rrugor mund të përpunohen, në mënyrë përjashtimore, të dhëna shëndetësore, për shembull lëndime të dukshme në fotografi. Baza ligjore është atëherë neni 9, paragrafi 2, shkronja f i GDPR-së – ushtrimi ose mbrojtja e pretendimeve ligjore."
+          "text": "Në rastin e një aksidenti të rëndë rrugor mund të përpunohen, në mënyrë përjashtimore, të dhëna shëndetësore, për shembull lëndime të dukshme në regjistrime. Baza ligjore është atëherë neni 9, paragrafi 2, shkronja f i GDPR-së – ushtrimi ose mbrojtja e pretendimeve ligjore."
         }
       ]
     },
@@ -217,7 +217,7 @@
               "value": "pak ditë, më pas mbishkruhen automatikisht"
             },
             {
-              "key": "Fotografitë e ngjarjeve të sigurisë në cloud",
+              "key": "Regjistrimet pamore dhe zanore të ngjarjeve të sigurisë në cloud",
               "value": "pak javë, më pas fshihen automatikisht"
             },
             {
@@ -281,7 +281,7 @@
       "blocks": [
         {
           "type": "paragraph",
-          "text": "Kur një ngjarje nxit një regjistrim, në fotografitë e drejtuara nga jashtë mund të shfaqen rastësisht edhe pjesëmarrës të tjerë në trafik. Fytyrat dhe targat në këtë material bëhen automatikisht të panjohshme (piksëlohen). Materiali i papiksëluar ruhet dhe analizohet vetëm nëse ka ndodhur një aksident rrugor ose ekzistojnë rrethana të krahasueshme."
+          "text": "Kur një ngjarje nxit një regjistrim, në regjistrimet e drejtuara nga jashtë mund të shfaqen ose të dëgjohen rastësisht edhe pjesëmarrës të tjerë në trafik. Fytyrat dhe targat në këtë material bëhen automatikisht të panjohshme (piksëlohen). Materiali i papiksëluar ruhet dhe analizohet vetëm nëse ka ndodhur një aksident rrugor ose ekzistojnë rrethana të krahasueshme."
         },
         {
           "type": "callout",
@@ -311,7 +311,7 @@
     "intro": "Ju lutemi konfirmoni se e keni marrë dhe e keni marrë në dijeni deklaratën e privatësisë.",
     "statement": "Konfirmoj se e kam marrë dhe e kam marrë në dijeni deklaratën e privatësisë për përdorimin e teknologjive për sigurinë rrugore dhe të mjeteve për sigurinë gjatë drejtimit, në versionin e datës {{documentDate}}.",
     "clarification": "Jam në dijeni se ky konfirmim nuk përbën pëlqim për përpunimin e të dhënave. Përpunimi kryhet mbi bazën e interesave legjitime.",
-    "systemNote": "Për orientim: sistemi nuk regjistron në mënyrë të vazhdueshme. Krijohen vetëm fotografi të nxitura nga ngjarje, pa zë, kur zbulohen ngjarje me rëndësi për sigurinë – asnjë transmetim i drejtpërdrejtë, asnjë mbikëqyrje e pandërprerë, asnjë regjistrim i vazhdueshëm, asnjë regjistrim zëri.",
+    "systemNote": "Për orientim: sistemi nuk regjistron në mënyrë të vazhdueshme. Regjistrimet krijohen vetëm të nxitura nga ngjarje, kur zbulohen ngjarje me rëndësi për sigurinë; në rastin e një incidenti regjistrohen pamja dhe zëri. Asnjë transmetim i drejtpërdrejtë, asnjë mbikëqyrje e pandërprerë, asnjë regjistrim i vazhdueshëm pamor ose zanor.",
     "checkboxLabel": "Marrë dhe marrë në dijeni",
     "signatureHint": "Nënshkrimi",
     "signatureOptional": false,

@@ -39,7 +39,7 @@
       "blocks": [
         {
           "type": "paragraph",
-          "text": "Kézbesítő járműveinkbe kamerás közlekedésbiztonsági rendszer van beépítve. A rendszer nem rögzít folyamatosan, hanem kizárólag eseményvezérelten készít fényképeket – vagyis csak akkor, ha biztonsági szempontból releváns eseményt észlel. Ebben a kurzusban egyszerű nyelven elmagyarázzuk Önnek, mi kerül rögzítésre, ki látja az adatokat, meddig tároljuk azokat, és milyen jogai vannak Önnek."
+          "text": "Kézbesítő járműveinkbe kamerás közlekedésbiztonsági rendszer van beépítve. A rendszer nem rögzít folyamatosan, hanem kizárólag eseményvezérelten – felvétel csak akkor keletkezik, ha biztonsági szempontból releváns eseményt észlel. Esemény esetén ilyenkor kép és hang egyaránt rögzítésre kerül. Ebben a kurzusban egyszerű nyelven elmagyarázzuk Önnek, mi kerül rögzítésre, ki látja az adatokat, meddig tároljuk azokat, és milyen jogai vannak Önnek."
         },
         {
           "type": "callout",
@@ -78,8 +78,8 @@
           "items": [
             "Nincs élő közvetítés. Senki nem nézi Önt valós időben vezetés közben.",
             "Nem történik hézagmentes megfigyelés. A fuvarját nem figyelik és nem értékelik folyamatosan.",
-            "Nincs folyamatos rögzítés és nincs folyamatos feltöltés – sem az útról, sem a vezetőtérből.",
-            "NEM készül HANGFELVÉTEL. A rendszer nem rögzít beszélgetéseket és zajokat – sem a vezetőtérben, sem azon kívül, sem folyamatosan, sem esemény esetén.",
+            "Nincs folyamatos kép- vagy hangrögzítés és nincs folyamatos feltöltés – sem az útról, sem a vezetőtérből.",
+            "NEM történik FOLYAMATOS lehallgatás. A hangot nem rögzítjük tartósan, csak akkor, ha egy esemény felvételt vált ki.",
             "A rendszer nem értékeli Önt automatikusan munkajogi következményekkel. Minden esetet ember vizsgál meg."
           ]
         },
@@ -88,9 +88,9 @@
           "style": "neutral",
           "title": "Ami történik",
           "items": [
-            "A rendszer kizárólag eseményvezérelten készít fényképeket – hang nélkül –, vagyis csak akkor, ha biztonsági szempontból releváns eseményt észlel (pl. erős fékezés, túl kis követési távolság, figyelemelterelés).",
+            "Esemény esetén a rendszer eseményvezérelten képet és hangot rögzít – vagyis csak akkor, ha biztonsági szempontból releváns eseményt észlel (pl. erős fékezés, túl kis követési távolság, figyelemelterelés).",
             "Amíg nem észlel eseményt, nem keletkezik olyan felvétel, amelyet tárolnának vagy továbbítanának.",
-            "A hozzá tartozó fényképek csak egy észlelt esemény után kerülnek továbbításra, és csak ekkor értékelhetők ki.",
+            "A hozzá tartozó kép- és hangfelvételek csak egy észlelt esemény után kerülnek továbbításra, és csak ekkor értékelhetők ki.",
             "Ezeket az eseményeket Ön is látja az alkalmazásban – a hozzájuk tartozó felvételekkel együtt."
           ]
         },
@@ -124,8 +124,8 @@
               "value": "E-mail-cím"
             },
             {
-              "key": "Eseményvezérelt fényképfelvételek (hang nélkül)",
-              "value": "Az útkörnyezetről és a jármű belsejéről készült fényképek, amelyek kizárólag észlelt biztonsági esemény esetén keletkeznek – nincs folyamatos rögzítés és nincs hangfelvétel"
+              "key": "Eseményvezérelt kép- és hangfelvételek (események esetén)",
+              "value": "Az útkörnyezetről és a jármű belsejéről készült kép- és hangfelvételek, amelyek kizárólag észlelt biztonsági esemény esetén keletkeznek – nincs folyamatos kép- vagy hangrögzítés"
             },
             {
               "key": "A jármű üzemi adatai",
@@ -217,7 +217,7 @@
               "value": "néhány napig, ezt követően automatikusan felülíródnak"
             },
             {
-              "key": "Biztonsági eseményekhez tartozó fényképek a felhőben",
+              "key": "Biztonsági eseményekhez tartozó kép- és hangfelvételek a felhőben",
               "value": "néhány hétig, ezt követően automatikus törlés"
             },
             {
@@ -281,7 +281,7 @@
       "blocks": [
         {
           "type": "paragraph",
-          "text": "Ha egy esemény felvételt vált ki, a kifelé irányuló fényképeken mellékesen más közlekedők is láthatók lehetnek. Az arcokat és a rendszámokat ebben az anyagban automatikusan kipixelezzük. Kipixelezés nélküli anyagot csak akkor őrzünk meg és értékelünk ki, ha közlekedési baleset vagy ahhoz hasonló körülmény következett be."
+          "text": "Ha egy esemény felvételt vált ki, a kifelé irányuló felvételeken mellékesen más közlekedők is láthatók vagy hallhatók lehetnek. Az arcokat és a rendszámokat ebben az anyagban automatikusan kipixelezzük. Kipixelezés nélküli anyagot csak akkor őrzünk meg és értékelünk ki, ha közlekedési baleset vagy ahhoz hasonló körülmény következett be."
         },
         {
           "type": "callout",
@@ -311,7 +311,7 @@
     "intro": "Kérjük, erősítse meg, hogy az adatvédelmi tájékoztatót megkapta és tudomásul vette.",
     "statement": "Megerősítem, hogy a közlekedésbiztonsági technológiák és vezetésbiztonsági eszközök alkalmazásáról szóló adatvédelmi tájékoztató {{documentDate}} napi változatát megkaptam és tudomásul vettem.",
     "clarification": "Tudomásom van arról, hogy ez a visszaigazolás nem jelent hozzájárulást az adatkezeléshez. Az adatkezelés jogos érdeken alapul.",
-    "systemNote": "Tájékoztatásul: a rendszer nem rögzít folyamatosan. Kizárólag eseményvezérelt, hang nélküli fényképfelvételek keletkeznek észlelt, biztonsági szempontból releváns események esetén – nincs élő közvetítés, nincs hézagmentes megfigyelés, nincs folyamatos rögzítés, nincs hangfelvétel.",
+    "systemNote": "Tájékoztatásul: a rendszer nem rögzít folyamatosan. Felvételek kizárólag eseményvezérelten, észlelt, biztonsági szempontból releváns események esetén keletkeznek; esemény esetén ilyenkor kép és hang egyaránt rögzítésre kerül. Nincs élő közvetítés, nincs hézagmentes megfigyelés, nincs folyamatos kép- vagy hangrögzítés.",
     "checkboxLabel": "Megkaptam és tudomásul vettem",
     "signatureHint": "Aláírás",
     "signatureOptional": false,

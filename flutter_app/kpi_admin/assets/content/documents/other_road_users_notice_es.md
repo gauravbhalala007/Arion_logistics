@@ -14,10 +14,10 @@ Puede ponerse en contacto con nuestro delegado de protección de datos en [E-Mai
 
 Podemos tratar las siguientes categorías de datos personales sobre usted:
 
-tomas de imagen del accidente de tráfico sin sonido, incluidos los metadatos (p. ej., fecha, hora y lugar de la toma); y
+grabaciones de imagen y sonido del accidente de tráfico, incluidos los metadatos (p. ej., fecha, hora y lugar de la grabación); y
 
 datos personales recogidos en el lugar del accidente (p. ej., su nombre, su dirección, sus datos de contacto, la matrícula de su vehículo y los datos de su seguro).
-- Los vehículos están equipados con tecnología de seguridad vial basada en cámaras y con herramientas de seguridad en la conducción. El sistema no graba de forma permanente: las tomas de imagen se generan exclusivamente con motivo de un incidente y sin sonido, cuando se detecta un evento relevante para la seguridad o un accidente. En ningún momento se realiza grabación de sonido. En ese contexto, las cámaras orientadas hacia el exterior pueden captar de forma incidental imágenes de otros usuarios de la vía. No obstante, en ese material de imagen los rostros de las personas y las matrículas de los demás vehículos se hacen automáticamente irreconocibles (se pixelan). El material de imagen sin pixelar solo se conserva y se analiza cuando se ha producido un accidente de tráfico o concurren circunstancias comparables.
+- Los vehículos están equipados con tecnología de seguridad vial basada en cámaras y con herramientas de seguridad en la conducción. El sistema no graba de forma permanente: las grabaciones se generan exclusivamente con motivo de un evento, cuando se detecta un evento relevante para la seguridad o un accidente; en ese caso se registran imagen y sonido. No se realiza grabación continua de imagen ni de sonido. En ese contexto, las cámaras orientadas hacia el exterior pueden captar de forma incidental imágenes de otros usuarios de la vía y grabar sus voces. No obstante, en ese material de imagen los rostros de las personas y las matrículas de los demás vehículos se hacen automáticamente irreconocibles (se pixelan). El material de imagen sin pixelar solo se conserva y se analiza cuando se ha producido un accidente de tráfico o concurren circunstancias comparables.
 
 ## 3. Fines
 
@@ -59,7 +59,7 @@ Para obtener más detalles sobre nuestras transferencias de datos a terceros pa�
 
 Una vez transcurridos nuestros plazos de conservación aplicables, suprimiremos o anonimizaremos sus datos personales. Para obtener más detalles sobre nuestras prácticas de conservación, póngase en contacto con nosotros a través de los datos de contacto indicados en el apartado 9 de esta declaración de protección de datos.
 
-Las tomas de imagen generadas con motivo de un incidente que no guarden relación con un accidente de tráfico permanecen en local en el dispositivo y se sobrescriben automáticamente en un plazo breve [konkrete Frist – vor Go-live eintragen].
+Las grabaciones de imagen y sonido generadas con motivo de un evento que no guarden relación con un accidente de tráfico permanecen en local en el dispositivo y se sobrescriben automáticamente en un plazo breve [konkrete Frist – vor Go-live eintragen].
 
 ## 8. Fuentes de los datos personales
 

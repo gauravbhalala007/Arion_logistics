@@ -4,7 +4,7 @@ Posljednje ažuriranje: [Datum – vor Go-live eintragen]
 
 Ovom vas izjavom o zaštiti podataka obavještavamo o tome kako obrađujemo vaše osobne podatke u vezi s našim sustavom za sigurnost u prometu koji se temelji na kamerama ugrađenima u dostavna vozila te s alatima za sigurnost vožnje („tehnologije za sigurnost u prometu”).
 
-Sustav ne snima neprekidno. On izrađuje isključivo slikovne zapise (fotografije) bez zvuka, snimljene povodom događaja, koje pokreće prepoznati događaj bitan za sigurnost. Ne provodi se prijenos uživo, nadzor bez prekida ni neprekidno snimanje ili prenošenje. Snimanje zvuka ne provodi se ni u jednom trenutku – ni trajno ni povodom događaja.
+Sustav ne snima neprekidno. On izrađuje isključivo snimke nastale povodom događaja, koje pokreće prepoznati događaj bitan za sigurnost; pri incidentu se pritom snimaju slika i zvuk. Ne provodi se prijenos uživo, nadzor bez prekida ni neprekidno snimanje slike ili zvuka.
 
 ## 1. Voditelj obrade i kontaktni podaci
 
@@ -17,7 +17,7 @@ Našeg službenika za zaštitu podataka možete kontaktirati putem [E-Mail-Adres
 O vama možemo obrađivati sljedeće vrste osobnih podataka:
 - identifikacijski podaci (npr. imena, slike);
 - podaci za kontakt (npr. adresa e-pošte);
-- slikovni zapisi (fotografije) bez zvuka snimljeni povodom događaja, koje pokreće prepoznati događaj bitan za sigurnost (npr. vanjski prikazi okoline ceste i unutarnji prikazi prostora u vozilu); neprekidno videosnimanje ne provodi se, a snimanje zvuka ne provodi se ni u jednom trenutku;
+- snimke slike i zvuka nastale povodom događaja, koje pokreće prepoznati događaj bitan za sigurnost (npr. vanjski prikazi okoline ceste i unutarnji prikazi prostora u vozilu, pri incidentu uključujući zvuk); neprekidno snimanje slike ili zvuka ne provodi se;
 - podaci o radu vozila (npr. lokacija, brzina, ubrzanje, kočenja, vožnja u zavojima, razmak do vozila koje vozi ispred);
 - podaci o sigurnosnim incidentima (npr. utvrđeno nesigurno ponašanje u vožnji, uključujući prekoračenja brzine, naglo kočenje, ubrzavanje i skretanje, sudare, prekratak razmak do vozila ispred, nepažljivu vožnju, pospanost, ometanje kamere, upozorenja na čelni sudar, prepoznavanje nepotpunih zaustavljanja te kršenja prometnih znakova ili svjetlosne signalizacije);
 - podaci o interakciji (npr. vaše interakcije sa sustavom tehnologija za sigurnost u prometu i s aplikacijom, uključujući eventualno ometanje kamere).
@@ -59,7 +59,7 @@ Za dodatne pojedinosti o našim prijenosima podataka u treće zemlje ili za izva
 ## 7. Rokovi čuvanja
 
 Vaše osobne podatke ne pohranjujemo dulje nego što je to potrebno za gore opisane svrhe. Konkretni rokovi čuvanja ovise o svrsi obrade:
-- Za poboljšanje sigurnosti u prometu: sve slikovne zapise snimljene povodom događaja koji su pohranjeni na lokalnim uređajima u dostavnim vozilima čuvamo nekoliko dana [konkrete Frist – vor Go-live eintragen], a sve slikovne zapise pohranjene u oblaku našeg pružatelja usluga (koji se odnose isključivo na prepoznate sigurnosne incidente) nekoliko tjedana [konkrete Frist – vor Go-live eintragen], prije nego što se i jedni i drugi automatski izbrišu.
+- Za poboljšanje sigurnosti u prometu: sve snimke slike i zvuka nastale povodom događaja koje su pohranjene na lokalnim uređajima u dostavnim vozilima čuvamo nekoliko dana [konkrete Frist – vor Go-live eintragen], a sve snimke slike i zvuka pohranjene u oblaku našeg pružatelja usluga (koje se odnose isključivo na prepoznate sigurnosne incidente) nekoliko tjedana [konkrete Frist – vor Go-live eintragen], prije nego što se i jedni i drugi automatski izbrišu.
 - Za istraživanje prometnih nesreća i provjeru pravnih zahtjeva: odgovarajuće osobne podatke čuvamo za vrijeme trajanja primjenjivog zastarnog roka, uključujući do potpunog okončanja povezanih pravnih sporova i eventualnih žalbenih postupaka, kao i za svako daljnje razdoblje koje je propisano zakonom ili potrebno za pitanja nakon okončanja postupka.
 
 Nakon isteka naših primjenjivih rokova čuvanja izbrisat ćemo ili anonimizirati vaše osobne podatke. Za dodatne informacije o našim postupcima čuvanja obratite nam se putem kontaktnih podataka navedenih u odjeljku 9. ove izjave o zaštiti podataka.

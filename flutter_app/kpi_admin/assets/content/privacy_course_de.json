@@ -39,7 +39,7 @@
       "blocks": [
         {
           "type": "paragraph",
-          "text": "In unseren Lieferfahrzeugen ist ein kamerabasiertes Verkehrssicherheitssystem verbaut. Es zeichnet nicht dauerhaft auf, sondern nimmt ausschließlich anlassbezogen Fotos auf – also nur dann, wenn ein sicherheitsrelevantes Ereignis erkannt wird. In diesem Kurs erklären wir Ihnen in einfacher Sprache, was aufgenommen wird, wer die Daten sieht, wie lange sie gespeichert werden und welche Rechte Sie haben."
+          "text": "In unseren Lieferfahrzeugen ist ein kamerabasiertes Verkehrssicherheitssystem verbaut. Es zeichnet nicht dauerhaft auf, sondern ausschließlich anlassbezogen – erst wenn ein sicherheitsrelevantes Ereignis erkannt wird, entsteht eine Aufnahme. Bei einem Vorfall werden dabei Bild und Ton aufgezeichnet. In diesem Kurs erklären wir Ihnen in einfacher Sprache, was aufgenommen wird, wer die Daten sieht, wie lange sie gespeichert werden und welche Rechte Sie haben."
         },
         {
           "type": "callout",
@@ -78,8 +78,8 @@
           "items": [
             "Es gibt keinen Livestream. Niemand sieht Ihnen in Echtzeit beim Fahren zu.",
             "Es findet keine lückenlose Überwachung statt. Ihre Fahrt wird nicht durchgehend beobachtet oder bewertet.",
-            "Es gibt keine Daueraufzeichnung und keinen Dauerupload – weder von der Straße noch aus dem Fahrerraum.",
-            "Es wird KEIN TON aufgenommen. Das System zeichnet keine Gespräche und keine Geräusche auf – weder im Fahrerraum noch außerhalb, weder dauerhaft noch bei einem Ereignis.",
+            "Es gibt keine durchgehende Bild- oder Tonaufzeichnung und keinen Dauerupload – weder von der Straße noch aus dem Fahrerraum.",
+            "Es wird NICHT DURCHGEHEND mitgehört. Ton wird nicht dauerhaft aufgezeichnet, sondern nur, wenn ein Vorfall eine Aufnahme auslöst.",
             "Das System bewertet Sie nicht automatisch mit arbeitsrechtlichen Folgen. Ein Mensch prüft jeden Vorfall."
           ]
         },
@@ -88,9 +88,9 @@
           "style": "neutral",
           "title": "Was passiert",
           "items": [
-            "Das System nimmt ausschließlich anlassbezogen Fotos auf – ohne Ton – also nur dann, wenn ein sicherheitsrelevantes Ereignis erkannt wird (z. B. starkes Bremsen, zu dichtes Auffahren, Ablenkung).",
+            "Bei einem Vorfall zeichnet das System anlassbezogen Bild und Ton auf – also nur dann, wenn ein sicherheitsrelevantes Ereignis erkannt wird (z. B. starkes Bremsen, zu dichtes Auffahren, Ablenkung).",
             "Solange kein Ereignis erkannt wird, entsteht keine Aufnahme, die gespeichert oder übertragen wird.",
-            "Erst nach einem erkannten Ereignis werden die zugehörigen Fotos übertragen und können ausgewertet werden.",
+            "Erst nach einem erkannten Ereignis werden die zugehörigen Bild- und Tonaufnahmen übertragen und können ausgewertet werden.",
             "Sie sehen diese Ereignisse selbst in der App – mit den zugehörigen Aufnahmen."
           ]
         },
@@ -124,8 +124,8 @@
               "value": "E-Mail-Adresse"
             },
             {
-              "key": "Anlassbezogene Fotoaufnahmen (ohne Ton)",
-              "value": "Fotos der Straßenumgebung und des Fahrzeuginnenraums, die ausschließlich bei einem erkannten Sicherheitsereignis entstehen – keine durchgehende Aufzeichnung und keine Tonaufnahme"
+              "key": "Anlassbezogene Bild- und Tonaufnahmen (bei Vorfällen)",
+              "value": "Bild- und Tonaufnahmen der Straßenumgebung und des Fahrzeuginnenraums, die ausschließlich bei einem erkannten Sicherheitsereignis entstehen – keine durchgehende Bild- oder Tonaufzeichnung"
             },
             {
               "key": "Fahrzeugbetriebsdaten",
@@ -217,7 +217,7 @@
               "value": "wenige Tage, danach automatisch überschrieben"
             },
             {
-              "key": "Fotos zu Sicherheitsereignissen in der Cloud",
+              "key": "Bild- und Tonaufnahmen zu Sicherheitsereignissen in der Cloud",
               "value": "wenige Wochen, danach automatische Löschung"
             },
             {
@@ -281,7 +281,7 @@
       "blocks": [
         {
           "type": "paragraph",
-          "text": "Wenn ein Ereignis eine Aufnahme auslöst, können auf den nach außen gerichteten Fotos beiläufig auch andere Verkehrsteilnehmer zu sehen sein. Gesichter und Kennzeichen werden in diesem Material automatisch verpixelt. Unverpixeltes Material wird nur aufbewahrt und ausgewertet, wenn es zu einem Verkehrsunfall oder vergleichbaren Umständen gekommen ist."
+          "text": "Wenn ein Ereignis eine Aufnahme auslöst, können auf den nach außen gerichteten Aufnahmen beiläufig auch andere Verkehrsteilnehmer zu sehen oder zu hören sein. Gesichter und Kennzeichen werden in diesem Material automatisch verpixelt. Unverpixeltes Material wird nur aufbewahrt und ausgewertet, wenn es zu einem Verkehrsunfall oder vergleichbaren Umständen gekommen ist."
         },
         {
           "type": "callout",
@@ -311,7 +311,7 @@
     "intro": "Bitte bestätigen Sie, dass Sie die Datenschutzerklärung erhalten und zur Kenntnis genommen haben.",
     "statement": "Ich bestätige, dass ich die Datenschutzerklärung für den Einsatz von Verkehrssicherheitstechnologien und Fahrsicherheitstools in der Fassung vom {{documentDate}} erhalten und zur Kenntnis genommen habe.",
     "clarification": "Mir ist bekannt, dass diese Bestätigung keine Einwilligung in die Datenverarbeitung darstellt. Die Verarbeitung erfolgt auf Grundlage berechtigter Interessen.",
-    "systemNote": "Zur Einordnung: Das System zeichnet nicht dauerhaft auf. Es entstehen ausschließlich anlassbezogene Fotoaufnahmen ohne Ton bei erkannten sicherheitsrelevanten Ereignissen – kein Livestream, keine lückenlose Überwachung, keine Daueraufzeichnung, keine Tonaufnahme.",
+    "systemNote": "Zur Einordnung: Das System zeichnet nicht dauerhaft auf. Aufnahmen entstehen ausschließlich anlassbezogen bei erkannten sicherheitsrelevanten Ereignissen; bei einem Vorfall werden dabei Bild und Ton aufgezeichnet. Kein Livestream, keine lückenlose Überwachung, keine durchgehende Bild- oder Tonaufzeichnung.",
     "checkboxLabel": "Erhalten und zur Kenntnis genommen",
     "signatureHint": "Unterschrift",
     "signatureOptional": false,

@@ -39,7 +39,7 @@
       "blocks": [
         {
           "type": "paragraph",
-          "text": "En nuestros vehículos de reparto hay instalado un sistema de seguridad vial basado en cámaras. No graba de forma permanente, sino que toma fotos únicamente cuando se produce un incidente, es decir, solo cuando se detecta un evento relevante para la seguridad. En este curso le explicamos en lenguaje sencillo qué se registra, quién ve los datos, cuánto tiempo se conservan y qué derechos tiene usted."
+          "text": "En nuestros vehículos de reparto hay instalado un sistema de seguridad vial basado en cámaras. No graba de forma permanente, sino únicamente con motivo de un evento: solo cuando se detecta un evento relevante para la seguridad se genera una grabación. Cuando se produce un incidente se registran tanto la imagen como el sonido. En este curso le explicamos en lenguaje sencillo qué se registra, quién ve los datos, cuánto tiempo se conservan y qué derechos tiene usted."
         },
         {
           "type": "callout",
@@ -78,8 +78,8 @@
           "items": [
             "No hay retransmisión en directo. Nadie le observa en tiempo real mientras conduce.",
             "No se realiza ninguna vigilancia ininterrumpida. Su trayecto no se observa ni se valora de forma continua.",
-            "No hay grabación permanente ni transmisión permanente de datos, ni de la calzada ni de la cabina.",
-            "NO SE GRABA NINGÚN SONIDO. El sistema no registra conversaciones ni ruidos, ni en la cabina ni en el exterior, ni de forma permanente ni al producirse un evento.",
+            "No hay grabación continua de imagen o de sonido ni transmisión permanente de datos, ni de la calzada ni de la cabina.",
+            "NO SE ESCUCHA DE FORMA CONTINUA. El sonido no se graba de forma permanente, sino únicamente cuando un incidente activa una grabación.",
             "El sistema no le evalúa automáticamente con consecuencias laborales. Una persona revisa cada incidente."
           ]
         },
@@ -88,9 +88,9 @@
           "style": "neutral",
           "title": "Lo que sí ocurre",
           "items": [
-            "El sistema toma fotos únicamente cuando se produce un incidente y sin sonido, es decir, solo cuando se detecta un evento relevante para la seguridad (p. ej., frenada brusca, distancia de seguridad demasiado corta, distracción).",
+            "Cuando se produce un incidente, el sistema graba imagen y sonido con motivo de ese evento, es decir, solo cuando se detecta un evento relevante para la seguridad (p. ej., frenada brusca, distancia de seguridad demasiado corta, distracción).",
             "Mientras no se detecte ningún evento, no se genera ninguna toma que se almacene o se transmita.",
-            "Solo después de detectarse un evento se transmiten las fotos correspondientes y pueden ser analizadas.",
+            "Solo después de detectarse un evento se transmiten las grabaciones de imagen y sonido correspondientes y pueden ser analizadas.",
             "Usted mismo ve estos eventos en la aplicación, junto con las tomas correspondientes."
           ]
         },
@@ -124,8 +124,8 @@
               "value": "Dirección de correo electrónico"
             },
             {
-              "key": "Fotos tomadas con motivo de un incidente (sin sonido)",
-              "value": "Fotos del entorno de la vía y del interior del vehículo que se generan exclusivamente al detectarse un evento de seguridad; no hay grabación continua ni grabación de sonido"
+              "key": "Grabaciones de imagen y sonido activadas por un evento (en caso de incidentes)",
+              "value": "Grabaciones de imagen y sonido del entorno de la vía y del interior del vehículo que se generan exclusivamente al detectarse un evento de seguridad; no hay grabación continua de imagen ni de sonido"
             },
             {
               "key": "Datos de funcionamiento del vehículo",
@@ -217,7 +217,7 @@
               "value": "unos pocos días; después se sobrescriben automáticamente"
             },
             {
-              "key": "Fotos de eventos de seguridad en la nube",
+              "key": "Grabaciones de imagen y sonido de eventos de seguridad en la nube",
               "value": "unas pocas semanas; después se suprimen automáticamente"
             },
             {
@@ -281,7 +281,7 @@
       "blocks": [
         {
           "type": "paragraph",
-          "text": "Cuando un evento activa una toma, en las fotos orientadas hacia el exterior pueden aparecer de forma incidental otros usuarios de la vía. En ese material, los rostros y las matrículas se pixelan automáticamente. El material sin pixelar solo se conserva y se analiza cuando se ha producido un accidente de tráfico o concurren circunstancias comparables."
+          "text": "Cuando un evento activa una grabación, en las grabaciones orientadas hacia el exterior pueden aparecer o escucharse de forma incidental otros usuarios de la vía. En ese material, los rostros y las matrículas se pixelan automáticamente. El material sin pixelar solo se conserva y se analiza cuando se ha producido un accidente de tráfico o concurren circunstancias comparables."
         },
         {
           "type": "callout",
@@ -311,7 +311,7 @@
     "intro": "Confirme, por favor, que ha recibido la declaración de protección de datos y que ha tomado conocimiento de ella.",
     "statement": "Confirmo que he recibido la declaración de protección de datos sobre el uso de tecnologías de seguridad vial y de herramientas de seguridad en la conducción, en su versión de {{documentDate}}, y que he tomado conocimiento de ella.",
     "clarification": "Soy consciente de que esta confirmación no constituye un consentimiento para el tratamiento de datos. El tratamiento se realiza sobre la base de intereses legítimos.",
-    "systemNote": "Para situarlo: el sistema no graba de forma permanente. Únicamente se generan fotos sin sonido, tomadas con motivo de eventos relevantes para la seguridad que hayan sido detectados: sin retransmisión en directo, sin vigilancia ininterrumpida, sin grabación permanente y sin grabación de sonido.",
+    "systemNote": "Para situarlo: el sistema no graba de forma permanente. Las grabaciones se generan exclusivamente con motivo de eventos relevantes para la seguridad que hayan sido detectados; cuando se produce un incidente se registran imagen y sonido. Sin retransmisión en directo, sin vigilancia ininterrumpida y sin grabación continua de imagen o de sonido.",
     "checkboxLabel": "He recibido y he tomado conocimiento",
     "signatureHint": "Firma",
     "signatureOptional": false,
