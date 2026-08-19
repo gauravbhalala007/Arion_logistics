@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../services/concessions_csv_parser.dart';
 import '../services/parser_api.dart';
 import '../services/report_section_remover.dart';
 import '../services/report_writer.dart';
@@ -247,7 +248,9 @@ class _ConcessionsOverviewPageState extends State<ConcessionsOverviewPage> {
     try {
       final picked = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['xlsx', 'xls'],
+        // CSV = neues Amazon-Exportformat (ab 2026), XLSX/XLS = Altformat
+        // (Uebergangszeit, laeuft weiter ueber den Parser-Service).
+        allowedExtensions: ['csv', 'xlsx', 'xls'],
         withData: true,
         allowMultiple: true,
       );
@@ -261,7 +264,12 @@ class _ConcessionsOverviewPageState extends State<ConcessionsOverviewPage> {
         final Uint8List? bytes = f.bytes;
         if (bytes == null) continue;
 
-        final parsed = await ParserApi.parseXlsx(bytes, filename: f.name);
+        // Neues CSV-Format wird komplett im Client geparst (kein Roundtrip
+        // zum Parser-Service); das alte XLSX bleibt unveraendert am
+        // Parser-Service.
+        final parsed = ConcessionsCsvParser.isCsvFile(f.name)
+            ? ConcessionsCsvParser.parseBytes(bytes, filename: f.name)
+            : await ParserApi.parseXlsx(bytes, filename: f.name);
         final date = DateFormat('yyyy-MM-dd').format(DateTime.now());
         final pseudoPath = 'inline/$date/${f.name}';
 
@@ -395,6 +403,12 @@ class _ConcessionsOverviewPageState extends State<ConcessionsOverviewPage> {
               const SizedBox(height: 12),
               const ReportSourceHint(
                 expectedFileName:
+                    'z. B. DSP_Associates_Concessions_DBY5_2026-W33.csv',
+                extraHintDe: 'Altes Format wird übergangsweise weiter '
+                    'akzeptiert:',
+                extraHintEn: 'The old format is still accepted during the '
+                    'transition:',
+                extraFileName:
                     'z. B. DE-AION-DBY5-Week19-Concessions.xlsx',
                 margin: EdgeInsets.zero,
               ),

@@ -1188,7 +1188,7 @@ const Map<String, String> kBgLocalizedValues = <String, String>{
   'concessions_title': 'Concessions',
   'concessions_shell_week_title': 'CONCESSIONS - СЕДМИЦА',
   'concessions_dashboard_title': 'ТАБЛО CONCESSIONS',
-  'concessions_upload_xlsx': 'Качи XLSX',
+  'concessions_upload_xlsx': 'Качи CSV/XLSX',
   'concessions_delete_week_tooltip': 'Изтрий тази седмица Concessions',
   'concessions_delete_week_confirm': 'Изтрий',
   'concessions_delete_week_title': 'Да изтрия ли данните за Concessions?',

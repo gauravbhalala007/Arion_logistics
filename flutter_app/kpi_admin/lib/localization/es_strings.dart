@@ -1266,7 +1266,7 @@ const Map<String, String> kEsLocalizedValues = <String, String>{
   'concessions_title': 'Concessions',
   'concessions_shell_week_title': 'CONCESSIONS - SEMANA',
   'concessions_dashboard_title': 'PANEL CONCESSIONS',
-  'concessions_upload_xlsx': 'Subir XLSX',
+  'concessions_upload_xlsx': 'Subir CSV/XLSX',
   'concessions_delete_week_tooltip': 'Eliminar esta semana de Concessions',
   'concessions_delete_week_confirm': 'Eliminar',
   'concessions_delete_week_title': '¿Eliminar los datos de Concessions?',
