@@ -28,6 +28,7 @@ class CortexImportReport {
   final int failed;
   final List<String> addedPlates;
   final List<String> duplicatePlates;
+
   /// Human-readable "PLATE: error" entries for vehicles that failed to write.
   final List<String> failures;
 
@@ -44,18 +45,17 @@ class CortexImportReport {
 
 class CortexVehicleImporter {
   CortexVehicleImporter({FirebaseFirestore? firestore})
-      : _db = firestore ?? FirebaseFirestore.instance;
+    : _db = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _db;
 
   CollectionReference<Map<String, dynamic>> _vehiclesCollection(
     String dspUid,
-  ) =>
-      _db.collection('users').doc(dspUid).collection('vehicles');
+  ) => _db.collection('users').doc(dspUid).collection('vehicles');
 
   /// Maps Cortex `Eigentumstypus` (+ name/provider hints) → CoDriver
-  /// [VehicleCategory]. SESO- and LMR-named vehicles land in their own
-  /// categories; plain rentals default to SESO Rental.
+  /// [VehicleCategory]. SESO-, LMR- und Amazon-benannte Fahrzeuge landen in
+  /// ihrer eigenen Kategorie; Mietfahrzeuge ohne Hinweis bleiben SESO Rental.
   VehicleCategory _mapCategory(
     String ownershipType, {
     String fleetName = '',
@@ -66,6 +66,7 @@ class CortexVehicleImporter {
     if (hint.contains('LMR') || hint.contains('LAST MILE')) {
       return VehicleCategory.lmr;
     }
+    if (hint.contains('AMAZON')) return VehicleCategory.amazonPaidRental;
     switch (ownershipType.trim().toUpperCase()) {
       case 'RENTAL':
         // Short-term rentals without an explicit hint are SESO rentals.
@@ -73,8 +74,12 @@ class CortexVehicleImporter {
       case 'SELF_OWNED':
       case 'SELF_SOURCED':
         return VehicleCategory.selfOwnedRental;
+      // Von Amazon gestellte Mietfahrzeuge haben seit der Einführung der
+      // Kategorie „Amazon Rental" ein eigenes Zuhause (vorher: Armada).
       case 'AMAZON_LEASED':
       case 'AMAZON_PAID_RENTAL':
+      case 'AMAZON_RENTAL':
+        return VehicleCategory.amazonPaidRental;
       case 'ARMADA':
       default:
         return VehicleCategory.armada;
@@ -139,7 +144,10 @@ class CortexVehicleImporter {
       // should bring them back instead of skipping them.
       if (data['isDeleted'] == true) continue;
       final vin = (data['vinNumber'] ?? '').toString().trim().toUpperCase();
-      final plate = (data['plateNumber'] ?? d.id).toString().trim().toUpperCase();
+      final plate = (data['plateNumber'] ?? d.id)
+          .toString()
+          .trim()
+          .toUpperCase();
       if (vin.isNotEmpty) existingVins.add(vin);
       if (plate.isNotEmpty) existingPlates.add(plate);
     }
@@ -187,7 +195,8 @@ class CortexVehicleImporter {
       // Re-activating a soft-deleted doc is an UPDATE — keep its original
       // createdAt so the security rule passes; otherwise stamp a new one.
       final prior = existingByDocId[docId];
-      final Object createdAtValue = (prior != null && prior['createdAt'] != null)
+      final Object createdAtValue =
+          (prior != null && prior['createdAt'] != null)
           ? prior['createdAt'] as Object
           : FieldValue.serverTimestamp();
 

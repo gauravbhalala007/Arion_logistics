@@ -215,6 +215,13 @@ class _DriverWaveplanViewState extends State<DriverWaveplanView>
         .toList();
   }
 
+  /// The published route this driver is on, matched by transporter ID.
+  ///
+  /// Synthetic "Atlas only" entries (Atlas packages whose route code has
+  /// no route in the wave) carry an empty `transporterId`, so they never
+  /// match here — an Atlas-only plan simply shows no personal wave to a
+  /// driver. Their packages become visible as soon as the route code
+  /// gets a real route with a driver.
   Map<String, dynamic>? _findMyRoute(List<Map<String, dynamic>> routes) {
     final me = widget.driverTransporterId.trim().toUpperCase();
     for (final r in routes) {
@@ -427,6 +434,17 @@ class _Header extends StatelessWidget {
 //  Segmented tabs
 // ════════════════════════════════════════════════════════════════════════════
 
+/// `"11:00:00"` → `"11:00"`. Published routes may legitimately carry an
+/// empty time — TMGM imports have none, and synthetic "Atlas only"
+/// entries (Atlas packages whose route code has no route) carry nothing
+/// at all — so anything shorter than `HH:MM` degrades to an em dash
+/// instead of throwing a RangeError.
+String _clock(dynamic raw) {
+  final s = (raw ?? '').toString().trim();
+  if (s.length < 5) return s.isEmpty ? '—' : s;
+  return s.substring(0, 5);
+}
+
 class _SegmentedTabs extends StatelessWidget {
   final TabController controller;
   const _SegmentedTabs({required this.controller});
@@ -464,10 +482,13 @@ class _MyWaveTab extends StatelessWidget {
     }
 
     final spur = (myRoute!['spur'] ?? '').toString().toLowerCase();
+    final hasSpur = spur.trim().isNotEmpty;
     final isLeft = spur == 'links';
-    final spurColor = isLeft
-        ? const Color(0xFF0A84FF)
-        : AppColors.codriverGreen;
+    final spurColor = !hasSpur
+        ? AppColors.labelTertiaryLight
+        : isLeft
+            ? const Color(0xFF0A84FF)
+            : AppColors.codriverGreen;
     final atlasIds = (myRoute!['atlasTrackingIds'] as List? ?? const [])
         .map((e) => e.toString())
         .where((e) => e.isNotEmpty)
@@ -500,7 +521,7 @@ class _MyWaveTab extends StatelessWidget {
               children: [
                 Text(
                   '${t.t('driver_waveplan_wave_prefix')} '
-                  '${(myRoute!['dispatchTime'] ?? '').toString().substring(0, 5)}',
+                  '${_clock(myRoute!['dispatchTime'])}',
                   style: AppTypography.footnote.copyWith(
                     color: Colors.white.withOpacity(0.85),
                     fontWeight: FontWeight.w600,
@@ -536,13 +557,19 @@ class _MyWaveTab extends StatelessWidget {
                 const SizedBox(width: AppSpacing.xs),
                 Expanded(
                   child: _DetailCard(
-                    icon: isLeft
-                        ? Icons.arrow_back_rounded
-                        : Icons.arrow_forward_rounded,
+                    icon: !hasSpur
+                        ? Icons.swap_horiz_rounded
+                        : isLeft
+                            ? Icons.arrow_back_rounded
+                            : Icons.arrow_forward_rounded,
                     label: t.t('driver_waveplan_lane'),
-                    value: isLeft
-                        ? t.t('driver_waveplan_lane_left')
-                        : t.t('driver_waveplan_lane_right'),
+                    // No lane published (TMGM / Atlas-only) → "—"
+                    // instead of silently claiming "right".
+                    value: !hasSpur
+                        ? '—'
+                        : isLeft
+                            ? t.t('driver_waveplan_lane_left')
+                            : t.t('driver_waveplan_lane_right'),
                     valueColor: spurColor,
                     compact: true,
                   ),
@@ -554,10 +581,9 @@ class _MyWaveTab extends StatelessWidget {
           _DetailCard(
             icon: Icons.schedule_rounded,
             label: t.t('driver_waveplan_shift'),
-            value:
-                '${(myRoute!['dispatchTime'] ?? '').toString().substring(0, 5)}'
+            value: '${_clock(myRoute!['dispatchTime'])}'
                 ' – '
-                '${(myRoute!['shiftEnd'] ?? '').toString().substring(0, 5)}',
+                '${_clock(myRoute!['shiftEnd'])}',
           ),
         ],
       ),
@@ -897,11 +923,15 @@ class _AllDriversTab extends StatelessWidget {
             (r['menteeTransporterId'] ?? '').toString().trim().toUpperCase();
         final isMe = tid == me || mentee == me;
         final spur = (r['spur'] ?? '').toString().toLowerCase();
+        final hasSpur = spur.trim().isNotEmpty;
         final isLeft = spur == 'links';
-        final spurColor = isLeft
-            ? const Color(0xFF0A84FF)
-            : AppColors.codriverGreen;
+        final spurColor = !hasSpur
+            ? AppColors.labelTertiaryLight
+            : isLeft
+                ? const Color(0xFF0A84FF)
+                : AppColors.codriverGreen;
         final name = (r['driverName'] ?? '').toString();
+        final routeCode = (r['routeCode'] ?? '').toString();
         final atlasIds = (r['atlasTrackingIds'] as List? ?? const [])
             .map((e) => e.toString())
             .where((e) => e.isNotEmpty)
@@ -944,7 +974,10 @@ class _AllDriversTab extends StatelessWidget {
                               (isMe
                                   ? '  ${t.t('driver_waveplan_me_suffix')}'
                                   : '')
-                          : tid,
+                          // No driver at all (unassigned route or an
+                          // Atlas-only entry) → fall back to the route
+                          // code so the row is never blank.
+                          : (tid.isNotEmpty ? tid : routeCode),
                       style: AppTypography.subheadline.copyWith(
                         color: AppColors.codriverGraphite,
                         fontWeight: FontWeight.w700,
@@ -968,8 +1001,10 @@ class _AllDriversTab extends StatelessWidget {
                         ],
                         Flexible(
                           child: Text(
-                            '${(r['routeCode'] ?? '').toString()}  ·  '
-                            '${(r['dispatchArea'] ?? '').toString()}',
+                            [
+                              routeCode,
+                              (r['dispatchArea'] ?? '').toString().trim(),
+                            ].where((e) => e.isNotEmpty).join('  ·  '),
                             style: AppTypography.footnote.copyWith(
                               color: AppColors.labelSecondaryLight,
                             ),
@@ -997,9 +1032,13 @@ class _AllDriversTab extends StatelessWidget {
                   ),
                 ),
                 child: Text(
-                  isLeft
-                      ? t.t('driver_waveplan_lane_left')
-                      : t.t('driver_waveplan_lane_right'),
+                  // Routes published without a lane show "—" instead of
+                  // defaulting to "right".
+                  !hasSpur
+                      ? '—'
+                      : isLeft
+                          ? t.t('driver_waveplan_lane_left')
+                          : t.t('driver_waveplan_lane_right'),
                   style: TextStyle(
                     fontSize: 11,
                     color: spurColor,

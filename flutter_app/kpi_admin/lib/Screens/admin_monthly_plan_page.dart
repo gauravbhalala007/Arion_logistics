@@ -2,12 +2,16 @@
 //
 // Monthly Plan ("Spesen Fast Check") — one grid per month:
 //   rows = working drivers, columns = days of the month.
-// Each cell holds a day code (A, AC, C, U, X, …). Days coded A or AC count
-// towards the monthly Spesen at 14 € per day; the two right-hand columns
-// show the qualifying-day count and the resulting €.
+// Each cell holds a day code (A, AC, AB, C, U, X, OSM, …). Days coded with
+// one of [_kSpesenCodes] (A / AC / Ra / AB) count towards the monthly
+// Spesen; the rate per day is configurable (default 14 €). The two
+// right-hand columns show the qualifying-day count and the resulting €.
 //
 // Storage: users/{uid}/monthly_plans/{YYYY-MM}
 //   { entries: { <transporterId>: { "1": "A", "2": "AC", ... } } }
+// Settings: users/{uid}/settings/monthly_plan
+//   { spesenContracts: [...], spesenBuckets: [...], autoFill: bool,
+//     spesenRate: number, codeLabels: { "<code>": "<Beschriftung>" } }
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
@@ -24,18 +28,24 @@ import '../utils/driver_activity.dart';
 import '../utils/vacation_days.dart';
 import '../widgets/admin_scope.dart';
 
-/// € added per qualifying day (code A or AC).
+/// Standard-Spesensatz in € pro qualifizierendem Tag. Über die
+/// Einstellungen (`users/{uid}/settings/monthly_plan.spesenRate`) frei
+/// konfigurierbar — dieser Wert dient nur als Vorbelegung/Fallback.
 const double kSpesenPerDay = 14.0;
 
 /// Day codes with display colours. Only [_kSpesenCodes] count towards €.
+/// „AB" und „OSM" sind additiv ergänzt: bestehende Pläne mit den alten
+/// Codes bleiben unverändert lesbar.
 const List<String> kDayCodes = [
-  'A', 'AC', 'C', 'U', 'K', 'X', 'F', 'S', 'SA', 'Ra', 'P', 'N',
+  'A', 'AC', 'AB', 'C', 'U', 'K', 'X', 'F', 'S', 'SA', 'Ra', 'OSM', 'P', 'N',
 ];
-const Set<String> _kSpesenCodes = {'A', 'AC', 'Ra'};
+
+/// Codes, die einen Spesen-Tag auslösen. „AB" zählt (Ticket), „OSM" nicht.
+const Set<String> _kSpesenCodes = {'A', 'AC', 'Ra', 'AB'};
 
 /// Codes counted as a worked day in the compact mobile summary
 /// (shift codes; U/K/F/X are days off and are counted separately).
-const Set<String> _kWorkCodes = {'A', 'AC', 'C', 'Ra'};
+const Set<String> _kWorkCodes = {'A', 'AC', 'C', 'Ra', 'AB', 'OSM'};
 
 /// Compact contract-type tag shown in front of the employee name.
 /// Minijob drivers never receive Spesen.
@@ -82,6 +92,10 @@ Color _codeColor(String code) {
       return const Color(0xFF86EFAC); // green
     case 'AC':
       return const Color(0xFF5EEAD4); // teal
+    case 'AB':
+      // Kräftigeres Smaragd — eigener Ton neben A (Grün) und AC (Türkis),
+      // zählt wie diese als Spesen-Tag.
+      return const Color(0xFF34D399); // emerald
     case 'C':
       return const Color(0xFFFDE047); // yellow
     case 'U':
@@ -102,6 +116,10 @@ Color _codeColor(String code) {
       return const Color(0xFF94A3B8); // slate
     case 'Ra':
       return const Color(0xFFBBF7D0); // light green
+    case 'OSM':
+      // Indigo — deutlich unterscheidbar von F (Blau) und N (Lavendel);
+      // keine Spesen.
+      return const Color(0xFF818CF8); // indigo
     case 'P':
       return const Color(0xFFF9A8D4); // pink
     case 'N':
@@ -238,6 +256,11 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
   };
   // Scorecard buckets entitled to Spesen. Default: all except Fair/Poor.
   Set<String> _spesenBuckets = {'FANTASTICPLUS', 'FANTASTIC', 'GREAT'};
+  // € pro Spesen-Tag — im Einstellungs-Dialog frei wählbar.
+  double _spesenRate = kSpesenPerDay;
+  // Eigene Beschriftung je Zellen-Code (Code → Klartext). Leere/fehlende
+  // Einträge fallen auf [_defaultCodeLabel] zurück.
+  Map<String, String> _codeLabels = {};
   bool _settingsLoaded = false;
 
   // ── Ticket „Auto-Vorbelegung" ──────────────────────────────────────
@@ -289,6 +312,16 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
         }
         final auto = data['autoFill'];
         if (auto is bool) _autoFill = auto;
+        final rate = data['spesenRate'];
+        if (rate is num && rate >= 0) _spesenRate = rate.toDouble();
+        final labels = data['codeLabels'];
+        if (labels is Map) {
+          _codeLabels = {
+            for (final e in labels.entries)
+              if (e.value != null && e.value.toString().trim().isNotEmpty)
+                e.key.toString(): e.value.toString().trim(),
+          };
+        }
       });
     } catch (_) {}
   }
@@ -300,6 +333,13 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
       'spesenContracts': _spesenContracts.toList(),
       'spesenBuckets': _spesenBuckets.toList(),
       'autoFill': _autoFill,
+      'spesenRate': _spesenRate,
+      // Immer alle Codes schreiben (leerer String = Standardbeschriftung).
+      // `merge: true` führt Map-Felder zusammen — eine gelöschte
+      // Beschriftung verschwände sonst nicht.
+      'codeLabels': {
+        for (final c in kDayCodes) c: _codeLabels[c] ?? '',
+      },
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
   }
@@ -328,6 +368,13 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
   bool _contractEligible(DriverContractType? c) =>
       c == null || _spesenContracts.contains(c.value);
 
+  /// Eingabeformat des Spesensatzes: „14" bzw. „14,50" (DE) / „14.50".
+  String _rateInput(double v) {
+    final s =
+        v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(2);
+    return _de ? s.replaceAll('.', ',') : s;
+  }
+
   Future<void> _openSettings() async {
     final contracts = {..._spesenContracts};
     final buckets = {..._spesenBuckets};
@@ -338,6 +385,11 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
       ('FAIR', 'Fair'),
       ('POOR', 'Poor'),
     ];
+    final rateCtrl = TextEditingController(text: _rateInput(_spesenRate));
+    final labelCtrls = {
+      for (final c in kDayCodes)
+        c: TextEditingController(text: _codeLabels[c] ?? ''),
+    };
     final saved = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -345,7 +397,7 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16)),
           title: Text(
-            _tr('Spesen-Einstellungen', 'Spesen settings'),
+            _tr('Monatsplan-Einstellungen', 'Monthly plan settings'),
             style:
                 const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
           ),
@@ -356,6 +408,46 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // ── Spesensatz ──
+                  Text(
+                    _tr('Spesensatz pro Spesen-Tag',
+                        'Spesen rate per qualifying day'),
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: _kMuted),
+                  ),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: rateCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(
+                          RegExp(r'[0-9.,]')),
+                    ],
+                    style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w700),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      suffixText: _tr('€ / Tag', '€ / day'),
+                      hintText: _rateInput(kSpesenPerDay),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    _tr(
+                        'Gilt für alle Codes mit Spesen '
+                            '(${kDayCodes.where(_kSpesenCodes.contains).join(' / ')}).',
+                        'Applies to all codes with Spesen '
+                            '(${kDayCodes.where(_kSpesenCodes.contains).join(' / ')}).'),
+                    style: const TextStyle(fontSize: 11, color: _kMuted),
+                  ),
+                  const SizedBox(height: 14),
+                  const Divider(height: 1, color: _kBorder),
+                  const SizedBox(height: 12),
                   Text(
                     _tr('Wer erhält Spesen? (Vertragsart)',
                         'Who receives Spesen? (contract type)'),
@@ -405,6 +497,80 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
                         'Weeks with a deselected status are cancelled automatically (orange). Manual per-week changes take precedence.'),
                     style: const TextStyle(fontSize: 11, color: _kMuted),
                   ),
+                  const SizedBox(height: 14),
+                  const Divider(height: 1, color: _kBorder),
+                  const SizedBox(height: 12),
+                  // ── Beschriftung der Codes ──
+                  Text(
+                    _tr('Beschriftung der Codes',
+                        'Labels for the day codes'),
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: _kMuted),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _tr(
+                        'Eigene Bedeutung je Kürzel — erscheint in Legende, '
+                            'Tooltips und im Code-Menü. Leer = Standard.',
+                        'Custom meaning per code — shown in the legend, '
+                            'tooltips and the code menu. Empty = default.'),
+                    style: const TextStyle(fontSize: 11, color: _kMuted),
+                  ),
+                  const SizedBox(height: 8),
+                  for (final code in kDayCodes)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 34,
+                            height: 30,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: _codeColor(code),
+                              borderRadius: BorderRadius.circular(7),
+                            ),
+                            child: Text(
+                              code,
+                              style: const TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF1F2937),
+                              ),
+                            ),
+                          ),
+                          if (_kSpesenCodes.contains(code)) ...[
+                            const SizedBox(width: 4),
+                            const Icon(Icons.euro_rounded,
+                                size: 13, color: Color(0xFF1D7F5A)),
+                          ],
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextField(
+                              controller: labelCtrls[code],
+                              style: const TextStyle(fontSize: 13),
+                              decoration: InputDecoration(
+                                isDense: true,
+                                contentPadding:
+                                    const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 9),
+                                hintText: _defaultCodeLabel(code) ??
+                                    _tr('Bedeutung eingeben',
+                                        'Enter meaning'),
+                                hintStyle: const TextStyle(
+                                    fontSize: 12, color: Color(0xFF9CA3AF)),
+                                border: OutlineInputBorder(
+                                    borderRadius:
+                                        BorderRadius.circular(10)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -422,10 +588,29 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
         ),
       ),
     );
+    final rateText = rateCtrl.text.trim().replaceAll(',', '.');
+    final labels = {
+      for (final e in labelCtrls.entries)
+        if (e.value.text.trim().isNotEmpty) e.key: e.value.text.trim(),
+    };
+    rateCtrl.dispose();
+    for (final c in labelCtrls.values) {
+      c.dispose();
+    }
     if (saved != true || !mounted) return;
+    final parsedRate = double.tryParse(rateText);
+    if (parsedRate == null || parsedRate < 0) {
+      _snack(_tr(
+          'Ungültiger Spesensatz — bisheriger Wert '
+              '(${_money(_spesenRate)}) bleibt bestehen.',
+          'Invalid Spesen rate — the previous value '
+              '(${_money(_spesenRate)}) is kept.'));
+    }
     setState(() {
       _spesenContracts = contracts;
       _spesenBuckets = buckets;
+      if (parsedRate != null && parsedRate >= 0) _spesenRate = parsedRate;
+      _codeLabels = labels;
     });
     await _saveSettings();
   }
@@ -1179,9 +1364,16 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
                 ),
                 const SizedBox(width: 8),
                 if (_kSpesenCodes.contains(code))
-                  const Text('+14 €',
-                      style: TextStyle(
-                          fontSize: 11, color: Color(0xFF1D7F5A)))
+                  Flexible(
+                    child: Text(
+                      _codeLabels[code] != null
+                          ? '${_codeLabel(code)} · +${_money(_spesenRate)}'
+                          : '+${_money(_spesenRate)}',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 11, color: Color(0xFF1D7F5A)),
+                    ),
+                  )
                 else if (_codeLabel(code) != null)
                   Flexible(
                     child: Text(
@@ -1814,16 +2006,7 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
           builder: (context, constraints) {
             final narrow = constraints.maxWidth < _kNarrow;
             final pad = narrow ? 10.0 : 16.0;
-            final legend = _tr(
-                    'A / AC / Ra = 14 € pro Tag · U = Urlaub bezahlt · '
-                        'X = Urlaub unbezahlt · K = Krank · '
-                        'U / X / K = keine Spesen · '
-                        'Poor/Fair-Woche = automatisch gestrichen',
-                    'A / AC / Ra = €14 per day · U = paid vacation · '
-                        'X = unpaid vacation · K = sick leave · '
-                        'U / X / K = no Spesen · '
-                        'poor/fair week = auto-cancelled') +
-                (_autoFill ? _autoLegendSuffix() : '');
+            final legend = _legendText();
 
             final head = <Widget>[
               if (narrow) ..._narrowTopBar() else ...[
@@ -1963,7 +2146,10 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
                     onPressed: _applyNationalHolidays,
                   ),
                   IconButton(
-                    tooltip: _tr('Spesen-Einstellungen', 'Spesen settings'),
+                    tooltip: _tr(
+                        'Monatsplan-Einstellungen '
+                            '(Spesensatz, Beschriftungen)',
+                        'Monthly plan settings (rate, labels)'),
                     icon: const Icon(Icons.settings_outlined,
                         color: Color(0xFF475569)),
                     onPressed: _openSettings,
@@ -2146,7 +2332,10 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
                           return n;
                         }
 
-                        final totalEur = drivers.fold<double>(
+                        // Monats-Gesamtsumme: Spesen-Tage aller
+                        // berechtigten Mitarbeiter und der daraus
+                        // resultierende Betrag.
+                        final totalDays = drivers.fold<int>(
                           0,
                           (total, d) {
                             // Contract types deselected in the
@@ -2157,13 +2346,12 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
                               return total;
                             }
                             return total +
-                                spesenDays(
-                                        (d.data()['transporterId'] ?? d.id)
-                                            .toString()
-                                            .trim()) *
-                                    kSpesenPerDay;
+                                spesenDays((d.data()['transporterId'] ?? d.id)
+                                    .toString()
+                                    .trim());
                           },
                         );
+                        final totalEur = totalDays * _spesenRate;
 
                         // Ticket: in der schmalen Ansicht ist ggf. die
                         // Tagesliste eines Fahrers geöffnet.
@@ -2217,14 +2405,19 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
                                       ),
                                     ),
                                     const Spacer(),
-                                    Text(
-                                      _tr('Spesen gesamt: ',
-                                              'Total Spesen: ') +
-                                          '${totalEur.toStringAsFixed(0)} €',
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w800,
-                                        color: Color(0xFF065F46),
+                                    Flexible(
+                                      child: Text(
+                                        '${_tr('Spesen gesamt: ', 'Total Spesen: ')}'
+                                        '$totalDays ${_tr('Tage', 'days')} · '
+                                        '${_money(totalEur)}',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        textAlign: TextAlign.right,
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w800,
+                                          color: Color(0xFF065F46),
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -2534,16 +2727,9 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
           borderRadius: BorderRadius.circular(10),
         ),
         child: Text(
-          _tr(
-                  'A / AC / Ra = 14 € pro Tag · U = Urlaub bezahlt · '
-                      'X = Urlaub unbezahlt · K = Krank · '
-                      'U / X / K = keine Spesen · '
-                      'Poor/Fair-Woche = automatisch gestrichen',
-                  'A / AC / Ra = €14 per day · U = paid vacation · '
-                      'X = unpaid vacation · K = sick leave · '
-                      'U / X / K = no Spesen · '
-                      'poor/fair week = auto-cancelled') +
-              (_autoFill ? _autoLegendSuffix() : ''),
+          _legendText(),
+          maxLines: 6,
+          overflow: TextOverflow.ellipsis,
           style: const TextStyle(
             fontSize: 10.5,
             fontWeight: FontWeight.w700,
@@ -2688,7 +2874,9 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
               const Icon(Icons.settings_outlined,
                   size: 18, color: Color(0xFF475569)),
               const SizedBox(width: 10),
-              Text(_tr('Spesen-Einstellungen', 'Spesen settings'),
+              Text(
+                  _tr('Monatsplan-Einstellungen',
+                      'Monthly plan settings'),
                   style: const TextStyle(fontSize: 13)),
             ],
           ),
@@ -2865,7 +3053,7 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
           }
         }
         final days = eligible ? spesenDays(tid) : 0;
-        final eur = days * kSpesenPerDay;
+        final eur = days * _spesenRate;
 
         final empNo = (data['employeeNumber'] ?? '').toString().trim();
         final sub = [
@@ -2983,8 +3171,8 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
                             _statChip(
                               'Spesen',
                               eligible
-                                  ? '$days ${_tr('T', 'd')} · '
-                                      '${eur.toStringAsFixed(0)} €'
+                                  ? '$days ${_tr('Tage', 'days')} · '
+                                      '${_money(eur)}'
                                   : '—',
                               eligible
                                   ? const Color(0xFF065F46)
@@ -3019,7 +3207,7 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
     final eligible = _contractEligible(
         DriverContractType.fromValue(data['contractType']));
     final days = eligible ? spesenDays(tid) : 0;
-    final eur = days * kSpesenPerDay;
+    final eur = days * _spesenRate;
     return Row(
       children: [
         SizedBox(
@@ -3060,7 +3248,7 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
         const SizedBox(width: 6),
         Text(
           eligible
-              ? '$days ${_tr('T', 'd')} · ${eur.toStringAsFixed(0)} €'
+              ? '$days ${_tr('T', 'd')} · ${_money(eur)}'
               : '—',
           style: TextStyle(
             fontSize: 13,
@@ -3072,15 +3260,55 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
     );
   }
 
-  /// Klartext für die dokumentierten Codes; alle übrigen Codes stehen für
-  /// sich (die Matrix zeigt dort ebenfalls nur das Kürzel).
-  String? _codeLabel(String code) => switch (code) {
+  /// Standard-Klartext für die dokumentierten Codes; alle übrigen Codes
+  /// stehen für sich (die Matrix zeigt dort ebenfalls nur das Kürzel),
+  /// bis der Admin in den Einstellungen eine Beschriftung hinterlegt.
+  String? _defaultCodeLabel(String code) => switch (code) {
         'U' => _tr('Urlaub (bezahlt)', 'Vacation (paid)'),
         'X' => _tr('Urlaub (unbezahlt)', 'Vacation (unpaid)'),
         'K' => _tr('Krank', 'Sick'),
         'N' => _tr('Feiertag', 'Public holiday'),
+        'AB' => _tr('AB-Schicht (mit Spesen)', 'AB shift (with Spesen)'),
+        'OSM' => _tr('OSM (ohne Spesen)', 'OSM (no Spesen)'),
         _ => null,
       };
+
+  /// Beschriftung eines Codes: eigene Bezeichnung aus den Einstellungen,
+  /// sonst der Standardtext. `null`, wenn beides fehlt.
+  String? _codeLabel(String code) {
+    final custom = _codeLabels[code]?.trim();
+    if (custom != null && custom.isNotEmpty) return custom;
+    return _defaultCodeLabel(code);
+  }
+
+  /// Geldbetrag in der Sprache des Admins („14 €" / „14,50 €").
+  String _money(double v) {
+    final s = v == v.roundToDouble()
+        ? v.toStringAsFixed(0)
+        : v.toStringAsFixed(2);
+    return '${_de ? s.replaceAll('.', ',') : s} €';
+  }
+
+  /// Legende des Kopfbereichs — nutzt den konfigurierten Spesensatz und
+  /// die (ggf. eigenen) Beschriftungen aller Codes.
+  String _legendText() {
+    final spesenCodes =
+        kDayCodes.where(_kSpesenCodes.contains).join(' / ');
+    final parts = <String>[
+      '$spesenCodes = ${_money(_spesenRate)} '
+          '${_tr('pro Tag', 'per day')}',
+      for (final c in kDayCodes)
+        if (!_kSpesenCodes.contains(c) && _codeLabel(c) != null)
+          '$c = ${_codeLabel(c)}',
+      for (final c in kDayCodes)
+        if (_kSpesenCodes.contains(c) && _codeLabels[c] != null)
+          '$c = ${_codeLabel(c)}',
+      _tr('U / X / K = keine Spesen', 'U / X / K = no Spesen'),
+      _tr('Poor/Fair-Woche = automatisch gestrichen',
+          'poor/fair week = auto-cancelled'),
+    ];
+    return parts.join(' · ') + (_autoFill ? _autoLegendSuffix() : '');
+  }
 
   /// Stufe 2 der Handy-Ansicht: die Tage des Monats untereinander. Tippen
   /// öffnet dasselbe [_pickCode]-Menü wie eine Matrix-Zelle — gleiche
@@ -3159,8 +3387,9 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
         if (auto) _tr('automatisch', 'automatic'),
         if (_kSpesenCodes.contains(code))
           blocked
-              ? _tr('14 € gestrichen', '€14 cancelled')
-              : '+14 €',
+              ? _tr('${_money(_spesenRate)} gestrichen',
+                  '${_money(_spesenRate)} cancelled')
+              : '+${_money(_spesenRate)}',
         if (code.isEmpty) _tr('kein Eintrag', 'no entry'),
       ].join(' · ');
 
@@ -3822,7 +4051,7 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
                         DriverContractType.fromValue(
                             drivers[i].data()['contractType']));
                     final days = isMinijob ? 0 : spesenDays(tid);
-                    final eur = days * kSpesenPerDay;
+                    final eur = days * _spesenRate;
                     return Container(
                       height: _rowH,
                       color: i.isOdd
@@ -3846,9 +4075,7 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
                           SizedBox(
                             width: 60,
                             child: Text(
-                              isMinijob
-                                  ? '—'
-                                  : '${eur.toStringAsFixed(0)} €',
+                              isMinijob ? '—' : _money(eur),
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 12,
@@ -3949,32 +4176,54 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
             right: const BorderSide(color: Color(0xFFEDF0F3), width: 0.5),
             bottom: const BorderSide(color: Color(0xFFEDF0F3), width: 0.5),
           );
+    // Tooltip: Bedeutung des Codes (eigene Beschriftung aus den
+    // Einstellungen, sonst Standard) samt Spesen-Hinweis.
+    final tip = code.isEmpty
+        ? ''
+        : [
+            [code, if (_codeLabel(code) != null) _codeLabel(code)!]
+                .join(' — '),
+            if (_kSpesenCodes.contains(code))
+              blocked
+                  ? _tr('${_money(_spesenRate)} gestrichen',
+                      '${_money(_spesenRate)} cancelled')
+                  : '+${_money(_spesenRate)}',
+            if (auto) _tr('automatisch vorbelegt', 'pre-filled automatically'),
+          ].join(' · ');
     return Builder(
-      builder: (cellContext) => InkWell(
-        onTap: () => _pickCode(
-            cellContext, tid, day, code, blocked, monthBlocked(tid),
-            isAuto: auto),
-        child: Container(
-          width: _cellW,
-          height: _rowH,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: bg,
-            border: border,
-          ),
-          child: Text(
-            code,
-            style: TextStyle(
-              fontSize: 10.5,
-              fontWeight: auto ? FontWeight.w600 : FontWeight.w800,
-              fontStyle: auto ? FontStyle.italic : FontStyle.normal,
-              color: auto
-                  ? const Color(0xFF64748B)
-                  : const Color(0xFF1F2937),
+      builder: (cellContext) {
+        final cell = InkWell(
+          onTap: () => _pickCode(
+              cellContext, tid, day, code, blocked, monthBlocked(tid),
+              isAuto: auto),
+          child: Container(
+            width: _cellW,
+            height: _rowH,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: bg,
+              border: border,
+            ),
+            child: Text(
+              code,
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: auto ? FontWeight.w600 : FontWeight.w800,
+                fontStyle: auto ? FontStyle.italic : FontStyle.normal,
+                color: auto
+                    ? const Color(0xFF64748B)
+                    : const Color(0xFF1F2937),
+              ),
             ),
           ),
-        ),
-      ),
+        );
+        if (tip.isEmpty) return cell;
+        return Tooltip(
+          message: tip,
+          waitDuration: const Duration(milliseconds: 400),
+          child: cell,
+        );
+      },
     );
   }
 }

@@ -54,6 +54,8 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
   static const Color _kAccentBlue = Color(0xFF2A5FA8);
   static const Color _kAccentBlueTint = Color(0xFFE9F0FA);
   static const Color _kAccentViolet = Color(0xFF7A4BB0);
+  static const Color _kAccentOrange = Color(0xFFB45309);
+  static const Color _kAccentOrangeTint = Color(0xFFFEF3C7);
   static const Color _kAccentVioletTint = Color(0xFFF3ECFA);
 
   static const String _tuvAllValue = '__all_tuv__';
@@ -402,6 +404,8 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
         return vehicle.category == VehicleCategory.armada;
       case 'SESO':
         return vehicle.category == VehicleCategory.sesoRental;
+      case 'AMAZON':
+        return vehicle.category == VehicleCategory.amazonPaidRental;
       case 'LMR':
         return vehicle.category == VehicleCategory.lmr;
       case 'SELF_OWNED':
@@ -3596,16 +3600,17 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
   }
 
   /// Farbpaar des Besitz-Badges (Handoff): Armada grün, SESO Rental blau,
-  /// LMR violett, alles Weitere grau.
+  /// Amazon Rental orange, LMR violett, alles Weitere grau.
   (Color, Color) _ownerBadgeColors(VehicleCategory category) {
     switch (category) {
       case VehicleCategory.armada:
         return (_kAccentGreenTint, _kAccentGreen);
       case VehicleCategory.sesoRental:
         return (_kAccentBlueTint, _kAccentBlue);
+      case VehicleCategory.amazonPaidRental:
+        return (_kAccentOrangeTint, _kAccentOrange);
       case VehicleCategory.lmr:
         return (_kAccentVioletTint, _kAccentViolet);
-      case VehicleCategory.amazonPaidRental:
       case VehicleCategory.selfSourcedRental:
       case VehicleCategory.selfOwnedRental:
         return (const Color(0xFFEEF1F4), _kSubtle);
@@ -4152,10 +4157,12 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    // Only the four main categories are selectable.
+                    // Die fünf geführten Kategorien; die Metadatenfelder
+                    // darunter richten sich nach der Auswahl.
                     for (final category in const [
                       VehicleCategory.armada,
                       VehicleCategory.sesoRental,
+                      VehicleCategory.amazonPaidRental,
                       VehicleCategory.lmr,
                       VehicleCategory.selfOwnedRental,
                     ])
@@ -5237,7 +5244,9 @@ String _categoryLabel(BuildContext context, VehicleCategory category) {
   final t = AppLocalizations.of(context);
   switch (category) {
     case VehicleCategory.amazonPaidRental:
-      return t.t('fleet_status_category_amazon_paid_rental');
+      // Markenname wie 'LMR' / 'SESO Rental' / 'Self Owned' — bewusst nicht
+      // übersetzt, der Lokalisierungs-Eintrag hieße 'Amazon Paid Rental'.
+      return 'Amazon Rental';
     case VehicleCategory.selfSourcedRental:
       return t.t('fleet_status_category_self_sourced_rental');
     case VehicleCategory.selfOwnedRental:
@@ -5335,6 +5344,7 @@ class _FleetHero extends StatelessWidget {
     final armada = countByCat(VehicleCategory.armada);
     final lmr = countByCat(VehicleCategory.lmr);
     final seso = countByCat(VehicleCategory.sesoRental);
+    final amazon = countByCat(VehicleCategory.amazonPaidRental);
     // Legacy self-sourced counts into Self-Owned so nothing gets lost.
     final selfOwned =
         countByCat(VehicleCategory.selfOwnedRental) +
@@ -5364,6 +5374,12 @@ class _FleetHero extends StatelessWidget {
         Icons.local_shipping_rounded,
         filterKey: 'SESO',
       ),
+      _tile(
+        'Amazon Rental',
+        amazon,
+        Icons.airport_shuttle_outlined,
+        filterKey: 'AMAZON',
+      ),
       _tile('LMR', lmr, Icons.commute_rounded, filterKey: 'LMR'),
       _tile(
         'Self-Owned',
@@ -5387,13 +5403,33 @@ class _FleetHero extends StatelessWidget {
   Widget _tileRow(List<Widget> tiles) {
     if (tiles.isEmpty) return const SizedBox.shrink();
     if (!isMobile) {
-      return Row(
-        children: [
-          for (int i = 0; i < tiles.length; i++) ...[
-            Expanded(child: tiles[i]),
-            if (i != tiles.length - 1) const SizedBox(width: 10),
-          ],
-        ],
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          // Sieben Kacheln brauchen Platz — wird es eng, scrollt die Reihe
+          // mit fester Kachelbreite, statt Labels wie „Amazon Rental"
+          // abzuschneiden.
+          if (constraints.maxWidth < 1000) {
+            return SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (int i = 0; i < tiles.length; i++) ...[
+                    SizedBox(width: 138, child: tiles[i]),
+                    if (i != tiles.length - 1) const SizedBox(width: 10),
+                  ],
+                ],
+              ),
+            );
+          }
+          return Row(
+            children: [
+              for (int i = 0; i < tiles.length; i++) ...[
+                Expanded(child: tiles[i]),
+                if (i != tiles.length - 1) const SizedBox(width: 10),
+              ],
+            ],
+          );
+        },
       );
     }
     // Mobil: schmale Kacheln — nur so breit, dass eine dreistellige Zahl

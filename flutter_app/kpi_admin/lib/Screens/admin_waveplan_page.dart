@@ -93,6 +93,26 @@ String _normalizeServiceType(String raw) {
   return s;
 }
 
+/// Route-id prefix marking a **synthetic Atlas-only entry**: an Atlas
+/// route code that carries tracking IDs but has no normal route in the
+/// wave. Such entries are materialised on the fly (never typed by the
+/// dispatcher) so an Atlas-only day can still be published, shared and
+/// printed. Every other field stays neutral/empty.
+const String _kAtlasOnlyRouteIdPrefix = 'ATLAS-ONLY::';
+
+/// Wave-group key for synthetic Atlas-only entries. Deliberately not a
+/// clock value so they never merge into a real wave (or into the
+/// "no time" bucket TMGM imports produce) and always sort last.
+const String _kAtlasWaveKey = 'ATLAS_ONLY_WAVE';
+
+bool _isAtlasOnlyRoute(WaveplanRoute r) =>
+    r.routeId.startsWith(_kAtlasOnlyRouteIdPrefix);
+
+/// Grouping key of a route in the wave list — real dispatch time for
+/// normal routes, the Atlas bucket for synthetic Atlas-only entries.
+String _waveKeyOf(WaveplanRoute r) =>
+    _isAtlasOnlyRoute(r) ? _kAtlasWaveKey : r.dispatchTime;
+
 /// Snapshot of every per-program piece of state. Three programs live
 /// side-by-side (`Sameday A`, `Nextday`, `Sameday C`). Switching the
 /// top tab saves the current state into the previous program and
@@ -654,13 +674,16 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
     // Tages spiegeln, damit ein Link aus Nextday oder Sameday C sie
     // ebenfalls enthält (auch nach einem Neuladen der Seite).
     unawaited(_mirrorDispatchersToOtherPrograms());
-    if (_routes.isEmpty) {
+    // Atlas-only waves (no routes at all) are worth keeping too — the
+    // draft is only deleted when nothing is left.
+    final draftRoutes = _allRoutes();
+    if (draftRoutes.isEmpty) {
       try {
         await ref.delete();
       } catch (_) {}
       return;
     }
-    final payloadRoutes = _routes.map((r) {
+    final payloadRoutes = draftRoutes.map((r) {
       return {
         'routeCode': r.routeCode,
         'routeId': r.routeId,
@@ -673,6 +696,7 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
         'assignedDsp': r.assignedDsp ?? '',
         'menteeTransporterId': r.menteeTransporterId ?? '',
         'atlasTrackingIds': _atlasByRoute[r.routeCode] ?? const <String>[],
+        if (_isAtlasOnlyRoute(r)) 'atlasOnly': true,
       };
     }).toList();
     try {
@@ -732,7 +756,14 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
     if (rawRoutes is List) {
       _routes = [
         for (final r in rawRoutes)
-          if (r is Map<String, dynamic>)
+          // Synthetic Atlas-only entries are NOT real routes — they are
+          // re-derived from `_atlasByRoute` below, so the route count
+          // (and everything gated on it) stays honest.
+          if (r is Map<String, dynamic> &&
+              r['atlasOnly'] != true &&
+              !(r['routeId'] ?? '')
+                  .toString()
+                  .startsWith(_kAtlasOnlyRouteIdPrefix))
             WaveplanRoute(
               routeCode: (r['routeCode'] ?? '').toString(),
               routeId: (r['routeId'] ?? '').toString(),
@@ -975,10 +1006,56 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
 
   // ─── Wave helpers ───────────────────────────────────────────────────────
 
+  /// Total number of imported Atlas tracking IDs across all route codes.
+  int get _atlasTotal =>
+      _atlasByRoute.values.fold<int>(0, (s, l) => s + l.length);
+
+  /// Atlas route codes that have **no** normal route in this wave,
+  /// materialised as neutral placeholder routes so they can be shown,
+  /// published, shared and printed. Every field except `routeCode` /
+  /// `routeId` stays empty — the views render "—" for those.
+  ///
+  /// Once such an entry has been published and hydrated back it lives in
+  /// [_routes] (keeping its `ATLAS-ONLY::` route id), so it is filtered
+  /// out here and never duplicated.
+  List<WaveplanRoute> _atlasOnlyRoutes() {
+    if (_atlasByRoute.isEmpty) return const <WaveplanRoute>[];
+    final known = <String>{
+      for (final r in _routes) r.routeCode.trim().toUpperCase(),
+    };
+    final codes = _atlasByRoute.keys.toList()..sort();
+    return [
+      for (final code in codes)
+        if ((_atlasByRoute[code] ?? const <String>[]).isNotEmpty &&
+            !known.contains(code.trim().toUpperCase()))
+          WaveplanRoute(
+            routeCode: code,
+            routeId: '$_kAtlasOnlyRouteIdPrefix$code',
+            dispatchArea: '',
+            waitingAreaSpur: '',
+            dispatchTime: '',
+            shiftEndTime: '',
+            serviceType: '',
+          ),
+    ];
+  }
+
+  /// Real routes plus the synthetic Atlas-only entries — the list every
+  /// output (publish, draft, PDF, share link, route list) works on.
+  List<WaveplanRoute> _allRoutes() => [..._routes, ..._atlasOnlyRoutes()];
+
+  /// True when the wave carries anything at all — routes or Atlas-only
+  /// packages. Used to gate clear / PDF / share / publish.
+  bool get _hasAnyEntries => _routes.isNotEmpty || _atlasTotal > 0;
+
   /// Routes ordered by wave (ascending) and then by dispatch slot.
+  /// Synthetic Atlas-only entries always come last, after every wave.
   List<WaveplanRoute> _routesSorted() {
-    final list = List<WaveplanRoute>.of(_routes);
+    final list = _allRoutes();
+    int kind(WaveplanRoute r) => _isAtlasOnlyRoute(r) ? 1 : 0;
     list.sort((a, b) {
+      final k = kind(a).compareTo(kind(b));
+      if (k != 0) return k;
       final t = a.dispatchTime.compareTo(b.dispatchTime);
       if (t != 0) return t;
       return a.dispatchSlot.compareTo(b.dispatchSlot);
@@ -1098,6 +1175,10 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
   @override
   Widget build(BuildContext context) {
     final routes = _routesSorted();
+    // Publishing needs *something* to publish (routes OR Atlas packages)
+    // plus an explicit Atlas decision. A bare "no Atlas today" without
+    // routes stays unpublishable.
+    final canPublish = _hasAnyEntries && _atlasConfirmed;
     final width = MediaQuery.of(context).size.width;
     final isNarrow = width < 1100;
     final isMobile = width < 700;
@@ -1191,7 +1272,7 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
                         _RoundPlusButton(
                           onTap: _showMobileActionsSheet,
                         ),
-                        if (_routes.isNotEmpty) ...[
+                        if (_hasAnyEntries) ...[
                           const SizedBox(width: AppSpacing.xs),
                           _RoundDangerButton(
                             icon: Icons.delete_outline_rounded,
@@ -1202,8 +1283,7 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
                         _PublishButton(
                           isPublished: _isPublished,
                           publishedAt: _publishedAt,
-                          onToggle: (_routes.isEmpty || !_atlasConfirmed) &&
-                                  !_isPublished
+                          onToggle: !canPublish && !_isPublished
                               ? null
                               : () => _togglePublish(namesMap),
                           compact: true,
@@ -1236,31 +1316,31 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
                       onEditEntries: () => _showManualEntriesSheet(namesMap),
                       onAtlasPaste: _showAtlasPasteDialog,
                       onNotesEdit: _showNotesDialog,
-                      onClear: _routes.isEmpty ? null : _clearWaveplan,
-                      onPublishToggle:
-                          (_routes.isEmpty || !_atlasConfirmed) && !_isPublished
-                              ? null
-                              : () => _togglePublish(namesMap),
-                      onPdf: _routes.isEmpty
+                      onClear: _hasAnyEntries ? _clearWaveplan : null,
+                      onPublishToggle: !canPublish && !_isPublished
+                          ? null
+                          : () => _togglePublish(namesMap),
+                      onPdf: !_hasAnyEntries
                           ? null
                           : () => _generateWaveplanPdf(namesMap),
-                      onShare: _routes.isEmpty
+                      onShare: !_hasAnyEntries
                           ? null
                           : () => _shareWaveplan(namesMap),
                       isPublished: _isPublished,
                       publishedAt: _publishedAt,
+                      // Counts stay honest: only real routes are counted
+                      // here — Atlas-only entries show in the Atlas chip.
                       routeCount: _routes.length,
                       assignedCount:
                           _routes.where((r) => r.isAssigned).length,
-                      atlasTotal: _atlasByRoute.values
-                          .fold<int>(0, (s, l) => s + l.length),
+                      atlasTotal: _atlasTotal,
                       atlasConfirmed: _atlasConfirmed,
                       notesLength: _generalNotes.trim().length,
                     ),
                   if (!isMobile) const SizedBox(height: AppSpacing.md),
                   // Driver search — filters the route list by assigned
                   // driver (name/TID), mentee or route code.
-                  if (_routes.isNotEmpty) ...[
+                  if (routes.isNotEmpty) ...[
                     SizedBox(
                       // 44px on phones so the field is an easy touch target.
                       height: isMobile ? 44 : 40,
@@ -3323,7 +3403,12 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
     }
 
     // ─── Publish: write all routes ─────────────────────────────────────
-    final payloadRoutes = _routes.map((r) {
+    // Atlas route codes without a normal route ride along as synthetic
+    // entries (same schema, neutral values, `atlasOnly: true`) so an
+    // Atlas-only day does not lose its packages.
+    final atlasOnly = _atlasOnlyRoutes();
+    final payloadRoutes = [..._routes, ...atlasOnly].map((r) {
+      final synthetic = _isAtlasOnlyRoute(r);
       return {
         'routeCode': r.routeCode,
         'routeId': r.routeId,
@@ -3338,6 +3423,7 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
         'menteeTransporterId': r.menteeTransporterId ?? '',
         'menteeName': _resolveName(namesMap, r.menteeTransporterId),
         'atlasTrackingIds': _atlasByRoute[r.routeCode] ?? const <String>[],
+        if (synthetic) 'atlasOnly': true,
       };
     }).toList();
 
@@ -3375,10 +3461,19 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
       _isPublished = true;
       _publishedAt = DateTime.now();
     });
+    // Atlas-only day → say so explicitly (0 routes, N packages) instead
+    // of the generic "drivers can see their wave" message.
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final atlasCount = _atlasTotal;
+    final message = _routes.isEmpty && atlasCount > 0
+        ? (de
+            ? 'Atlas-Plan veröffentlicht — 0 Routen, '
+                '$atlasCount Atlas-Pakete auf ${atlasOnly.length} Routencode(s).'
+            : 'Atlas plan published — 0 routes, '
+                '$atlasCount Atlas packages on ${atlasOnly.length} route code(s).')
+        : t.t('waveplan_snack_published');
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(t.t('waveplan_snack_published')),
-      ),
+      SnackBar(content: Text(message)),
     );
   }
 
@@ -3397,10 +3492,13 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
   /// routes inside a wave by their dispatch slot.
   List<MapEntry<String, List<WaveplanRoute>>> _wavesSorted() {
     final groups = <String, List<WaveplanRoute>>{};
-    for (final r in _routes) {
-      groups.putIfAbsent(r.dispatchTime, () => []).add(r);
+    for (final r in _allRoutes()) {
+      groups.putIfAbsent(_waveKeyOf(r), () => []).add(r);
     }
     int mins(String s) {
+      // Atlas-only bucket always sorts after every real (and unparseable)
+      // wave time.
+      if (s == _kAtlasWaveKey) return 100000;
       final m = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(s.trim());
       if (m == null) return 99999;
       return int.parse(m.group(1)!) * 60 + int.parse(m.group(2)!);
@@ -3427,7 +3525,7 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
   /// (driver, area, lane, shift end) and the Atlas tracking IDs listed
   /// beneath the affected routes.
   Future<void> _generateWaveplanPdf(Map<String, String> namesMap) async {
-    if (_routes.isEmpty) return;
+    if (!_hasAnyEntries) return;
     final programLabel = _programs.firstWhere(
       (p) => p['key'] == _activeProgram,
       orElse: () => _programs[0],
@@ -3435,8 +3533,8 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
     final brandDeep = PdfColor.fromInt(0xFF006047);
     final brandGreen = PdfColor.fromInt(0xFF00B287);
     final zebra = PdfColor.fromInt(0xFFF3F4F6);
-    final atlasTotal =
-        _atlasByRoute.values.fold<int>(0, (s, l) => s + l.length);
+    final atlasTotal = _atlasTotal;
+    final atlasOnlyCount = _atlasOnlyRoutes().length;
 
     pw.Widget cell(String txt, {bool bold = false, double size = 8.5}) =>
         pw.Padding(
@@ -3479,6 +3577,7 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
                 programLabel,
                 _pdfDateLabel(_selectedDate),
                 '${_routes.length} Routes',
+                if (atlasOnlyCount > 0) '$atlasOnlyCount Atlas-only',
                 if (atlasTotal > 0) '$atlasTotal Atlas',
               ].join('  |  '),
               style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
@@ -3511,7 +3610,11 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
                 borderRadius: pw.BorderRadius.circular(3),
               ),
               child: pw.Text(
-                'Wave ${_hhmm(wave.key)}  |  ${routes.length} Routes',
+                wave.key == _kAtlasWaveKey
+                    // Atlas-only bucket: no wave time, no driver — just
+                    // the route codes carrying packages.
+                    ? 'Atlas only  |  ${routes.length} route codes'
+                    : 'Wave ${_hhmm(wave.key)}  |  ${routes.length} Routes',
                 style: pw.TextStyle(
                     fontSize: 10,
                     fontWeight: pw.FontWeight.bold,
@@ -3595,7 +3698,9 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
                       return name.isEmpty ? 'unassigned' : name;
                     }(),
                     r.routeCode,
-                    'Wave ${_hhmm(wave.key)}',
+                    wave.key == _kAtlasWaveKey
+                        ? 'Atlas only'
+                        : 'Wave ${_hhmm(wave.key)}',
                     (_atlasByRoute[r.routeCode] ?? const []).join(', '),
                   ],
           ];
@@ -3665,7 +3770,8 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
   /// Publishes a read-only snapshot under an unguessable public link
   /// (viewable without login) and shows the copy dialog.
   Future<void> _shareWaveplan(Map<String, String> namesMap) async {
-    if (_routes.isEmpty) return;
+    if (!_hasAnyEntries) return;
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final programLabel = _programs.firstWhere(
       (p) => p['key'] == _activeProgram,
       orElse: () => _programs[0],
@@ -3675,7 +3781,13 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
     final sections = <Map<String, dynamic>>[
       for (final wave in _wavesSorted())
         {
-          'title': 'Wave ${_hhmm(wave.key)} · ${wave.value.length} routes',
+          'title': wave.key == _kAtlasWaveKey
+              // Atlas-only bucket — route codes with packages but no
+              // wave/driver of their own.
+              ? (de
+                  ? 'Nur Atlas · ${wave.value.length} Routencodes'
+                  : 'Atlas only · ${wave.value.length} route codes')
+              : 'Wave ${_hhmm(wave.key)} · ${wave.value.length} routes',
           'rows': [
             for (final r in wave.value)
               {
@@ -3688,7 +3800,13 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
                       : (mentee.isEmpty ? name : '$name + $mentee');
                   return '${r.routeCode} · $who';
                 }(),
-                'secondary': [
+                'secondary': _isAtlasOnlyRoute(r)
+                    // No wave time, no lane, no driver — spell it out
+                    // instead of leaving the line blank.
+                    ? (de
+                        ? 'Zeit — · Spur — · nur Atlas-Pakete'
+                        : 'Time — · Lane — · Atlas packages only')
+                    : [
                   // Start–end time so the public viewer shows both, not just
                   // the wave header time.
                   if (r.dispatchTime.trim().isNotEmpty &&
@@ -3699,7 +3817,7 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
                   else if (r.shiftEndTime.trim().isNotEmpty)
                     'until ${_hhmm(r.shiftEndTime)}',
                   if (r.dispatchArea.trim().isNotEmpty) r.dispatchArea,
-                ].join(' · '),
+                      ].join(' · '),
                 // Lane shown as its own green pill in the public viewer.
                 if (r.waitingAreaSpur.trim().isNotEmpty)
                   'pills': <String>[
@@ -3855,7 +3973,9 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
   /// row in the sheet maps to one of the existing dialogs/flows.
   Future<void> _showMobileActionsSheet() async {
     final t = AppLocalizations.of(context);
-    final hasRoutes = _routes.isNotEmpty;
+    // Atlas-only waves count as content too — PDF, share link and clear
+    // stay reachable when the day has nothing but Atlas packages.
+    final hasRoutes = _hasAnyEntries;
 
     await showModalBottomSheet<void>(
       context: context,
@@ -4929,10 +5049,17 @@ class _RouteList extends StatelessWidget {
     int routeIndex = 0;
     for (var i = 0; i < routes.length; i++) {
       final r = routes[i];
-      if (r.dispatchTime != currentWave) {
-        currentWave = r.dispatchTime;
-        waveCount = routes.where((x) => x.dispatchTime == currentWave).length;
-        items.add(_HeaderItem(currentWave!, waveCount));
+      final waveKey = _waveKeyOf(r);
+      if (waveKey != currentWave) {
+        currentWave = waveKey;
+        waveCount = routes.where((x) => _waveKeyOf(x) == currentWave).length;
+        items.add(
+          _HeaderItem(
+            waveKey,
+            waveCount,
+            atlasOnly: waveKey == _kAtlasWaveKey,
+          ),
+        );
         routeIndex = 0;
       }
       items.add(_RouteItem(r, routeIndex.isOdd));
@@ -4951,12 +5078,17 @@ class _RouteList extends StatelessWidget {
               top: i == 0 ? 0 : AppSpacing.lg,
               bottom: AppSpacing.sm,
             ),
-            child: _WaveSectionHeader(wave: it.wave, count: it.count),
+            child: _WaveSectionHeader(
+              wave: it.wave,
+              count: it.count,
+              atlasOnly: it.atlasOnly,
+            ),
           );
         }
         final routeItem = it as _RouteItem;
         return _RouteCard(
           route: routeItem.route,
+          atlasOnly: _isAtlasOnlyRoute(routeItem.route),
           atlasTrackingIds: atlasFor(routeItem.route.routeCode),
           resolveName: resolveName,
           onAssign: (tid) => onAssign(routeItem.route.routeId, tid),
@@ -5300,7 +5432,10 @@ abstract class _ListItem {
 class _HeaderItem extends _ListItem {
   final String wave;
   final int count;
-  const _HeaderItem(this.wave, this.count);
+
+  /// Section holds synthetic Atlas-only entries (no wave time).
+  final bool atlasOnly;
+  const _HeaderItem(this.wave, this.count, {this.atlasOnly = false});
 }
 
 class _RouteItem extends _ListItem {
@@ -5312,33 +5447,43 @@ class _RouteItem extends _ListItem {
 class _WaveSectionHeader extends StatelessWidget {
   final String wave;
   final int count;
-  const _WaveSectionHeader({required this.wave, required this.count});
+  final bool atlasOnly;
+  const _WaveSectionHeader({
+    required this.wave,
+    required this.count,
+    this.atlasOnly = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final de = Localizations.localeOf(context).languageCode == 'de';
     return Row(
       children: [
         Container(
           width: 4,
           height: 18,
           decoration: BoxDecoration(
-            color: AppColors.codriverGreen,
+            color: atlasOnly ? AppColors.warning : AppColors.codriverGreen,
             borderRadius: BorderRadius.circular(2),
           ),
         ),
         const SizedBox(width: AppSpacing.xs),
         Text(
-          'Wave ${_shortClock(wave)}',
+          atlasOnly
+              ? (de ? 'Nur Atlas' : 'Atlas only')
+              : 'Wave ${_shortClock(wave)}',
           style: AppTypography.title3.copyWith(
             fontWeight: FontWeight.w700,
-            color: AppColors.codriverGraphite,
+            color: atlasOnly ? AppColors.warning : AppColors.codriverGraphite,
           ),
         ),
         const SizedBox(width: AppSpacing.xs),
         Flexible(
           child: Text(
-            t.tf('waveplan_wave_routes_count', {'count': '$count'}),
+            atlasOnly
+                ? (de ? '· $count Routencodes' : '· $count route codes')
+                : t.tf('waveplan_wave_routes_count', {'count': '$count'}),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: AppTypography.subheadline.copyWith(
@@ -5357,6 +5502,11 @@ class _WaveSectionHeader extends StatelessWidget {
 /// right. Driver-chip width hugs its content rather than stretching.
 class _RouteCard extends StatelessWidget {
   final WaveplanRoute route;
+
+  /// Synthetic Atlas-only entry: a route code that exists purely because
+  /// Atlas packages were imported for it. Nothing can be dropped on it
+  /// and it has no time/lane — those render as "—".
+  final bool atlasOnly;
   final List<String> atlasTrackingIds;
   final String Function(String? transporterId) resolveName;
   final ValueChanged<String> onAssign;
@@ -5369,6 +5519,7 @@ class _RouteCard extends StatelessWidget {
 
   const _RouteCard({
     required this.route,
+    this.atlasOnly = false,
     required this.atlasTrackingIds,
     required this.resolveName,
     required this.onAssign,
@@ -5394,8 +5545,13 @@ class _RouteCard extends StatelessWidget {
             : AppColors.codriverGreen; // brand green — rechts
 
     return DragTarget<String>(
-      onWillAcceptWithDetails: (d) => d.data != route.transporterId,
-      onAcceptWithDetails: (d) => onAssign(d.data),
+      // Atlas-only rows are not real routes — nothing can be assigned.
+      onWillAcceptWithDetails: (d) =>
+          !atlasOnly && d.data != route.transporterId,
+      onAcceptWithDetails: (d) {
+        if (atlasOnly) return;
+        onAssign(d.data);
+      },
       builder: (context, candidate, _) {
         final hovered = candidate.isNotEmpty;
         return AnimatedContainer(
@@ -5449,7 +5605,9 @@ class _RouteCard extends StatelessWidget {
                                 inWaveTids: inWaveTids,
                                 compact: true,
                               )
-                            : _EmptyDropZone(active: hovered),
+                            : (atlasOnly
+                                ? const _AtlasOnlyDriverSlot()
+                                : _EmptyDropZone(active: hovered)),
                       ),
                     )
                   else
@@ -5473,7 +5631,9 @@ class _RouteCard extends StatelessWidget {
                                 namesMap: namesMap,
                                 inWaveTids: inWaveTids,
                               )
-                            : _EmptyDropZone(active: hovered),
+                            : (atlasOnly
+                                ? const _AtlasOnlyDriverSlot()
+                                : _EmptyDropZone(active: hovered)),
                       ),
                     ),
                   const SizedBox(width: AppSpacing.sm),
@@ -5481,7 +5641,8 @@ class _RouteCard extends StatelessWidget {
                     left: left,
                     color: spurColor,
                     hasSpur: hasSpur,
-                    onTap: onSpurChange,
+                    // Nothing to cycle on an Atlas-only entry.
+                    onTap: atlasOnly ? null : onSpurChange,
                     expandTouchTarget: isCompact,
                   ),
                   const SizedBox(width: AppSpacing.sm),
@@ -5529,7 +5690,9 @@ class _RouteCard extends StatelessWidget {
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
-                                  route.dispatchArea,
+                                  route.dispatchArea.trim().isEmpty
+                                      ? '—'
+                                      : route.dispatchArea,
                                   style:
                                       AppTypography.caption2.copyWith(
                                     color: spurColor,
@@ -5547,6 +5710,15 @@ class _RouteCard extends StatelessWidget {
                         ),
                         Text(
                           () {
+                            final de =
+                                Localizations.localeOf(context).languageCode ==
+                                    'de';
+                            // Atlas-only entry: no wave time, no lane.
+                            if (atlasOnly) {
+                              return de
+                                  ? 'Zeit —  ·  Spur —  ·  nur Atlas-Pakete'
+                                  : 'Time —  ·  Lane —  ·  Atlas packages only';
+                            }
                             // TMGM imports carry no service type / shift
                             // end — build the line only from what exists.
                             final parts = <String>[
@@ -5838,6 +6010,53 @@ class _SpurIndicator extends StatelessWidget {
                 child: indicator,
               )
             : indicator,
+      ),
+    );
+  }
+}
+
+/// Driver slot of a synthetic Atlas-only entry. There is no route to
+/// staff, so instead of an inviting drop zone the row states plainly
+/// that only Atlas packages exist for this route code.
+class _AtlasOnlyDriverSlot extends StatelessWidget {
+  const _AtlasOnlyDriverSlot();
+
+  @override
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    return Container(
+      height: 36,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppColors.warning.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: AppColors.warning.withOpacity(0.30),
+          width: 1,
+        ),
+      ),
+      alignment: Alignment.center,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.inventory_2_rounded,
+            size: 13,
+            color: AppColors.warning,
+          ),
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(
+              de ? 'Nur Atlas · kein Fahrer' : 'Atlas only · no driver',
+              style: AppTypography.caption1.copyWith(
+                color: AppColors.warning,
+                fontWeight: FontWeight.w700,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
       ),
     );
   }
