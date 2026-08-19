@@ -2555,6 +2555,10 @@ class _DriversHubPageState extends State<DriversHubPage> {
         return Localizations.localeOf(context).languageCode == 'de'
             ? 'Datenschutzinformation (Kenntnisnahme)'
             : 'Privacy notice (acknowledgement)';
+      case 'camera_privacy_ack_certificate':
+        return Localizations.localeOf(context).languageCode == 'de'
+            ? 'Kamera-Datenschutz (Kenntnisnahme)'
+            : 'Camera privacy (acknowledgement)';
       default:
         return docType;
     }
@@ -9668,6 +9672,10 @@ class _DriverDocumentsList extends StatelessWidget {
         return Localizations.localeOf(context).languageCode == 'de'
             ? 'Datenschutzinformation (Kenntnisnahme)'
             : 'Privacy notice (acknowledgement)';
+      case 'camera_privacy_ack_certificate':
+        return Localizations.localeOf(context).languageCode == 'de'
+            ? 'Kamera-Datenschutz (Kenntnisnahme)'
+            : 'Camera privacy (acknowledgement)';
       default:
         return docType;
     }

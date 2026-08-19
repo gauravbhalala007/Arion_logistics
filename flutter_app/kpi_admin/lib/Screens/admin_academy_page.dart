@@ -31,7 +31,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../data/academy_catalog.dart';
 import '../data/academy_visibility.dart';
 import '../data/privacy_camera/privacy_camera_content.dart'
-    show kPrivacyCameraTestId;
+    show PrivacyCourseBundle, kPrivacyBindingLanguage, kPrivacyCameraTestId;
+import '../data/privacy_camera/privacy_camera_repository.dart'
+    show PrivacyCameraAdminRepository;
 import '../utils/driver_activity.dart';
 import '../widgets/academy_visibility_toggle.dart';
 import '../widgets/admin_scope.dart';
@@ -141,10 +143,19 @@ class _AcademyData {
   /// Welche Schulungen der Admin für seine Fahrer freigeschaltet hat.
   final AcademyVisibility visibility;
 
+  /// Kamera-Datenschutzmodul. Bewusst NICHT über `kAcademyTrainings`:
+  /// dort steckt die Semantik `passedAt` + Ablaufdatum, dieses Modul
+  /// kennt aber nur „Kenntnisnahme zur aktuellen Fassung". Deshalb eine
+  /// gezielte Auswertung, die in denselben Zähler einfließt.
+  final int cameraDone;
+  final int cameraOpen;
+
   const _AcademyData({
     required this.drivers,
     required this.results,
     required this.visibility,
+    required this.cameraDone,
+    required this.cameraOpen,
   });
 }
 
@@ -343,10 +354,38 @@ class _AdminAcademyPageState extends State<AdminAcademyPage> {
 
     final visibility = await AcademyVisibility.load(uid);
 
+    // Kamera-Datenschutz: bestätigt = gültiger Nachweis zur AKTUELLEN
+    // (deutschen, verbindlichen) Fassung. Alles andere — kein Nachweis,
+    // veraltete Fassung oder eine Verweigerung aus Bestandsdaten — zählt
+    // als offen, aber ohne Alarmfarbe: eine Verweigerung ist kein Fehler.
+    var cameraDone = 0;
+    var cameraOpen = 0;
+    try {
+      final bundle = await PrivacyCourseBundle.load(kPrivacyBindingLanguage);
+      final acks = await PrivacyCameraAdminRepository(dspUid: uid).loadAcks();
+      final doc = bundle.bindingDocument;
+      for (final driver in drivers) {
+        final tid = '${driver['__id'] ?? ''}'.trim();
+        if (tid.isEmpty) continue;
+        final ack = acks[tid.toUpperCase()];
+        if (ack != null && ack.isAcknowledged && ack.matchesDocument(doc)) {
+          cameraDone++;
+        } else {
+          cameraOpen++;
+        }
+      }
+    } catch (_) {
+      // Ohne Inhalte/Daten lieber keine Zahl als eine falsche.
+      cameraDone = 0;
+      cameraOpen = 0;
+    }
+
     return _AcademyData(
       drivers: drivers,
       results: results,
       visibility: visibility,
+      cameraDone: cameraDone,
+      cameraOpen: cameraOpen,
     );
   }
 
@@ -466,6 +505,10 @@ class _AdminAcademyPageState extends State<AdminAcademyPage> {
                   narrow: narrow,
                   activeDrivers: data.drivers.length,
                   stats: stats,
+                  // Kameramodul zählt mit, obwohl es nicht in der
+                  // Registry steht.
+                  extraTrainings: 1,
+                  extraFullyDone: data.cameraOpen == 0 ? 1 : 0,
                 ),
                 const SizedBox(height: 14),
                 for (final s in stats)
@@ -573,16 +616,24 @@ class _OverviewCard extends StatelessWidget {
   final int activeDrivers;
   final List<_TrainingStats> stats;
 
+  /// Schulungen, die nicht aus `kAcademyTrainings` stammen, aber in den
+  /// Zählern erscheinen sollen (derzeit: Kamera-Datenschutz).
+  final int extraTrainings;
+  final int extraFullyDone;
+
   const _OverviewCard({
     required this.de,
     required this.narrow,
     required this.activeDrivers,
     required this.stats,
+    this.extraTrainings = 0,
+    this.extraFullyDone = 0,
   });
 
   @override
   Widget build(BuildContext context) {
-    final fullyDone = stats.where((s) => s.openCount == 0).length;
+    final fullyDone =
+        stats.where((s) => s.openCount == 0).length + extraFullyDone;
     final expired = stats.fold<int>(0, (acc, s) => acc + s.expiredCount);
 
     return _Card(
@@ -600,7 +651,7 @@ class _OverviewCard extends StatelessWidget {
                 narrow: narrow,
               ),
               _StatTile(
-                value: '${stats.length}',
+                value: '${stats.length + extraTrainings}',
                 label: de ? 'Schulungen' : 'trainings',
                 color: _kText,
                 narrow: narrow,

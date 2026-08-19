@@ -282,6 +282,11 @@ class _AdminPrivacyCameraSectionState extends State<AdminPrivacyCameraSection> {
           ),
         ],
         const SizedBox(height: 14),
+        // Zähler im Stil der übrigen Schulungskarten, damit das Modul in
+        // der Academy-Übersicht nicht anders gezählt aussieht als die
+        // Trainings aus der Registry.
+        _counterLine(data),
+        const SizedBox(height: 12),
         Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -409,6 +414,44 @@ class _AdminPrivacyCameraSectionState extends State<AdminPrivacyCameraSection> {
           icon: const Icon(Icons.refresh_rounded, size: 20),
           color: _kMuted,
           tooltip: privacyCameraText(_lang, 'admin_refresh'),
+        ),
+      ],
+    );
+  }
+
+  /// „N von M aktiven Fahrern bestätigt · X offen" plus Fortschrittsbalken.
+  ///
+  /// Bestätigt = gültiger Nachweis zur AKTUELLEN Fassung. Offen = kein
+  /// Nachweis, veraltete Fassung oder eine Verweigerung aus Bestandsdaten
+  /// — bewusst ohne Alarmfarbe, weil eine Verweigerung kein Fehler ist.
+  Widget _counterLine(_SectionData data) {
+    final done = data.count(_AckStatus.acknowledged);
+    final total = data.ackRows.length;
+    final open = total - done;
+    final ratio = total == 0 ? 0.0 : done / total;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            value: ratio,
+            minHeight: 7,
+            backgroundColor: const Color(0xFFEDF0F3),
+            valueColor: const AlwaysStoppedAnimation<Color>(_kAccent),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          widget.de
+              ? '$done von $total aktiven Fahrern bestätigt · $open offen'
+              : '$done of $total active drivers confirmed · $open open',
+          style: const TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w800,
+            color: _kSub,
+          ),
         ),
       ],
     );

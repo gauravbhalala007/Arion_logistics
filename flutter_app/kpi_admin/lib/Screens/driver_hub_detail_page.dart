@@ -16,6 +16,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/employment_period.dart';
 import '../services/incident_reports.dart';
@@ -2074,6 +2075,17 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
               (d.data()['docType'] ?? d.id).toString(): d.data(),
           };
 
+          // Nachweise aus Schulungen (Zertifikate, Kenntnisnahmen).
+          // Sie haben keinen festen Upload-Slot oben, sondern entstehen
+          // in der DA Academy und liegen als Dokument mit `downloadUrl`
+          // beim Fahrer. Ohne diesen Abschnitt wären sie hier unsichtbar.
+          final certTypes =
+              byType.keys
+                  .where((k) => !specs.any((s) => s.type == k))
+                  .where((k) => _str(byType[k]?['downloadUrl']).isNotEmpty)
+                  .toList()
+                ..sort();
+
           return LayoutBuilder(
             builder: (context, constraints) {
               final oneCol = constraints.maxWidth < 520;
@@ -2085,35 +2097,57 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
                     data: byType[s.type],
                   ),
               ];
-              if (oneCol) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    for (var i = 0; i < chips.length; i++) ...[
-                      if (i > 0) const SizedBox(height: 8),
-                      chips[i],
-                    ],
-                  ],
-                );
-              }
-              return Column(
-                children: [
-                  for (var i = 0; i < chips.length; i += 2) ...[
-                    if (i > 0) const SizedBox(height: 8),
-                    IntrinsicHeight(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Expanded(child: chips[i]),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: i + 1 < chips.length
-                                ? chips[i + 1]
-                                : const SizedBox.shrink(),
+              final grid = oneCol
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (var i = 0; i < chips.length; i++) ...[
+                          if (i > 0) const SizedBox(height: 8),
+                          chips[i],
+                        ],
+                      ],
+                    )
+                  : Column(
+                      children: [
+                        for (var i = 0; i < chips.length; i += 2) ...[
+                          if (i > 0) const SizedBox(height: 8),
+                          IntrinsicHeight(
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Expanded(child: chips[i]),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: i + 1 < chips.length
+                                      ? chips[i + 1]
+                                      : const SizedBox.shrink(),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
-                      ),
+                      ],
+                    );
+
+              if (certTypes.isEmpty) return grid;
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  grid,
+                  const SizedBox(height: 14),
+                  Text(
+                    _tr('Nachweise & Zertifikate', 'Certificates & records'),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: _C.text,
                     ),
+                  ),
+                  const SizedBox(height: 8),
+                  for (var i = 0; i < certTypes.length; i++) ...[
+                    if (i > 0) const SizedBox(height: 8),
+                    _certTile(certTypes[i], byType[certTypes[i]]),
                   ],
                 ],
               );
@@ -2122,6 +2156,97 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
         },
       ),
     );
+  }
+
+  /// Bezeichnung eines Schulungsnachweises. Gleiche Beschriftungen wie im
+  /// klassischen Drivers Hub, damit dasselbe Dokument nicht an zwei Orten
+  /// anders heißt.
+  String _certLabel(String docType) {
+    switch (docType) {
+      case 'safety_training_certificate':
+        return _tr('Sicherheitsunterweisung (Zertifikat)',
+            'Safety instruction (certificate)');
+      case 'privacy_training_certificate':
+        return _tr('Datenschutz-Schulung (Zertifikat)',
+            'Privacy training (certificate)');
+      case 'privacy_notice_ack':
+        return _tr('Datenschutzinformation (Kenntnisnahme)',
+            'Privacy notice (acknowledgement)');
+      case 'camera_privacy_ack_certificate':
+        return _tr('Kamera-Datenschutz (Kenntnisnahme)',
+            'Camera privacy (acknowledgement)');
+      default:
+        return docType;
+    }
+  }
+
+  /// Zeile für einen Schulungsnachweis: Klick öffnet das PDF.
+  ///
+  /// Bewusst kein Drive-Toggle wie bei den Upload-Slots — diese Dokumente
+  /// erzeugt die DA Academy selbst, sie werden hier nur eingesehen.
+  Widget _certTile(String docType, Map<String, dynamic>? data) {
+    final url = _str(data?['downloadUrl']);
+    final completedAt = data?['completedAt'];
+    final date = completedAt is Timestamp
+        ? DateFormat('dd.MM.yyyy').format(completedAt.toDate())
+        : '';
+
+    return _HoverTile(
+      onTap: url.isEmpty ? null : () => _openUrl(url),
+      tooltip: _tr('Nachweis öffnen', 'Open record'),
+      decoration: BoxDecoration(
+        color: _C.docBg,
+        border: Border.all(color: _C.docBorder),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      child: Row(
+        children: [
+          const Icon(Icons.picture_as_pdf_outlined, size: 18, color: _C.green),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              _certLabel(docType),
+              maxLines: 2,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: _C.text,
+                height: 1.25,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            date.isEmpty ? _tr('öffnen', 'open') : date,
+            textAlign: TextAlign.right,
+            style: const TextStyle(
+              fontSize: 11,
+              color: _C.text3,
+              height: 1.25,
+            ),
+          ),
+          const SizedBox(width: 6),
+          const Icon(Icons.open_in_new_rounded, size: 15, color: _C.text3),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openUrl(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _tr('Dokument konnte nicht geöffnet werden.',
+                'The document could not be opened.'),
+          ),
+        ),
+      );
+    }
   }
 
   /// Status-Chip „im Company Drive".
