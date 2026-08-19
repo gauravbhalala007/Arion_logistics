@@ -29,6 +29,7 @@ import 'package:intl/intl.dart';
 import '../data/privacy_camera/privacy_camera_content.dart';
 import '../data/privacy_camera/privacy_camera_repository.dart';
 import '../data/privacy_camera/privacy_camera_texts.dart';
+import '../widgets/academy_visibility_toggle.dart';
 
 const Color _kText = Color(0xFF111827);
 const Color _kSub = Color(0xFF4B5563);
@@ -81,6 +82,8 @@ class AdminPrivacyCameraSection extends StatefulWidget {
     required this.drivers,
     required this.de,
     required this.narrow,
+    required this.visible,
+    required this.onVisibilityChanged,
   });
 
   final String dspUid;
@@ -89,6 +92,12 @@ class AdminPrivacyCameraSection extends StatefulWidget {
   final List<Map<String, dynamic>> drivers;
   final bool de;
   final bool narrow;
+
+  /// Admin-Schalter „Für Fahrer sichtbar". Wirkt ZUSÄTZLICH zur
+  /// systemweiten Sperre [kPrivacyCameraDriverEnabled]: Die Kachel
+  /// erscheint nur, wenn beides an ist.
+  final bool visible;
+  final ValueChanged<bool> onVisibilityChanged;
 
   @override
   State<AdminPrivacyCameraSection> createState() =>
@@ -222,6 +231,13 @@ class _AdminPrivacyCameraSectionState extends State<AdminPrivacyCameraSection> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _header(data),
+        AcademyVisibilityToggle(
+          de: widget.de,
+          narrow: widget.narrow,
+          visible: widget.visible,
+          onChanged: widget.onVisibilityChanged,
+          systemLocked: !kPrivacyCameraDriverEnabled,
+        ),
         // Solange das Modul für Fahrer gesperrt ist, sagt die Ansicht das
         // offen — sonst wirkt eine Liste voller „Offen" wie ein Rückstand.
         if (!kPrivacyCameraDriverEnabled) ...[

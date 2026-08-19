@@ -29,7 +29,11 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../data/academy_catalog.dart';
+import '../data/academy_visibility.dart';
+import '../data/privacy_camera/privacy_camera_content.dart'
+    show kPrivacyCameraTestId;
 import '../utils/driver_activity.dart';
+import '../widgets/academy_visibility_toggle.dart';
 import '../widgets/admin_scope.dart';
 import 'admin_privacy_camera_section.dart';
 
@@ -134,7 +138,14 @@ class _AcademyData {
   /// testId -> transporterId (UPPER) -> Ergebnisdokument.
   final Map<String, Map<String, Map<String, dynamic>>> results;
 
-  const _AcademyData({required this.drivers, required this.results});
+  /// Welche Schulungen der Admin für seine Fahrer freigeschaltet hat.
+  final AcademyVisibility visibility;
+
+  const _AcademyData({
+    required this.drivers,
+    required this.results,
+    required this.visibility,
+  });
 }
 
 DateTime? _toDate(Object? value) =>
@@ -330,7 +341,43 @@ class _AdminAcademyPageState extends State<AdminAcademyPage> {
       };
     }
 
-    return _AcademyData(drivers: drivers, results: results);
+    final visibility = await AcademyVisibility.load(uid);
+
+    return _AcademyData(
+      drivers: drivers,
+      results: results,
+      visibility: visibility,
+    );
+  }
+
+  /// Optimistische Overrides, damit der Schalter sofort umspringt und
+  /// nicht erst nach einem Reload.
+  final Map<String, bool> _visOverride = <String, bool>{};
+
+  bool _visibleOf(_AcademyData data, String testId) =>
+      _visOverride[testId] ?? data.visibility.isVisible(testId);
+
+  Future<void> _setVisible(String testId, bool visible) async {
+    final uid = _loadedForUid;
+    if (uid == null) return;
+    setState(() => _visOverride[testId] = visible);
+    try {
+      await AcademyVisibility.setVisible(uid, testId, visible);
+    } catch (e) {
+      if (!mounted) return;
+      // Zurückdrehen — sonst zeigt die UI eine Freischaltung an, die
+      // gar nicht gespeichert wurde.
+      setState(() => _visOverride[testId] = !visible);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _de
+                ? 'Sichtbarkeit konnte nicht gespeichert werden: $e'
+                : 'Visibility could not be saved: $e',
+          ),
+        ),
+      );
+    }
   }
 
   void _reload() {
@@ -430,6 +477,9 @@ class _AdminAcademyPageState extends State<AdminAcademyPage> {
                       languageCode: lang,
                       narrow: narrow,
                       stats: s,
+                      visible: _visibleOf(data, s.training.testId),
+                      onVisibilityChanged: (v) =>
+                          _setVisible(s.training.testId, v),
                     ),
                   ),
                 // Kameras im Fahrzeug – Datenschutz. Eigener Abschnitt
@@ -443,6 +493,9 @@ class _AdminAcademyPageState extends State<AdminAcademyPage> {
                     drivers: data.drivers,
                     de: de,
                     narrow: narrow,
+                    visible: _visibleOf(data, kPrivacyCameraTestId),
+                    onVisibilityChanged: (v) =>
+                        _setVisible(kPrivacyCameraTestId, v),
                   ),
               ],
             );
@@ -748,12 +801,19 @@ class _TrainingCard extends StatefulWidget {
   final bool narrow;
   final _TrainingStats stats;
 
+  /// Für Fahrer sichtbar? Steuert nur die Kachel in der Fahrer-Academy,
+  /// nicht die Schulungslogik selbst.
+  final bool visible;
+  final ValueChanged<bool> onVisibilityChanged;
+
   const _TrainingCard({
     super.key,
     required this.de,
     required this.languageCode,
     required this.narrow,
     required this.stats,
+    required this.visible,
+    required this.onVisibilityChanged,
   });
 
   @override
@@ -850,6 +910,12 @@ class _TrainingCardState extends State<_TrainingCard> {
                 ],
               ),
             ),
+          ),
+          AcademyVisibilityToggle(
+            de: de,
+            narrow: widget.narrow,
+            visible: widget.visible,
+            onChanged: widget.onVisibilityChanged,
           ),
           AnimatedSize(
             duration: const Duration(milliseconds: 180),

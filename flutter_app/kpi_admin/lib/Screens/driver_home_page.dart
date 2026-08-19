@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../data/academy_visibility.dart';
 import '../data/privacy_camera/privacy_camera_content.dart'
     show
         PrivacyCourseBundle,
@@ -269,8 +270,17 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
           .collection('users')
           .doc(dsp)
           .collection('academy_test_results');
+
+      // Vom Admin ausgeblendete Schulungen zählen NICHT als offen —
+      // sonst zeigt die Kachel eine Aufgabe an, die der Fahrer gar
+      // nicht öffnen kann.
+      final visibility = await AcademyVisibility.load(dsp);
+      final visibleIds = _academyStatusTestIds
+          .where(visibility.isVisible)
+          .toList(growable: false);
+
       final snaps = await Future.wait(
-        _academyStatusTestIds.map(
+        visibleIds.map(
           (id) => base.doc(id).collection('drivers').doc(tid).get(),
         ),
       );
@@ -296,7 +306,8 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
       // Solange das Modul für Fahrer nicht freigeschaltet ist, darf es
       // den roten Zähler NICHT hochtreiben — sonst zeigt die Kachel eine
       // offene Aufgabe an, die der Fahrer gar nicht öffnen kann.
-      if (kPrivacyCameraDriverEnabled) {
+      if (kPrivacyCameraDriverEnabled &&
+          visibility.isVisible(kPrivacyCameraTestId)) {
         try {
           final bundle = await PrivacyCourseBundle.load(
             kPrivacyBindingLanguage,

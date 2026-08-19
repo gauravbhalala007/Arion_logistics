@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../data/academy_visibility.dart';
 import '../data/privacy_camera/privacy_camera_content.dart';
 import '../data/privacy_camera/privacy_camera_repository.dart';
 import '../data/privacy_camera/privacy_camera_texts.dart';
@@ -65,6 +66,20 @@ class _DriverAcademyPageState extends State<DriverAcademyPage> {
   /// Assets, daher nach dem ersten Laden im Prozess gecacht.
   PrivacyCourseBundle? _privacyCameraBundle;
 
+  /// Welche Schulungen der Admin freigeschaltet hat. Bis zum Laden gilt
+  /// „alles sichtbar" — eine Kachel darf nie wegen eines Ladefehlers
+  /// verschwinden.
+  AcademyVisibility _visibility = AcademyVisibility.allVisible;
+
+  /// Ausgeblendete Schulungen erscheinen wie die übrigen noch nicht
+  /// freigeschalteten Trainings als gesperrte „Kommt bald"-Kachel.
+  bool _visible(String testId) => _visibility.isVisible(testId);
+
+  /// Das Kameramodul braucht BEIDES: die systemweite Freigabe im Code
+  /// und den Sichtbarkeits-Schalter des Admins.
+  bool get _cameraVisible =>
+      kPrivacyCameraDriverEnabled && _visible(kPrivacyCameraTestId);
+
   @override
   void initState() {
     super.initState();
@@ -100,6 +115,12 @@ class _DriverAcademyPageState extends State<DriverAcademyPage> {
     } catch (_) {
       // Ohne Inhalte keine Statuszeile für das Kameramodul.
     }
+
+    // Sichtbarkeits-Schalter des Admins (users/{dspUid}/settings/
+    // academy_visibility). Fahrer dürfen `settings` lesen — dieselbe
+    // Regel, über die auch `settings/dispatcher_pill` gelesen wird.
+    final visibility = await AcademyVisibility.load(uid);
+    if (mounted) setState(() => _visibility = visibility);
     try {
       final snaps = await Future.wait(
         _statusTestIds.map(
@@ -325,9 +346,17 @@ class _DriverAcademyPageState extends State<DriverAcademyPage> {
                       iconBg: const Color(0xFFE9F7EF),
                       // Green Book: nur `passedAt`, keine Gültigkeitsdauer
                       // im Code hinterlegt → Schulung ohne Ablauf.
-                      status: _testStatus(locale, kGreenBookTestId),
-                      onTap: () => _open(
-                        (_) => DriverGreenBookPage(
+                      disabled: !_visible(kGreenBookTestId),
+                      badge: _visible(kGreenBookTestId)
+                          ? null
+                          : academyText(locale, 'badge_coming_soon'),
+                      status: !_visible(kGreenBookTestId)
+                          ? null
+                          : _testStatus(locale, kGreenBookTestId),
+                      onTap: !_visible(kGreenBookTestId)
+                          ? null
+                          : () => _open(
+                              (_) => DriverGreenBookPage(
                           dspUid: widget.dspUid,
                           driverTransporterId: widget.driverTransporterId,
                           onBack: () => Navigator.of(context).pop(),
@@ -347,9 +376,17 @@ class _DriverAcademyPageState extends State<DriverAcademyPage> {
                       iconBg: const Color(0xFFEAF1FB),
                       // Ride Along: nur `passedAt`, keine Gültigkeitsdauer
                       // im Code hinterlegt → Schulung ohne Ablauf.
-                      status: _testStatus(locale, kRideAlongTestId),
-                      onTap: () => _open(
-                        (_) => DriverRideAlongPage(
+                      disabled: !_visible(kRideAlongTestId),
+                      badge: _visible(kRideAlongTestId)
+                          ? null
+                          : academyText(locale, 'badge_coming_soon'),
+                      status: !_visible(kRideAlongTestId)
+                          ? null
+                          : _testStatus(locale, kRideAlongTestId),
+                      onTap: !_visible(kRideAlongTestId)
+                          ? null
+                          : () => _open(
+                              (_) => DriverRideAlongPage(
                           dspUid: widget.dspUid,
                           driverTransporterId: widget.driverTransporterId,
                           onBack: () => Navigator.of(context).pop(),
@@ -367,13 +404,21 @@ class _DriverAcademyPageState extends State<DriverAcademyPage> {
                       icon: Icons.health_and_safety_rounded,
                       iconColor: const Color(0xFF1D7F5A),
                       iconBg: const Color(0xFFE4F5EC),
-                      status: _testStatus(
-                        locale,
-                        kSafetyTrainingTestId,
-                        validity: kSafetyTrainingValidity,
-                      ),
-                      onTap: () => _open(
-                        (_) => DriverSafetyTrainingPage(
+                      disabled: !_visible(kSafetyTrainingTestId),
+                      badge: _visible(kSafetyTrainingTestId)
+                          ? null
+                          : academyText(locale, 'badge_coming_soon'),
+                      status: !_visible(kSafetyTrainingTestId)
+                          ? null
+                          : _testStatus(
+                              locale,
+                              kSafetyTrainingTestId,
+                              validity: kSafetyTrainingValidity,
+                            ),
+                      onTap: !_visible(kSafetyTrainingTestId)
+                          ? null
+                          : () => _open(
+                              (_) => DriverSafetyTrainingPage(
                           dspUid: widget.dspUid,
                           driverTransporterId: widget.driverTransporterId,
                           onBack: () => Navigator.of(context).pop(),
@@ -391,13 +436,21 @@ class _DriverAcademyPageState extends State<DriverAcademyPage> {
                       icon: Icons.privacy_tip_rounded,
                       iconColor: const Color(0xFF5C4B99),
                       iconBg: const Color(0xFFEFECF9),
-                      status: _testStatus(
-                        locale,
-                        kPrivacyTestId,
-                        validity: kPrivacyValidity,
-                      ),
-                      onTap: () => _open(
-                        (_) => DriverPrivacyTrainingPage(
+                      disabled: !_visible(kPrivacyTestId),
+                      badge: _visible(kPrivacyTestId)
+                          ? null
+                          : academyText(locale, 'badge_coming_soon'),
+                      status: !_visible(kPrivacyTestId)
+                          ? null
+                          : _testStatus(
+                              locale,
+                              kPrivacyTestId,
+                              validity: kPrivacyValidity,
+                            ),
+                      onTap: !_visible(kPrivacyTestId)
+                          ? null
+                          : () => _open(
+                              (_) => DriverPrivacyTrainingPage(
                           dspUid: widget.dspUid,
                           driverTransporterId: widget.driverTransporterId,
                           onBack: () => Navigator.of(context).pop(),
@@ -420,14 +473,14 @@ class _DriverAcademyPageState extends State<DriverAcademyPage> {
                       icon: Icons.photo_camera_outlined,
                       iconColor: const Color(0xFF2A5FB0),
                       iconBg: const Color(0xFFEAF1FB),
-                      disabled: !kPrivacyCameraDriverEnabled,
-                      badge: kPrivacyCameraDriverEnabled
+                      disabled: !_cameraVisible,
+                      badge: _cameraVisible
                           ? null
                           : academyText(locale, 'badge_coming_soon'),
-                      status: kPrivacyCameraDriverEnabled
+                      status: _cameraVisible
                           ? _privacyCameraStatus(locale)
                           : null,
-                      onTap: !kPrivacyCameraDriverEnabled
+                      onTap: !_cameraVisible
                           ? null
                           : () => _open(
                               (ctx) => DriverPrivacyCameraCoursePage(
@@ -452,11 +505,11 @@ class _DriverAcademyPageState extends State<DriverAcademyPage> {
                       icon: Icons.shield_outlined,
                       iconColor: const Color(0xFF3B5A80),
                       iconBg: const Color(0xFFEFF4FA),
-                      disabled: !kPrivacyCameraDriverEnabled,
-                      badge: kPrivacyCameraDriverEnabled
+                      disabled: !_cameraVisible,
+                      badge: _cameraVisible
                           ? null
                           : academyText(locale, 'badge_coming_soon'),
-                      onTap: !kPrivacyCameraDriverEnabled
+                      onTap: !_cameraVisible
                           ? null
                           : () => _open(
                               (ctx) => DriverPrivacyCenterPage(
@@ -478,13 +531,21 @@ class _DriverAcademyPageState extends State<DriverAcademyPage> {
                       icon: Icons.drive_eta_rounded,
                       iconColor: const Color(0xFF1D7F5A),
                       iconBg: const Color(0xFFE4F5EC),
-                      status: _testStatus(
-                        locale,
-                        kDrivingSafetyTrainingId,
-                        validMonths: kDrivingCertificateMonths,
-                      ),
-                      onTap: () => _open(
-                        (_) => DriverDrivingSafetyPage(
+                      disabled: !_visible(kDrivingSafetyTrainingId),
+                      badge: _visible(kDrivingSafetyTrainingId)
+                          ? null
+                          : academyText(locale, 'badge_coming_soon'),
+                      status: !_visible(kDrivingSafetyTrainingId)
+                          ? null
+                          : _testStatus(
+                              locale,
+                              kDrivingSafetyTrainingId,
+                              validMonths: kDrivingCertificateMonths,
+                            ),
+                      onTap: !_visible(kDrivingSafetyTrainingId)
+                          ? null
+                          : () => _open(
+                              (_) => DriverDrivingSafetyPage(
                           dspUid: widget.dspUid,
                           driverTransporterId: widget.driverTransporterId,
                           onBack: () => Navigator.of(context).pop(),
@@ -502,9 +563,17 @@ class _DriverAcademyPageState extends State<DriverAcademyPage> {
                       icon: Icons.menu_book_outlined,
                       iconColor: const Color(0xFF3B5A80),
                       iconBg: const Color(0xFFEFF4FA),
-                      status: _opsStatus(locale),
-                      onTap: () => _open(
-                        (_) => DriverOperatingInstructionsPage(
+                      disabled: !_visible(kOperatingInstructionsTestId),
+                      badge: _visible(kOperatingInstructionsTestId)
+                          ? null
+                          : academyText(locale, 'badge_coming_soon'),
+                      status: !_visible(kOperatingInstructionsTestId)
+                          ? null
+                          : _opsStatus(locale),
+                      onTap: !_visible(kOperatingInstructionsTestId)
+                          ? null
+                          : () => _open(
+                              (_) => DriverOperatingInstructionsPage(
                           dspUid: widget.dspUid,
                           driverTransporterId: widget.driverTransporterId,
                           onBack: () => Navigator.of(context).pop(),
