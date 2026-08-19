@@ -83,7 +83,6 @@ const List<String> kFleetLeasingProviders = <String>[
   'Arval',
   'Sixt',
   'ALD',
-  'Ownfleet',
   'Self-Owned',
 ];
 
