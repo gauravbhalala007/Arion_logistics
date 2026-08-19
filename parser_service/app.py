@@ -985,6 +985,13 @@ def extract_summary(pdf: pdfplumber.PDF) -> Dict[str, Any]:
     if res.get("reliabilityNextDay") is not None:
         res["reliabilityScore"] = res["reliabilityNextDay"]
 
+    # Neues Scorecard-Layout (seit ~KW29/2026): nur noch EINE Zeile
+    # "Capacity Reliability 100.00%|Fantastic" ohne Next/Same-Day-Präfix.
+    # Fallback nur, wenn die alten Muster nichts geliefert haben.
+    if res.get("reliabilityScore") is None:
+        if m := grab(r"Capacity\s+Reliability\s+([\d.,]+)\s*%"):
+            res["reliabilityScore"] = to_num(m.group(1))
+
     if m := grab(r"(?:Rank\s+(?:in\s+Station|at\s+[A-Z0-9\-]+))\D*(\d+)\D*(?:of|/|von)\D*(\d+)", re.IGNORECASE):
         res["rankAtStation"] = int(m.group(1))
         res["stationCount"] = int(m.group(2))
