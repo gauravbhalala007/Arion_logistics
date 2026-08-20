@@ -13,6 +13,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../data/privacy_notice/privacy_notice_content.dart';
 import '../data/privacy_notice/privacy_notice_texts.dart';
 import '../localization/app_localizations.dart';
+import '../services/vacation_pools_repository.dart';
+import '../utils/vacation_pools.dart';
+import '../widgets/vacation_pool_lines.dart';
 import '../widgets/web_preview.dart'
     if (dart.library.html) '../widgets/web_preview_web.dart';
 import 'driver_privacy_notice_page.dart';
@@ -37,6 +40,22 @@ class DriverProfilePage extends StatefulWidget {
 
 class _DriverProfilePageState extends State<DriverProfilePage> {
   bool _weeklyScoreSummaryExpanded = false;
+
+  // ── Urlaubs-Töpfe des DSP ───────────────────────────────────────────
+  // Ohne Konfigurationsdokument bleibt es beim Ein-Topf-Bestandsverhalten.
+  VacationPoolsConfig _poolsConfig = VacationPoolsConfig.disabled;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPools();
+  }
+
+  Future<void> _loadPools() async {
+    final config = await VacationPoolsRepository.load(widget.dspUid);
+    if (!mounted) return;
+    setState(() => _poolsConfig = config);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -740,43 +759,65 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
     );
   }
 
+  /// Resturlaub im Fahrer-Profil.
+  ///
+  /// Nutzt seit dem Ticket „getrennte Verfallsdaten" dieselbe Formel wie
+  /// der Admin (`utils/vacation_pools.dart`). Vorher rechnete diese
+  /// Seite eigenständig und ignorierte insbesondere den manuellen
+  /// Resturlaubs-Override — Fahrer und Admin sahen unterschiedliche
+  /// Zahlen. Bei aktivierten Töpfen folgt unter der Gesamtzahl je Topf
+  /// eine Zeile mit Resttagen und Verfallsdatum.
   Widget _buildRemainingVacationDaysRow({
     required DocumentReference<Map<String, dynamic>> driverRef,
     required Map<String, dynamic> onboarding,
   }) {
     final t = AppLocalizations.of(context);
+    final config = _poolsConfig.forDriver(onboarding);
     final annualVacationDays =
         _driverProfileAnnualVacationDaysFromOnboarding(onboarding);
-    final workStartDate =
-        _driverProfileDateFromDynamic(onboarding['workStartDate']);
+    final workStartDate = parseVacationDate(onboarding['workStartDate']);
 
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: driverRef.collection('absence_requests').snapshots(),
       builder: (context, snap) {
         String value = '...';
+        VacationBalance? balance;
 
         if (snap.hasError) {
           value = '—';
         } else if (snap.connectionState != ConnectionState.waiting) {
-          final approvedVacationDays =
-              _driverProfileApprovedVacationDaysFromRequests(
-            snap.data?.docs ??
-                const <QueryDocumentSnapshot<Map<String, dynamic>>>[],
+          final absences = <VacationAbsence>[
+            for (final doc in snap.data?.docs ??
+                const <QueryDocumentSnapshot<Map<String, dynamic>>>[])
+              if (VacationAbsence.fromMap(doc.data()) case final a?) a,
+          ];
+          balance = computeVacationBalance(
+            absences: absences,
+            config: config,
+            annualVacationDays: annualVacationDays,
+            workStartDate: workStartDate,
+            manualOverride: vacationOverrideOf(onboarding),
+            manualOverrideAt: vacationOverrideAtOf(onboarding),
           );
-          final now = DateTime.now();
-          final accruedDays = workStartDate == null
-              ? annualVacationDays
-              : (annualVacationDays / 12.0) *
-                    _driverProfileCompletedMonthsSince(workStartDate, now);
-          final remainingDays = accruedDays - approvedVacationDays;
-          value = _driverProfileFormatVacationDays(
-            remainingDays < 0 ? 0 : remainingDays,
-          );
+          value = _driverProfileFormatVacationDays(balance.totalRemaining);
         }
 
-        return _driverProfileDetailRow(
+        final row = _driverProfileDetailRow(
           t.t('drivers_hub_field_remaining_vacation_days'),
           value,
+        );
+        if (balance == null || !balance.pooled) return row;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            row,
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: VacationPoolLines(balance: balance),
+            ),
+          ],
         );
       },
     );
@@ -1792,49 +1833,9 @@ DateTime? _driverProfileDateFromDynamic(dynamic raw) {
   return _driverProfileParseIsoDate(raw?.toString());
 }
 
-/// Verbrauchte Tage des **bezahlten** Urlaubskontingents.
-///
-/// Ticket KJV4n2S: Unbezahlter Urlaub (`paid == false`) belastet das
-/// bezahlte Kontingent nicht. Fehlt das Feld (Bestandsdaten), gilt der
-/// Antrag als bezahlt und zählt weiter mit.
-double _driverProfileApprovedVacationDaysFromRequests(
-  List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
-) {
-  var total = 0.0;
-  for (final doc in docs) {
-    final data = doc.data();
-    final type = (data['type'] ?? '').toString().trim().toLowerCase();
-    final status = (data['status'] ?? '').toString().trim().toLowerCase();
-    if (type != 'vacation' || status != 'approved') continue;
-    final paid = data['paid'] is bool ? data['paid'] as bool : true;
-    if (!paid) continue;
-
-    total += _driverProfileInclusiveDays(
-      _driverProfileDateFromDynamic(data['fromDate']),
-      _driverProfileDateFromDynamic(data['toDate']),
-    );
-  }
-  return total;
-}
-
-int _driverProfileInclusiveDays(DateTime? from, DateTime? to) {
-  if (from == null || to == null) return 0;
-  final start = DateTime(from.year, from.month, from.day);
-  final end = DateTime(to.year, to.month, to.day);
-  if (end.isBefore(start)) return 0;
-  return end.difference(start).inDays + 1;
-}
-
-int _driverProfileCompletedMonthsSince(DateTime start, DateTime now) {
-  final safeStart = DateTime(start.year, start.month, start.day);
-  final safeNow = DateTime(now.year, now.month, now.day);
-  var months =
-      (safeNow.year - safeStart.year) * 12 + (safeNow.month - safeStart.month);
-  if (safeNow.day < safeStart.day) {
-    months -= 1;
-  }
-  return months < 0 ? 0 : months;
-}
+// `_driverProfileApprovedVacationDaysFromRequests` und
+// `_driverProfileCompletedMonthsSince` leben jetzt in
+// `utils/vacation_pools.dart` (eine Formel fuer Admin + Fahrer).
 
 String _driverProfileFormatVacationDays(double value) {
   if (value % 1 == 0) return value.toInt().toString();

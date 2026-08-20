@@ -26,6 +26,9 @@ import 'driver_hub_detail_page.dart';
 import 'driver_residence_permit_form_page.dart';
 import '../services/driver_csv.dart';
 import '../services/driver_export_service.dart';
+import '../services/vacation_pools_repository.dart';
+import '../utils/vacation_pools.dart';
+import '../widgets/vacation_pool_lines.dart';
 import '../widgets/app_side_menu.dart';
 import '../widgets/admin_scope.dart';
 import '../widgets/driver_reviews_card.dart';
@@ -272,9 +275,26 @@ class _DriversHubPageState extends State<DriversHubPage> {
     }
   }
 
+  // ── Urlaubs-Töpfe (DSP-weit) ────────────────────────────────────────
+  // Einmal je Seitenaufruf geladen; ohne Konfigurationsdokument bleibt
+  // es bei [VacationPoolsConfig.disabled] = bisheriges Ein-Topf-Verhalten.
+  VacationPoolsConfig _vacationPoolsConfig = VacationPoolsConfig.disabled;
+  bool _vacationPoolsRequested = false;
+
+  Future<void> _loadVacationPoolsOnce() async {
+    if (_vacationPoolsRequested) return;
+    final uid = _uid;
+    if (uid == null) return;
+    _vacationPoolsRequested = true;
+    final config = await VacationPoolsRepository.load(uid);
+    if (!mounted) return;
+    setState(() => _vacationPoolsConfig = config);
+  }
+
   @override
   Widget build(BuildContext context) {
     _loadDefaultDriverPasswordOnce();
+    unawaited(_loadVacationPoolsOnce());
     // Detailseite eingebettet rendern, damit das Shell-Menü links
     // sichtbar bleibt; Zurück-Pfeil der Detailseite räumt den State.
     final detailDoc = _detailDriverDoc;
@@ -955,62 +975,76 @@ class _DriversHubPageState extends State<DriversHubPage> {
     );
   }
 
+  /// Resturlaub-Zeile.
+  ///
+  /// Rechnet nicht mehr selbst, sondern über [computeVacationBalance] —
+  /// dieselbe Quelle, aus der auch die Detailseite, die „DA Balance" und
+  /// die Fahrer-App ihre Zahl ziehen. Damit kann Admin/Fahrer nicht mehr
+  /// auseinanderlaufen.
   Widget _remainingVacationDaysRow({
     required DocumentReference<Map<String, dynamic>> driverRef,
     required Map<String, dynamic> onboarding,
   }) {
     final t = AppLocalizations.of(context);
     final label = t.t('drivers_hub_field_remaining_vacation_days');
-    final annualVacationDays = _annualVacationDaysFromOnboarding(onboarding);
-    final workStartDate = _dateFromDynamic(onboarding['workStartDate']);
+    final config = _vacationPoolsConfig.forDriver(onboarding);
 
-    // Manual admin override (feedback ticket). When present it wins over the
-    // auto-calculated value and is flagged as edited — admin-only view.
-    final overrideRaw = onboarding['remainingVacationDaysOverride'];
-    double? override;
-    if (overrideRaw is num) {
-      override = overrideRaw.toDouble();
-    } else if (overrideRaw is String && overrideRaw.trim().isNotEmpty) {
-      override = double.tryParse(overrideRaw.trim().replaceAll(',', '.'));
-    }
-    final editedAt = _dateFromDynamic(onboarding['remainingVacationDaysOverrideAt']);
+    // Manueller Admin-Override. Er ist KEIN eingefrorener Endwert mehr,
+    // sondern eine Momentaufnahme zum Zeitpunkt
+    // `remainingVacationDaysOverrideAt` — später erfasster Urlaub wird
+    // davon abgezogen (siehe `utils/vacation_pools.dart`).
+    final override = vacationOverrideOf(onboarding);
+    final editedAt = vacationOverrideAtOf(onboarding);
 
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: driverRef.collection('absence_requests').snapshots(),
       builder: (context, snap) {
-        double? computed;
+        VacationBalance? balance;
+        VacationBalance? withoutOverride;
         if (!snap.hasError &&
             snap.connectionState != ConnectionState.waiting) {
-          final approvedVacationDays = _approvedVacationDaysFromRequests(
-            snap.data?.docs ??
-                const <QueryDocumentSnapshot<Map<String, dynamic>>>[],
+          final absences = <VacationAbsence>[
+            for (final doc in snap.data?.docs ??
+                const <QueryDocumentSnapshot<Map<String, dynamic>>>[])
+              if (VacationAbsence.fromMap(doc.data()) case final a?) a,
+          ];
+          final annual = annualVacationDaysOf(onboarding);
+          final workStartDate =
+              parseVacationDate(onboarding['workStartDate']);
+          balance = computeVacationBalance(
+            absences: absences,
+            config: config,
+            annualVacationDays: annual,
+            workStartDate: workStartDate,
+            manualOverride: override,
+            manualOverrideAt: editedAt,
           );
-          final now = DateTime.now();
-          final accruedDays = workStartDate == null
-              ? annualVacationDays
-              : (annualVacationDays / 12.0) *
-                    _completedMonthsSince(workStartDate, now);
-          final remainingDays = accruedDays - approvedVacationDays;
-          computed = remainingDays < 0 ? 0 : remainingDays;
+          withoutOverride = computeVacationBalance(
+            absences: absences,
+            config: config,
+            annualVacationDays: annual,
+            workStartDate: workStartDate,
+          );
         }
 
-        final showValue = override ?? computed;
-        final valueText = showValue == null
+        final valueText = balance == null
             ? (snap.hasError ? '—' : '...')
-            : _formatVacationDays(showValue);
+            : _formatVacationDays(balance.totalRemaining);
 
         return _remainingVacationRowUI(
           label: label,
           value: valueText,
           edited: override != null,
           editedAt: editedAt,
-          computedText:
-              computed == null ? null : _formatVacationDays(computed),
+          computedText: withoutOverride == null
+              ? null
+              : _formatVacationDays(withoutOverride.totalRemaining),
+          balance: balance,
           onEdit: () => _editRemainingVacationOverride(
             driverRef: driverRef,
             label: label,
             currentOverride: override,
-            computed: computed,
+            computed: withoutOverride?.totalRemaining,
           ),
         );
       },
@@ -1027,25 +1061,37 @@ class _DriversHubPageState extends State<DriversHubPage> {
     required DateTime? editedAt,
     required String? computedText,
     required VoidCallback onEdit,
+    VacationBalance? balance,
   }) {
     final de = Localizations.localeOf(context).languageCode == 'de';
     final hasText = value.trim().isNotEmpty && value != '—';
+    final usedSince = balance?.usedSinceOverride ?? 0;
 
     String editedTooltip() {
       final parts = <String>[
-        de ? 'Manuell bearbeitet' : 'Manually edited',
-        if (computedText != null)
-          de ? 'Berechnet: $computedText' : 'Calculated: $computedText',
+        de ? 'Manuell gesetzt' : 'Manually set',
+        if (balance?.overrideValue != null)
+          de
+              ? 'Startwert: ${_formatVacationDays(balance!.overrideValue!)} Tage'
+              : 'Baseline: ${_formatVacationDays(balance!.overrideValue!)} days',
         if (editedAt != null)
           '${editedAt.day.toString().padLeft(2, '0')}.'
               '${editedAt.month.toString().padLeft(2, '0')}.${editedAt.year}',
+        // Wichtig fürs Verständnis: seither erfasster Urlaub wird vom
+        // Startwert abgezogen (früher blieb die Zahl einfach stehen).
+        if (usedSince > 0)
+          de
+              ? 'seither ${_formatVacationDays(usedSince)} Tage Urlaub abgezogen'
+              : '${_formatVacationDays(usedSince)} days deducted since',
+        if (computedText != null)
+          de ? 'Ohne Anpassung: $computedText' : 'Without override: $computedText',
       ];
       return parts.join(' · ');
     }
 
     return _DetailRow(
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
             width: 160,
@@ -1059,63 +1105,72 @@ class _DriversHubPageState extends State<DriversHubPage> {
             ),
           ),
           Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                SelectableText(
-                  hasText ? value : '—',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: hasText
-                        ? const Color(0xFF111827)
-                        : const Color(0xFFCBD5E1),
-                  ),
-                ),
-                if (edited) ...[
-                  const SizedBox(width: 8),
-                  Tooltip(
-                    message: editedTooltip(),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFF7ED),
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(color: const Color(0xFFFDBA74)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.edit_note_rounded,
-                              size: 13, color: Color(0xFFC2410C)),
-                          const SizedBox(width: 3),
-                          Text(
-                            de ? 'bearbeitet' : 'edited',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFFC2410C),
-                            ),
-                          ),
-                        ],
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    SelectableText(
+                      hasText ? value : '—',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: hasText
+                            ? const Color(0xFF111827)
+                            : const Color(0xFFCBD5E1),
                       ),
                     ),
-                  ),
-                ],
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.edit_outlined, size: 16),
-                  padding: EdgeInsets.zero,
-                  constraints:
-                      const BoxConstraints.tightFor(width: 28, height: 28),
-                  visualDensity: VisualDensity.compact,
-                  splashRadius: 16,
-                  color: const Color(0xFF6B7280),
-                  tooltip: AppLocalizations.of(context)
-                      .tf('drivers_hub_edit_label', {'label': label}),
-                  onPressed: onEdit,
+                    if (edited) ...[
+                      const SizedBox(width: 8),
+                      Tooltip(
+                        message: editedTooltip(),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF7ED),
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(color: const Color(0xFFFDBA74)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.edit_note_rounded,
+                                  size: 13, color: Color(0xFFC2410C)),
+                              const SizedBox(width: 3),
+                              Text(
+                                de ? 'bearbeitet' : 'edited',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFFC2410C),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined, size: 16),
+                      padding: EdgeInsets.zero,
+                      constraints:
+                          const BoxConstraints.tightFor(width: 28, height: 28),
+                      visualDensity: VisualDensity.compact,
+                      splashRadius: 16,
+                      color: const Color(0xFF6B7280),
+                      tooltip: AppLocalizations.of(context)
+                          .tf('drivers_hub_edit_label', {'label': label}),
+                      onPressed: onEdit,
+                    ),
+                  ],
                 ),
+                // Getrennte Töpfe mit eigenem Verfallsdatum — nur wenn
+                // der DSP sie eingeschaltet hat.
+                if (balance != null) VacationPoolLines(balance: balance),
               ],
             ),
           ),
@@ -1165,12 +1220,20 @@ class _DriversHubPageState extends State<DriversHubPage> {
               computed != null
                   ? (de
                       ? 'Automatisch berechnet: ${_formatVacationDays(computed)} Tage. '
+                          'Der eingetragene Wert gilt als Stand von HEUTE — '
+                          'jeder danach erfasste Urlaub wird davon abgezogen. '
                           'Leeren + Speichern setzt auf den berechneten Wert zurück.'
                       : 'Auto-calculated: ${_formatVacationDays(computed)} days. '
+                          'The value you enter is the balance as of TODAY — '
+                          'any leave booked afterwards is deducted from it. '
                           'Clear + Save reverts to the calculated value.')
                   : (de
-                      ? 'Leeren + Speichern entfernt die manuelle Anpassung.'
-                      : 'Clear + Save removes the manual override.'),
+                      ? 'Der eingetragene Wert gilt als Stand von HEUTE — jeder '
+                          'danach erfasste Urlaub wird davon abgezogen. '
+                          'Leeren + Speichern entfernt die manuelle Anpassung.'
+                      : 'The value you enter is the balance as of TODAY — any '
+                          'leave booked afterwards is deducted from it. '
+                          'Clear + Save removes the manual override.'),
               style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
             ),
           ],
@@ -1240,68 +1303,11 @@ class _DriversHubPageState extends State<DriversHubPage> {
     }
   }
 
-  double _annualVacationDaysFromOnboarding(Map<String, dynamic> onboarding) {
-    final raw = onboarding['annualVacationDays'];
-    if (raw is num && raw > 0) return raw.toDouble();
-    if (raw is String) {
-      final parsed = num.tryParse(raw.trim().replaceAll(',', '.'));
-      if (parsed != null && parsed > 0) return parsed.toDouble();
-    }
-    return 20;
-  }
-
-  DateTime? _dateFromDynamic(dynamic raw) {
-    if (raw is Timestamp) return raw.toDate();
-    if (raw is DateTime) return raw;
-    return _parseIsoDate(raw?.toString());
-  }
-
-  /// Verbrauchte Tage des **bezahlten** Urlaubskontingents.
-  ///
-  /// Ticket KJV4n2S: Unbezahlter Urlaub (`paid == false`) darf das
-  /// bezahlte Kontingent NICHT belasten — er wird nur angezeigt, nicht
-  /// verrechnet. Fehlt das Feld (alle Bestandsdaten), gilt der Antrag
-  /// wie bisher als bezahlt und zählt weiter mit (gleiche Konvention
-  /// wie `computeMonthlyAccount` serverseitig: `paid !== false`).
-  double _approvedVacationDaysFromRequests(
-    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
-  ) {
-    var total = 0.0;
-    for (final doc in docs) {
-      final data = doc.data();
-      final type = (data['type'] ?? '').toString().trim().toLowerCase();
-      final status = (data['status'] ?? '').toString().trim().toLowerCase();
-      if (type != 'vacation' || status != 'approved') continue;
-      final paid = data['paid'] is bool ? data['paid'] as bool : true;
-      if (!paid) continue;
-
-      total += _inclusiveDays(
-        _dateFromDynamic(data['fromDate']),
-        _dateFromDynamic(data['toDate']),
-      );
-    }
-    return total;
-  }
-
-  static int _inclusiveDays(DateTime? from, DateTime? to) {
-    if (from == null || to == null) return 0;
-    final start = DateTime(from.year, from.month, from.day);
-    final end = DateTime(to.year, to.month, to.day);
-    if (end.isBefore(start)) return 0;
-    return end.difference(start).inDays + 1;
-  }
-
-  static int _completedMonthsSince(DateTime start, DateTime now) {
-    final safeStart = DateTime(start.year, start.month, start.day);
-    final safeNow = DateTime(now.year, now.month, now.day);
-    var months =
-        (safeNow.year - safeStart.year) * 12 +
-        (safeNow.month - safeStart.month);
-    if (safeNow.day < safeStart.day) {
-      months -= 1;
-    }
-    return months < 0 ? 0 : months;
-  }
+  // Bestandshelfer `_annualVacationDaysFromOnboarding`,
+  // `_approvedVacationDaysFromRequests`, `_inclusiveDays` und
+  // `_completedMonthsSince` sind nach `utils/vacation_pools.dart`
+  // gewandert — dort liegt jetzt die EINE Urlaubs-Formel fuer Admin und
+  // Fahrer-App.
 
   String _formatVacationDays(double value) {
     if (value % 1 == 0) return value.toInt().toString();
@@ -1338,6 +1344,15 @@ class _DriversHubPageState extends State<DriversHubPage> {
           ),
         ),
         const SizedBox(width: 12),
+        IconButton(
+          onPressed: _openVacationPoolsSettings,
+          icon: const Icon(Icons.beach_access_outlined, size: 20),
+          color: const Color(0xFF6B7280),
+          tooltip: Localizations.localeOf(context).languageCode == 'de'
+              ? 'Urlaubstöpfe (Verfallsdaten)'
+              : 'Leave pools (expiry dates)',
+        ),
+        const SizedBox(width: 4),
         _NewActionButton(
           busyCsv: _busyCsv,
           busyList: _busyList,
@@ -1352,6 +1367,231 @@ class _DriversHubPageState extends State<DriversHubPage> {
         ),
       ],
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // DSP-weite Urlaubs-Töpfe
+  // ---------------------------------------------------------------------------
+
+  /// Konfiguriert die Urlaubs-Töpfe für den ganzen DSP:
+  /// Tageszahl + Verfallsdatum je Topf, plus An/Aus-Schalter.
+  ///
+  /// Ausgeschaltet (= kein Dokument) verhält sich die App exakt wie
+  /// vorher: EIN Topf „Urlaub pro Jahr" ohne Verfallsdatum.
+  Future<void> _openVacationPoolsSettings() async {
+    final uid = _uid;
+    if (uid == null) return;
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final t = AppLocalizations.of(context);
+
+    final current = await VacationPoolsRepository.load(uid);
+    if (!mounted) return;
+
+    final base = current.enabled ? current : VacationPoolsConfig.defaults;
+    var enabled = current.enabled;
+    final ctrls = <String, TextEditingController>{};
+    final expiry = <String, DateTime>{};
+    final offsets = <String, int>{};
+    for (final pool in base.pools) {
+      ctrls[pool.key] =
+          TextEditingController(text: formatVacationDays(pool.days));
+      // Jahr ist Platzhalter — gespeichert werden nur Monat/Tag/Offset.
+      expiry[pool.key] = DateTime(2000, pool.expiryMonth, pool.expiryDay);
+      offsets[pool.key] = pool.expiryYearOffset;
+    }
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text(de ? 'Urlaubstöpfe' : 'Leave pools'),
+          content: SizedBox(
+            width: 520,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    de
+                        ? 'Getrennte Urlaubskontingente mit eigenem Verfallsdatum. '
+                            'Genommene Tage werden zuerst vom Topf abgezogen, der '
+                            'zuerst verfällt. Ausgeschaltet bleibt es beim '
+                            'bisherigen einzelnen Kontingent „Urlaub pro Jahr".'
+                        : 'Separate leave quotas, each with its own expiry date. '
+                            'Days taken are deducted from the pool that expires '
+                            'first. When switched off, the existing single '
+                            '"Annual leave" quota stays in place.',
+                    style: const TextStyle(
+                        fontSize: 12.5, color: Color(0xFF6B7280)),
+                  ),
+                  const SizedBox(height: 12),
+                  SwitchListTile.adaptive(
+                    contentPadding: EdgeInsets.zero,
+                    value: enabled,
+                    onChanged: (v) => setLocal(() => enabled = v),
+                    title: Text(
+                      de ? 'Getrennte Töpfe verwenden' : 'Use separate pools',
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  const Divider(height: 20),
+                  for (final pool in base.pools) ...[
+                    Text(
+                      vacationPoolLabel(ctx, pool.key),
+                      style: const TextStyle(
+                          fontSize: 13.5, fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        SizedBox(
+                          width: 110,
+                          child: TextField(
+                            controller: ctrls[pool.key],
+                            enabled: enabled,
+                            keyboardType: const TextInputType
+                                .numberWithOptions(decimal: true),
+                            decoration: InputDecoration(
+                              labelText: de ? 'Tage' : 'Days',
+                              isDense: true,
+                              border: const OutlineInputBorder(),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: !enabled
+                                ? null
+                                : () async {
+                                    final picked = await showDatePicker(
+                                      context: ctx,
+                                      initialDate: DateTime(
+                                        2000,
+                                        expiry[pool.key]!.month,
+                                        expiry[pool.key]!.day,
+                                      ),
+                                      firstDate: DateTime(2000, 1, 1),
+                                      lastDate: DateTime(2000, 12, 31),
+                                      helpText: de
+                                          ? 'Verfallstag (Tag & Monat)'
+                                          : 'Expiry (day & month)',
+                                    );
+                                    if (picked == null) return;
+                                    setLocal(() => expiry[pool.key] = picked);
+                                  },
+                            icon: const Icon(Icons.event_outlined, size: 16),
+                            label: Text(
+                              '${expiry[pool.key]!.day.toString().padLeft(2, '0')}.'
+                              '${expiry[pool.key]!.month.toString().padLeft(2, '0')}.',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: RadioListTile<int>(
+                            contentPadding: EdgeInsets.zero,
+                            dense: true,
+                            value: 0,
+                            groupValue: offsets[pool.key],
+                            onChanged: !enabled
+                                ? null
+                                : (v) => setLocal(() => offsets[pool.key] = 0),
+                            title: Text(
+                              de ? 'gleiches Jahr' : 'same year',
+                              style: const TextStyle(fontSize: 12.5),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: RadioListTile<int>(
+                            contentPadding: EdgeInsets.zero,
+                            dense: true,
+                            value: 1,
+                            groupValue: offsets[pool.key],
+                            onChanged: !enabled
+                                ? null
+                                : (v) => setLocal(() => offsets[pool.key] = 1),
+                            title: Text(
+                              de ? 'Folgejahr' : 'following year',
+                              style: const TextStyle(fontSize: 12.5),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  Text(
+                    de
+                        ? 'Hinweis: Gesetzlicher Urlaub verfällt nur, wenn die '
+                            'Beschäftigten rechtzeitig an den Resturlaub erinnert '
+                            'wurden. Die App zeigt das Datum nur an — sie '
+                            'verschickt keine Erinnerung.'
+                        : 'Note: statutory leave only expires if employees were '
+                            'reminded in time. The app only displays the date — '
+                            'it does not send reminders.',
+                    style: const TextStyle(
+                        fontSize: 11.5, color: Color(0xFF9CA3AF)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(t.t('admin_home_cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(t.t('button_save')),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    final next = VacationPoolsConfig(
+      enabled: enabled,
+      pools: base.pools
+          .map((pool) => VacationPoolDef(
+                key: pool.key,
+                days: double.tryParse(
+                        ctrls[pool.key]!.text.trim().replaceAll(',', '.')) ??
+                    pool.days,
+                expiryMonth: expiry[pool.key]!.month,
+                expiryDay: expiry[pool.key]!.day,
+                expiryYearOffset: offsets[pool.key]!,
+              ))
+          .toList(growable: false),
+    );
+    for (final ctrl in ctrls.values) {
+      ctrl.dispose();
+    }
+    if (saved != true) return;
+
+    try {
+      await VacationPoolsRepository.save(uid, next);
+      if (!mounted) return;
+      setState(() => _vacationPoolsConfig = next);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(de ? 'Gespeichert.' : 'Saved.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(de ? 'Speichern fehlgeschlagen: $e' : 'Save failed: $e'),
+        ),
+      );
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -5291,17 +5531,40 @@ class _DriversHubPageState extends State<DriversHubPage> {
                                         fieldKey: 'workStartDate',
                                         isDate: true,
                                       ),
-                                      _detailRowEditable(
-                                        driverRef: driverRef,
-                                        label: t.t(
-                                          'drivers_hub_field_annual_vacation_days',
+                                      // Ein-Topf-Modus: „Urlaub pro Jahr"
+                                      // wie bisher. Im Topf-Modus wird
+                                      // stattdessen je Topf eine eigene
+                                      // Tageszahl gepflegt.
+                                      if (!_vacationPoolsConfig.enabled)
+                                        _detailRowEditable(
+                                          driverRef: driverRef,
+                                          label: t.t(
+                                            'drivers_hub_field_annual_vacation_days',
+                                          ),
+                                          value: onboarding[
+                                                  'annualVacationDays'] ??
+                                              20,
+                                          fieldKey: 'annualVacationDays',
+                                          isNumeric: true,
                                         ),
-                                        value: onboarding[
-                                                'annualVacationDays'] ??
-                                            20,
-                                        fieldKey: 'annualVacationDays',
-                                        isNumeric: true,
-                                      ),
+                                      if (_vacationPoolsConfig.enabled)
+                                        for (final pool
+                                            in _vacationPoolsConfig
+                                                .forDriver(onboarding)
+                                                .pools)
+                                          _detailRowEditable(
+                                            driverRef: driverRef,
+                                            label: vacationPoolLabel(
+                                              context,
+                                              pool.key,
+                                            ),
+                                            value: formatVacationDays(
+                                              pool.days,
+                                            ),
+                                            fieldKey: VacationPoolsConfig
+                                                .driverDaysFieldKey(pool.key),
+                                            isNumeric: true,
+                                          ),
                                       _remainingVacationDaysRow(
                                         driverRef: driverRef,
                                         onboarding: onboarding,

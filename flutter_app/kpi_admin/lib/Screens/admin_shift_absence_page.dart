@@ -10,7 +10,10 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/employment_period.dart';
+import '../services/vacation_pools_repository.dart';
 import '../utils/driver_activity.dart';
+import '../utils/vacation_pools.dart';
+import '../widgets/vacation_pool_lines.dart';
 import '../widgets/web_preview.dart'
     if (dart.library.html) '../widgets/web_preview_web.dart';
 import 'zeitkonto_tab.dart';
@@ -4007,6 +4010,17 @@ class _AbsenceAdminItem {
   final DateTime submittedAt;
   final DateTime? reviewedAt;
 
+  /// Zeitpunkt, ab dem der Antrag „im System verbucht" war — Anker für
+  /// den manuellen Resturlaubs-Override (siehe `vacationBookedAtOf`).
+  ///
+  /// Bewusst NICHT aus [submittedAt] abgeleitet: das Feld fällt bei
+  /// Altdaten auf `fromDate` zurück und würde einen nachgetragenen
+  /// Vergangenheits-Urlaub fälschlich VOR den Override datieren. Hier
+  /// gilt die kanonische Kette `reviewedAt → submittedAt → createdAt →
+  /// updatedAt`, damit „DA Balance" denselben Saldo rechnet wie die
+  /// vier übrigen Anzeigeorte.
+  final DateTime? bookedAt;
+
   /// Zeitpunkt der Stornierung (Ticket jlmRu2T). Getrennt von
   /// [reviewedAt], damit die ursprüngliche Genehmigung erhalten bleibt.
   /// `null` bei Altfällen — dann greift [reviewedAt] als Fallback.
@@ -4039,6 +4053,7 @@ class _AbsenceAdminItem {
     required this.toDate,
     required this.submittedAt,
     required this.reviewedAt,
+    this.bookedAt,
     this.cancelledAt,
     this.paid = true,
     this.deleted = false,
@@ -4082,6 +4097,9 @@ class _AbsenceAdminItem {
       toDate: toDate,
       submittedAt: submittedAt,
       reviewedAt: _toDate(data['reviewedAt']),
+      // Aus den ROHDATEN, nicht aus `submittedAt` — Letzteres hat oben
+      // bereits den `fromDate`-Fallback für Altdaten eingebaut.
+      bookedAt: vacationBookedAtOf(data),
       cancelledAt: _toDate(data['cancelledAt']),
       // Fehlt das Feld (alle Bestandsdaten), gilt der Urlaub als bezahlt.
       paid: data['paid'] is bool ? data['paid'] as bool : true,
@@ -5510,16 +5528,9 @@ List<_DriverOvertimeMonth> _overtimeMonthsOf(Map<String, dynamic> data) {
   return out;
 }
 
-/// Vollständig abgeschlossene Beschäftigungsmonate — 1:1 die Formel aus
-/// `_completedMonthsSince` im Drivers Hub.
-int _daCompletedMonthsSince(DateTime start, DateTime now) {
-  final safeStart = DateTime(start.year, start.month, start.day);
-  final safeNow = DateTime(now.year, now.month, now.day);
-  var months = (safeNow.year - safeStart.year) * 12 +
-      (safeNow.month - safeStart.month);
-  if (safeNow.day < safeStart.day) months -= 1;
-  return months < 0 ? 0 : months;
-}
+// `_daCompletedMonthsSince` ist mit `accruedVacationDays` entfallen —
+// die Monatsformel lebt jetzt als `completedMonthsSince` in
+// `utils/vacation_pools.dart`.
 
 /// Ganze Zahlen ohne Nachkommastellen, sonst max. zwei — gleiche
 /// Darstellung wie `_formatVacationDays` im Drivers Hub.
@@ -5557,8 +5568,14 @@ class _DriverAbsenceProfile {
   /// Beschäftigungsbeginn — Basis der anteiligen Berechnung.
   final DateTime? workStartDate;
 
-  /// Manueller Admin-Override; gewinnt gegen die Berechnung.
+  /// Manueller Admin-Override — seit dem Bugfix eine MOMENTAUFNAHME zum
+  /// Zeitpunkt [vacationOverrideAt], kein eingefrorener Endwert mehr.
   final double? vacationOverride;
+  final DateTime? vacationOverrideAt;
+
+  /// DSP-weite Urlaubstopf-Konfiguration; [VacationPoolsConfig.disabled]
+  /// = bisheriges Ein-Topf-Verhalten.
+  final VacationPoolsConfig poolsConfig;
 
   const _DriverAbsenceProfile({
     required this.driverId,
@@ -5571,6 +5588,8 @@ class _DriverAbsenceProfile {
     required this.annualVacationDays,
     required this.workStartDate,
     required this.vacationOverride,
+    required this.vacationOverrideAt,
+    required this.poolsConfig,
   });
 
   static int _approvedDays(List<_AbsenceAdminItem> items) => items
@@ -5588,31 +5607,35 @@ class _DriverAbsenceProfile {
       .where((it) => it.status == 'approved' && it.hasPaidFlag && !it.paid)
       .fold<int>(0, (acc, it) => acc + it.totalDays);
 
-  /// Verbrauchte Tage des BEZAHLTEN Kontingents: nur `type ==
-  /// 'vacation'`, nur `approved`, nur bezahlt. Sonderurlaub zählt —
-  /// wie im Drivers Hub — bewusst NICHT gegen das Kontingent.
-  double get approvedPaidVacationDays => vacation
-      .where((it) =>
-          it.type == 'vacation' && it.status == 'approved' && it.paid)
-      .fold<double>(0, (acc, it) => acc + it.totalDays);
+  // `approvedPaidVacationDays` und `accruedVacationDays` sind entfallen:
+  // sie bildeten die alte, einfrierende Resturlaubs-Formel nach. Beides
+  // steckt jetzt in [vacationBalance] bzw. `utils/vacation_pools.dart`.
 
-  /// Anteilig erworbene Urlaubstage. Ohne `workStartDate` gilt — wie im
-  /// Drivers Hub — der volle Jahresanspruch.
-  double get accruedVacationDays {
-    final start = workStartDate;
-    if (start == null) return annualVacationDays;
-    return (annualVacationDays / 12.0) *
-        _daCompletedMonthsSince(start, DateTime.now());
-  }
+  /// Urlaubs-Saldo aus der gemeinsamen Formel (`utils/vacation_pools.dart`)
+  /// — identisch zu Drivers Hub, Detailseite und Fahrer-App.
+  VacationBalance get vacationBalance => computeVacationBalance(
+        absences: vacation
+            .map((it) => VacationAbsence(
+                  from: it.fromDate,
+                  to: it.toDate,
+                  chargeable: it.type == 'vacation' &&
+                      it.status == 'approved' &&
+                      it.paid,
+                  // Kanonische Kette aus den Rohdaten — siehe
+                  // `_AbsenceAdminItem.bookedAt`.
+                  bookedAt: it.bookedAt,
+                ))
+            .toList(growable: false),
+        config: poolsConfig,
+        annualVacationDays: annualVacationDays,
+        workStartDate: workStartDate,
+        manualOverride: vacationOverride,
+        manualOverrideAt: vacationOverrideAt,
+      );
 
-  /// PTO Balance = verbleibende BEZAHLTE Urlaubstage. Der manuelle
-  /// Override gewinnt, sonst `erworben − genommen`, nie negativ.
-  double get ptoBalanceDays {
-    final override = vacationOverride;
-    if (override != null) return override;
-    final remaining = accruedVacationDays - approvedPaidVacationDays;
-    return remaining < 0 ? 0 : remaining;
-  }
+  /// PTO Balance = verbleibende BEZAHLTE Urlaubstage über alle noch
+  /// gültigen Töpfe.
+  double get ptoBalanceDays => vacationBalance.totalRemaining;
 
   /// Overtime Balance über alle erfassten Monate (offen nach Auszahlung).
   int get overtimeBalanceMinutes => overtimeMonths.fold<int>(
@@ -5730,6 +5753,8 @@ class _AbsenceDriversOverviewPageState
         .doc(scope)
         .collection('absence_requests')
         .get();
+    // Urlaubs-Töpfe des DSP (ohne Konfiguration: Ein-Topf-Bestandslogik).
+    final poolsConfig = await VacationPoolsRepository.load(scope);
 
     // Anträge einmal nach Transporter-ID gruppieren (Fallback driverId,
     // damit auch Bestandsdaten ohne `driverTransporterId` landen).
@@ -5763,29 +5788,17 @@ class _AbsenceDriversOverviewPageState
         // zuerst — nicht das Antragsdatum.
         ..sort((a, b) => b.historySortDate.compareTo(a.historySortDate));
 
-      // ── Onboarding-Felder für die PTO-Balance (Drivers-Hub-Formel) ──
+      // ── Onboarding-Felder für die PTO-Balance ──
+      // Alle Leser stammen aus `utils/vacation_pools.dart`, damit hier
+      // keine zweite Parse-Implementierung entsteht.
       final rawOnboarding = data['onboarding'];
       final onboarding = rawOnboarding is Map
           ? rawOnboarding.map((k, v) => MapEntry(k.toString(), v))
           : const <String, dynamic>{};
 
-      double annual = 20;
-      final rawAnnual = onboarding['annualVacationDays'];
-      if (rawAnnual is num && rawAnnual > 0) {
-        annual = rawAnnual.toDouble();
-      } else if (rawAnnual is String) {
-        final parsed = num.tryParse(rawAnnual.trim().replaceAll(',', '.'));
-        if (parsed != null && parsed > 0) annual = parsed.toDouble();
-      }
-
-      final rawOverride = onboarding['remainingVacationDaysOverride'];
-      double? override;
-      if (rawOverride is num) {
-        override = rawOverride.toDouble();
-      } else if (rawOverride is String && rawOverride.trim().isNotEmpty) {
-        override =
-            double.tryParse(rawOverride.trim().replaceAll(',', '.'));
-      }
+      final annual = annualVacationDaysOf(onboarding);
+      final override = vacationOverrideOf(onboarding);
+      final overrideAt = vacationOverrideAtOf(onboarding);
 
       // ── Vertragszeitraum (laufender, sonst jüngster) ──
       final periods = employmentPeriodsOf(data);
@@ -5816,8 +5829,10 @@ class _AbsenceDriversOverviewPageState
               .toList(growable: false),
           overtimeMonths: _overtimeMonthsOf(data),
           annualVacationDays: annual,
-          workStartDate: parseFlexibleDate(onboarding['workStartDate']),
+          workStartDate: parseVacationDate(onboarding['workStartDate']),
           vacationOverride: override,
+          vacationOverrideAt: overrideAt,
+          poolsConfig: poolsConfig.forDriver(onboarding),
         ),
       );
     }
@@ -6147,12 +6162,18 @@ class _DriverRow extends StatelessWidget {
         value: _daFormatDays(profile.ptoBalanceDays),
         unit: de ? 'Tage' : 'days',
         color: const Color(0xFF1D7F5A),
-        tooltip: de
-            ? 'Verbleibende BEZAHLTE Urlaubstage — anteilig nach '
-                'Beschäftigungsmonaten, abzüglich genehmigter bezahlter '
-                'Urlaubstage'
-            : 'Remaining PAID vacation days — pro rata by months '
-                'employed, minus approved paid vacation days',
+        tooltip: <String>[
+          de
+              ? 'Verbleibende BEZAHLTE Urlaubstage — anteilig nach '
+                  'Beschäftigungsmonaten, abzüglich genehmigter bezahlter '
+                  'Urlaubstage'
+              : 'Remaining PAID vacation days — pro rata by months '
+                  'employed, minus approved paid vacation days',
+          // Bei aktivierten Töpfen die Aufteilung mit Verfallsdatum.
+          if (profile.vacationBalance.pooled)
+            for (final pool in profile.vacationBalance.pools)
+              vacationPoolSummary(context, pool),
+        ].join('\n'),
       ),
       _BalanceMetric(
         label: 'Overtime Balance',
@@ -6578,6 +6599,11 @@ class _DriverAbsenceHistoryView extends StatelessWidget {
                           'PTO Balance: '
                               '${_daFormatDays(profile.ptoBalanceDays)} '
                               '${de ? 'Tage' : 'days'}',
+                          // Getrennte Töpfe inkl. Verfallsdatum, sofern
+                          // der DSP sie eingeschaltet hat.
+                          if (profile.vacationBalance.pooled)
+                            for (final pool in profile.vacationBalance.pools)
+                              vacationPoolSummary(context, pool),
                         ].join(' · '),
                         emptyLabel: de
                             ? 'Kein Urlaub erfasst.'

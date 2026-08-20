@@ -9,7 +9,10 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../localization/app_localizations.dart';
+import '../services/vacation_pools_repository.dart';
 import '../theme/app_button_style.dart';
+import '../utils/vacation_pools.dart';
+import '../widgets/vacation_pool_lines.dart';
 
 class DriverAbsencePage extends StatefulWidget {
   final String dspUid;
@@ -43,6 +46,23 @@ class _DriverAbsencePageState extends State<DriverAbsencePage> {
   String _auMime = '';
 
   String get _driverId => widget.driverTransporterId.toUpperCase().trim();
+
+  // ── Urlaubs-Töpfe des DSP ───────────────────────────────────────────
+  // Fahrer dürfen `users/{dspUid}/settings/*` lesen (bestehende Rules).
+  // Ohne Dokument bleibt es beim Ein-Topf-Bestandsverhalten.
+  VacationPoolsConfig _poolsConfig = VacationPoolsConfig.disabled;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPools();
+  }
+
+  Future<void> _loadPools() async {
+    final config = await VacationPoolsRepository.load(widget.dspUid);
+    if (!mounted) return;
+    setState(() => _poolsConfig = config);
+  }
 
   DocumentReference<Map<String, dynamic>> get _driverRef {
     return FirebaseFirestore.instance
@@ -495,6 +515,11 @@ class _DriverAbsencePageState extends State<DriverAbsencePage> {
             }
 
             final docs = requestsSnap.data?.docs ?? const [];
+            final rawOnboarding = driverData['onboarding'];
+            final onboarding = rawOnboarding is Map
+                ? rawOnboarding
+                    .map((k, v) => MapEntry(k.toString(), v))
+                : const <String, dynamic>{};
             final annualVacationDays = _annualVacationDaysFromDriver(
               driverData,
             );
@@ -502,7 +527,13 @@ class _DriverAbsencePageState extends State<DriverAbsencePage> {
               docs,
               workStartDate,
               annualVacationDays,
+              onboarding,
             );
+            // Kopfzeile „X Tage / Jahr": im Topf-Modus die Summe der
+            // konfigurierten Töpfe, sonst der bisherige Jahresurlaub.
+            final headlineAnnualDays = overview.balance.pooled
+                ? _poolsConfig.forDriver(onboarding).totalDays
+                : annualVacationDays;
             final vacationCards = _buildVacationCards(docs);
 
             return Align(
@@ -587,7 +618,7 @@ class _DriverAbsencePageState extends State<DriverAbsencePage> {
                             ),
                           ),
                           Text(
-                            '${_formatDaysValue(annualVacationDays)} ${labels.daysPerYear}',
+                            '${_formatDaysValue(headlineAnnualDays)} ${labels.daysPerYear}',
                             style: const TextStyle(
                               color: Color(0xFF8A94A6),
                               fontSize: 15,
@@ -693,6 +724,41 @@ class _DriverAbsencePageState extends State<DriverAbsencePage> {
                               ),
                             ],
                           ),
+                          // Getrennte Urlaubs-Töpfe mit eigenem
+                          // Verfallsdatum — nur wenn der DSP sie
+                          // eingeschaltet hat.
+                          if (overview.balance.pooled &&
+                              overview.balance.pools.isNotEmpty) ...[
+                            const SizedBox(height: 18),
+                            Text(
+                              t.t('driver_absence_pools_title'),
+                              style: const TextStyle(
+                                color: Color(0xFF1E293B),
+                                fontSize: 15,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            for (final pool in overview.balance.pools)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: _VacationPoolTile(
+                                  title: vacationPoolLabel(context, pool.key),
+                                  remaining:
+                                      _formatDaysValue(pool.remaining),
+                                  total: _formatDaysValue(pool.entitlement),
+                                  ofWord: labels.ofWord,
+                                  daysLabel: labels.daysLabel,
+                                  expiryText: pool.expiresOn == null
+                                      ? ''
+                                      : t.tf('vacation_pool_expires_on', {
+                                          'date': formatVacationDate(
+                                            pool.expiresOn!,
+                                          ),
+                                        }),
+                                ),
+                              ),
+                          ],
                         ],
                       ),
                     ),
@@ -756,32 +822,40 @@ class _DriverAbsencePageState extends State<DriverAbsencePage> {
     );
   }
 
+  /// Urlaubs-Übersicht des Fahrers.
+  ///
+  /// Rechnet seit dem Ticket „getrennte Verfallsdaten" NICHT mehr selbst,
+  /// sondern über [computeVacationBalance] — dieselbe Formel, die auch
+  /// der Admin im Drivers Hub sieht. Dadurch stimmen Fahrer- und
+  /// Admin-Ansicht zwingend überein (vorher ignorierte die Fahrer-App
+  /// z. B. den manuellen Resturlaubs-Override des Admins).
+  ///
+  /// Ticket KJV4n2S bleibt gültig: die Übersicht bildet ausschließlich
+  /// das **bezahlte** Urlaubskontingent ab. Unbezahlter Urlaub
+  /// (`paid == false`) erscheint weiterhin in der Antragsliste, zehrt
+  /// aber weder „Genommen" noch „Verfügbar" auf.
   _VacationOverview _buildOverview(
     List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
     DateTime? workStartDate,
     double annualVacationDays,
+    Map<String, dynamic> onboarding,
   ) {
-    final now = DateTime.now();
-    // Ticket KJV4n2S: Die Übersicht bildet ausschließlich das
-    // **bezahlte** Urlaubskontingent ab. Unbezahlter Urlaub
-    // (`paid == false`) wird weiterhin in der Antragsliste angezeigt,
-    // zehrt aber weder „Genommen" noch „Verfügbar" auf. Fehlt das Feld
-    // (alle Bestandsdaten), gilt der Antrag als bezahlt und zählt mit —
-    // gleiche Konvention wie serverseitig (`paid !== false`).
-    final approvedVacationDays = docs.fold<double>(0, (total, doc) {
-      final data = doc.data();
-      final type = _stringOf(data['type']).toLowerCase();
-      final status = _stringOf(data['status']).toLowerCase();
-      if (type != 'vacation' || status != 'approved') return total;
-      final paid = data['paid'] is bool ? data['paid'] as bool : true;
-      if (!paid) return total;
-      return total +
-          _inclusiveDays(
-            _toDate(data['fromDate']),
-            _toDate(data['toDate']),
-          ).toDouble();
-    });
+    final absences = <VacationAbsence>[
+      for (final doc in docs)
+        if (VacationAbsence.fromMap(doc.data()) case final a?) a,
+    ];
 
+    final balance = computeVacationBalance(
+      absences: absences,
+      config: _poolsConfig.forDriver(onboarding),
+      annualVacationDays: annualVacationDays,
+      workStartDate: workStartDate,
+      manualOverride: vacationOverrideOf(onboarding),
+      manualOverrideAt: vacationOverrideAtOf(onboarding),
+    );
+
+    // Sonderurlaub zählt nicht gegen das Kontingent, wird aber als
+    // zusätzliche Freizeit ausgewiesen (Bestandsverhalten).
     final approvedSpecialDays = docs.fold<double>(0, (total, doc) {
       final data = doc.data();
       final type = _stringOf(data['type']).toLowerCase();
@@ -794,27 +868,27 @@ class _DriverAbsencePageState extends State<DriverAbsencePage> {
           ).toDouble();
     });
 
-    final completedMonths = workStartDate == null
-        ? 12
-        : _completedMonthsSince(workStartDate, now);
-    final accruedVacationDays = workStartDate == null
-        ? annualVacationDays
-        : (annualVacationDays / 12.0) * completedMonths;
+    // WICHTIG: `totalUsedAllTime`, nicht `totalUsed`. `totalUsed`
+    // summiert nur die noch OFFENEN Töpfe — sobald ein Topf verfällt,
+    // verschwinden dessen Tage daraus und die „Genommen"-Anzeige des
+    // Fahrers fiele zum Verfallsdatum sichtbar zurück. „Genommen" ist
+    // eine Historie und muss alle genehmigten, bezahlten Urlaubstage
+    // zeigen (auch das Bestandsverhalten vor den Töpfen).
+    final takenDays = balance.totalUsedAllTime;
     final totalDays = math.max(
-      accruedVacationDays + approvedSpecialDays,
-      approvedVacationDays,
+      balance.totalEntitlement + approvedSpecialDays,
+      takenDays,
     );
-    final remainingDays = math.max(totalDays - approvedVacationDays, 0.0);
-    final progress = totalDays <= 0
-        ? 0.0
-        : (approvedVacationDays / totalDays).clamp(0.0, 1.0);
+    final progress =
+        totalDays <= 0 ? 0.0 : (takenDays / totalDays).clamp(0.0, 1.0);
 
     return _VacationOverview(
       totalDays: totalDays,
       specialDays: approvedSpecialDays,
-      takenDays: approvedVacationDays,
-      remainingDays: remainingDays,
+      takenDays: takenDays,
+      remainingDays: balance.totalRemaining,
       progress: progress,
+      balance: balance,
     );
   }
 
@@ -1009,17 +1083,8 @@ class _DriverAbsencePageState extends State<DriverAbsencePage> {
     return null;
   }
 
-  static int _completedMonthsSince(DateTime start, DateTime now) {
-    final safeStart = DateTime(start.year, start.month, start.day);
-    final safeNow = DateTime(now.year, now.month, now.day);
-    var months =
-        (safeNow.year - safeStart.year) * 12 +
-        (safeNow.month - safeStart.month);
-    if (safeNow.day < safeStart.day) {
-      months -= 1;
-    }
-    return math.max(months, 0);
-  }
+  // `_completedMonthsSince` lebt jetzt in `utils/vacation_pools.dart`
+  // (eine gemeinsame Formel fuer Admin- und Fahrer-Ansicht).
 
   static double? _toDouble(dynamic raw) {
     if (raw is num) return raw.toDouble();
@@ -1284,13 +1349,98 @@ class _VacationOverview {
   final double remainingDays;
   final double progress;
 
+  /// Aufschlüsselung nach Urlaubs-Töpfen (siehe `utils/vacation_pools.dart`).
+  /// `pooled == false` = Ein-Topf-Bestandsverhalten, dann rendert die
+  /// Seite die Topf-Kacheln nicht.
+  final VacationBalance balance;
+
   const _VacationOverview({
     required this.totalDays,
     required this.specialDays,
     required this.takenDays,
     required this.remainingDays,
     required this.progress,
+    required this.balance,
   });
+}
+
+/// Eine Topf-Zeile in der Fahrer-Übersicht:
+/// „Gesetzlich — 14 von 20 Tage · verfällt 31.03.2027".
+class _VacationPoolTile extends StatelessWidget {
+  const _VacationPoolTile({
+    required this.title,
+    required this.remaining,
+    required this.total,
+    required this.ofWord,
+    required this.daysLabel,
+    required this.expiryText,
+  });
+
+  final String title;
+  final String remaining;
+  final String total;
+  final String ofWord;
+  final String daysLabel;
+  final String expiryText;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE4E8EE)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const Icon(
+            Icons.event_available_outlined,
+            size: 20,
+            color: Color(0xFF64748B),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Color(0xFF1E293B),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if (expiryText.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    expiryText,
+                    style: const TextStyle(
+                      color: Color(0xFF8A94A6),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            '$remaining $ofWord $total $daysLabel',
+            style: const TextStyle(
+              color: Color(0xFF1E293B),
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _VacationPeriodItem {

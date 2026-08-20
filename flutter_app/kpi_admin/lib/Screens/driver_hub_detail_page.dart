@@ -18,8 +18,12 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../localization/app_localizations.dart';
 import '../models/employment_period.dart';
 import '../services/incident_reports.dart';
+import '../services/vacation_pools_repository.dart';
+import '../utils/vacation_pools.dart';
+import '../widgets/vacation_pool_lines.dart';
 import '../widgets/driver_performance_sections.dart';
 
 // ---------------------------------------------------------------------------
@@ -284,6 +288,26 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
   bool get _de => Localizations.localeOf(context).languageCode == 'de';
 
   String _tr(String de, String en) => _de ? de : en;
+
+  // ── Urlaubs-Töpfe (DSP-weit, siehe utils/vacation_pools.dart) ───────
+  VacationPoolsConfig _poolsConfig = VacationPoolsConfig.disabled;
+  bool _poolsRequested = false;
+
+  Future<void> _loadPoolsOnce() async {
+    if (_poolsRequested) return;
+    final uid = widget.dspUid;
+    if (uid == null || uid.trim().isEmpty) return;
+    _poolsRequested = true;
+    final config = await VacationPoolsRepository.load(uid);
+    if (!mounted) return;
+    setState(() => _poolsConfig = config);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadPoolsOnce());
+  }
 
   @override
   void dispose() {
@@ -1743,16 +1767,24 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
               noneLabel: _tr('Unbefristet', 'Unlimited'),
             ),
           ),
-          _FieldSpec(
-            label: _tr('Urlaub pro Jahr', 'Annual leave'),
-            value: '${_fmtDays(annual)} ${_tr('Tage', 'days')}',
-            onEdit: () => widget.actions.editOnboardingField(
+          // Ein-Topf-Modus: unverändert „Urlaub pro Jahr".
+          if (!_poolsConfig.enabled)
+            _FieldSpec(
               label: _tr('Urlaub pro Jahr', 'Annual leave'),
-              fieldKey: 'annualVacationDays',
-              initialValue: _str(onboarding['annualVacationDays']),
-              isNumeric: true,
+              value: '${_fmtDays(annual)} ${_tr('Tage', 'days')}',
+              onEdit: () => widget.actions.editOnboardingField(
+                label: _tr('Urlaub pro Jahr', 'Annual leave'),
+                fieldKey: 'annualVacationDays',
+                initialValue: _str(onboarding['annualVacationDays']),
+                isNumeric: true,
+              ),
             ),
-          ),
+          // Topf-Modus: je Topf eine eigene Zeile mit Resttagen und
+          // Verfallsdatum; die Tageszahl ist fahrerindividuell
+          // übersteuerbar (leer = DSP-Default).
+          if (_poolsConfig.enabled)
+            for (final pool in _poolsConfig.forDriver(onboarding).pools)
+              _vacationPoolField(onboarding, pool),
           _remainingVacationField(onboarding),
           _FieldSpec(
             label: _tr('Arbeitserlaubnis', 'Work permit'),
@@ -1772,59 +1804,131 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
     );
   }
 
-  /// Resturlaub — exakt die Bestandsformel aus `_remainingVacationDaysRow`
-  /// (Override schlägt Berechnung; Berechnung = anteiliger Anspruch minus
-  /// genehmigter, bezahlter Urlaub).
+  /// Live-Saldo aus `utils/vacation_pools.dart` — dieselbe Quelle wie
+  /// Drivers Hub, „DA Balance" und Fahrer-App.
+  Widget _vacationBalanceBuilder(
+    Map<String, dynamic> onboarding, {
+    required Widget Function(VacationBalance? balance, VacationBalance? plain)
+        builder,
+  }) {
+    final config = _poolsConfig.forDriver(onboarding);
+    final annual = annualVacationDaysOf(onboarding);
+    final start = parseVacationDate(onboarding['workStartDate']);
+    final override = vacationOverrideOf(onboarding);
+    final overrideAt = vacationOverrideAtOf(onboarding);
+
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: widget.driverRef.collection('absence_requests').snapshots(),
+      builder: (context, snap) {
+        if (snap.hasError || snap.connectionState == ConnectionState.waiting) {
+          return builder(null, null);
+        }
+        final absences = <VacationAbsence>[
+          for (final doc in snap.data?.docs ??
+              const <QueryDocumentSnapshot<Map<String, dynamic>>>[])
+            if (VacationAbsence.fromMap(doc.data()) case final a?) a,
+        ];
+        return builder(
+          computeVacationBalance(
+            absences: absences,
+            config: config,
+            annualVacationDays: annual,
+            workStartDate: start,
+            manualOverride: override,
+            manualOverrideAt: overrideAt,
+          ),
+          computeVacationBalance(
+            absences: absences,
+            config: config,
+            annualVacationDays: annual,
+            workStartDate: start,
+          ),
+        );
+      },
+    );
+  }
+
+  /// Eine Topf-Zeile: „14 von 20 · verfällt 31.03.2027".
+  /// Der Stift bearbeitet die fahrerindividuelle Tageszahl
+  /// (`onboarding.vacationStatutoryDays` / `vacationAdditionalDays`);
+  /// leer lassen = DSP-Default.
+  _FieldSpec _vacationPoolField(
+    Map<String, dynamic> onboarding,
+    VacationPoolDef pool,
+  ) {
+    final fieldKey = VacationPoolsConfig.driverDaysFieldKey(pool.key);
+    return _FieldSpec(
+      label: vacationPoolLabel(context, pool.key),
+      value: '',
+      valueBuilder: (spec) => _vacationBalanceBuilder(
+        onboarding,
+        builder: (balance, _) {
+          final slice = balance?.poolByKey(pool.key);
+          final text = slice == null
+              ? '…'
+              : '${_fmtDays(slice.remaining)} ${_tr('von', 'of')} '
+                  '${_fmtDays(slice.entitlement)}'
+                  '${slice.expiresOn == null ? '' : ' · ${AppLocalizations.of(context).tf('vacation_pool_expires_on', {
+                      'date': formatVacationDate(slice.expiresOn!),
+                    })}'}';
+          return _FieldValue(
+            text: text,
+            onEdit: () => widget.actions.editOnboardingField(
+              label: vacationPoolLabel(context, pool.key),
+              fieldKey: fieldKey,
+              initialValue: _str(onboarding[fieldKey]),
+              isNumeric: true,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// Resturlaub gesamt.
+  ///
+  /// Der manuelle Override ist seit dem Bugfix kein eingefrorener Wert
+  /// mehr, sondern eine Momentaufnahme: später erfasster Urlaub wird
+  /// davon abgezogen (Details in `utils/vacation_pools.dart`).
   _FieldSpec _remainingVacationField(Map<String, dynamic> onboarding) {
     final label = _tr('Resturlaub', 'Remaining leave');
-    final annual = _annualVacationDays(onboarding);
-    final start = parseFlexibleDate(onboarding['workStartDate']);
-
-    final overrideRaw = onboarding['remainingVacationDaysOverride'];
-    double? override;
-    if (overrideRaw is num) {
-      override = overrideRaw.toDouble();
-    } else if (overrideRaw is String && overrideRaw.trim().isNotEmpty) {
-      override = double.tryParse(overrideRaw.trim().replaceAll(',', '.'));
-    }
+    final override = vacationOverrideOf(onboarding);
+    final overrideAt = vacationOverrideAtOf(onboarding);
 
     return _FieldSpec(
       label: label,
       value: '',
-      valueBuilder: (spec) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: widget.driverRef.collection('absence_requests').snapshots(),
-        builder: (context, snap) {
-          double? computed;
-          if (!snap.hasError &&
-              snap.connectionState != ConnectionState.waiting) {
-            final used = _approvedVacationDays(
-              snap.data?.docs ??
-                  const <QueryDocumentSnapshot<Map<String, dynamic>>>[],
-            );
-            final accrued = start == null
-                ? annual
-                : (annual / 12.0) * _completedMonthsSince(start, DateTime.now());
-            final remaining = accrued - used;
-            computed = remaining < 0 ? 0 : remaining;
-          }
-          final show = override ?? computed;
-          final text = show == null
-              ? (snap.hasError ? '—' : '…')
-              : '${_fmtDays(show)} ${_tr('Tage', 'days')}';
+      valueBuilder: (spec) => _vacationBalanceBuilder(
+        onboarding,
+        builder: (balance, plain) {
+          final text = balance == null
+              ? '…'
+              : '${_fmtDays(balance.totalRemaining)} ${_tr('Tage', 'days')}';
+          final usedSince = balance?.usedSinceOverride ?? 0;
 
           return _FieldValue(
             text: text,
             edited: override != null,
             editedTooltip: override == null
                 ? null
-                : _tr(
-                    'Manuell bearbeitet',
-                    'Manually edited',
-                  ),
+                : <String>[
+                    _tr('Manuell gesetzt', 'Manually set'),
+                    _tr('Startwert: ${_fmtDays(override)} Tage',
+                        'Baseline: ${_fmtDays(override)} days'),
+                    if (overrideAt != null) formatVacationDate(overrideAt),
+                    if (usedSince > 0)
+                      _tr(
+                        'seither ${_fmtDays(usedSince)} Tage abgezogen',
+                        '${_fmtDays(usedSince)} days deducted since',
+                      ),
+                    if (plain != null)
+                      _tr('Ohne Anpassung: ${_fmtDays(plain.totalRemaining)}',
+                          'Without override: ${_fmtDays(plain.totalRemaining)}'),
+                  ].join(' · '),
             onEdit: () => widget.actions.editRemainingVacation(
               label: label,
               currentOverride: override,
-              computed: computed,
+              computed: plain?.totalRemaining,
             ),
           );
         },
@@ -2767,39 +2871,8 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
     return 20;
   }
 
-  /// Verbrauchte Tage des **bezahlten** Urlaubskontingents — identisch zu
-  /// `_approvedVacationDaysFromRequests` im Drivers Hub (unbezahlter Urlaub
-  /// belastet das Kontingent nicht).
-  double _approvedVacationDays(
-    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
-  ) {
-    var total = 0.0;
-    for (final doc in docs) {
-      final data = doc.data();
-      final type = _str(data['type']).toLowerCase();
-      final status = _str(data['status']).toLowerCase();
-      if (type != 'vacation' || status != 'approved') continue;
-      final paid = data['paid'] is bool ? data['paid'] as bool : true;
-      if (!paid) continue;
-      final from = parseFlexibleDate(data['fromDate']);
-      final to = parseFlexibleDate(data['toDate']);
-      if (from == null || to == null) continue;
-      final start = DateTime(from.year, from.month, from.day);
-      final end = DateTime(to.year, to.month, to.day);
-      if (end.isBefore(start)) continue;
-      total += end.difference(start).inDays + 1;
-    }
-    return total;
-  }
-
-  static int _completedMonthsSince(DateTime start, DateTime now) {
-    final safeStart = DateTime(start.year, start.month, start.day);
-    final safeNow = DateTime(now.year, now.month, now.day);
-    var months = (safeNow.year - safeStart.year) * 12 +
-        (safeNow.month - safeStart.month);
-    if (safeNow.day < safeStart.day) months -= 1;
-    return months < 0 ? 0 : months;
-  }
+  // `_approvedVacationDays`/`_completedMonthsSince` leben jetzt in
+  // `utils/vacation_pools.dart` (eine Formel fuer Admin + Fahrer-App).
 
   String _normalizePermit(Map<String, dynamic> onboarding) {
     final value = _str(onboarding['workPermitType']).toLowerCase();
