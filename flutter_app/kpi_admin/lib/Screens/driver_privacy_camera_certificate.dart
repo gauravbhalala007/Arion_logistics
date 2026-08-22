@@ -20,9 +20,6 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
-import '../data/privacy_camera/privacy_camera_content.dart'
-    show kPrivacyBindingLanguage;
-
 const PdfColor _certGrey = PdfColor.fromInt(0xFF6B7280);
 const PdfColor _certDark = PdfColor.fromInt(0xFF111827);
 const PdfColor _certAccent = PdfColor.fromInt(0xFF2A5FB0);
@@ -357,13 +354,14 @@ Future<Uint8List> buildPrivacyCameraCertificatePdf({
   required List<String> moduleTitles,
   // Verbindlicher deutscher Wortlaut (Spec §7) — steht IMMER auf der
   // Bescheinigung, unabhängig von der Sprache des Fahrers.
+  //
+  // Die Bescheinigung ist bewusst EINSPRACHIG deutsch: sie ist das
+  // Nachweisdokument gegenüber der Aufsichtsbehörde, und dafür zählt der
+  // verbindliche Wortlaut. Die gelesene Übersetzung wird weiterhin im
+  // Nachweis-Dokument (`statementShownLocalized`) gespeichert, aber nicht
+  // mitgedruckt. Zweisprachig bleibt allein der Bestätigungs-Screen.
   required String statementShown,
   required String clarification,
-  // Zusätzlich die gelesene Übersetzung, falls der Fahrer die App nicht
-  // auf Deutsch nutzt. Ergänzt den deutschen Text, ersetzt ihn nie.
-  String? statementLocalized,
-  String? clarificationLocalized,
-  String languageCode = kPrivacyBindingLanguage,
 }) async {
   final doc = pw.Document();
   final sigImage = signaturePng == null ? null : pw.MemoryImage(signaturePng);
@@ -405,13 +403,11 @@ Future<Uint8List> buildPrivacyCameraCertificatePdf({
       pw.SizedBox(height: 5),
       _certTopicList(moduleTitles),
       pw.SizedBox(height: 11),
-      // Verbindlicher Wortlaut aus Spec §7 — unverändert übernommen,
-      // in jeder Sprachfassung auf Deutsch. Die gelesene Übersetzung
-      // steht ergänzend darunter.
+      // Verbindlicher Wortlaut aus Spec §7 — unverändert übernommen und
+      // ausschließlich auf Deutsch.
       _certLegalBox(
         '$statementShown\n\n'
         '$clarification\n\n'
-        '${(statementLocalized ?? '').isEmpty ? '' : '--- Übersetzung (${languageCode.toUpperCase()}) ---\n$statementLocalized\n\n${clarificationLocalized ?? ''}\n\n'}'
         'Diese Bescheinigung belegt ausschließlich die Aushändigung und '
         'Kenntnisnahme der genannten Datenschutzerklärung. Sie ist weder ein '
         'Prüfungs- oder Schulungszertifikat noch eine Einwilligung in die '

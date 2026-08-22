@@ -196,6 +196,24 @@ class _DriverPrivacyCameraCoursePageState
 
   // ── Nachweis speichern ────────────────────────────────────────────
 
+  /// Exportiert die Unterschrift als PNG. Ein Fehlversuch wird genau
+  /// einmal wiederholt — der Export kann auf Web sporadisch scheitern,
+  /// wenn er in einen Frame fällt, in dem die Canvas noch nicht bereit
+  /// ist. `null` heißt: endgültig fehlgeschlagen.
+  Future<Uint8List?> _exportSignature() async {
+    if (_signatureCtrl.isEmpty) return null;
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        final bytes = await _signatureCtrl.toPngBytes(height: 160);
+        if (bytes != null && bytes.isNotEmpty) return bytes;
+      } catch (_) {
+        // Zweiter Versuch nach einem Frame.
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+    }
+    return null;
+  }
+
   /// Speichert die Empfangsbestätigung.
   ///
   /// Es gibt im Fahrer-Flow nur noch DIESEN Ausgang: `acknowledged`.
@@ -209,12 +227,24 @@ class _DriverPrivacyCameraCoursePageState
     if (state == null) return;
     setState(() => _busy = true);
     try {
-      Uint8List? signatureBytes;
-      String? signature;
-      if (_signatureCtrl.isNotEmpty) {
-        signatureBytes = await _signatureCtrl.toPngBytes(height: 160);
-        if (signatureBytes != null) signature = base64Encode(signatureBytes);
+      // Die Unterschrift ist Pflicht und wird VOR dem Nachweis exportiert:
+      // Scheitert der PNG-Export, darf gar nichts gespeichert werden —
+      // sonst entstünde ein Nachweis, der eine Unterschrift behauptet,
+      // die weder im Dokument noch auf der Bescheinigung existiert.
+      final signatureBytes = await _exportSignature();
+      if (signatureBytes == null) {
+        if (!mounted) return;
+        setState(() => _busy = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              privacyCameraText(_lang, 'signature_export_failed'),
+            ),
+          ),
+        );
+        return;
       }
+      final signature = base64Encode(signatureBytes);
 
       final doc = state.document;
       final binding = state.bindingDocument;
@@ -261,6 +291,12 @@ class _DriverPrivacyCameraCoursePageState
       // trotzdem gespeichert — der Nachweis ist das rechtlich
       // Entscheidende, das PDF nur seine Ausfertigung.
       try {
+        // Die Bescheinigung ist durchgehend deutsch — auch die
+        // Inhaltsliste. Der Loader cacht die Sprachfassungen, der Zugriff
+        // kostet nach dem ersten Mal nichts.
+        final deBundle = await PrivacyCourseBundle.load(
+          kPrivacyBindingLanguage,
+        );
         final pdf = await buildPrivacyCameraCertificatePdf(
           signaturePng: signatureBytes,
           driverName: _driver.name,
@@ -270,16 +306,10 @@ class _DriverPrivacyCameraCoursePageState
           documentTitle: binding.ref.title,
           documentVersion: binding.ref.version,
           contentSha256: binding.contentSha256,
-          moduleTitles: [for (final m in state.bundle.course.modules) m.title],
-          // Auf der Bescheinigung steht IMMER der deutsche Wortlaut …
+          moduleTitles: [for (final m in deBundle.course.modules) m.title],
+          // Verbindlicher Wortlaut: ausschließlich deutsch.
           statementShown: statementDe,
           clarification: bindingCopy.clarification,
-          // … und darunter die gelesene Übersetzung, falls abweichend.
-          statementLocalized: statementLocalized,
-          clarificationLocalized: state.bundle.needsBindingTranslationBlock
-              ? copy.clarification
-              : null,
-          languageCode: state.bundle.languageCode,
         );
         await _repo.storeCertificate(
           pdfBytes: pdf,

@@ -27,6 +27,7 @@ import '../widgets/motion_helpers.dart';
 import 'driver_driving_safety_page.dart' show kDrivingSafetyTrainingId;
 import 'driver_green_book_training_page.dart' show kGreenBookTestId;
 import 'driver_ride_along_page.dart' show kRideAlongTestId;
+import 'driver_vehicle_check_page.dart';
 import 'driver_vehicle_inspection_page.dart';
 
 /// Driver-Whitelist als Fallback, falls der Admin das Add-On Flag noch
@@ -37,6 +38,22 @@ const Set<String> _kCotimerVisibleForDrivers = {
   'albert.dobra@arion-logistics.de',
   'test@arion-logistics.de',
 };
+
+/// Testgate für die geführte Foto-Fahrzeuginspektion
+/// ([DriverVehicleCheckPage], Stufe 1). Nur diese Login-E-Mails bekommen
+/// den neuen Wizard — alle anderen Fahrer sehen weiterhin den bisherigen
+/// Ja/Nein-Sheet aus `driver_vehicle_inspection_page.dart`.
+///
+/// Muster bewusst identisch zu [_kCotimerVisibleForDrivers], damit das
+/// Freischalten später nur eine Zeile ist.
+const Set<String> _kVehicleCheckVisibleForDrivers = {
+  'israfil.topi@arion-logistics.de',
+};
+
+/// `true`, wenn der eingeloggte Fahrer den neuen geführten Check sieht.
+bool _guidedVehicleCheckEnabled() => _kVehicleCheckVisibleForDrivers.contains(
+  (FirebaseAuth.instance.currentUser?.email ?? '').toLowerCase().trim(),
+);
 
 const double _kTopCardHeight = 142;
 
@@ -526,21 +543,42 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
         borderColor: const Color(0xFFFF8A1F),
         onTap: widget.onOpenIncidentReport,
       ),
-      // Pre-shift vehicle check — opens a bottom sheet with two quick
-      // yes/no questions. When "No" we instruct the driver to send a
-      // walk-around video to the dispatcher via WhatsApp.
-      _HomeCardData(
-        title: 'Fahrzeug-Check',
-        subtitle: 'Kurz vor Schichtstart bestätigen',
-        icon: Icons.directions_car_rounded,
-        iconColor: const Color(0xFF1D7F5A),
-        iconBackground: const Color(0xFFE6F8F2),
-        onTap: () => openDriverVehicleInspectionSheet(
-          context,
-          dspUid: widget.dspUid,
-          driverDocId: widget.driverTransporterId.toUpperCase(),
+      // Fahrzeug-Check.
+      //  • Testgate-Fahrer (_kVehicleCheckVisibleForDrivers): geführte
+      //    Foto-Inspektion (DriverVehicleCheckPage) — 8 Fotos, Schäden,
+      //    Kilometerstand; landet im Fleet Hub.
+      //  • Alle anderen: unveränderter Ja/Nein-Sheet mit dem Hinweis, ein
+      //    Walk-around-Video an den Dispatcher zu schicken.
+      if (_guidedVehicleCheckEnabled())
+        _HomeCardData(
+          title: 'Fahrzeug-Check',
+          subtitle: Localizations.localeOf(context).languageCode == 'de'
+              ? 'Foto-Rundgang · 8 Schritte'
+              : 'Photo walk-around · 8 steps',
+          icon: Icons.photo_camera_outlined,
+          iconColor: const Color(0xFF1D7F5A),
+          iconBackground: const Color(0xFFE6F8F2),
+          badgeText: 'BETA',
+          badgeColor: const Color(0xFFB7791F),
+          onTap: () => openDriverVehicleCheck(
+            context,
+            dspUid: widget.dspUid,
+            driverTransporterId: widget.driverTransporterId,
+          ),
+        )
+      else
+        _HomeCardData(
+          title: 'Fahrzeug-Check',
+          subtitle: 'Kurz vor Schichtstart bestätigen',
+          icon: Icons.directions_car_rounded,
+          iconColor: const Color(0xFF1D7F5A),
+          iconBackground: const Color(0xFFE6F8F2),
+          onTap: () => openDriverVehicleInspectionSheet(
+            context,
+            dspUid: widget.dspUid,
+            driverDocId: widget.driverTransporterId.toUpperCase(),
+          ),
         ),
-      ),
       // Page: DriverWaveplanView
       // Wiring: driver_home_shell.dart -> DriverView.waveplan
       _HomeCardData(

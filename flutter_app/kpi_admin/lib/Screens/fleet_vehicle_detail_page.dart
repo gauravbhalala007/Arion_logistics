@@ -32,9 +32,11 @@ import '../services/fleet_vehicle_document_repository.dart';
 import '../services/fleet_vehicle_document_service.dart';
 import '../services/fleet_vehicle_event_service.dart';
 import '../services/incident_reports.dart';
+import '../services/vehicle_check_service.dart' show kVehicleCheckEventType;
 import '../widgets/admin_scope.dart';
 import '../widgets/license_plate.dart';
 import 'admin_incident_reports_page.dart';
+import 'admin_vehicle_check_detail_page.dart';
 
 // ---------------------------------------------------------------------------
 // Design-Tokens (1:1 aus dem Handoff — identisch zum Driver Hub)
@@ -148,6 +150,15 @@ enum FleetEventType {
   accident,
   handover,
   document,
+  /// Geführte Foto-Inspektion aus der Fahrer-App. Der Spiegel wird von der
+  /// Cloud Function `onVehicleCheckCreated` geschrieben (wire:
+  /// [kVehicleCheckEventType]).
+  ///
+  /// Bewusst NICHT auf das Legacy-Wire `'inspection'` gemappt: Bestands-
+  /// Events aus `vehicles/{plate}/events` nutzen `eventType: 'INSPECTION'`
+  /// im Sinne von TÜV/HU (siehe `models/fleet_vehicle_event.dart`) — die
+  /// dürfen nicht plötzlich als Fahrzeug-Check erscheinen.
+  vehicleCheck,
   other,
 }
 
@@ -200,6 +211,7 @@ extension _FleetEventTypeX on FleetEventType {
     FleetEventType.accident => 'accident',
     FleetEventType.handover => 'handover',
     FleetEventType.document => 'document',
+    FleetEventType.vehicleCheck => kVehicleCheckEventType,
     FleetEventType.other => 'other',
   };
 
@@ -213,6 +225,7 @@ extension _FleetEventTypeX on FleetEventType {
     FleetEventType.accident => Icons.car_crash_outlined,
     FleetEventType.handover => Icons.swap_horiz,
     FleetEventType.document => Icons.description_outlined,
+    FleetEventType.vehicleCheck => Icons.fact_check_outlined,
     FleetEventType.other => Icons.event_note_outlined,
   };
 
@@ -233,6 +246,7 @@ extension _FleetEventTypeX on FleetEventType {
     FleetEventType.accident => de ? 'Unfall' : 'Accident',
     FleetEventType.handover => de ? 'Fahrzeugübergabe' : 'Handover',
     FleetEventType.document => de ? 'Dokument' : 'Document',
+    FleetEventType.vehicleCheck => de ? 'Fahrzeug-Check' : 'Vehicle check',
     FleetEventType.other => de ? 'Sonstiges' : 'Other',
   };
 
@@ -257,6 +271,8 @@ extension _FleetEventTypeX on FleetEventType {
       case 'document':
       case 'document_renewal':
         return FleetEventType.document;
+      case kVehicleCheckEventType:
+        return FleetEventType.vehicleCheck;
       default:
         return FleetEventType.other;
     }
@@ -279,6 +295,7 @@ class _FleetEvent {
     this.accident = const <String, String>{},
     this.fileUrl = '',
     this.fileName = '',
+    this.checkPath = '',
   });
 
   final String id;
@@ -299,8 +316,15 @@ class _FleetEvent {
   final String fileUrl;
   final String fileName;
 
+  /// Firestore-Pfad des zugehörigen Fahrzeug-Check-Dokuments — nur bei
+  /// [FleetEventType.vehicleCheck] gesetzt. Öffnet die Check-Detailansicht.
+  final String checkPath;
+
   bool get hasDetails =>
-      accident.isNotEmpty || subtitle.isNotEmpty || fileUrl.trim().isNotEmpty;
+      accident.isNotEmpty ||
+      subtitle.isNotEmpty ||
+      fileUrl.trim().isNotEmpty ||
+      checkPath.trim().isNotEmpty;
 
   static Map<String, String> _accidentFrom(Map<String, dynamic> source) {
     final result = <String, String>{};
@@ -323,6 +347,9 @@ class _FleetEvent {
       km: rawKm is num ? rawKm.toInt() : int.tryParse('${rawKm ?? ''}'.trim()),
       legacy: false,
       accident: _accidentFrom(data),
+      fileUrl: (data['fileUrl'] ?? '').toString().trim(),
+      fileName: (data['fileName'] ?? '').toString().trim(),
+      checkPath: (data['checkPath'] ?? '').toString().trim(),
     );
   }
 
@@ -393,6 +420,11 @@ class _FleetVehicleDetailPageState extends State<FleetVehicleDetailPage> {
 
   Future<int>? _damageFuture;
   String _damageKey = '';
+
+  /// Cache für [_lastCheckFallback] — ohne ihn würde jeder Rebuild des
+  /// Events-Panels eine neue Firestore-Abfrage auslösen.
+  Future<_FleetEvent?>? _lastCheckFuture;
+  String _lastCheckKey = '';
 
   String get _plate => normalizePlateNumber(widget.plateNumber);
 
@@ -2673,6 +2705,7 @@ class _FleetVehicleDetailPageState extends State<FleetVehicleDetailPage> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         _maintenanceTile(events),
+                        _lastCheckSection(events),
                         const SizedBox(height: 10),
                         _eventFilterPill(),
                       ],
@@ -2783,6 +2816,170 @@ class _FleetVehicleDetailPageState extends State<FleetVehicleDetailPage> {
       ),
     );
   }
+
+  /// Fallback-Suche nach dem letzten Check, solange die Spiegel-Function
+  /// noch keine `fleet_events` geschrieben hat.
+  ///
+  /// Der Fahrer legt beim Speichern zusätzlich `lastVehicleCheck` auf
+  /// seinem eigenen Driver-Doc ab (das darf er laut Rules) — eine reine
+  /// Gleichheitsabfrage auf ein Map-Feld, die Firestore ohne
+  /// Composite-Index bedient.
+  Future<_FleetEvent?> _lastCheckFallback() {
+    final key = '${widget.dspUid}|$_plate';
+    if (key != _lastCheckKey || _lastCheckFuture == null) {
+      _lastCheckKey = key;
+      _lastCheckFuture = FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.dspUid)
+          .collection('drivers')
+          .where('lastVehicleCheck.plateKey', isEqualTo: plateKeyOf(_plate))
+          .get()
+          .then<_FleetEvent?>((snap) {
+            _FleetEvent? best;
+            for (final doc in snap.docs) {
+              final raw = doc.data()['lastVehicleCheck'];
+              if (raw is! Map) continue;
+              final km = raw['odometerKm'];
+              final candidate = _FleetEvent(
+                id: '${raw['checkId'] ?? doc.id}',
+                type: FleetEventType.vehicleCheck,
+                title: 'Fahrzeug-Check',
+                subtitle: <String>[
+                  '${raw['photoCount'] ?? 0} '
+                      '${_tr('Fotos', 'photos')}',
+                  '${raw['damageCount'] ?? 0} '
+                      '${_tr('Schäden', 'damages')}',
+                  if (km is num) 'KM ${_fmtKm(km.toInt())}',
+                  if ('${raw['driverName'] ?? ''}'.trim().isNotEmpty)
+                    '${raw['driverName']}',
+                ].join(' · '),
+                date: (raw['at'] as Timestamp?)?.toDate(),
+                km: km is num ? km.toInt() : null,
+                legacy: false,
+                checkPath: '${raw['path'] ?? ''}'.trim(),
+              );
+              final bestDate = best?.date;
+              final candidateDate = candidate.date;
+              if (best == null ||
+                  (candidateDate != null &&
+                      (bestDate == null || candidateDate.isAfter(bestDate)))) {
+                best = candidate;
+              }
+            }
+            return best;
+          })
+          .catchError((_) => null);
+    }
+    return _lastCheckFuture!;
+  }
+
+  /// Kachel „Letzter Fahrzeug-Check" — der jüngste Check aus der Fahrer-App.
+  /// Primärquelle ist der Fleet-Event-Spiegel; ohne deployte Function
+  /// greift [_lastCheckFallback].
+  Widget _lastCheckSection(List<_FleetEvent> events) {
+    for (final event in events) {
+      if (event.type == FleetEventType.vehicleCheck) {
+        return Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: _lastCheckTile(event),
+        );
+      }
+    }
+    return FutureBuilder<_FleetEvent?>(
+      future: _lastCheckFallback(),
+      builder: (context, snap) {
+        final event = snap.data;
+        if (event == null) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: _lastCheckTile(event),
+        );
+      },
+    );
+  }
+
+  Widget _lastCheckTile(_FleetEvent event) {
+    final meta = <String>[
+      if (event.date != null) _fmtDate(event.date),
+      if (event.km != null) '${_fmtKm(event.km!)} km',
+    ].join(' · ');
+
+    final tile = Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: _C.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _C.rowLine),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.fact_check_outlined, size: 18, color: _C.green),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _tr(
+                    'LETZTER FAHRZEUG-CHECK',
+                    'LAST VEHICLE CHECK',
+                  ),
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                    color: _C.text3,
+                    height: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  event.subtitle.isEmpty ? meta : event.subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: _C.text,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            meta.isEmpty ? '—' : _fmtDate(event.date),
+            style: const TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: _C.text2,
+            ),
+          ),
+          if (event.checkPath.isNotEmpty)
+            const Padding(
+              padding: EdgeInsets.only(left: 4),
+              child: Icon(Icons.chevron_right, size: 17, color: _C.muted),
+            ),
+        ],
+      ),
+    );
+
+    if (event.checkPath.isEmpty) return tile;
+    return _Hoverable(
+      onTap: () => _openVehicleCheck(event.checkPath),
+      tooltip: _tr('Check öffnen', 'Open check'),
+      borderRadius: BorderRadius.circular(12),
+      child: tile,
+    );
+  }
+
+  Future<void> _openVehicleCheck(String checkPath) => openAdminVehicleCheckDetail(
+    context,
+    dspUid: widget.dspUid,
+    checkPath: checkPath,
+    canManage: widget.canManage,
+  );
 
   Widget _eventFilterPill() {
     final label = _eventFilter == null
@@ -2956,6 +3153,12 @@ class _FleetVehicleDetailPageState extends State<FleetVehicleDetailPage> {
   /// Volle Event-Ansicht — zeigt vor allem die Unfall-Zusatzfelder, die in
   /// der Kachel keinen Platz haben (auch für Bestands-ACCIDENT-Events).
   Future<void> _showEventDetails(_FleetEvent event) async {
+    // Fahrzeug-Checks haben eine eigene Vollansicht (Fotogalerie,
+    // NEU-Badges, KI-Befunde) — der generische Event-Dialog kann das nicht.
+    if (event.checkPath.isNotEmpty) {
+      await _openVehicleCheck(event.checkPath);
+      return;
+    }
     final hasFile = event.fileUrl.trim().isNotEmpty;
     await showDialog<void>(
       context: context,

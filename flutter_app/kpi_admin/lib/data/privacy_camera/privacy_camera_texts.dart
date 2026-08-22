@@ -51,6 +51,7 @@ const Map<String, String> _de = {
   'ack_signature_clear': 'Löschen',
   'later_label': 'Später',
   'signature_required_hint': 'Bitte unterschreiben Sie, um zu bestätigen.',
+  'signature_export_failed': 'Die Unterschrift konnte nicht übernommen werden. Bitte unterschreiben Sie noch einmal.',
   'ack_save_error': 'Speichern fehlgeschlagen: {error}',
   'ok': 'OK',
 
@@ -127,6 +128,7 @@ const Map<String, String> _en = {
   'ack_signature_clear': 'Clear',
   'later_label': 'Later',
   'signature_required_hint': 'Please sign to confirm.',
+  'signature_export_failed': 'The signature could not be captured. Please sign again.',
   'ack_save_error': 'Saving failed: {error}',
   'ok': 'OK',
 
@@ -199,6 +201,7 @@ const Map<String, String> _sq = {
   'ack_signature_clear': 'Fshi',
   'later_label': 'Më vonë',
   'signature_required_hint': 'Ju lutemi nënshkruani për të konfirmuar.',
+  'signature_export_failed': 'Nënshkrimi nuk mund të merrej. Ju lutemi nënshkruani përsëri.',
   'ack_save_error': 'Ruajtja dështoi: {error}',
   'ok': 'OK',
 
@@ -275,6 +278,7 @@ const Map<String, String> _hu = {
   'ack_signature_clear': 'Törlés',
   'later_label': 'Később',
   'signature_required_hint': 'Kérjük, írja alá a visszaigazoláshoz.',
+  'signature_export_failed': 'Az aláírást nem sikerült rögzíteni. Kérjük, írja alá újra.',
   'ack_save_error': 'A mentés nem sikerült: {error}',
   'ok': 'OK',
 
@@ -350,6 +354,7 @@ const Map<String, String> _ro = {
   'ack_signature_clear': 'Șterge',
   'later_label': 'Mai târziu',
   'signature_required_hint': 'Vă rugăm să semnați pentru a confirma.',
+  'signature_export_failed': 'Semnătura nu a putut fi preluată. Vă rugăm să semnați din nou.',
   'ack_save_error': 'Salvarea a eșuat: {error}',
   'ok': 'OK',
 
@@ -426,6 +431,7 @@ const Map<String, String> _hr = {
   'ack_signature_clear': 'Obriši',
   'later_label': 'Kasnije',
   'signature_required_hint': 'Molimo potpišite kako biste potvrdili.',
+  'signature_export_failed': 'Potpis nije bilo moguće preuzeti. Molimo potpišite ponovno.',
   'ack_save_error': 'Spremanje nije uspjelo: {error}',
   'ok': 'OK',
 
@@ -498,6 +504,7 @@ const Map<String, String> _ar = {
   'ack_signature_clear': 'مسح',
   'later_label': 'لاحقًا',
   'signature_required_hint': 'يُرجى التوقيع للتأكيد.',
+  'signature_export_failed': 'تعذّر التقاط التوقيع. يُرجى التوقيع مرة أخرى.',
   'ack_save_error': 'فشل الحفظ: {error}',
   'ok': 'OK',
 
@@ -569,6 +576,7 @@ const Map<String, String> _tr = {
   'ack_signature_clear': 'Sil',
   'later_label': 'Daha sonra',
   'signature_required_hint': 'Teyit etmek için lütfen imzalayın.',
+  'signature_export_failed': 'İmza alınamadı. Lütfen tekrar imzalayın.',
   'ack_save_error': 'Kaydetme başarısız oldu: {error}',
   'ok': 'OK',
 
@@ -644,6 +652,7 @@ const Map<String, String> _ru = {
   'ack_signature_clear': 'Очистить',
   'later_label': 'Позже',
   'signature_required_hint': 'Пожалуйста, подпишите, чтобы подтвердить.',
+  'signature_export_failed': 'Не удалось получить подпись. Пожалуйста, подпишите ещё раз.',
   'ack_save_error': 'Не удалось сохранить: {error}',
   'ok': 'OK',
 
@@ -718,6 +727,7 @@ const Map<String, String> _bg = {
   'ack_signature_clear': 'Изчисти',
   'later_label': 'По-късно',
   'signature_required_hint': 'Моля, подпишете, за да потвърдите.',
+  'signature_export_failed': 'Подписът не можа да бъде получен. Моля, подпишете отново.',
   'ack_save_error': 'Запазването е неуспешно: {error}',
   'ok': 'OK',
 
@@ -792,6 +802,7 @@ const Map<String, String> _es = {
   'ack_signature_clear': 'Borrar',
   'later_label': 'Más tarde',
   'signature_required_hint': 'Por favor, firme para confirmar.',
+  'signature_export_failed': 'No se ha podido capturar la firma. Por favor, firme de nuevo.',
   'ack_save_error': 'Error al guardar: {error}',
   'ok': 'OK',
 

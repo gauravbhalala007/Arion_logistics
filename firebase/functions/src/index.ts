@@ -2343,6 +2343,13 @@ export {generateResidencePermitPdf} from "./residence_permit";
 // `fahrzeugschein.*` (nur leere Felder werden gefuellt).
 export {extractFahrzeugscheinOnUpload} from "./fahrzeugschein";
 
+// Gefuehrte Foto-Fahrzeuginspektion (Vehicle Check). Triggert auf neue
+// Check-Dokumente unter users/{dspUid}/drivers/{driverId}/incident_reports
+// mit `kind: "vehicle_check"`, spiegelt sie als Fleet-Hub-Event und laesst
+// Vertex AI Gemini (europe-west3) Bildqualitaet, Kilometerstand,
+// Kennzeichen und Schadens-Kandidaten pruefen. Region europe-west3.
+export {onVehicleCheckCreated} from "./vehicleChecks";
+
 // ════════════════════════════════════════════════════════════════════════════
 //  Vehicle soft-delete purge (Mac-Claude branch)
 // ════════════════════════════════════════════════════════════════════════════
