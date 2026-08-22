@@ -23,8 +23,10 @@
 // der ausdrücklich KEIN Fehlerfall ist und deshalb nicht unter „Fehlt
 // noch" laufen darf. Die Bestandsschulungen bleiben unverändert.
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../data/privacy_camera/privacy_camera_content.dart';
 import '../data/privacy_camera/privacy_camera_repository.dart';
@@ -487,6 +489,48 @@ class _AdminPrivacyCameraSectionState extends State<AdminPrivacyCameraSection> {
     ),
   );
 
+  /// Öffnet die beim Bestätigen erzeugte Bescheinigung
+  /// (`drivers/{tid}/documents/camera_privacy_ack_certificate`). Lazy
+  /// geladen — kein Vorab-Read pro Fahrer nötig.
+  Future<void> _openCertificate(String transporterId) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.dspUid)
+          .collection('drivers')
+          .doc(transporterId)
+          .collection('documents')
+          .doc(kPrivacyCameraCertificateDocType)
+          .get();
+      final url = (doc.data()?['downloadUrl'] ?? '').toString();
+      if (url.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              widget.de
+                  ? 'Keine Bescheinigung hinterlegt — die PDF-Erzeugung ist '
+                      'bei diesem Fahrer vermutlich fehlgeschlagen.'
+                  : 'No certificate on file — PDF generation likely failed '
+                      'for this driver.',
+            ),
+          ),
+        );
+        return;
+      }
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            widget.de ? 'Öffnen fehlgeschlagen: $e' : 'Could not open: $e',
+          ),
+        ),
+      );
+    }
+  }
+
   Widget _ackTile(_AckRow row, _SectionData data) {
     final ack = row.ack;
     late final String statusLabel;
@@ -612,6 +656,54 @@ class _AdminPrivacyCameraSectionState extends State<AdminPrivacyCameraSection> {
                   ),
                 ),
               ),
+              // Unterschriebene Bescheinigung (PDF) — wird beim Bestätigen
+              // erzeugt und am Fahrer abgelegt; hier direkt öffnen.
+              if (ack != null && ack.isAcknowledged) ...[
+                const SizedBox(width: 6),
+                Tooltip(
+                  message: widget.de
+                      ? 'Unterschriebene Bescheinigung (PDF) öffnen'
+                      : 'Open signed certificate (PDF)',
+                  waitDuration: const Duration(milliseconds: 400),
+                  child: Material(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(9),
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      onTap: () => _openCertificate(row.transporterId),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(9),
+                          border: Border.all(color: _kBorder),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(
+                              Icons.picture_as_pdf_outlined,
+                              size: 15,
+                              color: Color(0xFF16704F),
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              'PDF',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF16704F),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
           if (details.isNotEmpty) ...[
