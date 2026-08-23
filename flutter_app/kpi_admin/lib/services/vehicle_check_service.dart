@@ -50,8 +50,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart' as fb;
 import 'package:flutter/material.dart';
-import 'package:image/image.dart' as img;
 
+import 'image_compression.dart';
 import 'incident_reports.dart' show plateKeyOf, transporterIdOf;
 
 export 'incident_reports.dart' show plateKeyOf, transporterIdOf;
@@ -542,32 +542,12 @@ CollectionReference<Map<String, dynamic>> fleetEventsCollection(String dspUid) =
 // ═════════════════════════════════════════════════════════════════════════
 
 /// Skaliert auf max. 1600 px längste Kante und kodiert als JPEG q75 —
-/// dasselbe Rezept wie `recruiting_upload_service.dart`, damit ein
-/// 12-MP-Handyfoto nicht 6 MB durch das Mobilfunknetz schiebt.
-Future<Uint8List> compressVehicleCheckPhoto(Uint8List raw) async {
-  return Future<Uint8List>.microtask(() {
-    final decoded = img.decodeImage(raw);
-    if (decoded == null) return raw;
-    const maxEdge = 1600;
-    final longest = decoded.width > decoded.height
-        ? decoded.width
-        : decoded.height;
-    final resized = longest <= maxEdge
-        ? decoded
-        : (decoded.width >= decoded.height
-              ? img.copyResize(
-                  decoded,
-                  width: maxEdge,
-                  interpolation: img.Interpolation.linear,
-                )
-              : img.copyResize(
-                  decoded,
-                  height: maxEdge,
-                  interpolation: img.Interpolation.linear,
-                ));
-    return Uint8List.fromList(img.encodeJpg(resized, quality: 75));
-  });
-}
+/// dasselbe Rezept wie Recruiting- und Incident-Fotos (siehe
+/// `image_compression.dart`), damit ein 12-MP-Handyfoto nicht 6 MB durch
+/// das Mobilfunknetz schiebt. Ist das Format nicht dekodierbar, geht das
+/// Original raus — ein Check ohne Foto wäre schlimmer als ein großes Foto.
+Future<Uint8List> compressVehicleCheckPhoto(Uint8List raw) async =>
+    await compressImageToJpeg(raw) ?? raw;
 
 /// Storage-Pfad eines Schritt-Fotos.
 String vehicleCheckPhotoPath({

@@ -24,6 +24,8 @@ import 'package:intl/intl.dart';
 ///   grounding           'yes'|'no'|'possible'|'unknown', groundingReason
 ///   thirdParty          {name, plate, phone, email, insurance}
 ///   notes, source, confidence, reviewFlag, reportedAt, reportedBy
+///   photos              [{url, path, uploadedBy, uploadedAt}]  (additiv)
+///   photoCount          int — gespiegelte Länge von `photos`
 ///   (work_accident) injuryType, bodyPart, activityAtTime, firstAid,
 ///                   firstAidBy, doctorVisited, witnesses, expectedDaysOff,
 ///                   bgReportRequired
@@ -313,6 +315,97 @@ String incidentGroundingOf(Map<String, dynamic> data) {
   return 'unknown';
 }
 
+// ── Fotos ────────────────────────────────────────────────────────────────
+
+/// Firestore-Feld mit der kanonischen Fotoliste.
+const String kIncidentPhotosField = 'photos';
+
+/// Ein Foto am Vorfall-Dokument.
+///
+/// `path` ist der Storage-Pfad und wird gebraucht, um die Datei beim
+/// Entfernen wirklich zu löschen. Bestandsfotos aus der Fahrer-App
+/// (`platePhotoUrl` / `damagePhotoUrls`) kennen nur die URL — dort bleibt
+/// `path` leer und die Datei bleibt beim Entfernen im Bucket liegen
+/// (verwaist, aber ohne Referenz im Dokument).
+class IncidentPhoto {
+  const IncidentPhoto({
+    required this.url,
+    this.path = '',
+    this.uploadedBy = '',
+    this.uploadedAt,
+  });
+
+  final String url;
+  final String path;
+
+  /// Auth-UID des Hochladenden (Admin oder Fahrer).
+  final String uploadedBy;
+  final DateTime? uploadedAt;
+
+  Map<String, dynamic> toMap() => <String, dynamic>{
+        'url': url,
+        'path': path,
+        'uploadedBy': uploadedBy,
+        'uploadedAt':
+            uploadedAt == null ? null : Timestamp.fromDate(uploadedAt!),
+      };
+
+  static IncidentPhoto? fromMap(Object? raw) {
+    if (raw is String) {
+      final url = raw.trim();
+      return url.isEmpty ? null : IncidentPhoto(url: url);
+    }
+    if (raw is! Map) return null;
+    final url = _s(raw['url']);
+    if (url.isEmpty) return null;
+    final at = raw['uploadedAt'];
+    return IncidentPhoto(
+      url: url,
+      path: _s(raw['path']),
+      uploadedBy: _s(raw['uploadedBy']),
+      uploadedAt: at is Timestamp
+          ? at.toDate()
+          : at is DateTime
+              ? at
+              : null,
+    );
+  }
+}
+
+/// Alle Fotos eines Vorfalls.
+///
+/// Kanonisch ist das Array [kIncidentPhotosField]. Nur wenn es fehlt oder
+/// leer ist, greifen die Altfelder der Fahrer-App (`platePhotoUrl`,
+/// `damagePhotoUrls`) — sonst würde eine seit dem Foto-Update gespeicherte
+/// Meldung, die beides schreibt, jedes Bild doppelt zeigen.
+List<IncidentPhoto> incidentPhotosOf(Map<String, dynamic> data) {
+  final raw = data[kIncidentPhotosField];
+  if (raw is List) {
+    final out = <IncidentPhoto>[];
+    for (final entry in raw) {
+      final photo = IncidentPhoto.fromMap(entry);
+      if (photo != null) out.add(photo);
+    }
+    if (out.isNotEmpty) return out;
+  }
+
+  final legacy = <IncidentPhoto>[];
+  final plate = _s(data['platePhotoUrl']);
+  if (plate.isNotEmpty) legacy.add(IncidentPhoto(url: plate));
+  final damage = data['damagePhotoUrls'];
+  if (damage is List) {
+    for (final entry in damage) {
+      final url = _s(entry);
+      if (url.isNotEmpty) legacy.add(IncidentPhoto(url: url));
+    }
+  }
+  return legacy;
+}
+
+/// Anzahl der Fotos — für das Kachel-Badge und den Kopier-Bericht.
+int incidentPhotoCount(Map<String, dynamic> data) =>
+    incidentPhotosOf(data).length;
+
 // ── Client-seitige Gruppierung (Statistik-Panel) ─────────────────────────
 
 /// Gruppenschlüssel eines Vorfalls für die Fahrer-Statistik.
@@ -570,6 +663,15 @@ String buildIncidentClipboardText(Map<String, dynamic> data) {
   }
 
   add('Notizen', _s(data['notes']));
+
+  // Bewusst nur die Anzahl, keine URLs: die Download-Links tragen einen
+  // Storage-Token und wären in einer WhatsApp-Gruppe ein dauerhaft
+  // öffentlicher Zugang zu Fahrer- und Fahrzeugfotos.
+  final photoCount = incidentPhotoCount(data);
+  if (photoCount > 0) {
+    add('Fotos', '$photoCount ${photoCount == 1 ? 'Foto' : 'Fotos'} in CoDriver');
+  }
+
   add('Gemeldet von', _firstNonEmpty([_s(data['reportedBy']), _s(data['createdBy'])]));
 
   return lines.join('\n');

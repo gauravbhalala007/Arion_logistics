@@ -3,12 +3,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../services/incident_reports.dart';
 import '../widgets/admin_scope.dart';
 import '../widgets/co_button.dart';
 import '../widgets/co_pressable.dart';
+import '../widgets/incident_photo_gallery.dart';
 import '../widgets/mobile_filter_controls.dart';
 import '../widgets/pill_tab_bar.dart';
 import 'admin_incident_form_page.dart';
@@ -1009,6 +1009,7 @@ class _IncidentCard extends StatelessWidget {
     final driverName = incidentDriverName(data);
     final plate = incidentPlate(data);
     final description = incidentDescription(data);
+    final photoCount = incidentPhotoCount(data);
 
     return CoPressable(
       onTap: onOpen,
@@ -1062,6 +1063,7 @@ class _IncidentCard extends StatelessWidget {
                           bg: _typeBg(incidentTypeOf(data)),
                           fg: _typeFg(incidentTypeOf(data)),
                         ),
+                      if (photoCount > 0) IncidentPhotoBadge(count: photoCount),
                     ],
                   ),
                   if (description.isNotEmpty) ...[
@@ -1639,18 +1641,13 @@ class _IncidentDetailDialog extends StatelessWidget {
     Map<String, dynamic> data,
     bool de,
   ) {
-    final urls = <String>[
-      (data['platePhotoUrl'] ?? '').toString(),
-      ...((data['damagePhotoUrls'] as List?) ?? const []).map(
-        (e) => e.toString(),
-      ),
-    ].map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
-    if (urls.isEmpty) return const <Widget>[];
+    final photos = incidentPhotosOf(data);
+    if (photos.isEmpty) return const <Widget>[];
 
     return <Widget>[
       const SizedBox(height: 20),
       Text(
-        de ? 'Fotos' : 'Photos',
+        de ? 'Fotos (${photos.length})' : 'Photos (${photos.length})',
         style: const TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w800,
@@ -1659,44 +1656,9 @@ class _IncidentDetailDialog extends StatelessWidget {
         ),
       ),
       const SizedBox(height: 8),
-      Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          for (final url in urls)
-            CoPressable(
-              onTap: () => launchUrl(
-                Uri.parse(url),
-                mode: LaunchMode.externalApplication,
-              ),
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                width: 148,
-                height: 104,
-                clipBehavior: Clip.antiAlias,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: kIncidentBorder),
-                  color: kIncidentFieldFill,
-                ),
-                child: Image.network(
-                  url,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Center(
-                    child: Text(
-                      de ? 'Foto öffnen' : 'Open photo',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: kIncidentFocus,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
+      // Tippen öffnet die Lightbox statt eines neuen Tabs — der Admin
+      // verliert sonst bei jedem Foto den Dialog-Kontext.
+      IncidentPhotoGallery(photos: photos),
     ];
   }
 }

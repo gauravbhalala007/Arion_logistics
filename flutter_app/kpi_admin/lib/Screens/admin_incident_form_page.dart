@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
+import '../services/incident_photos.dart';
 import '../services/incident_reports.dart';
 import '../utils/driver_activity.dart';
 import '../widgets/co_button.dart';
+import '../widgets/incident_photo_gallery.dart';
 
 /// ── Gemeinsame Feld-Optik ────────────────────────────────────────────────
 /// Ruhige, gefüllte Felder: hellgraue Füllung, 12er-Radius, Hairline-Border,
@@ -191,6 +193,28 @@ class _AdminIncidentFormPageState extends State<AdminIncidentFormPage> {
   bool _saving = false;
   final Map<String, String> _errors = <String, String>{};
 
+  // ── Fotos ──────────────────────────────────────────────────────────────
+  // Die Doc-ID steht schon vor dem Speichern fest, weil sie im
+  // Storage-Pfad steckt (`incident_reports/{dsp}/{TID}/{reportId}/photos`).
+  late final DocumentReference<Map<String, dynamic>> _docRef =
+      widget.isEdit
+          ? incidentReportsCol(widget.dspUid).doc(widget.docId)
+          : incidentReportsCol(widget.dspUid).doc();
+
+  /// Bereits am Dokument hängende Fotos (Bearbeiten-Modus).
+  final List<IncidentPhoto> _photos = <IncidentPhoto>[];
+
+  /// Beim Speichern aus dem Bucket zu löschen.
+  final List<IncidentPhoto> _photosToDelete = <IncidentPhoto>[];
+
+  /// Ausgewählt, aber noch nicht hochgeladen — der Upload passiert erst
+  /// beim Speichern, damit Abbrechen keine verwaisten Dateien hinterlässt.
+  final List<PickedIncidentPhoto> _newPhotos = <PickedIncidentPhoto>[];
+
+  bool _pickingPhotos = false;
+  int _uploadDone = 0;
+  int _uploadTotal = 0;
+
   bool get _isWorkAccident => widget.category == kIncidentWorkAccident;
 
   @override
@@ -273,6 +297,11 @@ class _AdminIncidentFormPageState extends State<AdminIncidentFormPage> {
     _driverTid = incidentDriverTid(data);
     _driverName = incidentDriverName(data);
     _plate = incidentPlate(data);
+
+    // Bestandsfotos der Fahrer-App (`platePhotoUrl`/`damagePhotoUrls`)
+    // kommen über den Fallback in `incidentPhotosOf` mit und werden beim
+    // nächsten Speichern in das kanonische `photos`-Array überführt.
+    _photos.addAll(incidentPhotosOf(data));
   }
 
   static String _str(dynamic v) => v?.toString().trim() ?? '';
@@ -334,6 +363,121 @@ class _AdminIncidentFormPageState extends State<AdminIncidentFormPage> {
     setState(() {
       _plate = result;
       _errors.remove('plate');
+    });
+  }
+
+  // ── Fotos ──────────────────────────────────────────────────────────────
+
+  Future<void> _pickPhotos() async {
+    if (_pickingPhotos || _saving) return;
+    setState(() => _pickingPhotos = true);
+    try {
+      final result = await pickIncidentPhotos();
+      if (!mounted) return;
+      setState(() => _newPhotos.addAll(result.photos));
+      if (result.hasRejections) _snackRejections(result);
+    } finally {
+      if (mounted) setState(() => _pickingPhotos = false);
+    }
+  }
+
+  void _snackRejections(IncidentPhotoPickResult result) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final parts = <String>[];
+    if (result.tooLarge > 0) {
+      final mb = kIncidentPhotoHardCapBytes ~/ (1024 * 1024);
+      parts.add(
+        de
+            ? '${result.tooLarge} Datei(en) über $mb MB übersprungen'
+            : '${result.tooLarge} file(s) over $mb MB skipped',
+      );
+    }
+    if (result.unreadable > 0) {
+      parts.add(
+        de
+            ? '${result.unreadable} Datei(en) nicht lesbar'
+            : '${result.unreadable} file(s) unreadable',
+      );
+    }
+    if (parts.isEmpty) return;
+    _snack(parts.join(' · '), error: true);
+  }
+
+  Widget _photoSection(bool de) {
+    final total = _photos.length + _newPhotos.length;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          _sectionLabel(de ? 'Fotos' : 'Photos'),
+          Text(
+            de
+                ? 'Bilder vom Schaden anhängen. Sie werden automatisch auf '
+                    '1600 px verkleinert (JPEG), bevor sie hochgeladen werden.'
+                : 'Attach photos of the damage. They are automatically '
+                    'resized to 1600 px (JPEG) before upload.',
+            style: const TextStyle(fontSize: 12, color: kIncidentMuted),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: <Widget>[
+              CoButton(
+                onPressed: _saving || _pickingPhotos ? null : _pickPhotos,
+                icon: Icons.add_photo_alternate_outlined,
+                label: de ? 'Fotos hinzufügen' : 'Add photos',
+                variant: CoButtonVariant.secondaryOutlined,
+                busy: _pickingPhotos,
+              ),
+              if (total > 0) ...[
+                const SizedBox(width: 12),
+                Text(
+                  de
+                      ? '$total ${total == 1 ? 'Foto' : 'Fotos'}'
+                      : '$total ${total == 1 ? 'photo' : 'photos'}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: kIncidentMuted,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          if (_photos.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            IncidentPhotoGallery(
+              photos: _photos,
+              onRemove: _saving ? null : _removeExistingPhoto,
+            ),
+          ],
+          if (_newPhotos.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            PickedIncidentPhotoStrip(
+              photos: _newPhotos,
+              enabled: !_saving,
+              removeTooltip: de ? 'Foto entfernen' : 'Remove photo',
+              onRemove: (i) => setState(() => _newPhotos.removeAt(i)),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              de
+                  ? 'Neue Fotos werden beim Speichern hochgeladen.'
+                  : 'New photos are uploaded when you save.',
+              style: const TextStyle(fontSize: 12, color: kIncidentMuted),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _removeExistingPhoto(int index) {
+    setState(() {
+      final removed = _photos.removeAt(index);
+      // Erst beim Speichern wirklich löschen — sonst wäre ein
+      // versehentliches X endgültig, obwohl der Dialog noch offen ist.
+      if (removed.path.isNotEmpty) _photosToDelete.add(removed);
     });
   }
 
@@ -484,16 +628,78 @@ class _AdminIncidentFormPageState extends State<AdminIncidentFormPage> {
       return;
     }
 
-    setState(() => _saving = true);
+    setState(() {
+      _saving = true;
+      _uploadDone = 0;
+      _uploadTotal = _newPhotos.length;
+    });
+
+    final uploaded = <IncidentPhoto>[];
     try {
-      final col = incidentReportsCol(widget.dspUid);
-      final ref = widget.isEdit ? col.doc(widget.docId) : col.doc();
-      await ref.set(_buildPayload(), SetOptions(merge: true));
+      for (var i = 0; i < _newPhotos.length; i++) {
+        uploaded.add(
+          await uploadIncidentPhoto(
+            dspUid: widget.dspUid,
+            transporterId: _driverTid,
+            reportId: _docRef.id,
+            photo: _newPhotos[i],
+            index: i,
+          ),
+        );
+        if (!mounted) return;
+        setState(() => _uploadDone = i + 1);
+      }
+    } catch (e) {
+      // Teil-Upload sauber zurückrollen: was schon im Bucket liegt, wird
+      // wieder gelöscht, sonst bleiben nach jedem Fehlversuch Reste da.
+      for (final photo in uploaded) {
+        await deleteIncidentPhotoFile(photo.path);
+      }
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _uploadTotal = 0;
+      });
+      final de = Localizations.localeOf(context).languageCode == 'de';
+      _snack(
+        de
+            ? 'Foto-Upload fehlgeschlagen — nichts gespeichert. '
+                'Entferne das Foto oder versuche es erneut. ($e)'
+            : 'Photo upload failed — nothing was saved. Remove the photo '
+                'or try again. ($e)',
+        error: true,
+      );
+      return;
+    }
+
+    try {
+      final payload = _buildPayload();
+      final photos = <IncidentPhoto>[..._photos, ...uploaded];
+      payload[kIncidentPhotosField] = <Map<String, dynamic>>[
+        for (final p in photos) p.toMap(),
+      ];
+      payload['photoCount'] = photos.length;
+      await _docRef.set(payload, SetOptions(merge: true));
+
+      // Erst nach dem erfolgreichen Schreiben aufräumen — schlägt der
+      // Write fehl, zeigt das Dokument die Fotos noch an.
+      for (final photo in _photosToDelete) {
+        await deleteIncidentPhotoFile(photo.path);
+      }
+      _photosToDelete.clear();
+
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _saving = false);
+      setState(() {
+        _saving = false;
+        _uploadTotal = 0;
+        // Die Uploads sind durch — sie gehören jetzt zum Formularstand,
+        // damit ein zweiter Speicherversuch sie nicht erneut hochlädt.
+        _photos.addAll(uploaded);
+        _newPhotos.clear();
+      });
       final de = Localizations.localeOf(context).languageCode == 'de';
       _snack(
         de ? 'Speichern fehlgeschlagen: $e' : 'Could not save: $e',
@@ -620,8 +826,41 @@ class _AdminIncidentFormPageState extends State<AdminIncidentFormPage> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
         children: [
+          if (_saving && _uploadTotal > 0)
+            Expanded(
+              child: Row(
+                children: <Widget>[
+                  const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(kIncidentFocus),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      de
+                          ? 'Foto $_uploadDone von $_uploadTotal wird '
+                              'hochgeladen …'
+                          : 'Uploading photo $_uploadDone of $_uploadTotal …',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: kIncidentMuted,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            const Spacer(),
           CoButton(
             onPressed: _saving ? null : () => Navigator.of(context).pop(false),
             label: de ? 'Abbrechen' : 'Cancel',
@@ -865,6 +1104,8 @@ class _AdminIncidentFormPageState extends State<AdminIncidentFormPage> {
         label: de ? 'Versicherung' : 'Insurance',
         child: _text(_tpInsuranceCtrl),
       ),
+      const SizedBox(height: 8),
+      _photoSection(de),
       _notesField(de),
     ];
   }
@@ -978,6 +1219,8 @@ class _AdminIncidentFormPageState extends State<AdminIncidentFormPage> {
         value: _bgReportRequired,
         onChanged: (v) => setState(() => _bgReportRequired = v),
       ),
+      const SizedBox(height: 8),
+      _photoSection(de),
       _notesField(de),
     ];
   }

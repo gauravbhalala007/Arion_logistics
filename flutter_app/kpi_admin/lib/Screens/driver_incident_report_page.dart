@@ -1,7 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart' as fb;
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geocoding/geocoding.dart' as geocoding;
@@ -9,7 +7,9 @@ import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../services/incident_photos.dart';
 import '../services/incident_reports.dart';
+import '../widgets/incident_photo_gallery.dart';
 import 'work_accident_form.dart';
 
 class DriverIncidentReportPage extends StatefulWidget {
@@ -71,8 +71,15 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
   bool _accidentNow = true;
   DateTime? _selectedAccidentTime;
 
-  _PickedPhoto? _platePhoto;
-  final List<_PickedPhoto> _damagePhotos = <_PickedPhoto>[];
+  // Fotos werden erst beim Absenden hochgeladen: die Storage-Rule erlaubt
+  // dem Fahrer `create/update`, aber KEIN `delete` (storage.rules:218) —
+  // ein vorher wieder entferntes Bild würde sonst dauerhaft im Bucket
+  // liegen bleiben, ohne dass es jemand aufräumen könnte.
+  PickedIncidentPhoto? _platePhoto;
+  final List<PickedIncidentPhoto> _damagePhotos = <PickedIncidentPhoto>[];
+
+  int _uploadDone = 0;
+  int _uploadTotal = 0;
 
   @override
   void initState() {
@@ -171,59 +178,49 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
   }
 
   Future<void> _pickPlatePhoto() async {
-    final picked = await _pickSingleImage();
-    if (picked == null || !mounted) return;
-    setState(() => _platePhoto = picked);
+    final result = await pickIncidentPhotos(limit: 1);
+    if (!mounted) return;
+    if (result.photos.isEmpty) {
+      if (result.hasRejections) {
+        _showSnack(
+          _t('driver_incident_snack_could_not_read_image_bytes'),
+          error: true,
+        );
+      }
+      return;
+    }
+    setState(() => _platePhoto = result.photos.first);
   }
 
   Future<void> _pickDamagePhotos() async {
-    final picked = await _pickManyImages();
-    if (picked.isEmpty || !mounted) return;
-    setState(() {
-      _damagePhotos
-        ..clear()
-        ..addAll(picked);
-    });
-  }
-
-  Future<_PickedPhoto?> _pickSingleImage() async {
-    final result = await FilePicker.platform.pickFiles(
-      allowMultiple: false,
-      withData: true,
-      type: FileType.image,
-    );
-    if (result == null || result.files.isEmpty) return null;
-    final file = result.files.first;
-    if (file.bytes == null) {
+    final free = kIncidentDriverPhotoLimit - _damagePhotos.length;
+    if (free <= 0) {
       _showSnack(
-        _t('driver_incident_snack_could_not_read_image_bytes'),
+        _tf('driver_incident_photo_limit', {
+          'count': '$kIncidentDriverPhotoLimit',
+        }),
         error: true,
       );
-      return null;
+      return;
     }
-    return _PickedPhoto(name: file.name, bytes: file.bytes!);
-  }
-
-  Future<List<_PickedPhoto>> _pickManyImages() async {
-    final result = await FilePicker.platform.pickFiles(
-      allowMultiple: true,
-      withData: true,
-      type: FileType.image,
-    );
-    if (result == null || result.files.isEmpty) return const <_PickedPhoto>[];
-    final out = <_PickedPhoto>[];
-    for (final file in result.files) {
-      final bytes = file.bytes;
-      if (bytes == null) continue;
-      out.add(_PickedPhoto(name: file.name, bytes: bytes));
+    final result = await pickIncidentPhotos(limit: free);
+    if (!mounted) return;
+    if (result.photos.isNotEmpty) {
+      setState(() => _damagePhotos.addAll(result.photos));
     }
-    if (out.isEmpty) {
+    if (result.overLimit > 0) {
+      _showSnack(
+        _tf('driver_incident_photo_limit', {
+          'count': '$kIncidentDriverPhotoLimit',
+        }),
+        error: true,
+      );
+    } else if (result.photos.isEmpty && result.hasRejections) {
       _showSnack(
         _t('driver_incident_snack_could_not_read_selected_image_bytes'),
         error: true,
       );
     }
-    return out;
   }
 
   Future<void> _pickAccidentDateTime() async {
@@ -342,37 +339,22 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
     return parts.join(', ');
   }
 
-  Future<String> _uploadPhoto({
-    required _PickedPhoto photo,
+  /// Lädt ein Foto in den Vorfall-Ordner. Pfad und MIME-Handling stecken in
+  /// `incident_photos.dart` — dieselbe Pipeline wie im Admin-Formular.
+  Future<IncidentPhoto> _uploadPhoto({
+    required PickedIncidentPhoto photo,
     required String reportId,
-    required String bucket,
-  }) async {
-    final fileName =
-        '${DateTime.now().millisecondsSinceEpoch}_${_safeFileName(photo.name)}';
-    final ref = fb.FirebaseStorage.instance
-        .ref()
-        .child('incident_reports')
-        .child(widget.dspUid)
-        .child(widget.driverTransporterId.toUpperCase())
-        .child(reportId)
-        .child(bucket)
-        .child(fileName);
-    // contentType MUSS gesetzt sein — die Storage-Rule isImage()
-    // lehnt Uploads ohne Bild-MIME-Type ab (Flutter Web lädt sonst
-    // als application/octet-stream hoch).
-    final lower = photo.name.toLowerCase();
-    final contentType = lower.endsWith('.png')
-        ? 'image/png'
-        : lower.endsWith('.webp')
-            ? 'image/webp'
-            : lower.endsWith('.heic') || lower.endsWith('.heif')
-                ? 'image/heic'
-                : 'image/jpeg';
-    await ref.putData(
-      photo.bytes,
-      fb.SettableMetadata(contentType: contentType),
+    required String folder,
+    required int index,
+  }) {
+    return uploadIncidentPhoto(
+      dspUid: widget.dspUid,
+      transporterId: widget.driverTransporterId,
+      reportId: reportId,
+      photo: photo,
+      index: index,
+      folder: folder,
     );
-    return ref.getDownloadURL();
   }
 
   Future<void> _shareByEmail() async {
@@ -502,30 +484,47 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
       return;
     }
 
-    setState(() => _submitting = true);
+    setState(() {
+      _submitting = true;
+      _uploadDone = 0;
+      _uploadTotal = (_platePhoto == null ? 0 : 1) + _damagePhotos.length;
+    });
     try {
       final db = FirebaseFirestore.instance;
       final dspRef = db.collection('users').doc(widget.dspUid);
       final rootRef = dspRef.collection(_reportsCollection).doc();
       final reportId = rootRef.id;
 
-      final plateUrl = _platePhoto == null
-          ? ''
-          : await _uploadPhoto(
-              photo: _platePhoto!,
-              reportId: reportId,
-              bucket: 'plate',
-            );
-
-      final damageUrls = <String>[];
-      for (final photo in _damagePhotos) {
-        final url = await _uploadPhoto(
-          photo: photo,
-          reportId: reportId,
-          bucket: 'damage',
+      // Kanonische Fotoliste des Incident-Schemas — Kennzeichen zuerst,
+      // danach die Schadensfotos in Auswahlreihenfolge.
+      final photos = <IncidentPhoto>[];
+      if (_platePhoto != null) {
+        photos.add(
+          await _uploadPhoto(
+            photo: _platePhoto!,
+            reportId: reportId,
+            folder: 'plate',
+            index: 0,
+          ),
         );
-        damageUrls.add(url);
+        if (mounted) setState(() => _uploadDone = photos.length);
       }
+      for (var i = 0; i < _damagePhotos.length; i++) {
+        photos.add(
+          await _uploadPhoto(
+            photo: _damagePhotos[i],
+            reportId: reportId,
+            folder: kIncidentPhotoFolder,
+            index: i,
+          ),
+        );
+        if (mounted) setState(() => _uploadDone = photos.length);
+      }
+      final plateUrl = _platePhoto == null ? '' : photos.first.url;
+      final damageUrls = <String>[
+        for (var i = _platePhoto == null ? 0 : 1; i < photos.length; i++)
+          photos[i].url,
+      ];
 
       final driverId = widget.driverTransporterId.toUpperCase();
       final driverRef = dspRef.collection('drivers').doc(driverId);
@@ -573,6 +572,13 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
         'status': 'submitted',
         'createdByAdmin': isAdminMode,
         if (isAdminMode) 'createdByAdminUid': auth.uid,
+        // Kanonisch für Incident-Center, Badge und Kopier-Bericht.
+        kIncidentPhotosField: <Map<String, dynamic>>[
+          for (final p in photos) p.toMap(),
+        ],
+        'photoCount': photos.length,
+        // Altfelder bleiben für Bestandsleser erhalten; `incidentPhotosOf`
+        // wertet sie nur aus, wenn `photos` fehlt — daher keine Dubletten.
         'platePhotoUrl': plateUrl,
         'damagePhotoUrls': damageUrls,
         'company': <String, dynamic>{
@@ -621,7 +627,10 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
       );
     } finally {
       if (mounted) {
-        setState(() => _submitting = false);
+        setState(() {
+          _submitting = false;
+          _uploadTotal = 0;
+        });
       }
     }
   }
@@ -932,7 +941,17 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
                             ),
                             if (_platePhoto != null) ...[
                               const SizedBox(height: 12),
-                              _imagePreview(_platePhoto!),
+                              PickedIncidentPhotoStrip(
+                                photos: <PickedIncidentPhoto>[_platePhoto!],
+                                enabled: !_submitting,
+                                thumbWidth: 180,
+                                thumbHeight: 110,
+                                removeTooltip: _t(
+                                  'driver_incident_photo_remove',
+                                ),
+                                onRemove: (_) =>
+                                    setState(() => _platePhoto = null),
+                              ),
                             ],
                           ],
                         ),
@@ -976,22 +995,35 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
                             ),
                             const SizedBox(height: 10),
                             _uploadSelectButton(
-                              onPressed: _pickDamagePhotos,
+                              onPressed:
+                                  _damagePhotos.length >=
+                                      kIncidentDriverPhotoLimit
+                                  ? null
+                                  : _pickDamagePhotos,
                               label: _damagePhotos.isEmpty
                                   ? _t('driver_incident_damage_take_photos')
-                                  : _t('driver_incident_damage_replace_photos'),
+                                  : _t('driver_incident_damage_add_photos'),
                             ),
                             if (_damagePhotos.isNotEmpty) ...[
-                              const SizedBox(height: 12),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: _damagePhotos
-                                    .map(
-                                      (photo) =>
-                                          _imagePreview(photo, compact: true),
-                                    )
-                                    .toList(),
+                              const SizedBox(height: 8),
+                              Text(
+                                '${_damagePhotos.length} / '
+                                '$kIncidentDriverPhotoLimit',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: _kMuted,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              PickedIncidentPhotoStrip(
+                                photos: _damagePhotos,
+                                enabled: !_submitting,
+                                removeTooltip: _t(
+                                  'driver_incident_photo_remove',
+                                ),
+                                onRemove: (i) =>
+                                    setState(() => _damagePhotos.removeAt(i)),
                               ),
                             ],
                           ],
@@ -1078,9 +1110,15 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
                                 )
                               : const Icon(Icons.send_outlined, size: 20),
                           label: Text(
-                            _submitting
-                                ? _t('driver_incident_submit_sending')
-                                : _t('driver_incident_submit'),
+                            !_submitting
+                                ? _t('driver_incident_submit')
+                                // Upload-Fortschritt hängt sich an den
+                                // bestehenden „Wird gesendet…"-Text an,
+                                // damit es in allen Sprachen stimmt.
+                                : _uploadTotal > 0
+                                ? '${_t('driver_incident_submit_sending')} '
+                                      '$_uploadDone/$_uploadTotal'
+                                : _t('driver_incident_submit_sending'),
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w800,
@@ -1339,7 +1377,7 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
   ];
 
   Widget _uploadSelectButton({
-    required VoidCallback onPressed,
+    required VoidCallback? onPressed,
     required String label,
   }) {
     return SizedBox(
@@ -1408,45 +1446,6 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
     );
   }
 
-  Widget _imagePreview(_PickedPhoto photo, {bool compact = false}) {
-    return Container(
-      width: compact ? 110 : 180,
-      height: compact ? 80 : 110,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(_kRadiusField),
-        border: Border.all(color: _kCardBorder),
-      ),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.memory(
-            photo.bytes,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) =>
-                const Center(child: Icon(Icons.broken_image_outlined)),
-          ),
-          Positioned(
-            left: 6,
-            right: 6,
-            bottom: 4,
-            child: Text(
-              photo.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 11,
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-                shadows: [Shadow(color: Colors.black, blurRadius: 2)],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showSnack(String message, {bool error = false}) {
     if (!mounted) return;
     final messenger = ScaffoldMessenger.maybeOf(context);
@@ -1457,10 +1456,6 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
         backgroundColor: error ? const Color(0xFFB42318) : null,
       ),
     );
-  }
-
-  static String _safeFileName(String input) {
-    return input.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
   }
 
   static String _stringOf(dynamic value) => value?.toString().trim() ?? '';
@@ -1505,13 +1500,6 @@ class _DriverIncidentReportPageState extends State<DriverIncidentReportPage> {
     if (value == null) return _t('driver_incident_select_date_time');
     return DateFormat('dd.MM.yyyy HH:mm').format(value);
   }
-}
-
-class _PickedPhoto {
-  final String name;
-  final Uint8List bytes;
-
-  const _PickedPhoto({required this.name, required this.bytes});
 }
 
 const Map<String, Map<String, String>> _driverIncidentReportTranslations = {
@@ -1580,6 +1568,9 @@ const Map<String, Map<String, String>> _driverIncidentReportTranslations = {
     'driver_incident_damage_both': 'Both',
     'driver_incident_damage_take_photos': 'Take damage photos',
     'driver_incident_damage_replace_photos': 'Replace damage photos',
+    'driver_incident_damage_add_photos': 'Add more photos',
+    'driver_incident_photo_remove': 'Remove photo',
+    'driver_incident_photo_limit': 'Maximum {count} photos.',
     'driver_incident_time_section_title': 'Accident time',
     'driver_incident_time_now': 'Accident happened now',
     'driver_incident_time_other': 'Other date / time',
@@ -1659,6 +1650,9 @@ const Map<String, Map<String, String>> _driverIncidentReportTranslations = {
     'driver_incident_damage_both': 'Beides',
     'driver_incident_damage_take_photos': 'Schadenfotos aufnehmen',
     'driver_incident_damage_replace_photos': 'Schadenfotos ersetzen',
+    'driver_incident_damage_add_photos': 'Weitere Fotos hinzufügen',
+    'driver_incident_photo_remove': 'Foto entfernen',
+    'driver_incident_photo_limit': 'Maximal {count} Fotos.',
     'driver_incident_time_section_title': 'Unfallzeitpunkt',
     'driver_incident_time_now': 'Unfall ist gerade passiert',
     'driver_incident_time_other': 'Anderes Datum / Uhrzeit',
@@ -1741,6 +1735,9 @@ const Map<String, Map<String, String>> _driverIncidentReportTranslations = {
     'driver_incident_damage_both': 'Te dyja',
     'driver_incident_damage_take_photos': 'Bej foto te demit',
     'driver_incident_damage_replace_photos': 'Zevendeso fotot e demit',
+    'driver_incident_damage_add_photos': 'Shto foto te tjera',
+    'driver_incident_photo_remove': 'Hiq foton',
+    'driver_incident_photo_limit': 'Maksimumi {count} foto.',
     'driver_incident_time_section_title': 'Koha e aksidentit',
     'driver_incident_time_now': 'Aksidenti ndodhi tani',
     'driver_incident_time_other': 'Date / ore tjeter',
@@ -1822,6 +1819,9 @@ const Map<String, Map<String, String>> _driverIncidentReportTranslations = {
     'driver_incident_damage_both': 'Mindketto',
     'driver_incident_damage_take_photos': 'Karfotok keszitese',
     'driver_incident_damage_replace_photos': 'Karfotok cserelese',
+    'driver_incident_damage_add_photos': 'Tovabbi fotok hozzaadasa',
+    'driver_incident_photo_remove': 'Foto eltavolitasa',
+    'driver_incident_photo_limit': 'Legfeljebb {count} foto.',
     'driver_incident_time_section_title': 'Baleset idopontja',
     'driver_incident_time_now': 'A baleset most tortent',
     'driver_incident_time_other': 'Mas datum / ido',
@@ -1904,6 +1904,9 @@ const Map<String, Map<String, String>> _driverIncidentReportTranslations = {
     'driver_incident_damage_both': 'Ambele',
     'driver_incident_damage_take_photos': 'Fa poze cu paguba',
     'driver_incident_damage_replace_photos': 'Inlocuieste pozele',
+    'driver_incident_damage_add_photos': 'Adauga mai multe poze',
+    'driver_incident_photo_remove': 'Sterge poza',
+    'driver_incident_photo_limit': 'Maximum {count} poze.',
     'driver_incident_time_section_title': 'Momentul accidentului',
     'driver_incident_time_now': 'Accidentul s-a intamplat acum',
     'driver_incident_time_other': 'Alta data / ora',
@@ -1984,6 +1987,9 @@ const Map<String, Map<String, String>> _driverIncidentReportTranslations = {
     'driver_incident_damage_both': 'Oboje',
     'driver_incident_damage_take_photos': 'Snimi fotografije stete',
     'driver_incident_damage_replace_photos': 'Zamijeni fotografije stete',
+    'driver_incident_damage_add_photos': 'Dodaj jos fotografija',
+    'driver_incident_photo_remove': 'Ukloni fotografiju',
+    'driver_incident_photo_limit': 'Najvise {count} fotografija.',
     'driver_incident_time_section_title': 'Vrijeme nesrece',
     'driver_incident_time_now': 'Nesreca se upravo dogodila',
     'driver_incident_time_other': 'Drugi datum / vrijeme',
@@ -2057,6 +2063,9 @@ const Map<String, Map<String, String>> _driverIncidentReportTranslations = {
     'driver_incident_damage_both': 'كلاهما',
     'driver_incident_damage_take_photos': 'التقاط صور الضرر',
     'driver_incident_damage_replace_photos': 'استبدال صور الضرر',
+    'driver_incident_damage_add_photos': 'إضافة صور أخرى',
+    'driver_incident_photo_remove': 'إزالة الصورة',
+    'driver_incident_photo_limit': 'بحد أقصى {count} صور.',
     'driver_incident_time_section_title': 'وقت الحادث',
     'driver_incident_time_now': 'الحادث وقع الآن',
     'driver_incident_time_other': 'تاريخ / وقت آخر',
@@ -2135,6 +2144,9 @@ const Map<String, Map<String, String>> _driverIncidentReportTranslations = {
     'driver_incident_damage_both': 'Ikisi de',
     'driver_incident_damage_take_photos': 'Hasar fotograflari cek',
     'driver_incident_damage_replace_photos': 'Hasar fotograflarini degistir',
+    'driver_incident_damage_add_photos': 'Daha fazla fotograf ekle',
+    'driver_incident_photo_remove': 'Fotografi kaldir',
+    'driver_incident_photo_limit': 'En fazla {count} fotograf.',
     'driver_incident_time_section_title': 'Kaza Zamani',
     'driver_incident_time_now': 'Kaza simdi oldu',
     'driver_incident_time_other': 'Diger tarih / saat',
@@ -2213,6 +2225,9 @@ const Map<String, Map<String, String>> _driverIncidentReportTranslations = {
     'driver_incident_damage_both': 'Оба',
     'driver_incident_damage_take_photos': 'Сделать фото повреждений',
     'driver_incident_damage_replace_photos': 'Заменить фото повреждений',
+    'driver_incident_damage_add_photos': 'Добавить ещё фото',
+    'driver_incident_photo_remove': 'Удалить фото',
+    'driver_incident_photo_limit': 'Максимум {count} фото.',
     'driver_incident_time_section_title': 'Время аварии',
     'driver_incident_time_now': 'Авария произошла только что',
     'driver_incident_time_other': 'Другая дата / время',
@@ -2275,6 +2290,9 @@ const Map<String, Map<String, String>> _driverIncidentReportTranslations = {
     'driver_incident_damage_both': 'И двете',
     'driver_incident_damage_take_photos': 'Снимай щетите',
     'driver_incident_damage_replace_photos': 'Смени снимките на щетите',
+    'driver_incident_damage_add_photos': 'Добави още снимки',
+    'driver_incident_photo_remove': 'Премахни снимката',
+    'driver_incident_photo_limit': 'Максимум {count} снимки.',
     'driver_incident_time_section_title': 'Час на инцидента',
     'driver_incident_time_now': 'Инцидентът се случи сега',
     'driver_incident_time_other': 'Друга дата / час',
@@ -2342,6 +2360,9 @@ const Map<String, Map<String, String>> _driverIncidentReportTranslations = {
     'driver_incident_damage_both': 'Ambos',
     'driver_incident_damage_take_photos': 'Hacer fotos de los daños',
     'driver_incident_damage_replace_photos': 'Repetir fotos de los daños',
+    'driver_incident_damage_add_photos': 'Añadir más fotos',
+    'driver_incident_photo_remove': 'Quitar foto',
+    'driver_incident_photo_limit': 'Máximo {count} fotos.',
     'driver_incident_time_section_title': 'Hora del accidente',
     'driver_incident_time_now': 'El accidente acaba de ocurrir',
     'driver_incident_time_other': 'Otra fecha / hora',

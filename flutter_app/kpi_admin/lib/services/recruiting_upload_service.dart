@@ -15,9 +15,9 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
-import 'package:image/image.dart' as img;
 
 import '../models/recruiting_application.dart';
+import 'image_compression.dart';
 
 /// A document the applicant picked but that has not been uploaded yet.
 /// Uploads are deferred to submit time so a slow connection while
@@ -129,27 +129,10 @@ class RecruitingUploadService {
   /// Down-scales an image so its longest edge is ≤ 1600 px and
   /// re-encodes at JPEG q75 — still perfectly readable for ID
   /// documents, but upload-friendly on cellular.
-  Future<Uint8List?> compressImage(Uint8List raw) async {
-    try {
-      final decoded = img.decodeImage(raw);
-      if (decoded == null) return null;
-      const maxEdge = 1600;
-      final longest =
-          decoded.width > decoded.height ? decoded.width : decoded.height;
-      final resized = longest > maxEdge
-          ? img.copyResize(
-              decoded,
-              width: decoded.width >= decoded.height ? maxEdge : null,
-              height: decoded.width >= decoded.height ? null : maxEdge,
-              interpolation: img.Interpolation.linear,
-            )
-          : decoded;
-      final encoded = img.encodeJpg(resized, quality: 75);
-      return Uint8List.fromList(encoded);
-    } catch (_) {
-      return null;
-    }
-  }
+  ///
+  /// The actual recipe lives in `image_compression.dart` so recruiting,
+  /// vehicle checks and incident photos all share it.
+  Future<Uint8List?> compressImage(Uint8List raw) => compressImageToJpeg(raw);
 
   /// Uploads one file to Firebase Storage and returns the resulting
   /// downloadUrl + storagePath.
