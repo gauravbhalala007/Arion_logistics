@@ -653,6 +653,13 @@ service cloud.firestore {
       match /vehicles/{plateNumber} {
         allow get, list: if isVehicleManager(userId);
 
+        // Fahrer dürfen die Fahrzeuge ihres DSP LESEN — sonst können sie
+        // im Fahrzeug-Check ihr Fahrzeug nicht auswählen und müssten das
+        // Kennzeichen abtippen. Nur lesen; anlegen, ändern und löschen
+        // bleibt dem Fleet-Hub-Verwalter vorbehalten. Fahrzeugdaten sind
+        // Betriebsmittel, keine personenbezogenen Daten.
+        allow get, list: if isDriverForUser(userId) && isApproved(userId);
+
         allow create: if isVehicleManager(userId)
           && validVehicleDocument(request.resource.data, userId, plateNumber)
           && request.resource.data.createdAt == request.time

@@ -46,14 +46,22 @@ const Set<String> _kCotimerVisibleForDrivers = {
 ///
 /// Muster bewusst identisch zu [_kCotimerVisibleForDrivers], damit das
 /// Freischalten später nur eine Zeile ist.
-const Set<String> _kVehicleCheckVisibleForDrivers = {
-  'israfil.topi@arion-logistics.de',
-};
+/// Test-Gate des geführten Fahrzeug-Checks — inzwischen leer, weil der
+/// Check samt Sichtprüfung für alle Fahrer freigegeben ist. Die Liste
+/// bleibt als Schalter stehen: Wer hier Adressen einträgt UND
+/// [kGuidedVehicleCheckForEveryone] auf `false` setzt, schaltet ihn
+/// wieder auf einzelne Testfahrer zurück.
+const Set<String> _kVehicleCheckVisibleForDrivers = <String>{};
+
+/// `false` = nur die Adressen oben sehen den geführten Check.
+const bool kGuidedVehicleCheckForEveryone = true;
 
 /// `true`, wenn der eingeloggte Fahrer den neuen geführten Check sieht.
-bool _guidedVehicleCheckEnabled() => _kVehicleCheckVisibleForDrivers.contains(
-  (FirebaseAuth.instance.currentUser?.email ?? '').toLowerCase().trim(),
-);
+bool _guidedVehicleCheckEnabled() =>
+    kGuidedVehicleCheckForEveryone ||
+    _kVehicleCheckVisibleForDrivers.contains(
+      (FirebaseAuth.instance.currentUser?.email ?? '').toLowerCase().trim(),
+    );
 
 const double _kTopCardHeight = 142;
 
@@ -553,8 +561,8 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
         _HomeCardData(
           title: 'Fahrzeug-Check',
           subtitle: Localizations.localeOf(context).languageCode == 'de'
-              ? 'Foto-Rundgang · 8 Schritte'
-              : 'Photo walk-around · 8 steps',
+              ? 'Fotos + Sichtprüfung'
+              : 'Photos + visual check',
           icon: Icons.photo_camera_outlined,
           iconColor: const Color(0xFF1D7F5A),
           iconBackground: const Color(0xFFE6F8F2),

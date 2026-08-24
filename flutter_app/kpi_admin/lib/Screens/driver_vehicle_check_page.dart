@@ -96,10 +96,46 @@ class _DriverVehicleCheckPageState extends State<DriverVehicleCheckPage> {
   static const List<VehicleCheckInspectionItem> _items =
       VehicleCheckInspectionItem.values;
 
+  /// Kennzeichen der aktiven Fahrzeuge des DSP — Auswahlliste statt
+  /// Abtippen. Leer, solange nicht geladen oder wenn die Rules den
+  /// Lesezugriff (noch) nicht erlauben; dann bleibt das Textfeld der Weg.
+  List<String> _fleetPlates = const <String>[];
+  bool _fleetLoading = true;
+
   @override
   void initState() {
     super.initState();
     _loadDriver();
+    _loadFleet();
+  }
+
+  /// Fahrzeugliste des DSP laden.
+  ///
+  /// Bewusst fehlertolerant: Scheitert die Abfrage (fehlende Freigabe,
+  /// kein Netz), bleibt die Liste leer und der Fahrer tippt das
+  /// Kennzeichen wie bisher ein — der Check ist dadurch nie blockiert.
+  Future<void> _loadFleet() async {
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.dspUid)
+          .collection('vehicles')
+          .get();
+      final plates =
+          <String>{
+            for (final doc in snap.docs)
+              if (doc.data()['isDeleted'] != true)
+                ('${doc.data()['plateNumber'] ?? doc.id}').trim().toUpperCase(),
+          }.where((p) => p.isNotEmpty).toList()..sort();
+      if (!mounted) return;
+      setState(() {
+        _fleetPlates = plates;
+        _fleetLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _fleetLoading = false);
+    }
   }
 
   @override
@@ -482,14 +518,39 @@ class _DriverVehicleCheckPageState extends State<DriverVehicleCheckPage> {
       children: [
         _sectionTitle(
           _tr('Welches Fahrzeug fährst du?', 'Which van are you driving?'),
-          _tr(
-            'Kennzeichen genau wie am Fahrzeug eintippen — Leerzeichen und '
-            'Bindestriche sind egal.',
-            'Type the plate exactly as on the van — spaces and dashes do '
-            'not matter.',
-          ),
+          _fleetPlates.isEmpty
+              ? _tr(
+                  'Kennzeichen genau wie am Fahrzeug eintippen — Leerzeichen '
+                  'und Bindestriche sind egal.',
+                  'Type the plate exactly as on the van — spaces and dashes '
+                  'do not matter.',
+                )
+              : _tr(
+                  'Aus der Liste auswählen oder Kennzeichen eintippen.',
+                  'Pick it from the list or type the plate.',
+                ),
         ),
         const SizedBox(height: 14),
+        if (_fleetLoading)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 12),
+            child: LinearProgressIndicator(minHeight: 2),
+          )
+        else if (_fleetPlates.isNotEmpty) ...[
+          _VehiclePicker(
+            plates: _fleetPlates,
+            selected: plateKeyOf(_plateCtrl.text),
+            lastPlate: _lastPlate,
+            de: _de,
+            onPick: (plate) => setState(() {
+              _plateCtrl.text = plate;
+              _plateCtrl.selection = TextSelection.collapsed(
+                offset: plate.length,
+              );
+            }),
+          ),
+          const SizedBox(height: 14),
+        ],
         TextField(
           controller: _plateCtrl,
           textCapitalization: TextCapitalization.characters,
@@ -2085,4 +2146,200 @@ class _DamageSheetState extends State<_DamageSheet> {
       ),
     ),
   );
+}
+
+/// Auswahl des eigenen Fahrzeugs aus der Flotte des DSP.
+///
+/// Bewusst als Suchfeld plus Kachelraster statt Dropdown: Auf dem Handy
+/// mit 60+ Fahrzeugen ist Tippen schneller als Scrollen, und das zuletzt
+/// gefahrene Fahrzeug steht immer ganz oben.
+class _VehiclePicker extends StatefulWidget {
+  const _VehiclePicker({
+    required this.plates,
+    required this.selected,
+    required this.lastPlate,
+    required this.de,
+    required this.onPick,
+  });
+
+  final List<String> plates;
+
+  /// Bereits gewähltes Kennzeichen als Vergleichsschlüssel.
+  final String selected;
+  final String lastPlate;
+  final bool de;
+  final ValueChanged<String> onPick;
+
+  @override
+  State<_VehiclePicker> createState() => _VehiclePickerState();
+}
+
+class _VehiclePickerState extends State<_VehiclePicker> {
+  final TextEditingController _search = TextEditingController();
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  List<String> get _visible {
+    final needle = plateKeyOf(_search.text);
+    final all = <String>[
+      // Zuletzt gefahren zuerst — der häufigste Fall.
+      if (widget.lastPlate.isNotEmpty &&
+          widget.plates.any(
+            (p) => plateKeyOf(p) == plateKeyOf(widget.lastPlate),
+          ))
+        widget.plates.firstWhere(
+          (p) => plateKeyOf(p) == plateKeyOf(widget.lastPlate),
+        ),
+      ...widget.plates.where(
+        (p) => plateKeyOf(p) != plateKeyOf(widget.lastPlate),
+      ),
+    ];
+    if (needle.isEmpty) return all;
+    return all.where((p) => plateKeyOf(p).contains(needle)).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final de = widget.de;
+    final visible = _visible;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (widget.plates.length > 8)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: TextField(
+              controller: _search,
+              textCapitalization: TextCapitalization.characters,
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                isDense: true,
+                hintText: de ? 'Kennzeichen suchen…' : 'Search plate…',
+                prefixIcon: const Icon(Icons.search, size: 20),
+                suffixIcon: _search.text.isEmpty
+                    ? null
+                    : IconButton(
+                        icon: const Icon(Icons.close, size: 18),
+                        onPressed: () => setState(_search.clear),
+                      ),
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: _kBorder),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: _kBorder),
+                ),
+              ),
+            ),
+          ),
+        if (visible.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Text(
+              de
+                  ? 'Kein Fahrzeug gefunden — tipp das Kennzeichen unten ein.'
+                  : 'No vehicle found — type the plate below.',
+              style: const TextStyle(fontSize: 12.5, color: _kMuted),
+            ),
+          )
+        else
+          ConstrainedBox(
+            // Höhe deckelt die Liste, damit das Textfeld darunter bei
+            // großen Flotten sichtbar bleibt.
+            constraints: const BoxConstraints(maxHeight: 232),
+            child: SingleChildScrollView(
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final plate in visible)
+                    _PlateChip(
+                      plate: plate,
+                      active: plateKeyOf(plate) == widget.selected,
+                      isLast: widget.lastPlate.isNotEmpty &&
+                          plateKeyOf(plate) == plateKeyOf(widget.lastPlate),
+                      de: de,
+                      onTap: () => widget.onPick(plate),
+                    ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _PlateChip extends StatelessWidget {
+  const _PlateChip({
+    required this.plate,
+    required this.active,
+    required this.isLast,
+    required this.de,
+    required this.onTap,
+  });
+
+  final String plate;
+  final bool active;
+  final bool isLast;
+  final bool de;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    const green = Color(0xFF1D7F5A);
+    return Material(
+      color: active ? green : Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 46),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: active ? green : _kBorder,
+              width: active ? 1.6 : 1,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isLast) ...[
+                Icon(
+                  Icons.history,
+                  size: 15,
+                  color: active ? Colors.white70 : _kMuted,
+                ),
+                const SizedBox(width: 6),
+              ],
+              Text(
+                plate,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.6,
+                  color: active ? Colors.white : const Color(0xFF111827),
+                ),
+              ),
+              if (active) ...[
+                const SizedBox(width: 8),
+                const Icon(Icons.check_circle, size: 16, color: Colors.white),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
