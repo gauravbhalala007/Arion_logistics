@@ -31,6 +31,28 @@
   <title>DSP CODRIVER — Operations-Plattform für DSPs</title>
   <link rel="manifest" href="manifest.json">
   <style>
+    /* Seitenhülle: Die App füllt IMMER die sichtbare Fläche.
+       Ohne das blieb auf Mobilgeräten unter der App ein weißer Streifen
+       stehen — die Adressleiste blendet sich beim Scrollen aus bzw. die
+       Bildschirmtastatur verkleinert die Ansicht, und die Flutter-Fläche
+       wuchs danach nicht wieder mit. `100dvh` folgt genau dieser
+       dynamischen Höhe; `100vh` bleibt als Rückfall für ältere Browser.
+       Die Hintergrundfarbe entspricht dem App-Hintergrund, damit selbst
+       ein Rest-Spalt nicht weiß aufblitzt. */
+    html, body {
+      height: 100vh;
+      height: 100dvh;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #F3F6F7;
+      overscroll-behavior: none;
+    }
+
+    flutter-view, flt-glass-pane {
+      height: 100%;
+    }
+
     #app-loading {
       position: fixed; inset: 0; z-index: 9999;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -120,6 +142,31 @@
       window.addEventListener('flutter-first-frame', hide);
       // Fallback, falls das Event nicht feuert.
       setTimeout(hide, 25000);
+    })();
+  </script>
+  <script>
+    // Mobile Ansichtshöhe nachziehen.
+    //
+    // Schliesst sich auf dem Handy die Bildschirmtastatur oder blendet die
+    // Adressleiste wieder ein, feuert Flutter nicht immer ein eigenes
+    // Resize — die App blieb dann auf der kleineren Höhe stehen und unter
+    // ihr klaffte ein weisser Bereich (gemeldet aus dem Feedback-Bereich).
+    // `visualViewport` meldet genau diese Aenderung; wir reichen sie als
+    // gewoehnliches resize-Event weiter, worauf Flutter neu misst.
+    (function () {
+      var vv = window.visualViewport;
+      if (!vv) return;
+      var pending = false;
+      function nudge() {
+        if (pending) return;
+        pending = true;
+        requestAnimationFrame(function () {
+          pending = false;
+          window.dispatchEvent(new Event('resize'));
+        });
+      }
+      vv.addEventListener('resize', nudge);
+      vv.addEventListener('scroll', nudge);
     })();
   </script>
   <script>
