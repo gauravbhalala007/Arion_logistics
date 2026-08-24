@@ -10,6 +10,8 @@
 //   • Kopfzeile (Kennzeichen, Anlass, Fahrer, Zeit, Kilometerstand)
 //   • Fotogalerie aller Schritte, mit Vorher/Nachher-Vergleich gegen einen
 //     frei wählbaren zweiten Check desselben Fahrzeugs
+//   • Ergebnis der 12-Punkte-Sichtprüfung des Fahrers (auffällige Punkte
+//     hervorgehoben) — fehlt bei Checks aus der Zeit davor
 //   • Schadenliste mit „NEU"-Badge gegenüber dem Vorgänger-Check
 //   • KI-Befunde (Stufe 2) — immer als Vorschlag, nie automatisch
 //     übernommen
@@ -426,6 +428,12 @@ class _AdminVehicleCheckDetailPageState
                     _header(check),
                     const SizedBox(height: 14),
                     _damagesCard(check),
+                    // Alte Checks tragen kein `inspection`-Feld — dann
+                    // entfällt die Karte ersatzlos.
+                    if (check.inspection.isNotEmpty) ...<Widget>[
+                      const SizedBox(height: 14),
+                      _inspectionCard(check),
+                    ],
                     const SizedBox(height: 14),
                     _aiCard(check),
                     const SizedBox(height: 14),
@@ -673,6 +681,181 @@ class _AdminVehicleCheckDetailPageState
                     style: const TextStyle(fontSize: 11, color: _kMuted),
                   ),
                 ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Sichtprüfung ───────────────────────────────────────────────────────
+
+  /// 12-Punkte-Sichtprüfung des Fahrers: auffällige Punkte groß und amber,
+  /// die als in Ordnung gemeldeten dezent als Chip-Reihe darunter.
+  Widget _inspectionCard(VehicleCheck check) {
+    final issues = check.inspectionIssues;
+    final rated = check.inspection.length;
+    final total = VehicleCheckInspectionItem.values.length;
+    final okItems = <VehicleCheckInspectionItem>[
+      for (final item in VehicleCheckInspectionItem.values)
+        if (check.inspection[item] == VehicleCheckItemState.ok) item,
+    ];
+    final missing = total - rated;
+
+    return _card(
+      title: _tr(
+        'Sichtprüfung ($rated/$total bewertet)',
+        'Visual inspection ($rated/$total rated)',
+      ),
+      trailing: issues.isEmpty
+          ? _pill(
+              _tr('Alles in Ordnung', 'All clear'),
+              _kGreen,
+              _kGreenSoft,
+            )
+          : _pill(
+              _tr(
+                '${issues.length} auffällig',
+                '${issues.length} flagged',
+              ),
+              Colors.white,
+              _kAmber,
+            ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          if (issues.isEmpty)
+            Row(
+              children: <Widget>[
+                const Icon(Icons.verified_outlined, size: 20, color: _kGreen),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    _tr(
+                      'Der Fahrer hat alle geprüften Punkte als in Ordnung '
+                      'gemeldet.',
+                      'The driver reported every rated point as fine.',
+                    ),
+                    style: const TextStyle(fontSize: 13, color: _kMuted),
+                  ),
+                ),
+              ],
+            )
+          else
+            for (var i = 0; i < issues.length; i++) ...<Widget>[
+              if (i > 0) const SizedBox(height: 8),
+              _inspectionIssueTile(issues[i]),
+            ],
+          if (okItems.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 12),
+            Text(
+              _tr(
+                'Als in Ordnung gemeldet (${okItems.length})',
+                'Reported as fine (${okItems.length})',
+              ),
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: _kMuted,
+                letterSpacing: 0.4,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: <Widget>[
+                for (final item in okItems)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _kPageBg,
+                      borderRadius: BorderRadius.circular(99),
+                      border: Border.all(color: _kBorder),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Icon(item.icon, size: 13, color: _kMuted),
+                        const SizedBox(width: 6),
+                        Text(
+                          item.label(_de),
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            color: _kMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ],
+          if (missing > 0) ...<Widget>[
+            const SizedBox(height: 10),
+            Text(
+              _tr(
+                '$missing Punkte wurden nicht bewertet.',
+                '$missing points were not rated.',
+              ),
+              style: const TextStyle(fontSize: 11.5, color: _kMuted),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _inspectionIssueTile(VehicleCheckInspectionItem item) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      decoration: BoxDecoration(
+        color: _kAmberSoft,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _kAmber),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Icon(item.icon, size: 19, color: _kAmber),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Row(
+                  children: <Widget>[
+                    Flexible(
+                      child: Text(
+                        item.label(_de),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: _kText,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _pill(
+                      _tr('AUFFÄLLIG', 'ISSUE'),
+                      Colors.white,
+                      _kAmber,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  item.hint(_de),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: _kMuted,
+                    height: 1.4,
+                  ),
+                ),
               ],
             ),
           ),

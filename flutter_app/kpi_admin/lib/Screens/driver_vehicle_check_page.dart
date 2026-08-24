@@ -3,7 +3,8 @@
 // Geführte Foto-Fahrzeuginspektion (Stufe 1) — Fahrer-Flow.
 //
 // Mobile-first Wizard: Fahrzeug → Anlass → 8 geführte Fotos →
-// optionale Schadensmeldung → Zusammenfassung → speichern.
+// 12-Punkte-Sichtprüfung → optionale Schadensmeldung → Zusammenfassung →
+// speichern.
 //
 // Sichtbarkeit steuert `driver_home_page.dart`
 // (`_kVehicleCheckVisibleForDrivers`). Alle anderen Fahrer bekommen
@@ -60,7 +61,7 @@ class DriverVehicleCheckPage extends StatefulWidget {
 
 /// Die Wizard-Phasen. Die Foto-Schritte sind eine eigene Phase mit
 /// eigenem Index, damit die Fortschrittsanzeige linear bleibt.
-enum _Phase { vehicle, photos, damages, review }
+enum _Phase { vehicle, photos, inspection, damages, review }
 
 class _DriverVehicleCheckPageState extends State<DriverVehicleCheckPage> {
   final _plateCtrl = TextEditingController();
@@ -74,6 +75,13 @@ class _DriverVehicleCheckPageState extends State<DriverVehicleCheckPage> {
       <VehicleCheckStep, Uint8List>{};
   final List<VehicleCheckDamage> _damages = <VehicleCheckDamage>[];
 
+  /// Ergebnis der Sichtprüfung. Fehlender Schlüssel = noch nicht bewertet.
+  final Map<VehicleCheckInspectionItem, VehicleCheckItemState> _inspection =
+      <VehicleCheckInspectionItem, VehicleCheckItemState>{};
+
+  /// Abschlussbestätigung in der Review-Phase (Kundenvorgabe).
+  bool _confirmed = false;
+
   bool _busyPicking = false;
   bool _submitting = false;
   int _uploaded = 0;
@@ -85,6 +93,8 @@ class _DriverVehicleCheckPageState extends State<DriverVehicleCheckPage> {
   String _tr(String de, String en) => _de ? de : en;
 
   static const List<VehicleCheckStep> _steps = VehicleCheckStep.values;
+  static const List<VehicleCheckInspectionItem> _items =
+      VehicleCheckInspectionItem.values;
 
   @override
   void initState() {
@@ -150,14 +160,25 @@ class _DriverVehicleCheckPageState extends State<DriverVehicleCheckPage> {
   bool get _allPhotosTaken =>
       _steps.every((s) => _shots[s] != null && _shots[s]!.isNotEmpty);
 
+  /// Noch nicht bewertete Sichtprüfungs-Punkte.
+  int get _openInspectionCount => _items.length - _inspection.length;
+
+  bool get _inspectionComplete => _openInspectionCount == 0;
+
+  /// Als auffällig markierte Punkte — steuert die Hinweise in Schaden- und
+  /// Review-Phase.
+  int get _issueCount =>
+      _inspection.values.where((s) => s == VehicleCheckItemState.issue).length;
+
   /// Gesamtzahl der Wizard-Seiten für die Fortschrittsleiste.
-  int get _totalPages => 1 + _steps.length + 2;
+  int get _totalPages => 1 + _steps.length + 3;
 
   int get _pageIndex => switch (_phase) {
     _Phase.vehicle => 0,
     _Phase.photos => 1 + _photoIndex,
-    _Phase.damages => 1 + _steps.length,
-    _Phase.review => 1 + _steps.length + 1,
+    _Phase.inspection => 1 + _steps.length,
+    _Phase.damages => 1 + _steps.length + 1,
+    _Phase.review => 1 + _steps.length + 2,
   };
 
   // ── Foto aufnehmen ─────────────────────────────────────────────────────
@@ -238,11 +259,33 @@ class _DriverVehicleCheckPageState extends State<DriverVehicleCheckPage> {
         if (_photoIndex + 1 < _steps.length) {
           setState(() => _photoIndex++);
         } else {
-          setState(() => _phase = _Phase.damages);
+          setState(() => _phase = _Phase.inspection);
         }
+      case _Phase.inspection:
+        if (!_inspectionComplete) {
+          _snack(
+            _tr(
+              'Noch $_openInspectionCount von ${_items.length} offen.',
+              '$_openInspectionCount of ${_items.length} still open.',
+            ),
+            error: true,
+          );
+          return;
+        }
+        setState(() => _phase = _Phase.damages);
       case _Phase.damages:
         setState(() => _phase = _Phase.review);
       case _Phase.review:
+        if (!_confirmed) {
+          _snack(
+            _tr(
+              'Bitte bestätige zuerst, dass du alles geprüft hast.',
+              'Please confirm that you have checked everything.',
+            ),
+            error: true,
+          );
+          return;
+        }
         _submit();
     }
   }
@@ -258,11 +301,13 @@ class _DriverVehicleCheckPageState extends State<DriverVehicleCheckPage> {
         } else {
           setState(() => _photoIndex--);
         }
-      case _Phase.damages:
+      case _Phase.inspection:
         setState(() {
           _phase = _Phase.photos;
           _photoIndex = _steps.length - 1;
         });
+      case _Phase.damages:
+        setState(() => _phase = _Phase.inspection);
       case _Phase.review:
         setState(() => _phase = _Phase.damages);
     }
@@ -282,6 +327,16 @@ class _DriverVehicleCheckPageState extends State<DriverVehicleCheckPage> {
     if (_odometerKm <= 0) {
       _snack(
         _tr('Kilometerstand fehlt.', 'Odometer reading is missing.'),
+        error: true,
+      );
+      return;
+    }
+    if (!_inspectionComplete) {
+      _snack(
+        _tr(
+          'Die Sichtprüfung ist noch nicht vollständig.',
+          'The visual inspection is not complete yet.',
+        ),
         error: true,
       );
       return;
@@ -325,6 +380,7 @@ class _DriverVehicleCheckPageState extends State<DriverVehicleCheckPage> {
         odometerKm: _odometerKm,
         photos: photos,
         damages: _damages,
+        inspection: _inspection,
       );
 
       if (!mounted) return;
@@ -403,6 +459,7 @@ class _DriverVehicleCheckPageState extends State<DriverVehicleCheckPage> {
                     child: switch (_phase) {
                       _Phase.vehicle => _buildVehicleStep(),
                       _Phase.photos => _buildPhotoStep(),
+                      _Phase.inspection => _buildInspectionStep(),
                       _Phase.damages => _buildDamageStep(),
                       _Phase.review => _buildReviewStep(),
                     },
@@ -668,12 +725,172 @@ class _DriverVehicleCheckPageState extends State<DriverVehicleCheckPage> {
     );
   }
 
-  // ── Phase 3: Schäden ───────────────────────────────────────────────────
+  // ── Phase 3: Sichtprüfung (12 Punkte) ──────────────────────────────────
+
+  Widget _buildInspectionStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _sectionTitle(
+          _tr('Sichtprüfung', 'Visual inspection'),
+          _tr(
+            'Geh die ${_items.length} Punkte am Fahrzeug durch und sag zu '
+            'jedem, ob er in Ordnung ist. Alles nur mit den Augen — du '
+            'musst nichts messen.',
+            'Walk through the ${_items.length} points on the van and say '
+            'for each one whether it is fine. Eyes only — you do not have '
+            'to measure anything.',
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          decoration: BoxDecoration(
+            color: _inspectionComplete ? _kGreenSoft : Colors.white,
+            borderRadius: BorderRadius.circular(99),
+            border: Border.all(
+              color: _inspectionComplete ? _kGreen : _kBorder,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                _inspectionComplete
+                    ? Icons.check_circle_outline
+                    : Icons.checklist_rtl,
+                size: 18,
+                color: _inspectionComplete ? _kGreen : _kMuted,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _inspectionComplete
+                      ? _tr(
+                          'Alle ${_items.length} Punkte bewertet.',
+                          'All ${_items.length} points rated.',
+                        )
+                      : _tr(
+                          'Noch $_openInspectionCount von ${_items.length} '
+                          'offen',
+                          '$_openInspectionCount of ${_items.length} still '
+                          'open',
+                        ),
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                    color: _inspectionComplete ? _kGreen : _kMuted,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        for (var i = 0; i < _items.length; i++) ...[
+          _InspectionCard(
+            index: i + 1,
+            total: _items.length,
+            item: _items[i],
+            de: _de,
+            state: _inspection[_items[i]],
+            onSelect: (state) =>
+                setState(() => _inspection[_items[i]] = state),
+            onOpenImage: () => _openExampleImage(_items[i]),
+          ),
+          const SizedBox(height: 10),
+        ],
+        const SizedBox(height: 4),
+        _InfoBox(
+          icon: Icons.image_outlined,
+          tone: _kMuted,
+          text: _tr(
+            'Beispielbilder — so sieht ein Mangel typischerweise aus.',
+            'Example photos — this is what a defect typically looks like.',
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Beispielbild groß: abgedunkelter Hintergrund, Bild vollflächig, Titel
+  /// darunter (Muster wie `_showQrPopup` in `fleet_status_page.dart`).
+  void _openExampleImage(VehicleCheckInspectionItem item) {
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: InteractiveViewer(
+                  maxScale: 5,
+                  child: Image.asset(item.asset, fit: BoxFit.contain),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              item.label(_de),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              _tr(
+                'Beispielbild — so sieht ein Mangel typischerweise aus.',
+                'Example photo — this is what a defect typically looks like.',
+              ),
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white70, fontSize: 12.5),
+            ),
+            const SizedBox(height: 10),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 22,
+                  vertical: 12,
+                ),
+              ),
+              child: Text(_tr('Schließen', 'Close')),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Phase 4: Schäden ───────────────────────────────────────────────────
 
   Widget _buildDamageStep() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (_issueCount > 0) ...[
+          _InfoBox(
+            icon: Icons.warning_amber_rounded,
+            tone: _kAmber,
+            text: _tr(
+              'Du hast $_issueCount ${_issueCount == 1 ? 'Punkt' : 'Punkte'} '
+              'als auffällig markiert — bitte melde sie unten als Schaden '
+              'mit Foto.',
+              'You marked $_issueCount '
+              '${_issueCount == 1 ? 'point' : 'points'} as an issue — '
+              'please report them below as damage with a photo.',
+            ),
+          ),
+          const SizedBox(height: 14),
+        ],
         _sectionTitle(
           _tr('Schäden melden', 'Report damage'),
           _tr(
@@ -735,7 +952,7 @@ class _DriverVehicleCheckPageState extends State<DriverVehicleCheckPage> {
     );
   }
 
-  // ── Phase 4: Zusammenfassung ───────────────────────────────────────────
+  // ── Phase 5: Zusammenfassung ───────────────────────────────────────────
 
   Widget _buildReviewStep() {
     return Column(
@@ -765,11 +982,62 @@ class _DriverVehicleCheckPageState extends State<DriverVehicleCheckPage> {
               '${_shots.length} / ${_steps.length}',
             ),
             (
+              _tr('Sichtprüfung', 'Visual inspection'),
+              _issueCount == 0
+                  ? _tr(
+                      'alle ${_items.length} in Ordnung',
+                      'all ${_items.length} OK',
+                    )
+                  : _tr(
+                      '$_issueCount von ${_items.length} auffällig',
+                      '$_issueCount of ${_items.length} flagged',
+                    ),
+            ),
+            (
               _tr('Gemeldete Schäden', 'Reported damage'),
               '${_damages.length}',
             ),
           ],
         ),
+        if (_issueCount > 0) ...[
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: <Widget>[
+              for (final item in _items)
+                if (_inspection[item] == VehicleCheckItemState.issue)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _kAmber.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(99),
+                      border: Border.all(
+                        color: _kAmber.withValues(alpha: 0.35),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(item.icon, size: 14, color: _kAmber),
+                        const SizedBox(width: 6),
+                        Text(
+                          item.label(_de),
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w800,
+                            color: _kAmber,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+            ],
+          ),
+        ],
         const SizedBox(height: 16),
         GridView.count(
           crossAxisCount: 4,
@@ -816,7 +1084,117 @@ class _DriverVehicleCheckPageState extends State<DriverVehicleCheckPage> {
             style: const TextStyle(fontSize: 12, color: _kMuted),
           ),
         ],
+        const SizedBox(height: 18),
+        _buildConfirmBox(),
       ],
+    );
+  }
+
+  /// Abschlussbestätigung direkt über dem Absende-Button. Ohne Haken bleibt
+  /// der Button im Footer inaktiv.
+  Widget _buildConfirmBox() {
+    final flagged = _issueCount > 0;
+    final tone = flagged ? _kAmber : _kGreen;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 6),
+      decoration: BoxDecoration(
+        color: tone.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: tone.withValues(alpha: 0.45), width: 1.4),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                flagged
+                    ? Icons.warning_amber_rounded
+                    : Icons.help_outline_rounded,
+                size: 20,
+                color: tone,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  _tr(
+                    'Bist du sicher, dass alles in Ordnung ist?',
+                    'Are you sure everything is in order?',
+                  ),
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: tone,
+                    height: 1.3,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _tr(
+              'Im Zweifel immer den Dispatcher fragen.',
+              'If in doubt, always ask your dispatcher.',
+            ),
+            style: TextStyle(fontSize: 13, color: tone, height: 1.4),
+          ),
+          if (flagged) ...[
+            const SizedBox(height: 6),
+            Text(
+              _tr(
+                'Du hast $_issueCount '
+                '${_issueCount == 1 ? 'Punkt' : 'Punkte'} als auffällig '
+                'markiert — informiere zusätzlich deinen Dispatcher.',
+                'You marked $_issueCount '
+                '${_issueCount == 1 ? 'point' : 'points'} as an issue — '
+                'please also inform your dispatcher.',
+              ),
+              style: TextStyle(fontSize: 12.5, color: tone, height: 1.4),
+            ),
+          ],
+          const SizedBox(height: 2),
+          InkWell(
+            onTap: _submitting
+                ? null
+                : () => setState(() => _confirmed = !_confirmed),
+            borderRadius: BorderRadius.circular(10),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: Checkbox(
+                      value: _confirmed,
+                      activeColor: tone,
+                      onChanged: _submitting
+                          ? null
+                          : (v) => setState(() => _confirmed = v ?? false),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _tr(
+                        'Ja, ich habe alles geprüft.',
+                        'Yes, I have checked everything.',
+                      ),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: tone,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -894,11 +1272,26 @@ class _DriverVehicleCheckPageState extends State<DriverVehicleCheckPage> {
   Widget _buildFooter() {
     final isReview = _phase == _Phase.review;
     final isDamages = _phase == _Phase.damages;
+    final isInspection = _phase == _Phase.inspection;
     final label = isReview
         ? _tr('Check absenden', 'Submit check')
         : isDamages
         ? _tr('Weiter zur Übersicht', 'Continue to summary')
         : _tr('Weiter', 'Continue');
+
+    // Zwei harte Gates: die Sichtprüfung muss vollständig sein, und der
+    // Fahrer muss die Abschlussfrage bestätigt haben.
+    final blocked =
+        (isInspection && !_inspectionComplete) || (isReview && !_confirmed);
+    final blockedHint = isInspection
+        ? _tr(
+            'Noch $_openInspectionCount von ${_items.length} offen',
+            '$_openInspectionCount of ${_items.length} still open',
+          )
+        : _tr(
+            'Bitte oben bestätigen, dass du alles geprüft hast.',
+            'Please confirm above that you have checked everything.',
+          );
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
@@ -906,48 +1299,76 @@ class _DriverVehicleCheckPageState extends State<DriverVehicleCheckPage> {
         color: Colors.white,
         border: Border(top: BorderSide(color: _kBorder)),
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          if (_phase != _Phase.vehicle) ...[
-            OutlinedButton(
-              onPressed: _submitting ? null : _back,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: _kMuted,
-                side: const BorderSide(color: _kBorder),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 18,
-                  vertical: 15,
+          if (blocked) ...[
+            Row(
+              children: [
+                const Icon(Icons.info_outline, size: 15, color: _kAmber),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: Text(
+                    blockedHint,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: _kAmber,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+          ],
+          Row(
+            children: [
+              if (_phase != _Phase.vehicle) ...[
+                OutlinedButton(
+                  onPressed: _submitting ? null : _back,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _kMuted,
+                    side: const BorderSide(color: _kBorder),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 15,
+                    ),
+                  ),
+                  child: Text(_tr('Zurück', 'Back')),
+                ),
+                const SizedBox(width: 10),
+              ],
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: (_submitting || blocked) ? null : _next,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _kGreen,
+                    disabledBackgroundColor: _kBorder,
+                    disabledForegroundColor: _kMuted,
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                  ),
+                  icon: _submitting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
+                          ),
+                        )
+                      : Icon(
+                          isReview ? Icons.send_rounded : Icons.arrow_forward,
+                          size: 19,
+                        ),
+                  label: Text(
+                    label,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
                 ),
               ),
-              child: Text(_tr('Zurück', 'Back')),
-            ),
-            const SizedBox(width: 10),
-          ],
-          Expanded(
-            child: FilledButton.icon(
-              onPressed: _submitting ? null : _next,
-              style: FilledButton.styleFrom(
-                backgroundColor: _kGreen,
-                padding: const EdgeInsets.symmetric(vertical: 15),
-              ),
-              icon: _submitting
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : Icon(
-                      isReview ? Icons.send_rounded : Icons.arrow_forward,
-                      size: 19,
-                    ),
-              label: Text(
-                label,
-                style: const TextStyle(fontWeight: FontWeight.w800),
-              ),
-            ),
+            ],
           ),
         ],
       ),
@@ -1095,6 +1516,256 @@ class _RadioTile extends StatelessWidget {
                   : Icons.radio_button_unchecked,
               size: 20,
               color: selected ? _kGreen : _kBorder,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Eine Karte der 12-Punkte-Sichtprüfung: Titel, Hilfstext, Beispielbild
+/// und die beiden Bewertungs-Schaltflächen.
+///
+/// Mobile-first: alles untereinander, Tap-Flächen ≥ 48 px, Bild nur so groß
+/// wie nötig (4:3, `BoxFit.cover`).
+class _InspectionCard extends StatelessWidget {
+  const _InspectionCard({
+    required this.index,
+    required this.total,
+    required this.item,
+    required this.de,
+    required this.state,
+    required this.onSelect,
+    required this.onOpenImage,
+  });
+
+  final int index;
+  final int total;
+  final VehicleCheckInspectionItem item;
+  final bool de;
+  final VehicleCheckItemState? state;
+  final ValueChanged<VehicleCheckItemState> onSelect;
+  final VoidCallback onOpenImage;
+
+  @override
+  Widget build(BuildContext context) {
+    final isOk = state == VehicleCheckItemState.ok;
+    final isIssue = state == VehicleCheckItemState.issue;
+    final border = isOk
+        ? _kGreen
+        : isIssue
+        ? _kAmber
+        : _kBorder;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: border, width: state == null ? 1 : 1.8),
+      ),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 26,
+                height: 26,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: isIssue
+                      ? _kAmber.withValues(alpha: 0.12)
+                      : _kGreenSoft,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$index',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: isIssue ? _kAmber : _kGreen,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.label(de),
+                      style: const TextStyle(
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.w800,
+                        color: _kText,
+                        height: 1.25,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      item.hint(de),
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        color: _kMuted,
+                        height: 1.45,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(item.icon, size: 20, color: _kMuted),
+            ],
+          ),
+          const SizedBox(height: 10),
+          GestureDetector(
+            onTap: onOpenImage,
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: AspectRatio(
+                aspectRatio: 4 / 3,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.asset(
+                        item.asset,
+                        fit: BoxFit.cover,
+                        // Alle 12 Karten hängen in derselben Scroll-Column,
+                        // werden also gleichzeitig dekodiert. Ohne
+                        // `cacheWidth` wären das 12 × ~3 MB Raster auf einem
+                        // Fahrer-Handy; die Vollauflösung liefert der
+                        // Lightbox-Dialog.
+                        cacheWidth: 720,
+                        errorBuilder: (_, _, _) => Container(
+                          color: _kPageBg,
+                          alignment: Alignment.center,
+                          child: Icon(item.icon, size: 34, color: _kBorder),
+                        ),
+                      ),
+                      Positioned(
+                        right: 8,
+                        bottom: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black54,
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.zoom_out_map,
+                                size: 13,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                de ? 'Beispiel' : 'Example',
+                                style: const TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _StateButton(
+                  icon: Icons.check_circle_outline,
+                  label: de ? 'In Ordnung' : 'OK',
+                  tone: _kGreen,
+                  selected: isOk,
+                  onTap: () => onSelect(VehicleCheckItemState.ok),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _StateButton(
+                  icon: Icons.error_outline,
+                  label: de ? 'Auffällig' : 'Issue',
+                  tone: _kAmber,
+                  selected: isIssue,
+                  onTap: () => onSelect(VehicleCheckItemState.issue),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// „In Ordnung" / „Auffällig" — bewusst zwei getrennte, große Flächen
+/// statt eines Toggles, damit auf dem Handy nichts versehentlich kippt.
+class _StateButton extends StatelessWidget {
+  const _StateButton({
+    required this.icon,
+    required this.label,
+    required this.tone,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color tone;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 48),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? tone.withValues(alpha: 0.1) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected ? tone : _kBorder,
+            width: selected ? 1.8 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 19, color: selected ? tone : _kMuted),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: selected ? tone : _kText,
+                ),
+              ),
             ),
           ],
         ),

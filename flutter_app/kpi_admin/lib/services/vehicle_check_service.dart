@@ -206,6 +206,231 @@ extension VehicleCheckStepX on VehicleCheckStep {
   }
 }
 
+/// Ergebnis eines Sichtprüfungs-Punkts.
+///
+/// Bewusst nur zwei Zustände: „nicht bewertet" wird nicht gespeichert,
+/// sondern ist schlicht das Fehlen des Schlüssels in der Map.
+enum VehicleCheckItemState { ok, issue }
+
+extension VehicleCheckItemStateX on VehicleCheckItemState {
+  String get wire => switch (this) {
+    VehicleCheckItemState.ok => 'ok',
+    VehicleCheckItemState.issue => 'issue',
+  };
+
+  bool get isIssue => this == VehicleCheckItemState.issue;
+
+  String label(bool de) => switch (this) {
+    VehicleCheckItemState.ok => de ? 'In Ordnung' : 'OK',
+    VehicleCheckItemState.issue => de ? 'Auffällig' : 'Issue',
+  };
+
+  static VehicleCheckItemState? fromWire(String raw) =>
+      switch (raw.trim().toLowerCase()) {
+        'ok' => VehicleCheckItemState.ok,
+        'issue' => VehicleCheckItemState.issue,
+        _ => null,
+      };
+}
+
+/// Die 12 Punkte der geführten Sichtprüfung (Kundenvorgabe).
+///
+/// Reihenfolge = Reihenfolge in der Fahrer-UI. Zu jedem Punkt liegt unter
+/// `assets/vehicle_check/` ein Beispielbild, das typisch zeigt, wie der
+/// Mangel aussieht — es ist ausdrücklich eine SICHTprüfung, nichts wird
+/// gemessen.
+enum VehicleCheckInspectionItem {
+  mirrors,
+  seatBelt,
+  wires,
+  tread,
+  pressure,
+  sharpEdges,
+  headlights,
+  holes,
+  sensors,
+  tireCracks,
+  lamps,
+  cameras,
+}
+
+extension VehicleCheckInspectionItemX on VehicleCheckInspectionItem {
+  String get wire => switch (this) {
+    VehicleCheckInspectionItem.mirrors => 'mirrors',
+    VehicleCheckInspectionItem.seatBelt => 'seat_belt',
+    VehicleCheckInspectionItem.wires => 'wires',
+    VehicleCheckInspectionItem.tread => 'tread',
+    VehicleCheckInspectionItem.pressure => 'pressure',
+    VehicleCheckInspectionItem.sharpEdges => 'sharp_edges',
+    VehicleCheckInspectionItem.headlights => 'headlights',
+    VehicleCheckInspectionItem.holes => 'holes',
+    VehicleCheckInspectionItem.sensors => 'sensors',
+    VehicleCheckInspectionItem.tireCracks => 'tire_cracks',
+    VehicleCheckInspectionItem.lamps => 'lamps',
+    VehicleCheckInspectionItem.cameras => 'cameras',
+  };
+
+  /// Beispielbild. Dateinamen sind fix — sie liegen bereits im Repo und
+  /// sind über `- assets/vehicle_check/` in der `pubspec.yaml` registriert.
+  String get asset => switch (this) {
+    VehicleCheckInspectionItem.mirrors => 'assets/vehicle_check/mirrors.jpg',
+    VehicleCheckInspectionItem.seatBelt => 'assets/vehicle_check/seatbelt.jpg',
+    VehicleCheckInspectionItem.wires => 'assets/vehicle_check/wires.jpg',
+    VehicleCheckInspectionItem.tread => 'assets/vehicle_check/tread.jpg',
+    VehicleCheckInspectionItem.pressure => 'assets/vehicle_check/pressure.jpg',
+    VehicleCheckInspectionItem.sharpEdges =>
+      'assets/vehicle_check/sharp_edges.jpg',
+    VehicleCheckInspectionItem.headlights =>
+      'assets/vehicle_check/headlights.jpg',
+    VehicleCheckInspectionItem.holes => 'assets/vehicle_check/holes.jpg',
+    VehicleCheckInspectionItem.sensors => 'assets/vehicle_check/sensors.jpg',
+    VehicleCheckInspectionItem.tireCracks =>
+      'assets/vehicle_check/tire_cracks.jpg',
+    VehicleCheckInspectionItem.lamps => 'assets/vehicle_check/lamps.jpg',
+    VehicleCheckInspectionItem.cameras => 'assets/vehicle_check/cameras.jpg',
+  };
+
+  // Nur `Icons.*` — Material Symbols laden im Web-Build nicht zuverlässig.
+  IconData get icon => switch (this) {
+    VehicleCheckInspectionItem.mirrors => Icons.flip,
+    VehicleCheckInspectionItem.seatBelt =>
+      Icons.airline_seat_recline_normal_outlined,
+    VehicleCheckInspectionItem.wires => Icons.cable,
+    VehicleCheckInspectionItem.tread => Icons.tire_repair,
+    VehicleCheckInspectionItem.pressure => Icons.compress,
+    VehicleCheckInspectionItem.sharpEdges => Icons.dangerous_outlined,
+    VehicleCheckInspectionItem.headlights => Icons.lightbulb_outline,
+    VehicleCheckInspectionItem.holes => Icons.donut_large,
+    VehicleCheckInspectionItem.sensors => Icons.sensors,
+    VehicleCheckInspectionItem.tireCracks => Icons.timeline,
+    VehicleCheckInspectionItem.lamps => Icons.wb_incandescent_outlined,
+    VehicleCheckInspectionItem.cameras => Icons.videocam_outlined,
+  };
+
+  String label(bool de) => switch (this) {
+    VehicleCheckInspectionItem.mirrors =>
+      de ? 'Spiegel & Spiegelgehäuse' : 'Mirrors & mirror frames',
+    VehicleCheckInspectionItem.seatBelt =>
+      de ? 'Sicherheitsgurte & Gurtschlösser' : 'Seat belts & buckles',
+    VehicleCheckInspectionItem.wires =>
+      de ? 'Lose Kabel & Kunststoffteile' : 'Hanging wires & plastic parts',
+    VehicleCheckInspectionItem.tread =>
+      de ? 'Reifenprofil (mind. 1,6 mm)' : 'Tire tread (at least 1.6 mm)',
+    VehicleCheckInspectionItem.pressure =>
+      de ? 'Reifendruck zu niedrig' : 'Low tire pressure',
+    VehicleCheckInspectionItem.sharpEdges =>
+      de ? 'Scharfe Kanten' : 'Sharp edges',
+    VehicleCheckInspectionItem.headlights =>
+      de ? 'Scheinwerfer & Leuchtmittel' : 'Headlights & bulbs',
+    VehicleCheckInspectionItem.holes =>
+      de ? 'Löcher in der Karosserie' : 'Holes in the bodywork',
+    VehicleCheckInspectionItem.sensors =>
+      de ? 'Sensoren & Sensoröffnungen' : 'Sensors & sensor holes',
+    VehicleCheckInspectionItem.tireCracks =>
+      de ? 'Risse im Reifen' : 'Cracked tires',
+    VehicleCheckInspectionItem.lamps =>
+      de ? 'Fehlende Leuchten' : 'Missing lamps',
+    VehicleCheckInspectionItem.cameras => de ? 'Kameras' : 'Cameras',
+  };
+
+  /// Worauf der Fahrer schaut — bewusst als Sichtprüfung formuliert,
+  /// nirgends wird gemessen.
+  String hint(bool de) => switch (this) {
+    VehicleCheckInspectionItem.mirrors => de
+        ? 'Beide Außenspiegel ansehen: Ist das Glas gesprungen oder das '
+              'Gehäuse gebrochen bzw. lose?'
+        : 'Look at both wing mirrors: is the glass cracked or the frame '
+              'broken or loose?',
+    VehicleCheckInspectionItem.seatBelt => de
+        ? 'Gurt ganz herausziehen — eingerissen oder ausgefranst? Rastet '
+              'das Gurtschloss sauber ein und löst es wieder?'
+        : 'Pull the belt all the way out — ripped or frayed? Does the '
+              'buckle click in cleanly and release again?',
+    VehicleCheckInspectionItem.wires => de
+        ? 'Hängen irgendwo Kabel oder Verkleidungsteile lose herunter — '
+              'innen im Laderaum wie außen unter dem Fahrzeug?'
+        : 'Are any wires or trim parts hanging loose — inside the cargo '
+              'area as well as underneath the van?',
+    VehicleCheckInspectionItem.tread => de
+        ? 'Nur hinsehen, nicht messen: Steht das Profil fast auf Höhe der '
+              'Verschleißmarker in den Rillen, ist es zu wenig.'
+        : 'Just look, do not measure: if the tread is almost level with '
+              'the wear markers in the grooves, it is too low.',
+    VehicleCheckInspectionItem.pressure => de
+        ? 'Sichtprüfung ohne Messgerät: Sieht ein Reifen platt aus oder '
+              'wird er unten sichtbar breit eingedrückt?'
+        : 'Visual check, no gauge: does a tire look flat or visibly '
+              'squashed and bulging where it meets the road?',
+    VehicleCheckInspectionItem.sharpEdges => de
+        ? 'Gebrochenes Plastik oder aufgerissenes Blech, an dem man sich '
+              'schneiden kann — besonders an Stoßfängern und Radläufen.'
+        : 'Broken plastic or torn metal you could cut yourself on — '
+              'especially on bumpers and wheel arches.',
+    VehicleCheckInspectionItem.headlights => de
+        ? 'Streuscheiben gebrochen oder blind? Licht kurz einschalten und '
+              'prüfen, ob wirklich alle Lampen brennen.'
+        : 'Lenses cracked or clouded? Switch the lights on briefly and '
+              'check that every lamp really works.',
+    VehicleCheckInspectionItem.holes => de
+        ? 'Durchgehende Löcher oder Risse in Blech und Stoßfänger, die '
+              'von einem Schaden stammen.'
+        : 'Holes or tears going right through panels or bumpers, caused '
+              'by damage.',
+    VehicleCheckInspectionItem.sensors => de
+        ? 'Sitzen alle Park- und Abstandssensoren fest in ihren '
+              'Öffnungen? Leere, lose oder gebrochene Löcher zählen als '
+              'Mangel.'
+        : 'Are all parking and distance sensors sitting firmly in their '
+              'holes? Empty, loose or broken holes count as a defect.',
+    VehicleCheckInspectionItem.tireCracks => de
+        ? 'Reifenflanke ansehen: tiefe Risse oder Furchen (deutlich '
+              'sichtbar, ab etwa 2,5 cm) sind ein Mangel.'
+        : 'Look at the sidewall: deep cracks or grooves (clearly '
+              'visible, from about 2.5 cm) are a defect.',
+    VehicleCheckInspectionItem.lamps => de
+        ? 'Fehlt eine Leuchte ganz — z. B. eine Seitenleuchte, ein '
+              'Nebelscheinwerfer oder eine Abdeckung?'
+        : 'Is a lamp missing entirely — e.g. a side lamp, a fog lamp or '
+              'a lamp cover?',
+    VehicleCheckInspectionItem.cameras => de
+        ? 'Sind alle Kameras da, sauber und unbeschädigt — Rückfahr- und '
+              'Seitenkameras?'
+        : 'Are all cameras present, clean and undamaged — reversing and '
+              'side cameras?',
+  };
+
+  static VehicleCheckInspectionItem? fromWire(String raw) {
+    final key = raw.trim().toLowerCase();
+    for (final item in VehicleCheckInspectionItem.values) {
+      if (item.wire == key) return item;
+    }
+    return null;
+  }
+}
+
+/// Firestore-Form der Sichtprüfung: `{ '<wire>': 'ok' | 'issue' }`.
+Map<String, String> encodeVehicleCheckInspection(
+  Map<VehicleCheckInspectionItem, VehicleCheckItemState> value,
+) => <String, String>{
+  for (final entry in value.entries) entry.key.wire: entry.value.wire,
+};
+
+/// Liest die Sichtprüfung robust zurück — alte Checks ohne `inspection`
+/// (und unbekannte Schlüssel/Werte) ergeben schlicht eine leere Map.
+Map<VehicleCheckInspectionItem, VehicleCheckItemState>
+decodeVehicleCheckInspection(Object? raw) {
+  if (raw is! Map) {
+    return const <VehicleCheckInspectionItem, VehicleCheckItemState>{};
+  }
+  final out = <VehicleCheckInspectionItem, VehicleCheckItemState>{};
+  raw.forEach((key, value) {
+    final item = VehicleCheckInspectionItemX.fromWire('$key');
+    final state = VehicleCheckItemStateX.fromWire('$value');
+    if (item != null && state != null) out[item] = state;
+  });
+  return out;
+}
+
 /// Schadenskategorie.
 enum VehicleDamageCategory { scratch, dent, glass, tire, interior, other }
 
@@ -431,6 +656,7 @@ class VehicleCheck {
     required this.odometerKm,
     required this.photos,
     required this.damages,
+    required this.inspection,
     required this.driverTransporterId,
     required this.driverName,
     required this.checkedAt,
@@ -453,6 +679,11 @@ class VehicleCheck {
   final int odometerKm;
   final List<VehicleCheckPhoto> photos;
   final List<VehicleCheckDamage> damages;
+
+  /// Ergebnis der 12-Punkte-Sichtprüfung. Leer bei Checks, die vor der
+  /// Einführung der Sichtprüfung entstanden sind.
+  final Map<VehicleCheckInspectionItem, VehicleCheckItemState> inspection;
+
   final String driverTransporterId;
   final String driverName;
   final DateTime? checkedAt;
@@ -466,6 +697,13 @@ class VehicleCheck {
   final List<VehicleCheckAiCandidate> aiCandidates;
   final List<VehicleCheckAiPhotoQuality> aiQuality;
   final String aiSummary;
+
+  /// Als auffällig markierte Sichtprüfungs-Punkte, in Enum-Reihenfolge.
+  List<VehicleCheckInspectionItem> get inspectionIssues =>
+      <VehicleCheckInspectionItem>[
+        for (final item in VehicleCheckInspectionItem.values)
+          if (inspection[item] == VehicleCheckItemState.issue) item,
+      ];
 
   VehicleCheckPhoto? photoFor(VehicleCheckStep step) {
     for (final p in photos) {
@@ -493,6 +731,7 @@ class VehicleCheck {
       odometerKm: odo is num ? odo.toInt() : 0,
       photos: _decodeList(data['photos'], VehicleCheckPhoto.fromMap),
       damages: _decodeList(data['damages'], VehicleCheckDamage.fromMap),
+      inspection: decodeVehicleCheckInspection(data['inspection']),
       driverTransporterId: '${data['driverTransporterId'] ?? ''}',
       driverName: '${data['driverName'] ?? ''}',
       checkedAt: (data['checkedAt'] as Timestamp?)?.toDate() ??
@@ -608,6 +847,8 @@ Future<void> saveVehicleCheck({
   required int odometerKm,
   required List<VehicleCheckPhoto> photos,
   required List<VehicleCheckDamage> damages,
+  Map<VehicleCheckInspectionItem, VehicleCheckItemState> inspection =
+      const <VehicleCheckInspectionItem, VehicleCheckItemState>{},
 }) async {
   final tid = transporterIdOf(transporterId);
   final db = FirebaseFirestore.instance;
@@ -619,6 +860,7 @@ Future<void> saveVehicleCheck({
   final checkRef = driverRef.collection(kVehicleCheckCollection).doc(checkId);
   final now = DateTime.now();
   final key = plateKeyOf(plate);
+  final inspectionIssues = inspection.values.where((s) => s.isIssue).length;
 
   final payload = <String, dynamic>{
     // Rules-Pflichtfeld: `request.resource.data.driverTransporterId == driverId`
@@ -633,6 +875,11 @@ Future<void> saveVehicleCheck({
     'odometerKm': odometerKm,
     'photos': <Map<String, dynamic>>[for (final p in photos) p.toMap()],
     'damages': <Map<String, dynamic>>[for (final d in damages) d.toMap()],
+    // Sichtprüfung: flache Map `{ '<wire>': 'ok' | 'issue' }` — ein
+    // zusätzliches Feld auf demselben Dokument, das die bestehenden
+    // Rules bereits abdecken (kein Pflicht-Feldschema).
+    'inspection': encodeVehicleCheckInspection(inspection),
+    'inspectionIssueCount': inspectionIssues,
     'photoCount': photos.length,
     'damageCount': damages.length,
     'driverName': driverName.trim(),
@@ -654,6 +901,7 @@ Future<void> saveVehicleCheck({
       'odometerKm': odometerKm,
       'photoCount': photos.length,
       'damageCount': damages.length,
+      'inspectionIssueCount': inspectionIssues,
       'at': Timestamp.fromDate(now),
       'driverName': driverName.trim(),
       'driverTransporterId': tid,

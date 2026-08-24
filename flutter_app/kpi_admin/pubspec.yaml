@@ -133,6 +133,7 @@ flutter:
     - assets/icons/
     - assets/academy/safety/
     - assets/academy/driving/
+    - assets/vehicle_check/
     - assets/da_academy/activity1/
     # DA Academy – Modul "Kameras im Fahrzeug – Datenschutz":
     # Kurstexte als JSON + die beiden Rechtstexte als Markdown.
