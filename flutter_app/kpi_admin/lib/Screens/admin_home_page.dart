@@ -5597,15 +5597,11 @@ class _AlertCenterCardState extends State<_AlertCenterCard> {
   /// Opens the tapped driver's profile inside a pushed Drivers-Hub route.
   void _openDriverProfile(String tid) {
     Navigator.of(context).push(MaterialPageRoute<void>(
+      // Ohne eigene AppBar: die Fahrer-Detailseite bringt ihren eigenen
+      // Kopf mit (Zurück-Pfeil, Titel, Einstellungen) — ein Rahmen-Header
+      // darüber ergäbe zwei gestapelte Kopfzeilen.
       builder: (_) => Scaffold(
         backgroundColor: AdminHomePage._kPageBg,
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          foregroundColor: AdminHomePage._kText,
-          elevation: 0,
-          centerTitle: true,
-          title: const Text('Drivers Hub'),
-        ),
         body: SafeArea(child: DriversHubPage(initialOpenTid: tid)),
       ),
     ));

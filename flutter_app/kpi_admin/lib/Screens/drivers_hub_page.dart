@@ -96,6 +96,12 @@ class _DriversHubPageState extends State<DriversHubPage> {
   /// gerendert im Shell-Inhalt, damit das Seitenmenü sichtbar bleibt.
   DocumentSnapshot<Map<String, dynamic>>? _detailDriverDoc;
 
+  /// `true`, wenn die offene Detailseite per [initialOpenTid] direkt
+  /// angesprungen wurde (z. B. aus einer Warnung der Startseite). Der
+  /// Zurück-Pfeil verlässt dann die Route, statt die Fahrerliste zu
+  /// zeigen — die hätte in dieser Route keinen eigenen Zurück-Weg.
+  bool _detailFromDeepLink = false;
+
   Future<void> _maybeAutoOpenDriver() async {
     final tid = widget.initialOpenTid?.trim() ?? '';
     if (_autoOpenHandled || tid.isEmpty) return;
@@ -108,8 +114,25 @@ class _DriversHubPageState extends State<DriversHubPage> {
         .collection('drivers')
         .doc(tid)
         .get();
-    if (!mounted || !doc.exists) return;
-    await _openDriverDetails(doc);
+    if (!mounted) return;
+    if (!doc.exists) {
+      // Angesprungener Fahrer existiert nicht mehr: die Route hat außer
+      // der Detailseite keinen eigenen Zurück-Weg — also schließen,
+      // statt den Aufrufer auf der Liste stranden zu lassen.
+      final de = Localizations.localeOf(context).languageCode == 'de';
+      if (Navigator.of(context).canPop()) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              de ? 'Fahrer nicht gefunden.' : 'Driver not found.',
+            ),
+          ),
+        );
+        Navigator.of(context).pop();
+      }
+      return;
+    }
+    await _openDriverDetails(doc, fromDeepLink: true);
   }
 
   User? get _user => _auth.currentUser;
@@ -310,7 +333,15 @@ class _DriversHubPageState extends State<DriversHubPage> {
         driverRef: detailDoc.reference,
         dspUid: _uid,
         actions: _detailActionsFor(detailDoc.reference),
-        onBack: () => setState(() => _detailDriverDoc = null),
+        onBack: () {
+          // Direkt angesprungen (Deep-Link): zurück zur aufrufenden
+          // Seite. Sonst wie bisher zurück auf die Fahrerliste.
+          if (_detailFromDeepLink && Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+            return;
+          }
+          setState(() => _detailDriverDoc = null);
+        },
       );
     }
     return Padding(
@@ -4741,11 +4772,15 @@ class _DriversHubPageState extends State<DriversHubPage> {
   /// [DriverHubDetailActions] genau den Editor auf, der hier in dieser Datei
   /// schon existiert. Es wird **keine** Editor-Logik dupliziert.
   Future<void> _openDriverDetails(
-    DocumentSnapshot<Map<String, dynamic>> driverDoc,
-  ) async {
+    DocumentSnapshot<Map<String, dynamic>> driverDoc, {
+    bool fromDeepLink = false,
+  }) async {
     // Eingebettet statt als eigene Route — so bleibt das Seitenmenü der
     // Shell links sichtbar (gilt generell für alle Admin-Seiten).
-    setState(() => _detailDriverDoc = driverDoc);
+    setState(() {
+      _detailDriverDoc = driverDoc;
+      _detailFromDeepLink = fromDeepLink;
+    });
   }
 
   /// Aktions-Brücke der 2a-Detailseite auf die Bestandseditoren.
