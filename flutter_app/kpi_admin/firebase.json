@@ -19,6 +19,7 @@
   },
   "hosting": {
     "public": "build/web",
+    "predeploy": ["node tool/write_version.cjs"],
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "headers": [
       {
@@ -64,6 +65,10 @@
       {
         "source": "/assets/**",
         "headers": [{ "key": "Cache-Control", "value": "no-cache, must-revalidate" }]
+      },
+      {
+        "source": "/version.json",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }]
       },
       {
         "source": "/manifest.json",

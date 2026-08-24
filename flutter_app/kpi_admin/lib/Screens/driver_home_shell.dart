@@ -21,6 +21,7 @@ import '../models/driver_notification.dart';
 import '../theme/app_button_style.dart';
 import '../widgets/app_update_popup.dart';
 import '../widgets/maintenance_banner.dart';
+import '../widgets/new_version_gate.dart';
 import 'driver_academy_page.dart';
 import 'driver_absence_page.dart';
 import 'driver_onboarding_page.dart';
@@ -43,8 +44,7 @@ import 'login_page.dart';
 /// MIME-Type für Foto-Uploads aus dem Dateinamen — ohne expliziten
 /// contentType blockt die Storage-Rule isImage() den Upload.
 String _photoContentType(String name) {
-  final ext =
-      name.contains('.') ? name.split('.').last.toLowerCase() : '';
+  final ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
   switch (ext) {
     case 'png':
       return 'image/png';
@@ -59,7 +59,6 @@ String _photoContentType(String name) {
       return 'image/jpeg';
   }
 }
-
 
 // same colors as in dashboard
 const _kBg = Color(0xFFF3F6F7);
@@ -141,7 +140,6 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
         .collection('tasks');
   }
 
-
   @override
   void initState() {
     super.initState();
@@ -174,11 +172,10 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
           .collection('users')
           .doc(user.uid)
           .get();
-      final topLang = (userDoc.data()?['languageCode'] ??
-              userDoc.data()?['language'] ??
-              '')
-          .toString()
-          .trim();
+      final topLang =
+          (userDoc.data()?['languageCode'] ?? userDoc.data()?['language'] ?? '')
+              .toString()
+              .trim();
       if (topLang.isNotEmpty) {
         if (localeController.locale?.languageCode != topLang) {
           localeController.setLocale(Locale(topLang));
@@ -193,10 +190,9 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
           .collection('drivers')
           .doc(widget.driverTransporterId.toUpperCase())
           .get();
-      final onboarding =
-          (driverDoc.data()?['onboarding'] as Map?)?.cast<String, dynamic>();
-      final onboardingLang =
-          (onboarding?['language'] ?? '').toString().trim();
+      final onboarding = (driverDoc.data()?['onboarding'] as Map?)
+          ?.cast<String, dynamic>();
+      final onboardingLang = (onboarding?['language'] ?? '').toString().trim();
       if (onboardingLang.isEmpty) return;
 
       if (localeController.locale?.languageCode != onboardingLang) {
@@ -262,7 +258,6 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
           });
         }, onError: (_) {});
   }
-
 
   /// Use the SAME logic as DriverOnboardingPage._pickAndUploadProfilePhoto
   /// so data is consistent everywhere.
@@ -384,76 +379,78 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
 
         final driverName = accountName.isEmpty ? 'Driver' : accountName;
 
-        return Scaffold(
-          backgroundColor: _kBg,
-          extendBody: true,
-          body: SafeArea(
-            child: Column(
-              children: [
-                const MaintenanceBanner(),
-                // ---------- HEADER (always visible) ----------
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 12,
+        return NewVersionGate(
+          child: Scaffold(
+            backgroundColor: _kBg,
+            extendBody: true,
+            body: SafeArea(
+              child: Column(
+                children: [
+                  const MaintenanceBanner(),
+                  // ---------- HEADER (always visible) ----------
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 12,
+                    ),
+                    child: _HeaderBar(
+                      driverName: driverName,
+                      profileImage: accountImage,
+                      unreadCount: _unreadCount,
+                      onChangePhoto: () => _changeProfilePhoto(context),
+                      onOpenProfile: () {
+                        setState(() {
+                          _view = DriverView.profile;
+                          _tabIndex = 0;
+                        });
+                      },
+                      onOpenNotifications: () {
+                        setState(() {
+                          _view = DriverView.notifications;
+                          _tabIndex = 0;
+                        });
+                      },
+                    ),
                   ),
-                  child: _HeaderBar(
-                    driverName: driverName,
-                    profileImage: accountImage,
-                    unreadCount: _unreadCount,
-                    onChangePhoto: () => _changeProfilePhoto(context),
-                    onOpenProfile: () {
-                      setState(() {
-                        _view = DriverView.profile;
-                        _tabIndex = 0;
-                      });
-                    },
-                    onOpenNotifications: () {
-                      setState(() {
-                        _view = DriverView.notifications;
-                        _tabIndex = 0;
-                      });
-                    },
-                  ),
-                ),
 
-                // ---------- TAB CONTENT ----------
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 18),
-                    child: _buildTabContent(context),
+                  // ---------- TAB CONTENT ----------
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 18),
+                      child: _buildTabContent(context),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
 
-          // ---------- BOTTOM NAV (always visible) ----------
-          bottomNavigationBar: SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
-              child: _DriverBottomNav(
-                index: _tabIndex,
-                pendingTasksCount: _pendingTasksCount,
-                unconfirmedRulesCount: _unconfirmedRulesCount,
-                onTap: (i) {
-                  setState(() {
-                    _tabIndex = i;
+            // ---------- BOTTOM NAV (always visible) ----------
+            bottomNavigationBar: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
+                child: _DriverBottomNav(
+                  index: _tabIndex,
+                  pendingTasksCount: _pendingTasksCount,
+                  unconfirmedRulesCount: _unconfirmedRulesCount,
+                  onTap: (i) {
+                    setState(() {
+                      _tabIndex = i;
 
-                    if (i == 0) {
-                      _view = DriverView.home;
-                    } else if (i == 1) {
-                      _view = DriverView.dashboard;
-                    } else if (i == 2) {
-                      _view = DriverView.faq;
-                    } else if (i == 3) {
-                      _view = DriverView.tasks;
-                    } else if (i == 4) {
-                      _view = DriverView.rules;
-                    }
-                  });
-                },
+                      if (i == 0) {
+                        _view = DriverView.home;
+                      } else if (i == 1) {
+                        _view = DriverView.dashboard;
+                      } else if (i == 2) {
+                        _view = DriverView.faq;
+                      } else if (i == 3) {
+                        _view = DriverView.tasks;
+                      } else if (i == 4) {
+                        _view = DriverView.rules;
+                      }
+                    });
+                  },
+                ),
               ),
             ),
           ),
@@ -990,9 +987,7 @@ class _HeaderBar extends StatelessWidget {
                           height: 32,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            border: Border.all(
-                              color: const Color(0x1F000000),
-                            ),
+                            border: Border.all(color: const Color(0x1F000000)),
                           ),
                           child: ClipOval(
                             child: SvgPicture.asset(
@@ -1051,7 +1046,7 @@ class _HeaderBar extends StatelessWidget {
 
     await showDialog<void>(
       context: context,
-      
+
       builder: (ctx) {
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
@@ -1142,9 +1137,7 @@ class _HeaderBar extends StatelessWidget {
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton(
-                        style: AppButtonStyle.of(
-                          AppButtonVariant.destructive,
-                        ),
+                        style: AppButtonStyle.of(AppButtonVariant.destructive),
                         onPressed: () async {
                           Navigator.of(ctx).pop();
                           await FirebaseAuth.instance.signOut();

@@ -11,6 +11,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../widgets/admin_scope.dart';
 import '../widgets/app_shell.dart';
+import '../widgets/new_version_gate.dart';
 import '../widgets/app_side_menu.dart';
 import 'login_page.dart';
 
@@ -141,8 +142,7 @@ class _AdminShellPageState extends State<AdminShellPage> {
         // erkennen das daran, dass im Widget-Baum ein AdminScope gesetzt
         // ist, dessen UID nicht der eingeloggten ist.
         final adminScope = AdminScope.maybeOf(context);
-        final isDispatcherShell =
-            role == 'dispatcher' && adminScope != null;
+        final isDispatcherShell = role == 'dispatcher' && adminScope != null;
 
         // ✅ Prevent driver accounts from opening AdminShell routes directly.
         // Dispatchers dürfen die Shell betreten, auch ohne `approved=true`.
@@ -162,7 +162,7 @@ class _AdminShellPageState extends State<AdminShellPage> {
 
         final dispatcherName = isDispatcherShell
             ? ((data['name'] ?? data['email'] ?? authUser.email ?? '')
-                .toString())
+                  .toString())
             : '';
 
         // Once per session: surface the newest unseen product update as a
@@ -171,176 +171,228 @@ class _AdminShellPageState extends State<AdminShellPage> {
           _updatePopupScheduled = true;
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!mounted) return;
-            AppUpdatePopup.maybeShow(
-              context,
-              uid: authUser.uid,
-              side: 'admin',
-            );
+            AppUpdatePopup.maybeShow(context, uid: authUser.uid, side: 'admin');
           });
         }
 
-        return AppShell(
-          menuWidth: _menuCollapsed && !narrow ? 72 : 300,
-          // Mobil: Logo linksbündig, kein Hamburger mehr (das Seitenmenü
-          // hängt jetzt an der ersten Kachel der schwebenden Bottom-Bar).
-          centerTitle: !narrow,
-          hideDrawerButton: narrow,
-          actions: narrow
-              ? [
-                  _HeaderLanguageAction(uid: authUser.uid),
-                  const SizedBox(width: 12),
-                  _HeaderIconAction(
-                    icon: Icons.attach_file,
-                    tooltip: _tr(context, 'Notizen', 'Notes'),
-                    onTap: () =>
-                        showAdminQuickNotes(context, uid: authUser.uid),
-                  ),
-                  const SizedBox(width: 12),
-                  _HeaderProfileAvatar(
-                    profile: data,
-                    onTap: () {
-                      if (_active == AppNav.profile) return;
-                      setState(() {
-                        _active = AppNav.profile;
-                        _materialized.add(AppNav.profile);
-                      });
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                ]
-              : null,
-          appBarBackgroundColor: _kHeaderNavy,
-          appBarForegroundColor: Colors.white,
-          appBarToolbarHeight: 72,
-          title: isDispatcherShell
-              ? Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Image.asset(
-                      'assets/Codriver_logo_dark.png',
-                      height: 30,
-                      fit: BoxFit.contain,
-                      filterQuality: FilterQuality.high,
-                      cacheHeight: 120,
+        return NewVersionGate(
+          child: AppShell(
+            menuWidth: _menuCollapsed && !narrow ? 72 : 300,
+            // Mobil: Logo linksbündig, kein Hamburger mehr (das Seitenmenü
+            // hängt jetzt an der ersten Kachel der schwebenden Bottom-Bar).
+            centerTitle: !narrow,
+            hideDrawerButton: narrow,
+            actions: narrow
+                ? [
+                    _HeaderLanguageAction(uid: authUser.uid),
+                    const SizedBox(width: 12),
+                    _HeaderIconAction(
+                      icon: Icons.attach_file,
+                      tooltip: _tr(context, 'Notizen', 'Notes'),
+                      onTap: () =>
+                          showAdminQuickNotes(context, uid: authUser.uid),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Dispatcher: $dispatcherName',
-                      style: AppTypography.caption2.copyWith(
-                        color: AppColors.codriverGreen,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.5,
+                    const SizedBox(width: 12),
+                    _HeaderProfileAvatar(
+                      profile: data,
+                      onTap: () {
+                        if (_active == AppNav.profile) return;
+                        setState(() {
+                          _active = AppNav.profile;
+                          _materialized.add(AppNav.profile);
+                        });
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                  ]
+                : null,
+            appBarBackgroundColor: _kHeaderNavy,
+            appBarForegroundColor: Colors.white,
+            appBarToolbarHeight: 72,
+            title: isDispatcherShell
+                ? Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Image.asset(
+                        'assets/Codriver_logo_dark.png',
+                        height: 30,
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.high,
+                        cacheHeight: 120,
                       ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Dispatcher: $dispatcherName',
+                        style: AppTypography.caption2.copyWith(
+                          color: AppColors.codriverGreen,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  )
+                : Image.asset(
+                    'assets/Codriver_logo_dark.png',
+                    height: 38,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.high,
+                    cacheHeight: 152,
+                  ),
+            sideMenu: AppSideMenu(
+              width: _menuCollapsed && !narrow ? 72 : 300,
+              collapsed: _menuCollapsed && !narrow,
+              onToggleCollapsed: narrow
+                  ? null
+                  : () => setState(() => _menuCollapsed = !_menuCollapsed),
+              active: _active,
+              onSelect: (nav) {
+                if (nav == _active) return;
+                setState(() {
+                  _active = nav;
+                  _materialized.add(nav);
+                });
+              },
+              closeDrawerIfOpen: () {
+                if (!narrow) return;
+                if (Navigator.of(context).canPop()) {
+                  Navigator.of(context).pop(); // closes Drawer
+                }
+              },
+            ),
+            body: _withMobileBottomNav(
+              narrow: narrow,
+              child: Column(
+                children: [
+                  // Desktop-only top menu bar: company + station on the left,
+                  // quick notes / language / profile on the right.
+                  if (!narrow && !isDispatcherShell)
+                    AdminTopBar(
+                      uid: authUser.uid,
+                      profile: data,
+                      onOpenProfile: () {
+                        if (_active == AppNav.profile) return;
+                        setState(() {
+                          _active = AppNav.profile;
+                          _materialized.add(AppNav.profile);
+                        });
+                      },
+                      onOpenUpdates: () {
+                        if (_active == AppNav.appUpdates) return;
+                        setState(() {
+                          _active = AppNav.appUpdates;
+                          _materialized.add(AppNav.appUpdates);
+                        });
+                      },
                     ),
-                  ],
-                )
-              : Image.asset(
-                  'assets/Codriver_logo_dark.png',
-                  height: 38,
-                  fit: BoxFit.contain,
-                  filterQuality: FilterQuality.high,
-                  cacheHeight: 152,
-                ),
-          sideMenu: AppSideMenu(
-            width: _menuCollapsed && !narrow ? 72 : 300,
-            collapsed: _menuCollapsed && !narrow,
-            onToggleCollapsed: narrow
-                ? null
-                : () =>
-                    setState(() => _menuCollapsed = !_menuCollapsed),
-            active: _active,
-            onSelect: (nav) {
-              if (nav == _active) return;
-              setState(() {
-                _active = nav;
-                _materialized.add(nav);
-              });
-            },
-            closeDrawerIfOpen: () {
-              if (!narrow) return;
-              if (Navigator.of(context).canPop()) {
-                Navigator.of(context).pop(); // closes Drawer
-              }
-            },
-          ),
-          body: _withMobileBottomNav(
-            narrow: narrow,
-            child: Column(
-            children: [
-              // Desktop-only top menu bar: company + station on the left,
-              // quick notes / language / profile on the right.
-              if (!narrow && !isDispatcherShell)
-                AdminTopBar(
-                  uid: authUser.uid,
-                  profile: data,
-                  onOpenProfile: () {
-                    if (_active == AppNav.profile) return;
-                    setState(() {
-                      _active = AppNav.profile;
-                      _materialized.add(AppNav.profile);
-                    });
-                  },
-                  onOpenUpdates: () {
-                    if (_active == AppNav.appUpdates) return;
-                    setState(() {
-                      _active = AppNav.appUpdates;
-                      _materialized.add(AppNav.appUpdates);
-                    });
-                  },
-                ),
-              _TrialCountdownBanner(profile: data),
-              Expanded(
-                child: IndexedStack(
-            index: _indexFor(_active),
-            children: [
-              _lazy(AppNav.home, () => const AdminHomePage()),
-              _lazy(AppNav.dashboard, () => const ScorecardOverviewPage()),
-              _lazy(AppNav.podQuality, () => const PodQualityOverviewPage()),
-              _lazy(AppNav.concessions, () => const ConcessionsOverviewPage()),
-              _lazy(AppNav.cdf, () => const CdfOverviewPage()),
-              _lazy(AppNav.drivers, () => const DriversHubPage()),
-              _lazy(AppNav.recruiting, () => const AdminRecruitingPage()),
-              _lazy(AppNav.waveplan, () => const AdminWaveplanPage()),
-              _lazy(AppNav.calendar, () => const AdminCalendarPage()),
-              _lazy(AppNav.fleetStatus, () => const FleetStatusPage()),
-              _lazy(AppNav.tasks, () => const TaskSheetPage()),
-              _lazy(AppNav.shiftAbsence,
-                  () => const AdminZeitenAbwesenheitenPage()),
-              _lazy(AppNav.incidentReports,
-                  () => const AdminIncidentReportsPage()),
-              _lazy(AppNav.academy, () => const AdminAcademyPage()),
-              _lazy(AppNav.dispatcherPill,
-                  () => const AdminDispatcherCenterPage()),
-              _lazy(AppNav.notifications, () => const NotificationsPage()),
-              _lazy(AppNav.appUpdates, () => const AdminAppUpdatesPage()),
-              _lazy(AppNav.feedback, () => const FeedbackPage()),
-              _lazy(AppNav.faqs, () => const AdminFaqPage()),
-              _lazy(AppNav.adminApprovals, () => const AdminApprovalsPage()),
-              _lazy(AppNav.dispatchers, () => const AdminDispatchersPage()),
-              _lazy(AppNav.profile, () => const DspProfilePage()),
-              _lazy(AppNav.styleguide, () => const AdminStyleguidePage()),
-              _lazy(AppNav.cotimer, () => const AdminCotimerPage()),
-              _lazy(AppNav.inventory, () => const AdminInventoryPage()),
-              _lazy(AppNav.cart, () => const AdminCartPage()),
-              _lazy(AppNav.shiftPlan, () => const AdminShiftPlanPage()),
-              _lazy(AppNav.paymentCheck,
-                  () => const AdminPaymentCheckPage()),
-              _lazy(AppNav.monthlyPlan,
-                  () => const AdminMonthlyPlanPage()),
-              _lazy(AppNav.dwc, () => const DwcOverviewPage()),
-              _lazy(AppNav.daRequests, () => const AdminDaRequestsPage()),
-              _lazy(AppNav.safetyTraining,
-                  () => const AdminSafetyTrainingPage()),
-              _lazy(AppNav.driverReviews,
-                  () => const AdminDriverReviewsPage()),
-              _lazy(AppNav.contactCompliance,
-                  () => const ContactComplianceOverviewPage()),
-            ],
-                ),
+                  _TrialCountdownBanner(profile: data),
+                  Expanded(
+                    child: IndexedStack(
+                      index: _indexFor(_active),
+                      children: [
+                        _lazy(AppNav.home, () => const AdminHomePage()),
+                        _lazy(
+                          AppNav.dashboard,
+                          () => const ScorecardOverviewPage(),
+                        ),
+                        _lazy(
+                          AppNav.podQuality,
+                          () => const PodQualityOverviewPage(),
+                        ),
+                        _lazy(
+                          AppNav.concessions,
+                          () => const ConcessionsOverviewPage(),
+                        ),
+                        _lazy(AppNav.cdf, () => const CdfOverviewPage()),
+                        _lazy(AppNav.drivers, () => const DriversHubPage()),
+                        _lazy(
+                          AppNav.recruiting,
+                          () => const AdminRecruitingPage(),
+                        ),
+                        _lazy(AppNav.waveplan, () => const AdminWaveplanPage()),
+                        _lazy(AppNav.calendar, () => const AdminCalendarPage()),
+                        _lazy(
+                          AppNav.fleetStatus,
+                          () => const FleetStatusPage(),
+                        ),
+                        _lazy(AppNav.tasks, () => const TaskSheetPage()),
+                        _lazy(
+                          AppNav.shiftAbsence,
+                          () => const AdminZeitenAbwesenheitenPage(),
+                        ),
+                        _lazy(
+                          AppNav.incidentReports,
+                          () => const AdminIncidentReportsPage(),
+                        ),
+                        _lazy(AppNav.academy, () => const AdminAcademyPage()),
+                        _lazy(
+                          AppNav.dispatcherPill,
+                          () => const AdminDispatcherCenterPage(),
+                        ),
+                        _lazy(
+                          AppNav.notifications,
+                          () => const NotificationsPage(),
+                        ),
+                        _lazy(
+                          AppNav.appUpdates,
+                          () => const AdminAppUpdatesPage(),
+                        ),
+                        _lazy(AppNav.feedback, () => const FeedbackPage()),
+                        _lazy(AppNav.faqs, () => const AdminFaqPage()),
+                        _lazy(
+                          AppNav.adminApprovals,
+                          () => const AdminApprovalsPage(),
+                        ),
+                        _lazy(
+                          AppNav.dispatchers,
+                          () => const AdminDispatchersPage(),
+                        ),
+                        _lazy(AppNav.profile, () => const DspProfilePage()),
+                        _lazy(
+                          AppNav.styleguide,
+                          () => const AdminStyleguidePage(),
+                        ),
+                        _lazy(AppNav.cotimer, () => const AdminCotimerPage()),
+                        _lazy(
+                          AppNav.inventory,
+                          () => const AdminInventoryPage(),
+                        ),
+                        _lazy(AppNav.cart, () => const AdminCartPage()),
+                        _lazy(
+                          AppNav.shiftPlan,
+                          () => const AdminShiftPlanPage(),
+                        ),
+                        _lazy(
+                          AppNav.paymentCheck,
+                          () => const AdminPaymentCheckPage(),
+                        ),
+                        _lazy(
+                          AppNav.monthlyPlan,
+                          () => const AdminMonthlyPlanPage(),
+                        ),
+                        _lazy(AppNav.dwc, () => const DwcOverviewPage()),
+                        _lazy(
+                          AppNav.daRequests,
+                          () => const AdminDaRequestsPage(),
+                        ),
+                        _lazy(
+                          AppNav.safetyTraining,
+                          () => const AdminSafetyTrainingPage(),
+                        ),
+                        _lazy(
+                          AppNav.driverReviews,
+                          () => const AdminDriverReviewsPage(),
+                        ),
+                        _lazy(
+                          AppNav.contactCompliance,
+                          () => const ContactComplianceOverviewPage(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
           ),
         );
       },
@@ -350,17 +402,15 @@ class _AdminShellPageState extends State<AdminShellPage> {
   /// Legt mobil die schwebende Bottom-Navigation über den Inhalt und
   /// reserviert darunter Platz, damit nichts verdeckt wird. Desktop gibt
   /// den Inhalt unverändert zurück.
-  Widget _withMobileBottomNav({
-    required bool narrow,
-    required Widget child,
-  }) {
+  Widget _withMobileBottomNav({required bool narrow, required Widget child}) {
     if (!narrow) return child;
     final bottomInset = MediaQuery.of(context).padding.bottom;
     // Reservierte Fläche = Bar-Höhe + Abstand nach unten + Luft darüber.
     // Weil der Seiteninhalt dadurch oberhalb der Bar endet, sitzen auch die
     // schwebenden Plus-/FAB-Buttons der Seiten (Fleet, …) automatisch über
     // der Bar — sie orientieren sich am unteren Rand ihres eigenen Bereichs.
-    const reserved = _AdminMobileBottomNav.barHeight +
+    const reserved =
+        _AdminMobileBottomNav.barHeight +
         _AdminMobileBottomNav.bottomMargin +
         16;
     return Stack(
@@ -544,8 +594,7 @@ class _TrialCountdownBanner extends StatelessWidget {
         bottom: false,
         child: Container(
           width: double.infinity,
-          padding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: BoxDecoration(
             border: Border(
               bottom: BorderSide(color: accent.withValues(alpha: 0.18)),
@@ -660,9 +709,8 @@ class _HeaderLanguageAction extends StatelessWidget {
   }
 
   Future<void> _select(BuildContext context) async {
-    final current =
-        (localeController.locale ?? Localizations.localeOf(context))
-            .languageCode;
+    final current = (localeController.locale ?? Localizations.localeOf(context))
+        .languageCode;
     final de = Localizations.localeOf(context).languageCode == 'de';
 
     final picked = await showModalBottomSheet<String>(
@@ -732,11 +780,12 @@ class _HeaderLanguageAction extends StatelessWidget {
                           ),
                         ),
                         trailing: locale.languageCode == current
-                            ? const Icon(Icons.check_rounded,
-                                color: AppColors.codriverGreen)
+                            ? const Icon(
+                                Icons.check_rounded,
+                                color: AppColors.codriverGreen,
+                              )
                             : null,
-                        onTap: () =>
-                            Navigator.of(ctx).pop(locale.languageCode),
+                        onTap: () => Navigator.of(ctx).pop(locale.languageCode),
                       ),
                   ],
                 ),
@@ -791,8 +840,11 @@ class _HeaderProfileAvatar extends StatelessWidget {
   final VoidCallback onTap;
 
   static String _initials(String name) {
-    final parts =
-        name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    final parts = name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .toList();
     if (parts.isEmpty) return '?';
     if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
     return (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase();
@@ -801,11 +853,9 @@ class _HeaderProfileAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final de = Localizations.localeOf(context).languageCode == 'de';
-    final name = (profile['companyName'] ??
-            profile['dspName'] ??
-            profile['name'] ??
-            '')
-        .toString();
+    final name =
+        (profile['companyName'] ?? profile['dspName'] ?? profile['name'] ?? '')
+            .toString();
 
     ImageProvider? image;
     final b64 = (profile['profilePhotoBase64'] ?? '').toString().trim();
@@ -913,11 +963,7 @@ class _AdminMobileBottomNav extends StatelessWidget {
         icon: Icons.badge_outlined,
         label: de ? 'Fahrer' : 'Drivers',
       ),
-      (
-        nav: AppNav.dashboard,
-        icon: Icons.dashboard,
-        label: 'Scorecard',
-      ),
+      (nav: AppNav.dashboard, icon: Icons.dashboard, label: 'Scorecard'),
       (
         nav: AppNav.fleetStatus,
         icon: Icons.local_shipping_outlined,

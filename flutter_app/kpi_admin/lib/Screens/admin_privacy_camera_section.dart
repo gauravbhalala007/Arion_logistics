@@ -72,7 +72,16 @@ class _SectionData {
   final List<_AckRow> ackRows;
   final PrivacyCourseBundle bundle;
 
-  const _SectionData({required this.ackRows, required this.bundle});
+  /// Vorab geladene Bescheinigungs-URLs je Transporter-ID. Muss VOR dem
+  /// Klick vorliegen: `launchUrl` nach einem await verliert die
+  /// User-Geste und wird vom Popup-Blocker geschluckt.
+  final Map<String, String> certUrls;
+
+  const _SectionData({
+    required this.ackRows,
+    required this.bundle,
+    required this.certUrls,
+  });
 
   int count(_AckStatus s) => ackRows.where((r) => r.status == s).length;
 }
@@ -178,7 +187,30 @@ class _AdminPrivacyCameraSectionState extends State<AdminPrivacyCameraSection> {
       return a.name.toLowerCase().compareTo(b.name.toLowerCase());
     });
 
-    return _SectionData(ackRows: ackRows, bundle: bundle);
+    // Bescheinigungs-URLs vorab laden (nur für Zeilen mit Nachweis),
+    // damit der PDF-Klick synchron öffnen kann (Popup-Blocker).
+    final certUrls = <String, String>{};
+    final withAck = ackRows.where((r) => r.ack != null).toList();
+    await Future.wait(
+      withAck.map((r) async {
+        try {
+          final doc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(widget.dspUid)
+              .collection('drivers')
+              .doc(r.transporterId)
+              .collection('documents')
+              .doc(kPrivacyCameraCertificateDocType)
+              .get();
+          final url = (doc.data()?['downloadUrl'] ?? '').toString();
+          if (url.isNotEmpty) certUrls[r.transporterId] = url;
+        } catch (_) {
+          // Fehlende URL → Button meldet es beim Klick.
+        }
+      }),
+    );
+
+    return _SectionData(ackRows: ackRows, bundle: bundle, certUrls: certUrls);
   }
 
   @override
@@ -340,9 +372,7 @@ class _AdminPrivacyCameraSectionState extends State<AdminPrivacyCameraSection> {
             isDense: true,
             prefixIcon: const Icon(Icons.search_rounded, size: 19),
             hintText: privacyCameraText(_lang, 'admin_search'),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(11),
-            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(11)),
           ),
         ),
         const SizedBox(height: 10),
@@ -489,46 +519,25 @@ class _AdminPrivacyCameraSectionState extends State<AdminPrivacyCameraSection> {
     ),
   );
 
-  /// Öffnet die beim Bestätigen erzeugte Bescheinigung
-  /// (`drivers/{tid}/documents/camera_privacy_ack_certificate`). Lazy
-  /// geladen — kein Vorab-Read pro Fahrer nötig.
-  Future<void> _openCertificate(String transporterId) async {
-    try {
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.dspUid)
-          .collection('drivers')
-          .doc(transporterId)
-          .collection('documents')
-          .doc(kPrivacyCameraCertificateDocType)
-          .get();
-      final url = (doc.data()?['downloadUrl'] ?? '').toString();
-      if (url.isEmpty) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              widget.de
-                  ? 'Keine Bescheinigung hinterlegt — die PDF-Erzeugung ist '
-                      'bei diesem Fahrer vermutlich fehlgeschlagen.'
-                  : 'No certificate on file — PDF generation likely failed '
-                      'for this driver.',
-            ),
-          ),
-        );
-        return;
-      }
-      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-    } catch (e) {
-      if (!mounted) return;
+  /// Öffnet die vorab geladene Bescheinigungs-URL SOFORT (synchron im
+  /// Klick) — jedes await davor würde den Popup-Blocker auslösen.
+  void _openCertificate(String transporterId, Map<String, String> certUrls) {
+    final url = certUrls[transporterId];
+    if (url == null || url.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            widget.de ? 'Öffnen fehlgeschlagen: $e' : 'Could not open: $e',
+            widget.de
+                ? 'Keine Bescheinigung hinterlegt — die PDF-Erzeugung ist '
+                      'bei diesem Fahrer vermutlich fehlgeschlagen.'
+                : 'No certificate on file — PDF generation likely failed '
+                      'for this driver.',
           ),
         ),
       );
+      return;
     }
+    launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
   }
 
   Widget _ackTile(_AckRow row, _SectionData data) {
@@ -670,7 +679,8 @@ class _AdminPrivacyCameraSectionState extends State<AdminPrivacyCameraSection> {
                     borderRadius: BorderRadius.circular(9),
                     clipBehavior: Clip.antiAlias,
                     child: InkWell(
-                      onTap: () => _openCertificate(row.transporterId),
+                      onTap: () =>
+                          _openCertificate(row.transporterId, data.certUrls),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 9,
@@ -741,9 +751,7 @@ class _AdminPrivacyCameraSectionState extends State<AdminPrivacyCameraSection> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    data.bundle.bindingAck.declineNoteFor(
-                      _fmt(ack.occurredAt),
-                    ),
+                    data.bundle.bindingAck.declineNoteFor(_fmt(ack.occurredAt)),
                     style: const TextStyle(
                       fontSize: 12.5,
                       height: 1.45,

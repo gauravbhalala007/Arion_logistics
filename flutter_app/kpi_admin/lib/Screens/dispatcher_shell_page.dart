@@ -37,6 +37,7 @@ import 'drivers_hub_page.dart';
 import 'feedback_page.dart';
 import 'fleet_status_page.dart';
 import 'task_sheet_page.dart';
+import '../widgets/new_version_gate.dart';
 import 'scorecard_overview.dart';
 import 'pod_quality_overview.dart';
 import 'notifications_page.dart';
@@ -191,7 +192,11 @@ class _DispatcherShellPageState extends State<DispatcherShellPage> {
           final data = snap.data?.data() ?? const <String, dynamic>{};
           final active = data['active'] != false;
           final displayName =
-              (data['name'] ?? data['email'] ?? auth.displayName ?? auth.email ?? '')
+              (data['name'] ??
+                      data['email'] ??
+                      auth.displayName ??
+                      auth.email ??
+                      '')
                   .toString();
 
           if (!active) {
@@ -216,67 +221,69 @@ class _DispatcherShellPageState extends State<DispatcherShellPage> {
           final body = _bodyFor(_active, allowed);
           final isNarrow = MediaQuery.of(context).size.width < 1100;
 
-          return Scaffold(
-            backgroundColor: AppColors.surfaceLight,
-            drawer: isNarrow
-                ? Drawer(
-                    child: SafeArea(
+          return NewVersionGate(
+            child: Scaffold(
+              backgroundColor: AppColors.surfaceLight,
+              drawer: isNarrow
+                  ? Drawer(
+                      child: SafeArea(
+                        child: _DispatcherSideMenu(
+                          active: _active,
+                          allowed: allowed,
+                          displayName: displayName,
+                          onSelect: (k) {
+                            setState(() => _active = k);
+                            Navigator.of(context).pop();
+                          },
+                        ),
+                      ),
+                    )
+                  : null,
+              appBar: isNarrow
+                  ? AppBar(
+                      backgroundColor: const Color(0xFF0B1220),
+                      foregroundColor: Colors.white,
+                      title: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Image.asset(
+                            'assets/Codriver_logo_dark.png',
+                            height: 30,
+                            fit: BoxFit.contain,
+                          ),
+                          if (displayName.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              'Dispatcher: $displayName',
+                              style: AppTypography.caption2.copyWith(
+                                color: Colors.white.withOpacity(0.8),
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      centerTitle: true,
+                    )
+                  : null,
+              body: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (!isNarrow)
+                    SizedBox(
+                      width: 300,
                       child: _DispatcherSideMenu(
                         active: _active,
                         allowed: allowed,
                         displayName: displayName,
-                        onSelect: (k) {
-                          setState(() => _active = k);
-                          Navigator.of(context).pop();
-                        },
+                        onSelect: (k) => setState(() => _active = k),
                       ),
                     ),
-                  )
-                : null,
-            appBar: isNarrow
-                ? AppBar(
-                    backgroundColor: const Color(0xFF0B1220),
-                    foregroundColor: Colors.white,
-                    title: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Image.asset(
-                          'assets/Codriver_logo_dark.png',
-                          height: 30,
-                          fit: BoxFit.contain,
-                        ),
-                        if (displayName.isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            'Dispatcher: $displayName',
-                            style: AppTypography.caption2.copyWith(
-                              color: Colors.white.withOpacity(0.8),
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.4,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    centerTitle: true,
-                  )
-                : null,
-            body: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (!isNarrow)
-                  SizedBox(
-                    width: 300,
-                    child: _DispatcherSideMenu(
-                      active: _active,
-                      allowed: allowed,
-                      displayName: displayName,
-                      onSelect: (k) => setState(() => _active = k),
-                    ),
-                  ),
-                Expanded(child: body),
-              ],
+                  Expanded(child: body),
+                ],
+              ),
             ),
           );
         },
