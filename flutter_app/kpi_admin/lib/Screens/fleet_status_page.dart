@@ -111,6 +111,10 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
   // Plates with an uploaded vehicle registration ("Fahrzeugschein") — drives
   // the green/red chip in the fleet rows.
   Set<String> _registrationPlates = <String>{};
+  // Solange der Dokumente-Stream noch keinen ersten Snapshot geliefert hat,
+  // zeigen die TÜV-/Fahrzeugschein-Chips „…" statt fälschlich „fehlt" —
+  // sonst sieht der erste Seitenaufbau kurz wie Datenverlust aus.
+  bool _scopeDocsLoaded = false;
 
   /// Plate of the vehicle whose detail page is currently shown *inside* the
   /// shell content (no Navigator.push, so the side menu stays visible).
@@ -1541,6 +1545,7 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                   final complianceByPlate = _buildComplianceByPlate(
                     scopeDocuments,
                   );
+                  _scopeDocsLoaded = docsSnapshot.hasData;
                   _tuvDocByPlate = _latestTuvDocsByPlate(scopeDocuments);
                   _registrationPlates = <String>{
                     for (final doc in scopeDocuments)
@@ -3284,7 +3289,11 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
 
     final String tuvValue;
     final Color tuvColor;
-    if (expiry.isEmpty) {
+    if (expiry.isEmpty && !_scopeDocsLoaded) {
+      // Dokumente laden noch — neutraler Platzhalter statt „fehlt".
+      tuvValue = '…';
+      tuvColor = _kFaint;
+    } else if (expiry.isEmpty) {
       tuvValue = de ? 'fehlt' : 'missing';
       tuvColor = _kAccentAmber;
     } else {
@@ -3651,6 +3660,14 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                 '')
             .trim();
     if (expiry.isEmpty) {
+      if (!_scopeDocsLoaded) {
+        // Dokumente laden noch — neutraler Platzhalter statt „fehlt".
+        return _fleetChip(
+          label: '…',
+          foreground: _kFaint,
+          background: _kRowLine,
+        );
+      }
       return _fleetChip(
         label: de ? 'fehlt' : 'missing',
         foreground: _kAccentAmber,
@@ -3682,6 +3699,10 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
     final present = _registrationPlates.contains(
       normalizePlateNumber(vehicle.plateNumber),
     );
+    if (!present && !_scopeDocsLoaded) {
+      // Dokumente laden noch — neutraler Platzhalter statt „fehlt".
+      return _fleetChip(label: '…', foreground: _kFaint, background: _kRowLine);
+    }
     return _fleetChip(
       label: present
           ? (de ? 'vorhanden' : 'available')

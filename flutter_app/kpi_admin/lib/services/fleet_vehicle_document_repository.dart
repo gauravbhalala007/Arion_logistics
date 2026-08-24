@@ -83,8 +83,18 @@ class FleetVehicleDocumentRepository {
     final documentSubscriptions =
         <String, StreamSubscription<List<FleetVehicleDocument>>>{};
     final documentsByPlate = <String, List<FleetVehicleDocument>>{};
+    // Erst emittieren, wenn jedes abonnierte Fahrzeug einmal geliefert hat
+    // (Fehler zählen als geliefert) — sonst halten Konsumenten den leeren
+    // Zwischenstand für „keine Dokumente vorhanden" und zeigen z. B. in der
+    // Fleet-Liste kurz überall „TÜV fehlt".
+    final deliveredPlates = <String>{};
+    var vehiclesReady = false;
+
+    bool ready() =>
+        vehiclesReady && deliveredPlates.containsAll(documentSubscriptions.keys);
 
     void emit() {
+      if (!ready()) return;
       final items = documentsByPlate.values
           .expand((docs) => docs)
           .toList()
@@ -114,6 +124,7 @@ class FleetVehicleDocumentRepository {
       for (final plate in removedPlates) {
         await documentSubscriptions.remove(plate)?.cancel();
         documentsByPlate.remove(plate);
+        deliveredPlates.remove(plate);
       }
 
       for (final plate in activePlates) {
@@ -123,17 +134,24 @@ class FleetVehicleDocumentRepository {
           plateNumber: plate,
         ).listen(
           (docs) {
+            deliveredPlates.add(plate);
             documentsByPlate[plate] = docs;
             emit();
           },
           onError: (Object error, StackTrace stackTrace) {
+            // Als „geliefert" werten, damit ein einzelnes defektes Abo den
+            // Gesamtstream nicht dauerhaft blockiert.
+            deliveredPlates.add(plate);
+            documentsByPlate[plate] = const <FleetVehicleDocument>[];
             if (!controller.isClosed) {
               controller.addError(error, stackTrace);
             }
+            emit();
           },
         );
       }
 
+      vehiclesReady = true;
       emit();
     }
 
