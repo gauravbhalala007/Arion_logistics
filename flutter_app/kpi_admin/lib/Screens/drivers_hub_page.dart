@@ -26,6 +26,7 @@ import 'driver_hub_detail_page.dart';
 import 'driver_residence_permit_form_page.dart';
 import '../services/driver_csv.dart';
 import '../services/driver_export_service.dart';
+import '../services/driver_identity_service.dart';
 import '../services/vacation_pools_repository.dart';
 import '../utils/vacation_pools.dart';
 import '../widgets/vacation_pool_lines.dart';
@@ -1740,14 +1741,17 @@ class _DriversHubPageState extends State<DriversHubPage> {
       }
 
       if (!mounted) return;
+      final de = Localizations.localeOf(context).languageCode == 'de';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
+          duration: importResult.hasWarnings
+              ? const Duration(seconds: 10)
+              : const Duration(seconds: 4),
+          backgroundColor:
+              importResult.hasWarnings ? const Color(0xFFB45309) : null,
           content: Text(
             '${t.tf('drivers_hub_csv_imported_for_dsp', {'file': f.name})} '
-            'Parsed ${importResult.parsedRows}, '
-            'matched ${importResult.mappedDrivers}, '
-            'new ${importResult.newDrivers}, '
-            'score rows updated ${importResult.updatedScores}.',
+            '${importResult.summary(de: de)}',
           ),
         ),
       );
@@ -2112,31 +2116,37 @@ class _DriversHubPageState extends State<DriversHubPage> {
     }
 
     final newTid = newTidRaw.toUpperCase();
-    final oldTid = tidOriginal.toUpperCase();
     final hasNewTid = newTid.isNotEmpty;
-    // Only treat as "tidChanged" when both old and new TID are non-empty and
-    // differ. Adding/removing a TID is handled via merge on the same doc id
-    // (no doc move) since the original doc id may already be an auto-id.
-    final tidChanged = hasNewTid && oldTid.isNotEmpty && newTid != oldTid;
+    // Ein echter Umzug ist fällig, sobald eine TID vorliegt und die
+    // Doc-ID nicht schon danach heißt — das gilt für Platzhalter-Docs
+    // (`PENDING-XXXXXX`) genauso wie für alte Auto-ID-Dokumente.
+    final tidChanged = hasNewTid && driverDoc.id.toUpperCase() != newTid;
 
     try {
       // Decide which document we will finally use
       DocumentReference<Map<String, dynamic>> targetRef = driverDoc.reference;
+      var loginSyncWarning = false;
 
       if (tidChanged) {
-        // move driver document to new TID-based ID
-        final driversCol = driverDoc.reference.parent;
-        final newDocRef = driversCol.doc(newTid);
+        // Vollständiger Umzug auf die TID-basierte Doc-ID.
+        //
+        // Früher wurde hier nur das Fahrer-Dokument 1:1 kopiert: die
+        // Subcollections (Dokumente, Zeitkonto, Nachweise) blieben an der
+        // alten ID zurück und `tidPending: true` wurde mitkopiert, sodass
+        // Fahrer mit echter TID weiter als „TID ausstehend" erschienen.
+        // `migrateDriverToTid` nimmt alles mit und setzt das Flag korrekt.
+        final moved = await migrateDriverToTid(
+          dspUid: _uid!,
+          fromDocId: driverDoc.id,
+          toTid: newTid,
+        );
+        loginSyncWarning = moved.hasLoginSyncWarning;
 
-        final existingData = Map<String, dynamic>.from(data);
-        existingData['transporterId'] = newTid;
-        existingData['email'] = email;
-        existingData['updatedAt'] = FieldValue.serverTimestamp();
-
-        await newDocRef.set(existingData, SetOptions(merge: true));
-        await driverDoc.reference.delete();
-
-        targetRef = newDocRef;
+        targetRef = driverDoc.reference.parent.doc(newTid);
+        await targetRef.set({
+          'email': email,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
       } else {
         // just update email + transporterId (if provided)
         await driverDoc.reference.set({
@@ -2196,8 +2206,21 @@ class _DriversHubPageState extends State<DriversHubPage> {
         ),
       );
 
+      final de = Localizations.localeOf(context).languageCode == 'de';
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(t.t('drivers_hub_driver_login_saved'))),
+        SnackBar(
+          backgroundColor:
+              loginSyncWarning ? const Color(0xFFB45309) : null,
+          content: Text(
+            loginSyncWarning
+                ? (de
+                    ? 'Gespeichert — der Fahrer-Login konnte aber nicht auf '
+                        'die neue TID synchronisiert werden.'
+                    : 'Saved — but the driver login could not be synced to '
+                        'the new TID.')
+                : t.t('drivers_hub_driver_login_saved'),
+          ),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
@@ -2207,6 +2230,30 @@ class _DriversHubPageState extends State<DriversHubPage> {
         ),
       );
     }
+  }
+
+  /// Öffnet das Werkzeug „Profile zusammenführen".
+  ///
+  /// Bekommt die bereits geladenen Fahrer-Dokumente mit, damit der Dialog
+  /// die Gegenüberstellung ohne erneute Fahrer-Query rendern kann. Nur die
+  /// Zähler je Datenbereich holt er selbst nach.
+  Future<void> _openMergeDuplicatesDialog(
+    List<DuplicateDriverGroup> groups,
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) async {
+    if (_uid == null) return;
+    final driverData = <String, Map<String, dynamic>>{
+      for (final d in docs) d.id: d.data(),
+    };
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _MergeDuplicateProfilesDialog(
+        dspUid: _uid!,
+        groups: groups,
+        driverData: driverData,
+      ),
+    );
   }
 
   /// Ask for the contract end date before a driver is switched off.
@@ -3075,57 +3122,37 @@ class _DriversHubPageState extends State<DriversHubPage> {
         }
       }
 
-      final data = Map<String, dynamic>.from(driverDoc.data() ?? {});
-      data['transporterId'] = newTid;
-      data['updatedAt'] = FieldValue.serverTimestamp();
-
-      // If the doc ID matches the OLD TID, we want to move it to the
-      // new TID-based ID. Otherwise (auto-id doc) we just patch the
-      // transporterId field in place.
-      final docIsTidBased = driverDoc.id.toUpperCase() == oldTid;
-      if (docIsTidBased && newTid.isNotEmpty && newTid != oldTid) {
-        await driversCol.doc(newTid).set(data, SetOptions(merge: true));
-        await driverDoc.reference.delete();
-      } else if (docIsTidBased && newTid.isEmpty) {
-        // User cleared the TID — we keep the existing doc id (since it
-        // matched OLD TID) but blank out the field.
+      // Es gibt genau EINEN Weg für einen TID-Wechsel:
+      // `migrateDriverToTid`. Der Umzug nimmt die Subcollections
+      // (Dokumente, Zeitkonto, Abwesenheiten …) und die nach TID
+      // geschlüsselten Academy-Nachweise mit, setzt `tidPending` korrekt
+      // auf `false` und zieht das Fahrer-Login (users-Doc + Auth-Claims)
+      // über `syncDriverLoginTransporterId` nach — sonst vergleichen die
+      // Firestore-Rules weiter die alte ID und Fahrer-Schreibzugriffe
+      // (z. B. Vorschussantrag) scheitern mit permission-denied.
+      var loginSyncWarning = false;
+      if (newTid.isNotEmpty && driverDoc.id.toUpperCase() != newTid) {
+        final moved = await migrateDriverToTid(
+          dspUid: _uid!,
+          fromDocId: driverDoc.id,
+          toTid: newTid,
+        );
+        loginSyncWarning = moved.hasLoginSyncWarning;
+      } else if (newTid.isEmpty) {
+        // Admin hat die TID geleert — die Doc-ID bleibt, nur das Feld
+        // wird geblankt.
         await driverDoc.reference.set({
           'transporterId': '',
           'updatedAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
       } else {
+        // Doc-ID heißt bereits wie die neue TID — nur die Felder
+        // geraderücken.
         await driverDoc.reference.set({
           'transporterId': newTid,
+          'tidPending': false,
           'updatedAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
-      }
-
-      // Fahrer-Login (users-Doc + Auth-Claims) auf die neue TID
-      // mitziehen — sonst vergleichen die Firestore-Rules weiter die
-      // alte ID und Fahrer-Schreibzugriffe (z. B. Vorschussantrag)
-      // scheitern mit permission-denied.
-      var loginSyncWarning = false;
-      final loginEmail = ((data['email'] ??
-                  data['loginEmail'] ??
-                  (data['onboarding'] is Map
-                      ? (data['onboarding'] as Map)['email']
-                      : null)) ??
-              '')
-          .toString()
-          .trim();
-      if (newTid.isNotEmpty && loginEmail.isNotEmpty) {
-        try {
-          await FirebaseFunctions.instance
-              .httpsCallable('syncDriverLoginTransporterId')
-              .call(<String, dynamic>{
-            'driverEmail': loginEmail,
-            'newTransporterId': newTid,
-          });
-        } catch (_) {
-          // Nicht fatal: TID-Wechsel selbst ist durch. Ohne Sync bleibt
-          // das Login aber auf der alten ID — deshalb warnen.
-          loginSyncWarning = true;
-        }
       }
 
       if (!mounted) return;
@@ -7273,13 +7300,12 @@ class _DriversHubPageState extends State<DriversHubPage> {
                 }).toList();
               } else if (!_showArchive &&
                   _driverSort == _DriverSort.tidPending) {
-                // Nur Fahrer ohne zugewiesene Transporter-ID.
-                filtered = filtered.where((d) {
-                  final data = d.data();
-                  final tid =
-                      (data['transporterId'] ?? '').toString().trim();
-                  return data['tidPending'] == true || tid.isEmpty;
-                }).toList();
+                // Nur Fahrer ohne zugewiesene Transporter-ID. Maßgeblich
+                // ist die wirksame TID (`isDriverTidPending`), nicht das
+                // gern hängenbleibende Feld `tidPending`.
+                filtered = filtered
+                    .where((d) => isDriverTidPending(d.data(), d.id))
+                    .toList();
               } else if (!_showArchive &&
                   _driverSort == _DriverSort.employeeIdMissing) {
                 // Nur Fahrer ohne Personalnummer / Employee ID
@@ -7445,6 +7471,13 @@ class _DriversHubPageState extends State<DriversHubPage> {
                   // stable while the admin searches/filters. Rejected
                   // / inactive drivers (`active: false`) drop out of
                   // both the total and the per-type counts.
+                  // Verdachtsfälle auf Doppel-Profile: gleicher
+                  // normalisierter Name ODER gleiche Personalnummer.
+                  // Läuft auf der unfilterten Liste, damit ein aktives
+                  // und ein archiviertes Profil derselben Person nicht
+                  // auseinanderfallen.
+                  final duplicateGroups = findDuplicateDriverGroups(docs);
+
                   final contractCounts = <DriverContractType?, int>{};
                   var activeTotal = 0;
                   for (final d in docs) {
@@ -7490,6 +7523,19 @@ class _DriversHubPageState extends State<DriversHubPage> {
                               },
                             ),
                           ),
+                          // Verdacht auf Doppel-Profile — rein lesend aus
+                          // der ohnehin geladenen Fahrerliste (`docs`),
+                          // keine zusätzliche Query. Der Hinweis
+                          // erscheint nur, wenn es wirklich etwas zu
+                          // prüfen gibt.
+                          if (duplicateGroups.isNotEmpty)
+                            _DuplicateProfilesBanner(
+                              count: duplicateGroups.length,
+                              onTap: () => _openMergeDuplicatesDialog(
+                                duplicateGroups,
+                                docs,
+                              ),
+                            ),
                           Expanded(
                             child: ListView.separated(
                               padding: const EdgeInsets.only(
@@ -7502,14 +7548,23 @@ class _DriversHubPageState extends State<DriversHubPage> {
                           final d = filtered[index];
                           final data = d.data();
                           final name = (data['driverName'] ?? '').toString();
-                          final hasTid =
-                              (data['transporterId'] ?? '').toString().trim().isNotEmpty;
-                          final tidPending = data['tidPending'] == true || !hasTid;
-                          final transporterId = hasTid
-                              ? (data['transporterId'] as String)
-                                  .trim()
-                                  .toUpperCase()
-                              : '';
+                          // „TID ausstehend" richtet sich nach der
+                          // wirksamen TID, nicht nach dem Flag — sonst
+                          // erscheinen Fahrer mit längst echter TID
+                          // weiter als ausstehend.
+                          final tidPending =
+                              isDriverTidPending(data, d.id);
+                          final hasTid = (data['transporterId'] ?? '')
+                              .toString()
+                              .trim()
+                              .isNotEmpty;
+                          final transporterId = tidPending
+                              ? ''
+                              : (hasTid
+                                  ? (data['transporterId'] as String)
+                                      .trim()
+                                      .toUpperCase()
+                                  : d.id.trim().toUpperCase());
                           final hasLogin =
                               (data['hasLogin'] as bool?) ?? false;
                           final active = (data['active'] as bool?) ?? true;
@@ -11331,5 +11386,842 @@ ImageProvider? _profileImageFromOnboarding(dynamic onboardingRaw) {
     return MemoryImage(bytes);
   } catch (_) {
     return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// „Profile zusammenführen" — manuelles Werkzeug für Alt-Dubletten
+// ---------------------------------------------------------------------------
+//
+// Durch den früheren Fehler (CSV-Import legte für eine neue TID blind ein
+// zweites Dokument an, statt den Platzhalter-Fahrer umzuziehen) existieren
+// im Bestand Personen mit zwei oder drei Profilen, deren Daten aufgeteilt
+// sind: die Scorecard-Wochen am einen, die Dokumente am anderen.
+//
+// Der Automatik-Fix in `driver_identity_service.dart` verhindert neue
+// Dubletten, räumt die alten aber bewusst NICHT von selbst auf — welches
+// Profil bestehen bleibt, ist eine Entscheidung des Admins. Dieses
+// Werkzeug stellt die Kandidaten gegenüber und führt sie auf Zuruf über
+// `migrateDriverToTid` zusammen.
+
+/// `dd.MM.yyyy` ohne `intl` — reicht für das Anlage-Datum im Vergleich.
+String _formatDayMonthYear(DateTime d) {
+  final day = d.day.toString().padLeft(2, '0');
+  final month = d.month.toString().padLeft(2, '0');
+  return '$day.$month.${d.year}';
+}
+
+/// Zähler je Datenbereich eines Profils — daran erkennt der Admin, welches
+/// das gepflegte Profil ist.
+class _DuplicateProfileStats {
+  const _DuplicateProfileStats({
+    this.documents = 0,
+    this.timeAccount = 0,
+    this.absences = 0,
+    this.academyProofs = 0,
+    this.scoreWeeks = 0,
+  });
+
+  final int documents;
+  final int timeAccount;
+  final int absences;
+  final int academyProofs;
+  final int scoreWeeks;
+
+  int get total =>
+      documents + timeAccount + absences + academyProofs + scoreWeeks;
+}
+
+/// Lädt die Zähler eines Profils.
+///
+/// Bewusst mit `count()`-Aggregaten statt vollständiger `get()`s — die
+/// Scorecard-Wochen sind je Fahrer schnell dreistellig. Nur die
+/// Academy-Nachweise brauchen einzelne Dokument-Reads, weil sie unter
+/// `academy_test_results/{testId}/drivers/{TID}` liegen.
+Future<_DuplicateProfileStats> _loadDuplicateProfileStats({
+  required String dspUid,
+  required String docId,
+  required String tid,
+}) async {
+  final db = FirebaseFirestore.instance;
+  final driverRef =
+      db.collection('users').doc(dspUid).collection('drivers').doc(docId);
+
+  Future<int> countOf(Query<Map<String, dynamic>> query) async {
+    try {
+      final snap = await query.count().get();
+      return snap.count ?? 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  final documents = await countOf(driverRef.collection('documents'));
+  final timeAccount = await countOf(driverRef.collection('time_account'));
+  final absences = await countOf(driverRef.collection('absence_requests'));
+
+  var academyProofs = 0;
+  for (final testId in kAcademyTestIdsForMigration) {
+    try {
+      final snap = await db
+          .collection('users')
+          .doc(dspUid)
+          .collection('academy_test_results')
+          .doc(testId)
+          .collection('drivers')
+          .doc(docId)
+          .get();
+      if (snap.exists) academyProofs++;
+    } catch (_) {
+      // Einzelner Nachweis nicht lesbar — Zähler bleibt konservativ.
+    }
+  }
+
+  final scoreWeeks = tid.isEmpty
+      ? 0
+      : await countOf(
+          db
+              .collection('users')
+              .doc(dspUid)
+              .collection('scores')
+              .where('transporterId', isEqualTo: tid),
+        );
+
+  return _DuplicateProfileStats(
+    documents: documents,
+    timeAccount: timeAccount,
+    absences: absences,
+    academyProofs: academyProofs,
+    scoreWeeks: scoreWeeks,
+  );
+}
+
+/// Dezenter Einstieg im Kopf der Fahrerliste — erscheint nur, wenn es
+/// mindestens einen Verdachtsfall gibt. Kein Badge-Spam.
+class _DuplicateProfilesBanner extends StatelessWidget {
+  const _DuplicateProfilesBanner({
+    required this.count,
+    required this.onTap,
+  });
+
+  final int count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFF8EC),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFF2D9A8)),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.people_alt_outlined,
+                size: 18,
+                color: Color(0xFFB45309),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  de
+                      ? (count == 1
+                          ? '1 mögliches Doppel-Profil prüfen'
+                          : '$count mögliche Doppel-Profile prüfen')
+                      : (count == 1
+                          ? '1 possible duplicate profile'
+                          : '$count possible duplicate profiles'),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF92400E),
+                  ),
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right,
+                size: 20,
+                color: Color(0xFFB45309),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Der Zusammenführen-Dialog.
+///
+/// Zeigt je Verdachtsfall alle beteiligten Profile nebeneinander. Der
+/// Admin wählt per Radio das ZIEL-Profil (dessen TID bleibt bestehen) und
+/// führt die übrigen einzeln hinein. Damit funktioniert auch der Fall mit
+/// drei Profilen: nach dem ersten Zusammenführen bleibt der Fall mit dem
+/// verbleibenden Profil stehen.
+class _MergeDuplicateProfilesDialog extends StatefulWidget {
+  const _MergeDuplicateProfilesDialog({
+    required this.dspUid,
+    required this.groups,
+    required this.driverData,
+  });
+
+  final String dspUid;
+  final List<DuplicateDriverGroup> groups;
+
+  /// Doc-ID → Fahrerdaten, aus dem Stream der Seite (keine neue Query).
+  final Map<String, Map<String, dynamic>> driverData;
+
+  @override
+  State<_MergeDuplicateProfilesDialog> createState() =>
+      _MergeDuplicateProfilesDialogState();
+}
+
+class _MergeDuplicateProfilesDialogState
+    extends State<_MergeDuplicateProfilesDialog> {
+  /// Fälle als veränderliche Kopie — nach einem Umzug fällt das
+  /// Quell-Profil heraus.
+  late List<List<String>> _cases;
+  late List<Set<DuplicateDriverSignal>> _signals;
+  late List<String> _labels;
+
+  /// Fall-Index → gewählte Ziel-Doc-ID.
+  final Map<int, String> _target = <int, String>{};
+
+  /// Doc-ID → Zähler (null = lädt noch).
+  final Map<String, _DuplicateProfileStats?> _stats =
+      <String, _DuplicateProfileStats?>{};
+
+  String? _busyDocId;
+
+  @override
+  void initState() {
+    super.initState();
+    _cases = widget.groups.map((g) => [...g.docIds]).toList();
+    _signals = widget.groups.map((g) => g.signals).toList();
+    _labels = widget.groups.map((g) => g.label).toList();
+    for (var i = 0; i < _cases.length; i++) {
+      // Vorschlag: das Profil mit den meisten Daten ist meistens das
+      // gepflegte — bis die Zähler da sind, einfach das erste.
+      _target[i] = _cases[i].first;
+    }
+    _loadAllStats();
+  }
+
+  Future<void> _loadAllStats() async {
+    for (final docIds in _cases) {
+      for (final docId in docIds) {
+        if (_stats.containsKey(docId)) continue;
+        _stats[docId] = null;
+        final stats = await _loadDuplicateProfileStats(
+          dspUid: widget.dspUid,
+          docId: docId,
+          tid: _tidOf(docId),
+        );
+        if (!mounted) return;
+        setState(() => _stats[docId] = stats);
+        _suggestTargets();
+      }
+    }
+  }
+
+  /// Sobald die Zähler eines Falls vollständig sind, das datenreichste
+  /// Profil vorschlagen — der Admin kann es jederzeit ändern.
+  void _suggestTargets() {
+    for (var i = 0; i < _cases.length; i++) {
+      final ids = _cases[i];
+      if (ids.any((id) => _stats[id] == null)) continue;
+      final best = ids.reduce((a, b) =>
+          (_stats[a]!.total >= _stats[b]!.total) ? a : b);
+      if (_target[i] != best && !_userPicked.contains(i)) {
+        setState(() => _target[i] = best);
+      }
+    }
+  }
+
+  /// Fälle, in denen der Admin selbst gewählt hat — dann nie mehr
+  /// automatisch umstellen.
+  final Set<int> _userPicked = <int>{};
+
+  String _tidOf(String docId) {
+    final data = widget.driverData[docId] ?? const <String, dynamic>{};
+    return effectiveDriverTid(data, docId);
+  }
+
+  String _nameOf(String docId) {
+    final data = widget.driverData[docId] ?? const <String, dynamic>{};
+    return (data['driverName'] ?? '').toString().trim();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final mediaW = MediaQuery.of(context).size.width;
+    final dialogW = mediaW < 720 ? mediaW - 24 : 880.0;
+
+    final visible = <int>[
+      for (var i = 0; i < _cases.length; i++)
+        if (_cases[i].length > 1) i,
+    ];
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: dialogW, maxHeight: 720),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.merge_type,
+                    size: 20,
+                    color: Color(0xFFB45309),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      de
+                          ? 'Profile zusammenführen'
+                          : 'Merge duplicate profiles',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF111827),
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: de ? 'Schließen' : 'Close',
+                    icon: const Icon(Icons.close, size: 20),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                de
+                    ? 'Diese Fahrer haben denselben Namen oder dieselbe '
+                        'Personalnummer und sind vermutlich dieselbe Person. '
+                        'Wähle je Fall das Profil, dessen Transporter-ID '
+                        'bestehen bleiben soll, und führe die übrigen dort '
+                        'hinein. Es wird nichts automatisch zusammengeführt.'
+                    : 'These drivers share a name or an employee ID and are '
+                        'most likely the same person. Pick the profile whose '
+                        'transporter ID should remain, then merge the others '
+                        'into it. Nothing is merged automatically.',
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  height: 1.4,
+                  color: Color(0xFF6B7280),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Flexible(
+                child: visible.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 32),
+                        child: Center(
+                          child: Text(
+                            de
+                                ? 'Keine offenen Doppel-Profile mehr.'
+                                : 'No duplicate profiles left.',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF6B7280),
+                            ),
+                          ),
+                        ),
+                      )
+                    : ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: visible.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 14),
+                        itemBuilder: (ctx, i) => _buildCase(visible[i], de),
+                      ),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(de ? 'Fertig' : 'Done'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCase(int index, bool de) {
+    final ids = _cases[index];
+    final signals = _signals[index];
+    final target = _target[index] ?? ids.first;
+    final isNarrow = MediaQuery.of(context).size.width < 720;
+
+    final chips = <String>[
+      if (signals.contains(DuplicateDriverSignal.driverName))
+        de ? 'gleicher Name' : 'same name',
+      if (signals.contains(DuplicateDriverSignal.employeeNumber))
+        de ? 'gleiche Personalnummer' : 'same employee ID',
+    ];
+
+    final cards = <Widget>[
+      for (final docId in ids)
+        _buildProfileCard(
+          caseIndex: index,
+          docId: docId,
+          isTarget: docId == target,
+          targetDocId: target,
+          de: de,
+        ),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFAFAFA),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              Text(
+                _labels[index].isEmpty
+                    ? (de ? 'Ohne Name' : 'No name')
+                    : _labels[index],
+                style: const TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF111827),
+                ),
+              ),
+              for (final chip in chips)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: const Color(0xFFBFDBFE)),
+                  ),
+                  child: Text(
+                    chip,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1D4ED8),
+                    ),
+                  ),
+                ),
+              Text(
+                de
+                    ? '${ids.length} Profile'
+                    : '${ids.length} profiles',
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  color: Color(0xFF6B7280),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (isNarrow)
+            Column(
+              children: [
+                for (var i = 0; i < cards.length; i++) ...[
+                  if (i > 0) const SizedBox(height: 10),
+                  cards[i],
+                ],
+              ],
+            )
+          else
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var i = 0; i < cards.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 10),
+                  Expanded(child: cards[i]),
+                ],
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileCard({
+    required int caseIndex,
+    required String docId,
+    required bool isTarget,
+    required String targetDocId,
+    required bool de,
+  }) {
+    final data = widget.driverData[docId] ?? const <String, dynamic>{};
+    final tid = _tidOf(docId);
+    final pending = isDriverTidPending(data, docId);
+    final employeeNumber = (data['employeeNumber'] ?? '').toString().trim();
+    final email = (data['email'] ?? data['loginEmail'] ?? '').toString().trim();
+    final active = (data['active'] as bool?) ?? true;
+    final hasLogin = data['hasLogin'] == true;
+    final createdRaw = data['createdAt'];
+    final created = createdRaw is Timestamp
+        ? _formatDayMonthYear(createdRaw.toDate())
+        : '—';
+    final stats = _stats[docId];
+    final busy = _busyDocId != null;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isTarget ? const Color(0xFF00B287) : const Color(0xFFE5E7EB),
+          width: isTarget ? 1.6 : 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              SizedBox(
+                width: 24,
+                height: 24,
+                child: Radio<String>(
+                  value: docId,
+                  groupValue: targetDocId,
+                  activeColor: const Color(0xFF00B287),
+                  onChanged: busy
+                      ? null
+                      : (v) {
+                          if (v == null) return;
+                          setState(() {
+                            _target[caseIndex] = v;
+                            _userPicked.add(caseIndex);
+                          });
+                        },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  pending
+                      ? (de ? 'TID ausstehend' : 'TID pending')
+                      : tid,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
+                    color: pending
+                        ? const Color(0xFFB45309)
+                        : const Color(0xFF111827),
+                  ),
+                ),
+              ),
+              if (isTarget)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE7F8F1),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    de ? 'Ziel' : 'Target',
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F7A5A),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _kv(de ? 'Name' : 'Name', _nameOf(docId)),
+          _kv(de ? 'Personalnummer' : 'Employee ID', employeeNumber),
+          _kv(de ? 'E-Mail' : 'Email', email),
+          _kv(de ? 'Aktiv' : 'Active',
+              active ? (de ? 'ja' : 'yes') : (de ? 'nein' : 'no')),
+          _kv(de ? 'Login' : 'Login',
+              hasLogin ? (de ? 'ja' : 'yes') : (de ? 'nein' : 'no')),
+          _kv(de ? 'Angelegt' : 'Created', created),
+          const Divider(height: 18),
+          if (stats == null)
+            Row(
+              children: [
+                const SizedBox(
+                  width: 13,
+                  height: 13,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  de ? 'Daten werden gezählt …' : 'Counting data …',
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    color: Color(0xFF6B7280),
+                  ),
+                ),
+              ],
+            )
+          else ...[
+            _kv(de ? 'Dokumente' : 'Documents', '${stats.documents}'),
+            _kv(de ? 'Zeitkonto-Monate' : 'Time account months',
+                '${stats.timeAccount}'),
+            _kv(de ? 'Abwesenheiten' : 'Absences', '${stats.absences}'),
+            _kv(de ? 'Academy-Nachweise' : 'Academy proofs',
+                '${stats.academyProofs}'),
+            _kv(de ? 'Scorecard-Wochen' : 'Scorecard weeks',
+                '${stats.scoreWeeks}'),
+          ],
+          if (!isTarget) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFB45309),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+                onPressed: busy
+                    ? null
+                    : () => _confirmAndMerge(
+                          caseIndex: caseIndex,
+                          sourceDocId: docId,
+                          targetDocId: targetDocId,
+                        ),
+                icon: _busyDocId == docId
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Icon(Icons.merge_type, size: 16),
+                label: Text(
+                  de ? 'In Ziel zusammenführen' : 'Merge into target',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _kv(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 5,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 11.5,
+                color: Color(0xFF6B7280),
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 6,
+            child: Text(
+              value.trim().isEmpty ? '—' : value,
+              textAlign: TextAlign.right,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF111827),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Sicherheitsnetz: klare Warnung mit Nennung der Quell-TID, bevor das
+  /// Quell-Profil verschwindet.
+  Future<void> _confirmAndMerge({
+    required int caseIndex,
+    required String sourceDocId,
+    required String targetDocId,
+  }) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final messenger = ScaffoldMessenger.of(context);
+    final sourceTid = _tidOf(sourceDocId);
+    final targetTid = _tidOf(targetDocId);
+    final sourceStats = _stats[sourceDocId] ?? const _DuplicateProfileStats();
+
+    if (isDriverTidPending(
+      widget.driverData[targetDocId] ?? const <String, dynamic>{},
+      targetDocId,
+    )) {
+      messenger.showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFFB42318),
+          content: Text(
+            de
+                ? 'Das Ziel-Profil hat noch keine echte Transporter-ID. '
+                    'Wähle das Profil mit der echten TID als Ziel.'
+                : 'The target profile has no real transporter ID yet. Pick '
+                    'the profile with the real TID as the target.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Text(
+          de ? 'Profile zusammenführen?' : 'Merge profiles?',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+        ),
+        content: SizedBox(
+          width: 400,
+          child: Text(
+            de
+                ? 'Das Profil "$sourceTid" wird in "$targetTid" überführt und '
+                    'danach GELÖSCHT. Dokumente, Zeitkonto, Abwesenheiten und '
+                    'Academy-Nachweise wandern mit. Felder und Dokumente, die '
+                    'im Ziel schon vorhanden sind, bleiben unverändert — leere '
+                    'Felder im Ziel werden aus "$sourceTid" ergänzt.\n\n'
+                    'Das lässt sich nicht rückgängig machen.'
+                : 'Profile "$sourceTid" will be moved into "$targetTid" and '
+                    'then DELETED. Documents, time account, absences and '
+                    'academy proofs move along. Fields and documents that '
+                    'already exist on the target stay untouched — empty '
+                    'target fields are filled from "$sourceTid".\n\n'
+                    'This cannot be undone.',
+            style: const TextStyle(fontSize: 12.5, height: 1.4),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(de ? 'Abbrechen' : 'Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFB45309),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(de ? 'Zusammenführen' : 'Merge'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    setState(() => _busyDocId = sourceDocId);
+    try {
+      final result = await migrateDriverToTid(
+        dspUid: widget.dspUid,
+        fromDocId: sourceDocId,
+        toTid: targetTid,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _cases[caseIndex] = [
+          for (final id in _cases[caseIndex])
+            if (id != sourceDocId) id,
+        ];
+        _busyDocId = null;
+      });
+
+      final detail = de
+          ? '${sourceStats.documents} Dokumente, '
+              '${sourceStats.timeAccount} Zeitkonto-Einträge, '
+              '${sourceStats.academyProofs} Academy-Nachweise übernommen'
+          : '${sourceStats.documents} documents, '
+              '${sourceStats.timeAccount} time-account entries, '
+              '${sourceStats.academyProofs} academy proofs moved';
+
+      messenger.showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 8),
+          backgroundColor: result.hasLoginSyncWarning
+              ? const Color(0xFFB45309)
+              : null,
+          content: Text(
+            result.hasLoginSyncWarning
+                ? (de
+                    ? 'Profil $sourceTid → $targetTid zusammengeführt '
+                        '($detail) — der Fahrer-Login konnte aber nicht auf '
+                        'die neue TID synchronisiert werden.'
+                    : 'Profile $sourceTid → $targetTid merged ($detail) — but '
+                        'the driver login could not be synced to the new TID.')
+                : (de
+                    ? 'Profil $sourceTid → $targetTid zusammengeführt: $detail.'
+                    : 'Profile $sourceTid → $targetTid merged: $detail.'),
+          ),
+        ),
+      );
+
+      // Nach dem Umzug liegen die Daten im Ziel — Zähler neu holen.
+      final refreshed = await _loadDuplicateProfileStats(
+        dspUid: widget.dspUid,
+        docId: targetDocId,
+        tid: targetTid,
+      );
+      if (!mounted) return;
+      setState(() => _stats[targetDocId] = refreshed);
+
+      // Keine offenen Fälle mehr → Dialog schließen.
+      if (_cases.every((ids) => ids.length < 2)) {
+        if (mounted) Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _busyDocId = null);
+      messenger.showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFFB42318),
+          content: Text(
+            de
+                ? 'Zusammenführen fehlgeschlagen: $e'
+                : 'Merge failed: $e',
+          ),
+        ),
+      );
+    }
   }
 }

@@ -4,18 +4,106 @@ import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'driver_identity_service.dart';
+
 class DriverCsvImportResult {
   const DriverCsvImportResult({
     required this.parsedRows,
     required this.mappedDrivers,
     required this.newDrivers,
     required this.updatedScores,
+    this.mergedDrivers = 0,
+    this.ambiguousDrivers = const <String>[],
+    this.loginSyncWarnings = const <String>[],
+    this.mergeErrors = const <String>[],
   });
 
   final int parsedRows;
   final int mappedDrivers;
   final int newDrivers;
   final int updatedScores;
+
+  /// Fahrer, die statt als Dublette neu angelegt zu werden, von ihrer
+  /// Platzhalter-ID (`PENDING-…`) auf die echte TID umgezogen wurden.
+  final int mergedDrivers;
+
+  /// Fälle, in denen mehrere Platzhalter-Fahrer gepasst hätten — hier
+  /// wird **nichts** automatisch zusammengeführt, der Fahrer wird wie
+  /// bisher neu angelegt. Format: `"Name (TID)"`.
+  final List<String> ambiguousDrivers;
+
+  /// Umzüge, bei denen die Cloud Function
+  /// `syncDriverLoginTransporterId` fehlschlug. Das Fahrer-Login zeigt
+  /// dann noch auf die alte ID — der Admin muss es erfahren.
+  final List<String> loginSyncWarnings;
+
+  /// Umzüge, die komplett fehlschlugen. Der Fahrer wurde stattdessen
+  /// (wie bisher) unter der neuen TID angelegt.
+  final List<String> mergeErrors;
+
+  /// True, wenn der Import etwas gemeldet hat, das der Admin sehen sollte.
+  bool get hasWarnings =>
+      ambiguousDrivers.isNotEmpty ||
+      loginSyncWarnings.isNotEmpty ||
+      mergeErrors.isNotEmpty;
+
+  /// Zweisprachige Zusammenfassung für die SnackBar nach dem Import.
+  ///
+  /// Der Import läuft ohne UI durch — was er automatisch zusammengeführt
+  /// hat und was er bewusst NICHT angefasst hat (mehrdeutige Fälle), muss
+  /// der Admin hier erfahren.
+  String summary({required bool de}) {
+    final parts = <String>[
+      de
+          ? 'Zeilen $parsedRows, zugeordnet $mappedDrivers, neu $newDrivers, '
+              'Score-Zeilen $updatedScores.'
+          : 'Rows $parsedRows, matched $mappedDrivers, new $newDrivers, '
+              'score rows $updatedScores.',
+    ];
+    if (mergedDrivers > 0) {
+      parts.add(de
+          ? '$mergedDrivers Fahrer von ihrer Platzhalter-ID auf die echte '
+              'TID zusammengeführt.'
+          : '$mergedDrivers driver(s) merged from their placeholder ID onto '
+              'the real TID.');
+    }
+    if (ambiguousDrivers.isNotEmpty) {
+      parts.add(de
+          ? 'Nicht eindeutig, bitte manuell prüfen: '
+              '${ambiguousDrivers.join(', ')}.'
+          : 'Ambiguous, please check manually: '
+              '${ambiguousDrivers.join(', ')}.');
+    }
+    if (loginSyncWarnings.isNotEmpty) {
+      parts.add(de
+          ? 'Login-Sync fehlgeschlagen bei: '
+              '${loginSyncWarnings.join(', ')}.'
+          : 'Login sync failed for: ${loginSyncWarnings.join(', ')}.');
+    }
+    if (mergeErrors.isNotEmpty) {
+      parts.add(de
+          ? 'Zusammenführen fehlgeschlagen: ${mergeErrors.join(', ')}.'
+          : 'Merge failed: ${mergeErrors.join(', ')}.');
+    }
+    return parts.join(' ');
+  }
+}
+
+/// Zwischenergebnis von `_writeDriversUser`.
+class _DriversWriteOutcome {
+  const _DriversWriteOutcome({
+    required this.created,
+    required this.merged,
+    required this.ambiguous,
+    required this.loginSyncWarnings,
+    required this.mergeErrors,
+  });
+
+  final int created;
+  final int merged;
+  final List<String> ambiguous;
+  final List<String> loginSyncWarnings;
+  final List<String> mergeErrors;
 }
 
 class DriverCsvService {
@@ -49,6 +137,11 @@ class DriverCsvService {
 
     final idIdx = _findIdColumnIndex(header);
     final nameIdx = _findNameColumnIndex(header);
+    // Optional — hilft dem Platzhalter-Matcher, wenn der Export die
+    // Personalnummer mitliefert. Muss eine ANDERE Spalte als die TID
+    // sein, sonst ignorieren wir sie.
+    final employeeIdxRaw = _findEmployeeNumberColumnIndex(header);
+    final employeeIdx = employeeIdxRaw == idIdx ? -1 : employeeIdxRaw;
 
     if (idIdx < 0) {
       throw Exception('CSV missing transporter ID column (e.g. "Transporter ID" / "Zustellende-ID").');
@@ -56,6 +149,7 @@ class DriverCsvService {
 
     // ---------- Build {transporterId -> driverName} ----------
     final latestNameById = <String, String>{};
+    final employeeNumberById = <String, String>{};
     for (var i = 1; i < rows.length; i++) {
       final r = rows[i];
       if (r.isEmpty) continue;
@@ -70,6 +164,12 @@ class DriverCsvService {
       if (rawName.isNotEmpty) {
         latestNameById[tid] = rawName;
       }
+      if (employeeIdx >= 0 && employeeIdx < r.length) {
+        final rawEmployee = r[employeeIdx].toString().trim();
+        if (rawEmployee.isNotEmpty) {
+          employeeNumberById[tid] = rawEmployee;
+        }
+      }
     }
     if (latestNameById.isEmpty) {
       return DriverCsvImportResult(
@@ -81,7 +181,12 @@ class DriverCsvService {
     }
 
     // ---------- 1) Update users/{uid}/drivers ----------
-    final newDrivers = await _writeDriversUser(db, uid, latestNameById);
+    final driverOutcome = await _writeDriversUser(
+      db,
+      uid,
+      latestNameById,
+      employeeNumberById,
+    );
 
     // ---------- 2) Update ALL reports of this user (driverNames subcollection) ----------
     final reportSnaps = await db
@@ -102,8 +207,12 @@ class DriverCsvService {
     return DriverCsvImportResult(
       parsedRows: rows.length > 1 ? rows.length - 1 : 0,
       mappedDrivers: latestNameById.length,
-      newDrivers: newDrivers,
+      newDrivers: driverOutcome.created,
       updatedScores: updatedScores,
+      mergedDrivers: driverOutcome.merged,
+      ambiguousDrivers: driverOutcome.ambiguous,
+      loginSyncWarnings: driverOutcome.loginSyncWarnings,
+      mergeErrors: driverOutcome.mergeErrors,
     );
   }
 
@@ -272,6 +381,31 @@ class DriverCsvService {
     );
   }
 
+  /// Optionale Spalte mit der Personalnummer / Employee-ID.
+  ///
+  /// Bewusst nur eindeutige Aliase — `mitarbeiter id` gehört bereits zur
+  /// TID-Erkennung und darf hier nicht zusätzlich greifen. Findet der
+  /// Export nichts, matcht der Platzhalter-Abgleich eben nur über den
+  /// Namen.
+  static int _findEmployeeNumberColumnIndex(List<String> header) {
+    return _findHeaderIndex(
+      header,
+      const [
+        'personalnummer',
+        'personal-nr',
+        'personalnr',
+        'employee number',
+        'employee no',
+        'employee id',
+        'mitarbeiternummer',
+      ],
+      const [
+        ['personal', 'nummer'],
+        ['employee', 'number'],
+      ],
+    );
+  }
+
   static int _findHeaderIndex(
     List<String> header,
     List<String> exactAliases,
@@ -304,23 +438,92 @@ class DriverCsvService {
 
   // ------------ Firestore write helpers (USER-SCOPED) ------------
 
-  static Future<int> _writeDriversUser(
+  /// Schreibt die Fahrer-Stammdaten — und führt dabei Platzhalter-Profile
+  /// mit ihrer echten TID zusammen.
+  ///
+  /// Früher legte diese Methode für jede TID aus der CSV blind
+  /// `drivers/{TID}` an. Fahrer, die im Drivers Hub schon als
+  /// `PENDING-XXXXXX` existierten (weil Amazon die TID noch nicht
+  /// vergeben hatte), bekamen dadurch ein **zweites** Profil, und ihre
+  /// Dokumente, Zeitkonten und Nachweise blieben am Platzhalter hängen.
+  ///
+  /// Jetzt wird die Fahrerliste des DSP **einmal** geladen
+  /// ([DriverIdentityIndex]) und je TID im Speicher geprüft, ob ein
+  /// Platzhalter-Fahrer dazu passt:
+  ///
+  ///   • Eindeutiger Treffer → [migrateDriverToTid] zieht den Fahrer samt
+  ///     Subcollections auf die echte TID um, statt ein zweites Profil
+  ///     anzulegen.
+  ///   • Mehrdeutiger Treffer → **kein** Automatismus. Der Fahrer wird
+  ///     wie bisher neu angelegt und der Fall im Ergebnis gemeldet.
+  ///
+  /// Der Umzug läuft bewusst sequenziell und schreibt den Index fort
+  /// ([DriverIdentityIndex.applyMigration]), damit zwei TIDs derselben
+  /// CSV nicht denselben Platzhalter beanspruchen.
+  static Future<_DriversWriteOutcome> _writeDriversUser(
     FirebaseFirestore db,
     String uid,
     Map<String, String> idToName,
+    Map<String, String> idToEmployeeNumber,
   ) async {
-    final existingIds = <String>{};
     final driverCol = db.collection('users').doc(uid).collection('drivers');
-    final ids = idToName.keys.toList(growable: false);
-    const lookupChunk = 30;
-    for (var i = 0; i < ids.length; i += lookupChunk) {
-      final slice = ids.sublist(
-        i,
-        (i + lookupChunk > ids.length) ? ids.length : i + lookupChunk,
+
+    // Eine Query für den ganzen Import statt einer je Zeile.
+    final index = await DriverIdentityIndex.load(dspUid: uid, firestore: db);
+
+    var mergedCount = 0;
+    final ambiguous = <String>[];
+    final loginSyncWarnings = <String>[];
+    final mergeErrors = <String>[];
+
+    for (final e in idToName.entries) {
+      final tid = e.key;
+      final name = e.value;
+      final targetExists = index.hasDoc(tid);
+
+      final match = index.match(
+        tid: tid,
+        driverName: name,
+        employeeNumber: idToEmployeeNumber[tid] ?? '',
       );
-      final snap = await driverCol.where(FieldPath.documentId, whereIn: slice).get();
-      for (final doc in snap.docs) {
-        existingIds.add(doc.id);
+
+      if (match.isAmbiguous) {
+        // Nur melden, wenn wir sonst zusammengeführt hätten — sonst
+        // stünde bei jedem Import dieselbe Namensdublette in der
+        // Meldung, obwohl gar nichts anstand.
+        if (!targetExists) ambiguous.add('$name ($tid)');
+        continue;
+      }
+      if (!match.isMatch) continue;
+
+      // Liegt unter der echten TID schon ein Dokument, greifen wir nur
+      // beim sichersten Treffer ein: `transporterId` zeigt bereits auf
+      // diese TID, nur die Doc-ID hinkt hinterher. Genau das ist die
+      // Altlast aus „TID zuordnen" ohne Umzug — hier ist das
+      // Zusammenführen eindeutig richtig. Namens-/Personalnummer-Treffer
+      // gegen ein bestehendes Profil bleiben dem manuellen Werkzeug
+      // „Profile zusammenführen" im Drivers Hub überlassen.
+      if (targetExists &&
+          match.reason != DriverMatchReason.transporterIdField) {
+        continue;
+      }
+
+      try {
+        final result = await migrateDriverToTid(
+          dspUid: uid,
+          fromDocId: match.docId!,
+          toTid: tid,
+          firestore: db,
+        );
+        index.applyMigration(fromDocId: match.docId!, toTid: tid);
+        if (!result.skipped) mergedCount++;
+        if (result.hasLoginSyncWarning) {
+          loginSyncWarnings.add('$name ($tid)');
+        }
+      } catch (err) {
+        // Nicht fatal: der Fahrer wird unten wie bisher angelegt bzw.
+        // aktualisiert. Der Admin erfährt es über das Import-Ergebnis.
+        mergeErrors.add('$name ($tid): $err');
       }
     }
 
@@ -336,7 +539,10 @@ class DriverCsvService {
 
       for (final e in slice) {
         final doc = driverCol.doc(e.key);
-        final isNew = !existingIds.contains(e.key);
+        // `hasDoc` kennt nach den Umzügen oben auch die frisch
+        // umgezogenen Fahrer — die gelten deshalb nicht als „neu" und
+        // behalten `createdAt`, `hasLogin` und `active`.
+        final isNew = !index.hasDoc(e.key);
         if (isNew) createdCount++;
         final payload = <String, dynamic>{
           'transporterId': e.key,
@@ -345,12 +551,23 @@ class DriverCsvService {
           if (isNew) 'createdAt': FieldValue.serverTimestamp(),
           if (isNew) 'hasLogin': false,
           if (isNew) 'active': true,
+          // Der Fahrer hat jetzt nachweislich eine echte TID — ein
+          // hängengebliebenes Flag würde ihn sonst weiter als
+          // „TID ausstehend" anzeigen.
+          'tidPending': false,
         };
         batch.set(doc, payload, SetOptions(merge: true));
       }
       await batch.commit();
     }
-    return createdCount;
+
+    return _DriversWriteOutcome(
+      created: createdCount,
+      merged: mergedCount,
+      ambiguous: ambiguous,
+      loginSyncWarnings: loginSyncWarnings,
+      mergeErrors: mergeErrors,
+    );
   }
 
   static Future<void> _writeDriverNamesToUserReports(

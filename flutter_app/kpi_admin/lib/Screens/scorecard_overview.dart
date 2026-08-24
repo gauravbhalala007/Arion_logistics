@@ -1211,14 +1211,17 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage>
       );
 
       if (!mounted) return;
+      final de = Localizations.localeOf(context).languageCode == 'de';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
+          duration: result.hasWarnings
+              ? const Duration(seconds: 10)
+              : const Duration(seconds: 4),
+          backgroundColor:
+              result.hasWarnings ? const Color(0xFFB45309) : null,
           content: Text(
             '${t.t('scorecard_overview_csv_updated')} '
-            'Parsed ${result.parsedRows}, '
-            'matched ${result.mappedDrivers}, '
-            'new ${result.newDrivers}, '
-            'score rows updated ${result.updatedScores}.',
+            '${result.summary(de: de)}',
           ),
         ),
       );

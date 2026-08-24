@@ -12,6 +12,7 @@ import '../widgets/co_button.dart';
 import '../widgets/co_pressable.dart';
 import '../utils/driver_activity.dart';
 import '../models/fleet_vehicle_document.dart';
+import '../services/driver_identity_service.dart';
 import '../services/fleet_vehicle_document_service.dart';
 import '../widgets/operative_tasks_card.dart';
 import 'admin_calendar_page.dart';
@@ -5218,9 +5219,11 @@ class _AlertCenterCardState extends State<_AlertCenterCard> {
         add('contract', _tr('Vertragsende', 'Contract end'));
       }
       // Ticket: fehlende Transporter-ID und fehlende Employee ID
-      // (Zeiterfassung) ebenfalls als Missing Data melden.
-      if (data['tidPending'] == true ||
-          (data['transporterId'] ?? '').toString().trim().isEmpty) {
+      // (Zeiterfassung) ebenfalls als Missing Data melden. Maßgeblich ist
+      // die wirksame TID (`isDriverTidPending`) — das Feld `tidPending`
+      // bleibt bei TID-Wechseln gern auf `true` hängen und meldete dann
+      // Fahrer mit längst echter TID als unvollständig.
+      if (isDriverTidPending(data, d.id)) {
         add('tid', 'Transporter-ID');
       }
       if ((data['employeeNumber'] ?? '').toString().trim().isEmpty) {

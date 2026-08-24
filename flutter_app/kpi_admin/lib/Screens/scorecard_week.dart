@@ -10,6 +10,7 @@
 // Datenfluss bleibt: report/{id}, users/{adminUid}/scores, driverNames.
 
 import '../services/driver_csv.dart';
+import '../services/driver_identity_service.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -259,12 +260,14 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
+          duration: result.hasWarnings
+              ? const Duration(seconds: 10)
+              : const Duration(seconds: 4),
+          backgroundColor:
+              result.hasWarnings ? const Color(0xFFB45309) : null,
           content: Text(
             '${t.t('scorecard_overview_csv_updated')} '
-            'Parsed ${result.parsedRows}, '
-            'matched ${result.mappedDrivers}, '
-            'new ${result.newDrivers}, '
-            'score rows updated ${result.updatedScores}.',
+            '${result.summary(de: _de)}',
           ),
         ),
       );
@@ -1896,10 +1899,16 @@ class _EmptyState extends StatelessWidget {
 // ─── Reassign Dialog ─────────────────────────────────────────────────
 //
 // Opens from a scorecard row whose Transporter-ID does not match any of
-// the admin's drivers. Lists drivers with `tidPending: true` (their TID
-// is still a generated PENDING-XXXXXX placeholder). Picking one writes
-// the real TID onto that driver and refreshes the report's driverNames
-// map so the row immediately shows the correct name.
+// the admin's drivers. Lists every driver whose TID is still a generated
+// `PENDING-XXXXXX` placeholder. Picking one MOVES that driver document to
+// the real TID (`migrateDriverToTid`) — including its subcollections —
+// and refreshes the report's driverNames map so the row immediately shows
+// the correct name.
+//
+// Die Kandidatenliste wird bewusst **clientseitig** gefiltert: eine Query
+// auf `tidPending == true` allein verpasst Fahrer, deren Flag hängen
+// geblieben oder nie gesetzt worden ist, und eine schärfere Query bräuchte
+// einen neuen Firestore-Index. Die Fahrerzahl je DSP ist klein genug.
 class _ReassignDriverDialog extends StatelessWidget {
   final String dspUid;
   final String unmatchedTid;
@@ -1963,7 +1972,6 @@ class _ReassignDriverDialog extends StatelessWidget {
                       .collection('users')
                       .doc(dspUid)
                       .collection('drivers')
-                      .where('tidPending', isEqualTo: true)
                       .snapshots(),
                   builder: (ctx, snap) {
                     if (snap.connectionState == ConnectionState.waiting) {
@@ -1979,7 +1987,11 @@ class _ReassignDriverDialog extends StatelessWidget {
                         ),
                       );
                     }
-                    final docs = snap.data?.docs ?? [];
+                    // Clientseitiger Filter statt `where('tidPending')`:
+                    // maßgeblich ist die wirksame TID, nicht das Flag.
+                    final docs = (snap.data?.docs ?? [])
+                        .where((d) => isDriverTidPending(d.data(), d.id))
+                        .toList();
                     if (docs.isEmpty) {
                       return Container(
                         padding: const EdgeInsets.all(16),
@@ -2053,6 +2065,13 @@ class _ReassignDriverDialog extends StatelessWidget {
     );
   }
 
+  /// Ordnet die unbekannte TID einem Platzhalter-Fahrer zu.
+  ///
+  /// Wichtig: Es reicht **nicht**, `transporterId` und `tidPending` zu
+  /// setzen. Solange das Dokument weiter `PENDING-XXXXXX` heißt, legt der
+  /// nächste CSV-/Scorecard-Import unter der echten TID ein zweites
+  /// Profil an. Deshalb zieht [migrateDriverToTid] das Dokument samt
+  /// Subcollections und Academy-Nachweisen auf die echte TID um.
   Future<void> _assign(
     BuildContext context, {
     required DocumentReference<Map<String, dynamic>> driverDoc,
@@ -2067,12 +2086,11 @@ class _ReassignDriverDialog extends StatelessWidget {
     final navigator = Navigator.of(context);
 
     try {
-      // Update the driver doc: real TID + flip tidPending off.
-      await driverDoc.set({
-        'transporterId': realTid,
-        'tidPending': false,
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      final result = await migrateDriverToTid(
+        dspUid: dspUid,
+        fromDocId: driverDoc.id,
+        toTid: realTid,
+      );
 
       // Write the name into the report's driverNames subcollection so
       // this week's scorecard rows render the driver name immediately.
@@ -2088,10 +2106,21 @@ class _ReassignDriverDialog extends StatelessWidget {
       navigator.pop();
       messenger.showSnackBar(
         SnackBar(
+          backgroundColor: result.hasLoginSyncWarning
+              ? const Color(0xFFB45309)
+              : null,
           content: Text(
-            de
-                ? 'TID $realTid → $driverName zugeordnet.'
-                : 'TID $realTid → assigned to $driverName.',
+            result.hasLoginSyncWarning
+                ? (de
+                    ? 'TID $realTid → $driverName zugeordnet — der '
+                        'Login-Sync ist fehlgeschlagen, das Fahrer-Login '
+                        'zeigt evtl. noch auf die alte ID.'
+                    : 'TID $realTid → assigned to $driverName — login '
+                        'sync failed, the driver login may still point to '
+                        'the old ID.')
+                : (de
+                    ? 'TID $realTid → $driverName zugeordnet.'
+                    : 'TID $realTid → assigned to $driverName.'),
           ),
         ),
       );
