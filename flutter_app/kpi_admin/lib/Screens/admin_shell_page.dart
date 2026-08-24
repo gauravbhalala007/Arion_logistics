@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../localization/app_localizations.dart';
+import '../services/da_request_badge.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../widgets/admin_scope.dart';
@@ -93,6 +94,16 @@ class _AdminShellPageState extends State<AdminShellPage> {
 
   static String _tr(BuildContext c, String de, String en) =>
       Localizations.localeOf(c).languageCode == 'de' ? de : en;
+
+  /// Wechselt den Shell-Tab (IndexedStack) auf [nav] — genutzt von den
+  /// Header-Actions (z. B. Glocke → DA Requests).
+  void _openNav(AppNav nav) {
+    if (_active == nav) return;
+    setState(() {
+      _active = nav;
+      _materialized.add(nav);
+    });
+  }
 
   Stream<DocumentSnapshot<Map<String, dynamic>>> _profileDocStreamFor(
     String uid,
@@ -193,6 +204,26 @@ class _AdminShellPageState extends State<AdminShellPage> {
                           showAdminQuickNotes(context, uid: authUser.uid),
                     ),
                     const SizedBox(width: 12),
+                    // Glocke mit rotem Zaehler: offene DA Requests.
+                    StreamBuilder<int>(
+                      stream: DaRequestBadge.watchForContext(context),
+                      builder: (context, snap) {
+                        final open = snap.data ?? 0;
+                        return _HeaderIconAction(
+                          icon: Icons.notifications_outlined,
+                          badgeCount: open,
+                          tooltip: open > 0
+                              ? _tr(
+                                  context,
+                                  'Offene DA Requests: $open',
+                                  'Open DA requests: $open',
+                                )
+                              : _tr(context, 'DA Requests', 'DA requests'),
+                          onTap: () => _openNav(AppNav.daRequests),
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 12),
                     _HeaderProfileAvatar(
                       profile: data,
                       onTap: () {
@@ -284,6 +315,7 @@ class _AdminShellPageState extends State<AdminShellPage> {
                           _materialized.add(AppNav.appUpdates);
                         });
                       },
+                      onOpenDaRequests: () => _openNav(AppNav.daRequests),
                     ),
                   _TrialCountdownBanner(profile: data),
                   Expanded(
@@ -643,29 +675,72 @@ class _HeaderIconAction extends StatelessWidget {
     required this.icon,
     required this.tooltip,
     required this.onTap,
+    this.badgeCount = 0,
   });
 
   final IconData icon;
   final String tooltip;
   final VoidCallback onTap;
 
+  /// Roter Zaehler oben rechts am Icon; 0 blendet ihn aus, ab 100 "99+".
+  final int badgeCount;
+
   @override
   Widget build(BuildContext context) {
     return Tooltip(
       message: tooltip,
       waitDuration: const Duration(milliseconds: 500),
-      child: Material(
-        color: Colors.white.withValues(alpha: 0.10),
-        shape: const CircleBorder(),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: SizedBox(
-            width: 44,
-            height: 44,
-            child: Icon(icon, size: 21, color: Colors.white),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Material(
+            color: Colors.white.withValues(alpha: 0.10),
+            shape: const CircleBorder(),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: onTap,
+              child: SizedBox(
+                width: 44,
+                height: 44,
+                child: Icon(icon, size: 21, color: Colors.white),
+              ),
+            ),
           ),
-        ),
+          if (badgeCount > 0)
+            Positioned(
+              top: -2,
+              right: -2,
+              child: IgnorePointer(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 1.5,
+                  ),
+                  constraints: const BoxConstraints(minWidth: 18),
+                  decoration: BoxDecoration(
+                    color: AppColors.error,
+                    borderRadius: BorderRadius.circular(999),
+                    // Ring in der Header-Navy, damit der Punkt sauber
+                    // vom Icon abgesetzt ist.
+                    border: Border.all(
+                      color: const Color(0xFF0B1220),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Text(
+                    badgeCount > 99 ? '99+' : '$badgeCount',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      height: 1.2,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

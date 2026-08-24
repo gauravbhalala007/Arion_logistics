@@ -7,6 +7,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../Screens/owner_insights_page.dart';
 import '../services/admin_expiry_aggregator.dart';
 import '../services/auth_service.dart';
+import '../services/da_request_badge.dart';
 import '../localization/app_localizations.dart';
 import '../utils/inventory_l10n.dart';
 
@@ -340,11 +341,15 @@ class AppSideMenu extends StatelessWidget {
         active: active == AppNav.shiftAbsence,
         onTap: () => _handleNav(context, AppNav.shiftAbsence, '/shift-absence'),
       ),
-      _MenuItem(
-        icon: Icons.request_page_outlined,
-        label: 'DA Requests',
-        active: active == AppNav.daRequests,
-        onTap: () => _handleNav(context, AppNav.daRequests, '/da-requests'),
+      StreamBuilder<int>(
+        stream: DaRequestBadge.watchForContext(context),
+        builder: (context, snap) => _MenuItem(
+          icon: Icons.request_page_outlined,
+          label: 'DA Requests',
+          active: active == AppNav.daRequests,
+          onTap: () => _handleNav(context, AppNav.daRequests, '/da-requests'),
+          badgeCount: snap.data ?? 0,
+        ),
       ),
       // Fahrerbewertung ist vorerst ausgeblendet — das Feature bleibt
       // vollstaendig erhalten (Seite, Modell, Auswertung) und wird

@@ -3,7 +3,7 @@
 // Desktop-only top menu bar for the admin shell.
 //   Left:  company name + selectable station (e.g. DBY5).
 //   Right: paperclip (quick notes like IBAN — click to copy), language
-//          switcher, profile shortcut.
+//          switcher, updates, DA-Request bell, profile shortcut.
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -12,6 +12,7 @@ import 'package:flutter/services.dart';
 import '../localization/app_localizations.dart';
 import '../models/app_update.dart';
 import '../services/app_updates_service.dart';
+import '../services/da_request_badge.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 
@@ -22,6 +23,7 @@ class AdminTopBar extends StatelessWidget {
     required this.profile,
     required this.onOpenProfile,
     required this.onOpenUpdates,
+    required this.onOpenDaRequests,
   });
 
   /// The admin's own uid (quick notes + station live on this user doc).
@@ -35,6 +37,9 @@ class AdminTopBar extends StatelessWidget {
 
   /// Navigates to the updates page inside the shell.
   final VoidCallback onOpenUpdates;
+
+  /// Navigates to the DA-Requests page inside the shell (bell icon).
+  final VoidCallback onOpenDaRequests;
 
   DocumentReference<Map<String, dynamic>> get _userRef =>
       FirebaseFirestore.instance.collection('users').doc(uid);
@@ -296,6 +301,27 @@ class AdminTopBar extends StatelessWidget {
             },
           ),
           const SizedBox(width: 8),
+          // Glocke mit rotem Zaehler: offene DA Requests der Fahrer.
+          StreamBuilder<int>(
+            stream: DaRequestBadge.watchForContext(context),
+            builder: (context, snap) {
+              final open = snap.data ?? 0;
+              final de =
+                  Localizations.localeOf(context).languageCode == 'de';
+              return _BarIcon(
+                tooltip: open > 0
+                    ? (de
+                        ? 'Offene DA Requests: $open'
+                        : 'Open DA requests: $open')
+                    : (de ? 'DA Requests' : 'DA requests'),
+                icon: Icons.notifications_outlined,
+                badgeCount: open,
+                badgeColor: AppColors.error,
+                onTap: onOpenDaRequests,
+              );
+            },
+          ),
+          const SizedBox(width: 8),
           _BarIcon(
             tooltip: 'Profil',
             icon: Icons.account_circle_outlined,
@@ -330,19 +356,22 @@ class _BarIconChip extends StatelessWidget {
   }
 }
 
-/// Tappable white icon chip with an optional green count badge.
+/// Tappable white icon chip with an optional count badge (green by
+/// default, red for attention-grabbing counters like open DA Requests).
 class _BarIcon extends StatelessWidget {
   const _BarIcon({
     required this.tooltip,
     required this.icon,
     required this.onTap,
     this.badgeCount = 0,
+    this.badgeColor = AppColors.codriverGreen,
   });
 
   final String tooltip;
   final IconData icon;
   final VoidCallback onTap;
   final int badgeCount;
+  final Color badgeColor;
 
   @override
   Widget build(BuildContext context) {
@@ -364,12 +393,12 @@ class _BarIcon extends StatelessWidget {
                       const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                   constraints: const BoxConstraints(minWidth: 16),
                   decoration: BoxDecoration(
-                    color: AppColors.codriverGreen,
+                    color: badgeColor,
                     borderRadius: BorderRadius.circular(999),
                     border: Border.all(color: Colors.white, width: 1.5),
                   ),
                   child: Text(
-                    '$badgeCount',
+                    badgeCount > 99 ? '99+' : '$badgeCount',
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       color: Colors.white,
