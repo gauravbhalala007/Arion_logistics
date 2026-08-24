@@ -1,8 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/fleet_vehicle.dart';
+import 'incident_reports.dart' show plateKeyOf;
 
 class DuplicateVehicleException implements Exception {}
+
+/// Ein einzelner Schreibvorgang des Kennzeichen-Umzugs.
+class _PlateMoveWrite {
+  const _PlateMoveWrite(this.ref, this.data);
+
+  final DocumentReference<Map<String, dynamic>> ref;
+  final Map<String, dynamic> data;
+}
 
 class ImmutablePlateNumberException implements Exception {}
 
@@ -59,7 +68,10 @@ class FleetVehicleRepository {
       if (existing.exists) {
         throw DuplicateVehicleException();
       }
-      transaction.set(docRef, _createPayload(dspUid, normalizedPlateNumber, draft));
+      transaction.set(
+        docRef,
+        _createPayload(dspUid, normalizedPlateNumber, draft),
+      );
     });
   }
 
@@ -125,11 +137,188 @@ class FleetVehicleRepository {
     ).doc(normalizePlateNumber(plateNumber)).update(payload);
   }
 
+  // ─── Kennzeichen-Umzug ───────────────────────────────────────────────
+  //
+  // Die Doc-ID eines Fahrzeugs **ist** das normalisierte Kennzeichen. Ein
+  // neues Kennzeichen bedeutet deshalb einen echten Umzug aller daran
+  // hängenden Daten:
+  //
+  //   users/{dsp}/vehicles/{plate}                 (Stammdaten)
+  //   users/{dsp}/vehicles/{plate}/documents/*     (TÜV, Fahrzeugschein, …)
+  //   users/{dsp}/vehicles/{plate}/events/*        (Bestands-Events)
+  //   users/{dsp}/fleet_vehicle_extras/{plate}     (Werkstatt, Bemerkungen,
+  //                                                 Leasinggeber, Specs)
+  //   users/{dsp}/fleet_events  (plateKey == alt)  (neue Fahrzeug-Events)
+  //
+  // Bewusst **nicht** mitgezogen: `users/{dsp}/incident_reports`. Vorfälle
+  // sind historische Ereignisse und bleiben beim damals gültigen
+  // Kennzeichen — der Schadenszähler auf der Detailseite zählt danach nur
+  // noch neue Vorfälle.
+  //
+  // Storage bleibt unangetastet: Dokumente behalten `storagePath` und
+  // `fileUrl`, nur die Firestore-Metadaten wandern mit.
+
+  /// Verschiebt ein Fahrzeug samt Anhang auf ein neues Kennzeichen.
+  ///
+  /// Ablauf strikt „erst vollständig kopieren, dann löschen": schlägt das
+  /// Kopieren fehl, wird das bereits Kopierte best-effort wieder entfernt und
+  /// der Altbestand bleibt unberührt.
+  ///
+  /// Wirft [DuplicateVehicleException], wenn unter dem Zielkennzeichen bereits
+  /// ein aktives Fahrzeug liegt, und [VehicleValidationException] bei
+  /// ungültiger oder unveränderter Eingabe.
+  Future<void> changePlateNumber({
+    required String dspUid,
+    required String fromPlateNumber,
+    required String toPlateNumber,
+  }) async {
+    final from = normalizePlateNumber(fromPlateNumber);
+    final to = normalizePlateNumber(toPlateNumber);
+
+    if (to.isEmpty) {
+      throw const VehicleValidationException('Plate number is required.');
+    }
+    if (from == to) return;
+
+    final vehicles = vehiclesCollection(dspUid);
+    final sourceRef = vehicles.doc(from);
+    final targetRef = vehicles.doc(to);
+
+    final source = await sourceRef.get();
+    if (!source.exists) {
+      throw const VehicleValidationException('Vehicle not found.');
+    }
+
+    final existingTarget = await targetRef.get();
+    if (existingTarget.exists && existingTarget.data()?['isDeleted'] != true) {
+      throw DuplicateVehicleException();
+    }
+
+    final documents = await sourceRef.collection('documents').get();
+    final events = await sourceRef.collection('events').get();
+    final extrasSource = _extrasCollection(dspUid).doc(from);
+    final extras = await extrasSource.get();
+
+    // Neue Fahrzeug-Events hängen nicht an der Doc-ID, sondern am `plateKey`.
+    final fleetEvents = await _fleetEventsCollection(
+      dspUid,
+    ).where('plateKey', isEqualTo: plateKeyOf(from)).get();
+
+    // Für das Aufräumen nach einem Teilfehler.
+    final written = <DocumentReference<Map<String, dynamic>>>[];
+
+    try {
+      final writes = <_PlateMoveWrite>[
+        _PlateMoveWrite(targetRef, {
+          ...source.data() ?? const <String, dynamic>{},
+          'plateNumber': to,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }),
+        for (final doc in documents.docs)
+          _PlateMoveWrite(targetRef.collection('documents').doc(doc.id), {
+            ...doc.data(),
+            'plateNumber': to,
+          }),
+        for (final doc in events.docs)
+          _PlateMoveWrite(targetRef.collection('events').doc(doc.id), {
+            ...doc.data(),
+            'plateNumber': to,
+          }),
+        if (extras.exists)
+          _PlateMoveWrite(_extrasCollection(dspUid).doc(to), {
+            ...extras.data() ?? const <String, dynamic>{},
+            'plateNumber': to,
+            'updatedAt': FieldValue.serverTimestamp(),
+          }),
+      ];
+
+      for (final chunk in _chunk(writes, _kBatchLimit)) {
+        final batch = _firestore.batch();
+        for (final write in chunk) {
+          batch.set(write.ref, write.data);
+          written.add(write.ref);
+        }
+        await batch.commit();
+      }
+    } catch (_) {
+      // Kopie unvollständig → Zielpfad best-effort wieder räumen, damit ein
+      // erneuter Versuch nicht am Duplikat-Check scheitert. Der Altbestand
+      // wurde noch nicht angefasst.
+      for (final chunk in _chunk(written, _kBatchLimit)) {
+        try {
+          final batch = _firestore.batch();
+          for (final ref in chunk) {
+            batch.delete(ref);
+          }
+          await batch.commit();
+        } catch (_) {
+          // Aufräumen ist Kür — der Fehler unten ist die Hauptmeldung.
+        }
+      }
+      rethrow;
+    }
+
+    // `fleet_events` zieht per Update um (die Doc-IDs bleiben, nur der
+    // Schlüssel ändert sich) — deshalb erst nach der erfolgreichen Kopie.
+    for (final chunk in _chunk(fleetEvents.docs, _kBatchLimit)) {
+      final batch = _firestore.batch();
+      for (final doc in chunk) {
+        batch.update(doc.reference, <String, dynamic>{
+          'plateKey': plateKeyOf(to),
+          'plate': to,
+        });
+      }
+      await batch.commit();
+    }
+
+    // Jetzt erst der Altbestand.
+    final deletions = <DocumentReference<Map<String, dynamic>>>[
+      for (final doc in documents.docs) doc.reference,
+      for (final doc in events.docs) doc.reference,
+      if (extras.exists) extrasSource,
+      sourceRef,
+    ];
+    for (final chunk in _chunk(deletions, _kBatchLimit)) {
+      final batch = _firestore.batch();
+      for (final ref in chunk) {
+        batch.delete(ref);
+      }
+      await batch.commit();
+    }
+  }
+
+  CollectionReference<Map<String, dynamic>> _extrasCollection(String dspUid) {
+    return _firestore
+        .collection('users')
+        .doc(dspUid)
+        .collection('fleet_vehicle_extras');
+  }
+
+  CollectionReference<Map<String, dynamic>> _fleetEventsCollection(
+    String dspUid,
+  ) {
+    return _firestore
+        .collection('users')
+        .doc(dspUid)
+        .collection('fleet_events');
+  }
+
+  /// Firestore erlaubt 500 Schreibvorgänge je Batch — mit etwas Luft.
+  static const int _kBatchLimit = 400;
+
+  static Iterable<List<T>> _chunk<T>(List<T> items, int size) sync* {
+    for (var i = 0; i < items.length; i += size) {
+      yield items.sublist(i, i + size > items.length ? items.length : i + size);
+    }
+  }
+
   Future<void> softDeleteVehicle({
     required String dspUid,
     required String plateNumber,
   }) async {
-    await vehiclesCollection(dspUid).doc(normalizePlateNumber(plateNumber)).update({
+    await vehiclesCollection(
+      dspUid,
+    ).doc(normalizePlateNumber(plateNumber)).update({
       'isDeleted': true,
       'odometerKm': FieldValue.delete(),
       'registrationDate': FieldValue.delete(),

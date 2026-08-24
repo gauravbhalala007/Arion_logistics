@@ -806,6 +806,78 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
     );
   }
 
+  /// Bestätigung vor dem Kennzeichen-Umzug. Nennt ausdrücklich, was mitzieht
+  /// — und was bewusst nicht (Vorfälle bleiben historisch beim alten Schild).
+  Future<bool?> _confirmPlateChange(String oldPlate, String newPlate) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Text(
+          de ? 'Kennzeichen ändern?' : 'Change plate number?',
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+        ),
+        content: SizedBox(
+          width: 420,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Flexible(child: LicensePlate.compact(plate: oldPlate)),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10),
+                    child: Icon(
+                      Icons.arrow_forward_rounded,
+                      size: 18,
+                      color: _kFaint,
+                    ),
+                  ),
+                  Flexible(child: LicensePlate.compact(plate: newPlate)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                de
+                    ? 'Alle Dokumente (TÜV, Fahrzeugschein …), Events und '
+                          'Bemerkungen ziehen mit um.'
+                    : 'All documents (TÜV, registration …), events and '
+                          'remarks move along.',
+                style: const TextStyle(fontSize: 13.5, height: 1.4),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                de
+                    ? 'Vergangene Vorfälle bleiben unter dem alten '
+                          'Kennzeichen.'
+                    : 'Past incidents stay under the old plate number.',
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  color: _kSubtle,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          CoButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            label: de ? 'Abbrechen' : 'Cancel',
+            variant: CoButtonVariant.quiet,
+          ),
+          CoButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            label: de ? 'Umziehen' : 'Move',
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _showVehicleEditor({FleetVehicle? vehicle}) async {
     final scope = _scopeUid;
     final t = AppLocalizations.of(context);
@@ -834,6 +906,19 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
     if (result == null) return;
     final draft = result.draft;
 
+    // Kennzeichen geändert? Dann steht ein Umzug an, bevor die restlichen
+    // Felder geschrieben werden — die Doc-ID ist das Kennzeichen.
+    final oldPlate = vehicle == null
+        ? ''
+        : normalizePlateNumber(vehicle.plateNumber);
+    final newPlate = normalizePlateNumber(draft.plateNumber);
+    final isPlateChange = vehicle != null && oldPlate != newPlate;
+
+    if (isPlateChange) {
+      final confirmed = await _confirmPlateChange(oldPlate, newPlate);
+      if (!mounted || confirmed != true) return;
+    }
+
     try {
       if (vehicle == null) {
         await _repository.createVehicle(dspUid: scope, draft: draft);
@@ -844,9 +929,21 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
           }),
         );
       } else {
+        if (isPlateChange) {
+          await _repository.changePlateNumber(
+            dspUid: scope,
+            fromPlateNumber: oldPlate,
+            toPlateNumber: newPlate,
+          );
+          if (!mounted) return;
+          // Eine offene Detailseite zeigt sonst auf ein gelöschtes Dokument.
+          if (_detailPlate == oldPlate) {
+            setState(() => _detailPlate = newPlate);
+          }
+        }
         await _repository.updateVehicle(
           dspUid: scope,
-          originalPlateNumber: vehicle.plateNumber,
+          originalPlateNumber: newPlate,
           draft: draft,
         );
         if (!mounted) return;
@@ -4144,11 +4241,22 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
                 const SizedBox(height: 18),
                 _SectionTitle(text: t.t('fleet_status_section_general')),
                 const SizedBox(height: 12),
+                // Das Kennzeichen ist zugleich die Doc-ID. Es lässt sich
+                // ändern — beim Speichern zieht dann der gesamte Anhang mit
+                // (Dokumente, Events, Bemerkungen); der Bestätigungsdialog
+                // erklärt das vor dem Umzug.
                 TextFormField(
                   controller: _plateNumberCtrl,
-                  enabled: !_isEditing,
+                  textCapitalization: TextCapitalization.characters,
                   decoration: _inputDecoration(
                     label: t.t('fleet_status_field_plate_number'),
+                    helperText: _isEditing
+                        ? (Localizations.localeOf(context).languageCode == 'de'
+                              ? 'Änderung zieht Dokumente, Events und '
+                                    'Bemerkungen mit um.'
+                              : 'Changing it moves documents, events and '
+                                    'remarks along.')
+                        : null,
                   ),
                   validator: (value) => _requiredText(
                     context,
@@ -4765,9 +4873,14 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
     }
   }
 
-  InputDecoration _inputDecoration({required String label}) {
+  InputDecoration _inputDecoration({
+    required String label,
+    String? helperText,
+  }) {
     return InputDecoration(
       labelText: label,
+      helperText: helperText,
+      helperMaxLines: 3,
       filled: true,
       fillColor: const Color(0xFFF9FAFB),
       border: OutlineInputBorder(
