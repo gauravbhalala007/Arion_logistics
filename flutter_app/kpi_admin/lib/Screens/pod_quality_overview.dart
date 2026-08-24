@@ -143,6 +143,9 @@ class _PodQualityOverviewPageState extends State<PodQualityOverviewPage> {
   Future<void> _uploadPodQualityPdf() async {
     final t = AppLocalizations.of(context);
     if (_busyUpload) return;
+    // Scope VOR den awaits auflösen: Dispatcher schreiben in den Namespace
+    // des Parent-Admins, sonst landet der Report unsichtbar im eigenen.
+    final adminUid = AdminScope.adminUidOf(context);
     setState(() => _busyUpload = true);
 
     try {
@@ -169,6 +172,7 @@ class _PodQualityOverviewPageState extends State<PodQualityOverviewPage> {
         await ReportWriter.writeReportAndScores(
           parserJson: parsed,
           storagePath: pseudoPath,
+          adminUid: adminUid,
         );
         successCount++;
       }

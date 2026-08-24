@@ -21,6 +21,7 @@ import 'package:intl/intl.dart';
 import '../services/parser_api.dart';
 import '../services/report_section_remover.dart';
 import '../services/report_writer.dart';
+import '../widgets/admin_scope.dart';
 import '../widgets/report_source_hint.dart';
 
 // Theme accents (blue — distinct from CDF's amber).
@@ -62,10 +63,15 @@ class _DwcOverviewPageState extends State<DwcOverviewPage> {
   // so the sidebar stays) instead of pushing a full-screen route.
   _DwcWeek? _selectedWeek;
 
-  String? get _uid => FirebaseAuth.instance.currentUser?.uid;
+  // Dispatcher arbeiten im Namespace des Parent-Admins (AdminScope) —
+  // nur Fallback auf die eigene UID, wenn kein Scope aufgelöst werden kann.
+  String? get _uid =>
+      AdminScope.adminUidOf(context) ?? FirebaseAuth.instance.currentUser?.uid;
 
   Future<void> _uploadDwcHtml() async {
     if (_busyUpload) return;
+    // Scope VOR den awaits auflösen (Dispatcher → Parent-Admin-Namespace).
+    final adminUid = _uid;
     setState(() => _busyUpload = true);
     try {
       final picked = await FilePicker.platform.pickFiles(
@@ -85,6 +91,7 @@ class _DwcOverviewPageState extends State<DwcOverviewPage> {
         await ReportWriter.writeReportAndScores(
           parserJson: parsed,
           storagePath: 'inline/$date/${f.name}',
+          adminUid: adminUid,
         );
         ok++;
       }

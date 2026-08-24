@@ -243,6 +243,8 @@ class _ConcessionsOverviewPageState extends State<ConcessionsOverviewPage> {
   Future<void> _uploadConcessionsXlsx() async {
     final t = AppLocalizations.of(context);
     if (_busyUpload) return;
+    // Scope VOR den awaits auflösen (Dispatcher → Parent-Admin-Namespace).
+    final adminUid = AdminScope.adminUidOf(context);
     setState(() => _busyUpload = true);
 
     try {
@@ -276,6 +278,7 @@ class _ConcessionsOverviewPageState extends State<ConcessionsOverviewPage> {
         await ReportWriter.writeReportAndScores(
           parserJson: parsed,
           storagePath: pseudoPath,
+          adminUid: adminUid,
         );
         successCount++;
       }

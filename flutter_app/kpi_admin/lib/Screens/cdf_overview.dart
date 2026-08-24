@@ -61,6 +61,8 @@ class _CdfOverviewPageState extends State<CdfOverviewPage> {
   Future<void> _uploadCdfHtml() async {
     if (_busyUpload) return;
     final de = Localizations.localeOf(context).languageCode == 'de';
+    // Scope VOR den awaits auflösen (Dispatcher → Parent-Admin-Namespace).
+    final uploadScopeUid = _uid;
     setState(() => _busyUpload = true);
     try {
       final picked = await FilePicker.platform.pickFiles(
@@ -96,6 +98,7 @@ class _CdfOverviewPageState extends State<CdfOverviewPage> {
         await ReportWriter.writeReportAndScores(
           parserJson: parsed,
           storagePath: 'inline/$date/${f.name}',
+          adminUid: uploadScopeUid,
         );
         ok++;
       }

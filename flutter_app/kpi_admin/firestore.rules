@@ -729,18 +729,19 @@ service cloud.firestore {
       // ---------- reports (scorecards) ----------
       // users/{userId}/reports/{reportId}
       match /reports/{reportId} {
-        // DSP itself can read + write its own reports (and must be approved)
-        allow read: if isSelf(userId) && isApproved(userId);
-        allow write: if isSelf(userId) && isApproved(userId);
+        // DSP itself — and seine Dispatcher (Scorecard-Center im
+        // Dispatcher-Bereich: ansehen UND hochladen) — read + write.
+        allow read: if isAdminOrDispatcherOf(userId) && isApproved(userId);
+        allow write: if isAdminOrDispatcherOf(userId) && isApproved(userId);
 
         // Drivers of this DSP can READ reports (for dashboard)
         allow read: if isDriverForUser(userId) && isApproved(userId);
 
         // per-report driver name mappings
         match /driverNames/{nameId} {
-          // DSP full access
-          allow read: if isSelf(userId) && isApproved(userId);
-          allow write: if isSelf(userId) && isApproved(userId);
+          // DSP + Dispatcher full access
+          allow read: if isAdminOrDispatcherOf(userId) && isApproved(userId);
+          allow write: if isAdminOrDispatcherOf(userId) && isApproved(userId);
 
           // drivers of this DSP can read for display
           allow read: if isDriverForUser(userId) && isApproved(userId);
@@ -766,9 +767,10 @@ service cloud.firestore {
       // ---------- scores for a report ----------
       // users/{userId}/scores/{scoreId}
       match /scores/{scoreId} {
-        // DSP full access
-        allow read: if isSelf(userId) && isApproved(userId);
-        allow write: if isSelf(userId) && isApproved(userId);
+        // DSP + Dispatcher full access (Scorecard-Uploads schreiben die
+        // per-Fahrer-Scores; Dispatcher laden im Namen der Firma hoch).
+        allow read: if isAdminOrDispatcherOf(userId) && isApproved(userId);
+        allow write: if isAdminOrDispatcherOf(userId) && isApproved(userId);
 
         // drivers of this DSP can read all scores (for ranking view)
         allow read: if isDriverForUser(userId) && isApproved(userId);
