@@ -12,6 +12,7 @@ import '../widgets/incident_photo_gallery.dart';
 import '../widgets/mobile_filter_controls.dart';
 import '../widgets/pill_tab_bar.dart';
 import 'admin_incident_form_page.dart';
+import 'incident_faq_dialog.dart';
 
 /// Ab hier greift die aufgeräumte Mobile-Fassung (gleiche Schwelle wie im
 /// Fleet Hub): kompakte Titelzeile mit Erfassen-Button, keine Sektions-
@@ -197,6 +198,10 @@ class _AdminIncidentReportsPageState extends State<AdminIncidentReportsPage>
                       ),
                     ),
                   ),
+                  // Leitfaden für den Unfall-Anruf. Steht bewusst vor dem
+                  // Erfassen-Button: gefragt wird zuerst, erfasst danach.
+                  const SizedBox(width: 8),
+                  IncidentFaqButton(compact: isMobile),
                   // Mobil sitzt die Erfassen-Aktion kompakt in der Titelzeile;
                   // der vollbreite Button in der Sektions-Kopfzeile entfällt
                   // dort (siehe `_IncidentListTabState._header`).

@@ -12,6 +12,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/employment_period.dart';
 import '../services/vacation_pools_repository.dart';
 import '../utils/driver_activity.dart';
+import '../utils/vacation_days.dart';
 import '../utils/vacation_pools.dart';
 import '../widgets/clearable_search_field.dart';
 import '../widgets/vacation_pool_lines.dart';
@@ -4130,10 +4131,18 @@ class _AbsenceAdminItem {
       ? (de ? 'Bezahlt' : 'Paid')
       : (de ? 'Unbezahlt' : 'Unpaid');
 
+  /// Tage des Antrags.
+  ///
+  /// Ticket „TIME OFF & BALANCE": Bei URLAUB zählen nur Werktage —
+  /// Wochenenden und die bundesweiten Feiertage zehren kein Kontingent
+  /// auf und dürfen deshalb auch in der Anzeige nicht mitzählen. Für
+  /// Krankmeldungen und Sonderurlaub bleibt es bei Kalendertagen
+  /// (Bestandsverhalten; Krankheitstage werden kalendarisch gezählt).
   int get totalDays {
     final start = DateTime(fromDate.year, fromDate.month, fromDate.day);
     final end = DateTime(toDate.year, toDate.month, toDate.day);
     if (end.isBefore(start)) return 0;
+    if (type == 'vacation') return vacationChargeableDays(start, end);
     return end.difference(start).inDays + 1;
   }
 
@@ -5658,13 +5667,20 @@ class _DriverAbsenceProfile {
   /// nur im Legacy-Modus (ein Topf, Zählung ab Beschäftigungsbeginn,
   /// Verfall erst zum Vertragsende). Im Topf-Modus tragen die Töpfe
   /// ihre eigene Aufschlüsselung. `null` = nicht anzeigen.
-  String? ptoHeaderLine(bool de) {
+  /// [compact] kürzt für schmale Bildschirme — dort schnitt die lange
+  /// Fassung sonst mitten im Satz ab (Ticket „TIME & BALANCE").
+  String? ptoHeaderLine(bool de, {bool compact = false}) {
     final balance = vacationBalance;
     if (balance.pooled) return null;
     final total = balance.totalEntitlement;
     if (total <= 0) return null;
     final remaining = _daFormatDays(balance.totalRemainingSigned);
     final totalText = _daFormatDays(total);
+    if (compact) {
+      return de
+          ? '$remaining von $totalText Tagen übrig'
+          : '$remaining of $totalText days left';
+    }
     return de
         ? '$remaining von $totalText Urlaubstagen übrig seit Beginn'
         : '$remaining of $totalText PTO days remaining since start';
@@ -6292,20 +6308,40 @@ class _DriverRow extends StatelessWidget {
                 ),
               ),
               // Ticket „DA Balance": Gesamt-Anspruch seit Vertragsbeginn
-              // direkt im Kopf — „X von Y Urlaubstagen übrig seit Beginn".
+              // direkt im Kopf. Auf schmalen Zeilen die Kurzfassung und
+              // als eigenes Pill, damit nichts mehr abschneidet
+              // (Ticket „TIME & BALANCE").
               if (profile.ptoHeaderLine(de) != null) ...[
-                const SizedBox(height: 2),
-                Text(
-                  profile.ptoHeaderLine(de)!,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: profile.ptoBalanceDays < 0
+                const SizedBox(height: 5),
+                LayoutBuilder(
+                  builder: (context, c) {
+                    final compact = c.maxWidth < 260;
+                    final negative = profile.ptoBalanceDays < 0;
+                    final color = negative
                         ? const Color(0xFFB91C1C)
-                        : const Color(0xFF1D7F5A),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
+                        : const Color(0xFF1D7F5A);
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        profile.ptoHeaderLine(de, compact: compact)!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: color,
+                          fontSize: 11.5,
+                          height: 1.25,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ],
             ],
@@ -6554,9 +6590,11 @@ class _DriverAbsenceHistoryView extends StatelessWidget {
       'ID: ${profile.driverId}',
       if (profile.contractPeriodText.isNotEmpty) profile.contractPeriodText,
       de ? 'komplette Abwesenheits-Historie' : 'full absence history',
-      // Ticket „DA Balance": Gesamt-Anspruch seit Vertragsbeginn im Kopf.
-      if (profile.ptoHeaderLine(de) != null) profile.ptoHeaderLine(de)!,
     ];
+    // Der Urlaubsstand steht bewusst NICHT in der Untertitelzeile: die
+    // ist auf zwei Zeilen begrenzt und schnitt ihn auf dem Handy ab
+    // (Ticket „TIME & BALANCE"). Er bekommt darunter ein eigenes Pill.
+    final ptoLine = profile.ptoHeaderLine(de);
 
     return SizedBox(
       width: width,
@@ -6607,6 +6645,35 @@ class _DriverAbsenceHistoryView extends StatelessWidget {
                           fontWeight: FontWeight.w500,
                         ),
                       ),
+                      if (ptoLine != null) ...[
+                        const SizedBox(height: 7),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 9,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: (profile.ptoBalanceDays < 0
+                                    ? const Color(0xFFB91C1C)
+                                    : const Color(0xFF1D7F5A))
+                                .withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(9),
+                          ),
+                          child: Text(
+                            ptoLine,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: profile.ptoBalanceDays < 0
+                                  ? const Color(0xFFB91C1C)
+                                  : const Color(0xFF1D7F5A),
+                              fontSize: 12,
+                              height: 1.25,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

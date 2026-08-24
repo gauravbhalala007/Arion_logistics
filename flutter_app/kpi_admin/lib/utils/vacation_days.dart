@@ -1,5 +1,11 @@
 DateTime _dateOnly(DateTime value) => DateTime(value.year, value.month, value.day);
 
+/// Zehrt dieser einzelne Tag Urlaubskontingent auf?
+///
+/// Wochenenden und die neun bundesweiten Feiertage nicht.
+bool isVacationChargeableDay(DateTime value) =>
+    !_isWeekend(value) && !_isGermanyPublicHoliday(value);
+
 int vacationChargeableDays(DateTime? from, DateTime? to) {
   if (from == null || to == null) return 0;
   final start = _dateOnly(from);

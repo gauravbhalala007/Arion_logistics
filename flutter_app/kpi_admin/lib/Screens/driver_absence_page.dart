@@ -11,6 +11,7 @@ import 'package:intl/intl.dart';
 import '../localization/app_localizations.dart';
 import '../services/vacation_pools_repository.dart';
 import '../theme/app_button_style.dart';
+import '../utils/vacation_days.dart';
 import '../utils/vacation_pools.dart';
 import '../widgets/vacation_pool_lines.dart';
 
@@ -141,7 +142,8 @@ class _DriverAbsencePageState extends State<DriverAbsencePage> {
       return false;
     }
     if (_type == 'vacation') {
-      final requestedDays = _inclusiveDays(_from, _to).toDouble();
+      // Nur Werktage zehren Kontingent auf (Wochenenden/Feiertage nicht).
+      final requestedDays = vacationChargeableDays(_from, _to).toDouble();
       if (requestedDays > availableVacationDays + 0.0001) {
         _showSnack(
           labels.vacationLimitExceeded(
@@ -920,7 +922,8 @@ class _DriverAbsencePageState extends State<DriverAbsencePage> {
         _VacationPeriodItem(
           from: from,
           to: to,
-          days: _inclusiveDays(from, to),
+          // Urlaubsliste zeigt die tatsächlich belasteten Werktage.
+          days: vacationChargeableDays(from, to),
           status: status.isEmpty ? 'pending' : status,
           // Gleiche Konvention wie überall sonst: `paid !== false`
           // zählt als bezahlt (Bestandsdaten ohne Feld).

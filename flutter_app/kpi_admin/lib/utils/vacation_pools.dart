@@ -71,6 +71,8 @@
 
 import 'dart:math' as math;
 
+import 'vacation_days.dart';
+
 /// Rundungstoleranz für die Tage-Arithmetik (halbe Tage sind möglich).
 const double _epsilon = 0.000001;
 
@@ -267,7 +269,14 @@ class VacationAbsence {
   /// oder nach einem manuellen Resturlaubs-Override entstanden ist.
   final DateTime? bookedAt;
 
-  int get days => inclusiveDays(from, to);
+  /// Belastete Urlaubstage des Antrags.
+  ///
+  /// Ticket „TIME OFF & BALANCE": Samstage, Sonntage und die neun
+  /// bundesweiten Feiertage zehren KEIN Urlaubskontingent auf — ein
+  /// Antrag von Freitag bis Montag kostet also zwei Tage, nicht vier.
+  /// Gezählt wird mit [vacationChargeableDays]; [inclusiveDays] bleibt
+  /// als reine Kalendertage-Zählung für andere Abwesenheitsarten.
+  int get days => vacationChargeableDays(from, to);
 
   /// Baut den Eintrag aus einem `absence_requests`-Dokument.
   /// Liefert `null`, wenn kein verwertbarer Zeitraum drinsteht.
@@ -514,12 +523,15 @@ VacationBalance computeVacationBalance({
     }
   }
 
-  // Jeden einzelnen Urlaubstag chronologisch verbuchen.
+  // Jeden einzelnen Urlaubstag chronologisch verbuchen. Wochenenden und
+  // bundesweite Feiertage bleiben außen vor — sie kosten keinen Urlaub
+  // (siehe [VacationAbsence.days]).
   final days = <DateTime>[];
   for (final absence in consuming) {
     for (var day = absence.from;
         !day.isAfter(absence.to);
         day = day.add(const Duration(days: 1))) {
+      if (!isVacationChargeableDay(day)) continue;
       days.add(_dateOnly(day));
     }
   }
