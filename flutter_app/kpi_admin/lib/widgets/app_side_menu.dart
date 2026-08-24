@@ -1174,7 +1174,15 @@ class _CollapsedTipState extends State<_CollapsedTip> {
 
 /// Eine anwählbare Lieblingsseite: Ziel, Icon und zweisprachiger Name.
 class _ShortcutDef {
-  const _ShortcutDef(this.nav, this.icon, this.route, this.de, this.en);
+  const _ShortcutDef(
+    this.nav,
+    this.icon,
+    this.route,
+    this.de,
+    this.en, {
+    this.sDe,
+    this.sEn,
+  });
 
   final AppNav nav;
   final IconData icon;
@@ -1182,7 +1190,15 @@ class _ShortcutDef {
   final String de;
   final String en;
 
+  /// Kurzform für die Bildunterschrift der Kachel — nur nötig, wenn der
+  /// volle Name unter dem Icon nicht in eine Zeile passt. Der volle Name
+  /// steht weiterhin im Tooltip.
+  final String? sDe;
+  final String? sEn;
+
   String label(bool isDe) => isDe ? de : en;
+
+  String caption(bool isDe) => isDe ? (sDe ?? de) : (sEn ?? en);
 
   /// Firestore-Schlüssel — der Enum-Name ist stabil.
   String get key => nav.name;
@@ -1199,13 +1215,16 @@ const List<_ShortcutDef> _kShortcutCatalog = <_ShortcutDef>[
   _ShortcutDef(AppNav.concessions, Icons.report_gmailerrorred_outlined,
       '/concessions', 'Concessions', 'Concessions'),
   _ShortcutDef(AppNav.cdf, Icons.feedback_outlined, '/cdf', 'Customer Feedback',
-      'Customer Feedback'),
+      'Customer Feedback',
+      sDe: 'Customer', sEn: 'Customer'),
   _ShortcutDef(AppNav.dwc, Icons.verified_user_outlined, '/dwc', 'DWC / IADC',
       'DWC / IADC'),
   _ShortcutDef(AppNav.contactCompliance, Icons.phone_in_talk_outlined,
-      '/contact-compliance', 'Contact Compliance', 'Contact Compliance'),
+      '/contact-compliance', 'Contact Compliance', 'Contact Compliance',
+      sDe: 'Contact', sEn: 'Contact'),
   _ShortcutDef(AppNav.drivers, Icons.badge_outlined, '/drivers', 'Drivers Hub',
-      'Drivers Hub'),
+      'Drivers Hub',
+      sDe: 'Drivers', sEn: 'Drivers'),
   _ShortcutDef(AppNav.recruiting, Icons.work_outline_rounded, '/recruiting',
       'Recruiting', 'Recruiting'),
   _ShortcutDef(AppNav.fleetStatus, Icons.local_shipping_outlined,
@@ -1215,29 +1234,38 @@ const List<_ShortcutDef> _kShortcutCatalog = <_ShortcutDef>[
   _ShortcutDef(AppNav.shiftPlan, Icons.event_note_rounded, '/shift-plan',
       'Shift Plan', 'Shift Plan'),
   _ShortcutDef(AppNav.monthlyPlan, Icons.calendar_view_month_rounded,
-      '/monthly-plan', 'Monthly Plan', 'Monthly Plan'),
+      '/monthly-plan', 'Monthly Plan', 'Monthly Plan',
+      sDe: 'Monthly', sEn: 'Monthly'),
   _ShortcutDef(AppNav.calendar, Icons.calendar_month_rounded, '/calendar',
       'Kalender', 'Calendar'),
   _ShortcutDef(AppNav.tasks, Icons.task_alt_outlined, '/tasks', 'Task Sheet',
-      'Task Sheet'),
+      'Task Sheet',
+      sDe: 'Tasks', sEn: 'Tasks'),
   _ShortcutDef(AppNav.dispatcherPill, Icons.support_agent_rounded,
-      '/dispatcher-pill', 'Dispatcher Center', 'Dispatcher Center'),
+      '/dispatcher-pill', 'Dispatcher Center', 'Dispatcher Center',
+      sDe: 'Dispatcher', sEn: 'Dispatcher'),
   _ShortcutDef(AppNav.cotimer, Icons.timer_outlined, '/cotimer', 'co:timer',
       'co:timer'),
   _ShortcutDef(AppNav.shiftAbsence, Icons.schedule_rounded, '/shift-absence',
-      'Zeiten & Abwesenheiten', 'Time & absence'),
+      'Zeiten & Abwesenheiten', 'Time & absence',
+      sDe: 'Zeiten', sEn: 'Absence'),
   _ShortcutDef(AppNav.daRequests, Icons.request_page_outlined, '/da-requests',
-      'DA Requests', 'DA Requests'),
+      'DA Requests', 'DA Requests',
+      sDe: 'Requests', sEn: 'Requests'),
   _ShortcutDef(AppNav.academy, Icons.school_outlined, '/academy', 'DA Academy',
-      'DA Academy'),
+      'DA Academy',
+      sDe: 'Academy', sEn: 'Academy'),
   _ShortcutDef(AppNav.safetyTraining, Icons.health_and_safety_outlined,
-      '/safety-training', 'Sicherheitsunterweisung', 'Safety training'),
+      '/safety-training', 'Sicherheitsunterweisung', 'Safety training',
+      sDe: 'Sicherheit', sEn: 'Safety'),
   _ShortcutDef(AppNav.incidentReports, Icons.warning_amber_rounded,
-      '/incident-reports', 'Incident Reports', 'Incident Reports'),
+      '/incident-reports', 'Incident Reports', 'Incident Reports',
+      sDe: 'Incidents', sEn: 'Incidents'),
   _ShortcutDef(AppNav.inventory, Icons.inventory_2_outlined, '/inventory',
       'Inventar', 'Inventory'),
   _ShortcutDef(AppNav.paymentCheck, Icons.fact_check_outlined, '/payment-check',
-      'Payment Check', 'Payment Check'),
+      'Payment Check', 'Payment Check',
+      sDe: 'Payment', sEn: 'Payment'),
   _ShortcutDef(AppNav.feedback, Icons.feedback, '/feedback', 'Feedback',
       'Feedback'),
   _ShortcutDef(AppNav.faqs, Icons.help_outline, '/faqs', 'FAQs', 'FAQs'),
@@ -1418,6 +1446,7 @@ class _ShortcutsBar extends StatelessWidget {
                               def: def,
                               width: tile,
                               label: def.label(de),
+                              caption: def.caption(de),
                               accent: _accent,
                               onTap: () => onOpen(def.nav, def.route),
                             ),
@@ -1440,13 +1469,19 @@ class _ShortcutTile extends StatelessWidget {
     required this.def,
     required this.width,
     required this.label,
+    required this.caption,
     required this.accent,
     required this.onTap,
   });
 
   final _ShortcutDef def;
   final double width;
+
+  /// Voller Name — nur im Tooltip.
   final String label;
+
+  /// Kurzer Titel unter dem Icon.
+  final String caption;
   final Color accent;
   final VoidCallback onTap;
 
@@ -1457,7 +1492,7 @@ class _ShortcutTile extends StatelessWidget {
       waitDuration: const Duration(milliseconds: 350),
       child: SizedBox(
         width: width,
-        height: 42,
+        height: 58,
         child: Material(
           color: Colors.white.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(12),
@@ -1465,12 +1500,32 @@ class _ShortcutTile extends StatelessWidget {
           child: InkWell(
             onTap: onTap,
             hoverColor: accent.withValues(alpha: 0.22),
-            child: Center(
-              child: Icon(
-                def.icon,
-                size: 20,
-                color: Colors.white.withValues(alpha: 0.85),
-              ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  def.icon,
+                  size: 19,
+                  color: Colors.white.withValues(alpha: 0.85),
+                ),
+                const SizedBox(height: 4),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                  child: Text(
+                    caption,
+                    maxLines: 1,
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 8.8,
+                      height: 1.1,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.1,
+                      color: Colors.white.withValues(alpha: 0.55),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
