@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!--
+    Vorschau-Seite für geteilte Bewerbungslinks (/jobs/...).
+    WhatsApp/Facebook/Slack laden nur dieses statische HTML für die
+    Link-Vorschau — deshalb stehen hier NEUTRALE, zweisprachige Meta-Tags
+    ohne DSP-Namen. Echte Besucher werden sofort in die App
+    weitergeleitet (#/jobs/...), der Slug im Pfad bleibt erhalten.
+  -->
+  <title>Bewerbungslink · Application Link</title>
+  <meta name="description" content="Jetzt bewerben als Fahrer / Zusteller · Apply now as a delivery driver. Bewerbung dauert nur wenige Minuten — mehrsprachig, direkt vom Handy.">
+  <meta property="og:title" content="Bewerbungslink · Application Link">
+  <meta property="og:description" content="Jetzt bewerben als Fahrer / Zusteller · Apply now as a delivery driver. Nur wenige Minuten — direkt vom Handy.">
+  <meta property="og:type" content="website">
+  <meta name="robots" content="noindex">
+  <style>
+    body { margin: 0; font-family: -apple-system, system-ui, sans-serif;
+           background: #F2F4F7; color: #1A212B; display: flex;
+           align-items: center; justify-content: center; height: 100vh; }
+    .card { text-align: center; }
+    .spin { width: 34px; height: 34px; border: 3px solid #E5E9EE;
+            border-top-color: #0D8A60; border-radius: 50%;
+            margin: 0 auto 14px; animation: r 0.8s linear infinite; }
+    @keyframes r { to { transform: rotate(360deg); } }
+    p { font-size: 14px; color: #5B6572; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="spin"></div>
+    <p>Bewerbung wird geladen … · Loading application …</p>
+  </div>
+  <script>
+    // /jobs/<slug>[/visa|/agency]  →  /#/jobs/<slug>[/...]
+    // /jobs?dsp=...&type=...       →  /#/jobs?dsp=...&type=...
+    (function () {
+      var rest = location.pathname.replace(/^\/jobs\/?/, '');
+      var target = '/#/jobs' + (rest ? '/' + rest : '') + location.search;
+      location.replace(target);
+    })();
+  </script>
+</body>
+</html>

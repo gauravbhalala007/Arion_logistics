@@ -65,6 +65,10 @@ class _AdminRecruitingPanelState extends State<AdminRecruitingPanel>
     super.dispose();
   }
 
+  /// Hash-freie Links (/jobs/... statt /#/jobs/...): Nur so können
+  /// WhatsApp & Co. die neutrale Vorschau-Seite (web/jobs.html) laden —
+  /// Fragmente werden von Link-Previews nie mitgesendet. jobs.html
+  /// leitet echte Besucher sofort in die App weiter.
   String _publicFormUrl(RecruitingChannel channel) {
     final base = Uri.base;
     // Prefer the short branded slug URL when available; otherwise fall
@@ -72,9 +76,9 @@ class _AdminRecruitingPanelState extends State<AdminRecruitingPanel>
     // customers without a slug keep working.
     if (_brandSlug != null && _brandSlug!.isNotEmpty) {
       final typeSegment = channel == RecruitingChannel.visa ? '/visa' : '';
-      return '${base.origin}/#/jobs/$_brandSlug$typeSegment';
+      return '${base.origin}/jobs/$_brandSlug$typeSegment';
     }
-    return '${base.origin}/#/jobs?dsp=${widget.adminUid}'
+    return '${base.origin}/jobs?dsp=${widget.adminUid}'
         '&type=${channel.value}';
   }
 
@@ -83,9 +87,9 @@ class _AdminRecruitingPanelState extends State<AdminRecruitingPanel>
   String _agencyFormUrl() {
     final base = Uri.base;
     if (_brandSlug != null && _brandSlug!.isNotEmpty) {
-      return '${base.origin}/#/jobs/$_brandSlug/agency';
+      return '${base.origin}/jobs/$_brandSlug/agency';
     }
-    return '${base.origin}/#/jobs?dsp=${widget.adminUid}&type=agency';
+    return '${base.origin}/jobs?dsp=${widget.adminUid}&type=agency';
   }
 
   Future<void> _shareAgencyLink() async {

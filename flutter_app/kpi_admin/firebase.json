@@ -79,7 +79,11 @@
         "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }]
       }
     ],
-    "rewrites": [{ "source": "**", "destination": "/index.html" }]
+    "rewrites": [
+      { "source": "/jobs", "destination": "/jobs.html" },
+      { "source": "/jobs/**", "destination": "/jobs.html" },
+      { "source": "**", "destination": "/index.html" }
+    ]
   },
   "storage": {
     "rules": "storage.rules"
