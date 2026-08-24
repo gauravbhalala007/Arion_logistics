@@ -4953,7 +4953,10 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
                   },
                 ),
                 const SizedBox(height: 18),
-                _SectionTitle(text: t.t('fleet_status_section_metadata')),
+                // „optional" ist in beiden Sprachen dasselbe Wort.
+                _SectionTitle(
+                  text: '${t.t('fleet_status_section_metadata')} · optional',
+                ),
                 const SizedBox(height: 12),
                 _buildMetadataFields(context),
                 const SizedBox(height: 18),
@@ -5030,7 +5033,7 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
                   context,
                 ).t('fleet_status_field_armada_id'),
               ),
-              validator: (value) => _requiredText(
+              validator: (value) => _optionalText(
                 context,
                 value,
                 AppLocalizations.of(context).t('fleet_status_field_armada_id'),
@@ -5044,7 +5047,7 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
                   context,
                 ).t('fleet_status_field_armada_company_name'),
               ),
-              validator: (value) => _requiredText(
+              validator: (value) => _optionalText(
                 context,
                 value,
                 AppLocalizations.of(
@@ -5062,7 +5065,7 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
                       context,
                     ).t('fleet_status_field_contract_start_date'),
                     onPick: () => _pickDate(_armadaStartCtrl),
-                    validator: (value) => _requiredDate(
+                    validator: (value) => _optionalDate(
                       context,
                       value,
                       AppLocalizations.of(
@@ -5079,7 +5082,7 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
                       context,
                     ).t('fleet_status_field_contract_end_date'),
                     onPick: () => _pickDate(_armadaEndCtrl),
-                    validator: (value) => _requiredDate(
+                    validator: (value) => _optionalDate(
                       context,
                       value,
                       AppLocalizations.of(
@@ -5102,7 +5105,7 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
                   context,
                 ).t('fleet_status_field_rental_company_name'),
               ),
-              validator: (value) => _requiredText(
+              validator: (value) => _optionalText(
                 context,
                 value,
                 AppLocalizations.of(
@@ -5118,7 +5121,7 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
                   context,
                 ).t('fleet_status_field_contract_number'),
               ),
-              validator: (value) => _requiredText(
+              validator: (value) => _optionalText(
                 context,
                 value,
                 AppLocalizations.of(
@@ -5136,7 +5139,7 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
                       context,
                     ).t('fleet_status_field_rental_start_date'),
                     onPick: () => _pickDate(_amazonStartCtrl),
-                    validator: (value) => _requiredDate(
+                    validator: (value) => _optionalDate(
                       context,
                       value,
                       AppLocalizations.of(
@@ -5153,7 +5156,7 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
                       context,
                     ).t('fleet_status_field_rental_end_date'),
                     onPick: () => _pickDate(_amazonEndCtrl),
-                    validator: (value) => _requiredDate(
+                    validator: (value) => _optionalDate(
                       context,
                       value,
                       AppLocalizations.of(
@@ -5176,7 +5179,7 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
                   context,
                 ).t('fleet_status_field_owner_name'),
               ),
-              validator: (value) => _requiredText(
+              validator: (value) => _optionalText(
                 context,
                 value,
                 AppLocalizations.of(context).t('fleet_status_field_owner_name'),
@@ -5190,7 +5193,7 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
                   context,
                 ).t('fleet_status_field_owner_contact_number'),
               ),
-              validator: (value) => _requiredText(
+              validator: (value) => _optionalText(
                 context,
                 value,
                 AppLocalizations.of(
@@ -5206,7 +5209,7 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
                   context,
                 ).t('fleet_status_field_rental_agreement_number'),
               ),
-              validator: (value) => _requiredText(
+              validator: (value) => _optionalText(
                 context,
                 value,
                 AppLocalizations.of(
@@ -5224,7 +5227,7 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
                       context,
                     ).t('fleet_status_field_rental_start_date'),
                     onPick: () => _pickDate(_selfSourcedStartCtrl),
-                    validator: (value) => _requiredDate(
+                    validator: (value) => _optionalDate(
                       context,
                       value,
                       AppLocalizations.of(
@@ -5241,7 +5244,7 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
                       context,
                     ).t('fleet_status_field_rental_end_date'),
                     onPick: () => _pickDate(_selfSourcedEndCtrl),
-                    validator: (value) => _requiredDate(
+                    validator: (value) => _optionalDate(
                       context,
                       value,
                       AppLocalizations.of(
@@ -5264,7 +5267,7 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
                   context,
                 ).t('fleet_status_field_ownership_type'),
               ),
-              validator: (value) => _requiredText(
+              validator: (value) => _optionalText(
                 context,
                 value,
                 AppLocalizations.of(
@@ -5279,7 +5282,7 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
                 context,
               ).t('fleet_status_field_purchase_date'),
               onPick: () => _pickDate(_purchaseDateCtrl),
-              validator: (value) => _requiredDate(
+              validator: (value) => _optionalDate(
                 context,
                 value,
                 AppLocalizations.of(
@@ -5329,13 +5332,19 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
     return null;
   }
 
-  String? _requiredDate(BuildContext context, String? value, String field) {
+  // ── Kategorie-Zusatzfelder: freiwillig ────────────────────────────────
+  // Leasing-Stammdaten (Armada-ID, Vertragsdaten …) liegen beim Anlegen
+  // oft noch nicht vor, und eine schnelle Korrektur — etwa ein neues
+  // Kennzeichen — darf nicht daran scheitern. Deshalb blockieren diese
+  // Felder das Speichern nicht mehr; Datumsfelder prüfen weiterhin das
+  // Format, sobald etwas drinsteht.
+
+  String? _optionalText(BuildContext context, String? value, String field) =>
+      null;
+
+  String? _optionalDate(BuildContext context, String? value, String field) {
     final trimmed = (value ?? '').trim();
-    if (trimmed.isEmpty) {
-      return AppLocalizations.of(
-        context,
-      ).tf('error_required', {'field': field});
-    }
+    if (trimmed.isEmpty) return null;
     if (!isValidVehicleDate(trimmed)) {
       return AppLocalizations.of(context).t('fleet_status_invalid_date');
     }
