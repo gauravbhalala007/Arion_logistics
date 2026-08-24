@@ -1499,6 +1499,21 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
     return result;
   }
 
+  Stream<List<FleetVehicleDocument>>? _scopeDocsStream;
+  String? _scopeDocsStreamFor_;
+
+  /// Gecachter Dokumenten-Stream je Admin-Scope (siehe Kommentar am
+  /// StreamBuilder — Neuerzeugung pro Build lässt die Chips leer laufen).
+  Stream<List<FleetVehicleDocument>> _scopeDocumentsStreamFor(String scope) {
+    if (_scopeDocsStreamFor_ != scope || _scopeDocsStream == null) {
+      _scopeDocsStreamFor_ = scope;
+      _scopeDocsStream = _documentService
+          .watchScopeDocuments(dspUid: scope)
+          .asBroadcastStream();
+    }
+    return _scopeDocsStream!;
+  }
+
   Widget _buildVehiclesTab(BuildContext context, String scope) {
     final t = AppLocalizations.of(context);
     return LayoutBuilder(
@@ -1515,7 +1530,11 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                   : null;
 
               return StreamBuilder<List<FleetVehicleDocument>>(
-                stream: _documentService.watchScopeDocuments(dspUid: scope),
+                // WICHTIG: Stream cachen statt bei jedem Build neu erzeugen —
+                // watchScopeDocuments baut 61 Sub-Abos auf und beginnt bei
+                // jeder Neuerzeugung wieder leer. Ohne Cache blieben die
+                // TÜV-/Fahrzeugschein-Chips dauerhaft auf „fehlt".
+                stream: _scopeDocumentsStreamFor(scope),
                 builder: (context, docsSnapshot) {
                   final scopeDocuments =
                       docsSnapshot.data ?? const <FleetVehicleDocument>[];
