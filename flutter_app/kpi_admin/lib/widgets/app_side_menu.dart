@@ -136,6 +136,15 @@ class AppSideMenu extends StatelessWidget {
     final t = AppLocalizations.of(context);
 
     final navItems = <Widget>[
+      // ── Shortlinks (Favoriten) ──
+      // Nur am Desktop und nur in der ausgeklappten Leiste: die
+      // Icons-only-Schiene ist selbst schon eine Kurzwahl, und mobil
+      // führt die schwebende Bottom-Nav durch die Hauptseiten.
+      if (!collapsed && MediaQuery.sizeOf(context).width >= 1100)
+        _ShortcutsBar(
+          onOpen: (nav, route) => _handleNav(context, nav, route),
+        ),
+
       // ── Overview ──
       _SectionHeader(_groupTitle(context, 'overview')),
       _MenuItem(
@@ -375,7 +384,6 @@ class AppSideMenu extends StatelessWidget {
           label: InvL10n.of(context).inventory,
           active: active == AppNav.inventory,
           onTap: () => _handleNav(context, AppNav.inventory, '/inventory'),
-          betaBadge: true,
         ),
       ]),
 
@@ -1156,6 +1164,419 @@ class _CollapsedTipState extends State<_CollapsedTip> {
       onEnter: (_) => _show(),
       onExit: (_) => _hide(),
       child: widget.child,
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Shortlinks (Favoriten) — Icon-Reihe über der OVERVIEW-Sektion
+// ═══════════════════════════════════════════════════════════════════════
+
+/// Eine anwählbare Lieblingsseite: Ziel, Icon und zweisprachiger Name.
+class _ShortcutDef {
+  const _ShortcutDef(this.nav, this.icon, this.route, this.de, this.en);
+
+  final AppNav nav;
+  final IconData icon;
+  final String route;
+  final String de;
+  final String en;
+
+  String label(bool isDe) => isDe ? de : en;
+
+  /// Firestore-Schlüssel — der Enum-Name ist stabil.
+  String get key => nav.name;
+}
+
+/// Auswahl für das Anpassen-Menü. Bewusst nur Seiten, die die Shell
+/// wirklich kennt (siehe `_lazy(...)`-Liste in `AdminShellPage`).
+const List<_ShortcutDef> _kShortcutCatalog = <_ShortcutDef>[
+  _ShortcutDef(AppNav.home, Icons.home_outlined, '/home', 'Home', 'Home'),
+  _ShortcutDef(AppNav.dashboard, Icons.dashboard, '/dashboard', 'Scorecard',
+      'Scorecard'),
+  _ShortcutDef(AppNav.podQuality, Icons.photo_camera_outlined, '/pod-quality',
+      'POD Quality', 'POD Quality'),
+  _ShortcutDef(AppNav.concessions, Icons.report_gmailerrorred_outlined,
+      '/concessions', 'Concessions', 'Concessions'),
+  _ShortcutDef(AppNav.cdf, Icons.feedback_outlined, '/cdf', 'Customer Feedback',
+      'Customer Feedback'),
+  _ShortcutDef(AppNav.dwc, Icons.verified_user_outlined, '/dwc', 'DWC / IADC',
+      'DWC / IADC'),
+  _ShortcutDef(AppNav.contactCompliance, Icons.phone_in_talk_outlined,
+      '/contact-compliance', 'Contact Compliance', 'Contact Compliance'),
+  _ShortcutDef(AppNav.drivers, Icons.badge_outlined, '/drivers', 'Drivers Hub',
+      'Drivers Hub'),
+  _ShortcutDef(AppNav.recruiting, Icons.work_outline_rounded, '/recruiting',
+      'Recruiting', 'Recruiting'),
+  _ShortcutDef(AppNav.fleetStatus, Icons.local_shipping_outlined,
+      '/fleet-status', 'Fleet Hub', 'Fleet Hub'),
+  _ShortcutDef(AppNav.waveplan, Icons.waves_rounded, '/waveplan', 'Waveplan',
+      'Waveplan'),
+  _ShortcutDef(AppNav.shiftPlan, Icons.event_note_rounded, '/shift-plan',
+      'Shift Plan', 'Shift Plan'),
+  _ShortcutDef(AppNav.monthlyPlan, Icons.calendar_view_month_rounded,
+      '/monthly-plan', 'Monthly Plan', 'Monthly Plan'),
+  _ShortcutDef(AppNav.calendar, Icons.calendar_month_rounded, '/calendar',
+      'Kalender', 'Calendar'),
+  _ShortcutDef(AppNav.tasks, Icons.task_alt_outlined, '/tasks', 'Task Sheet',
+      'Task Sheet'),
+  _ShortcutDef(AppNav.dispatcherPill, Icons.support_agent_rounded,
+      '/dispatcher-pill', 'Dispatcher Center', 'Dispatcher Center'),
+  _ShortcutDef(AppNav.cotimer, Icons.timer_outlined, '/cotimer', 'co:timer',
+      'co:timer'),
+  _ShortcutDef(AppNav.shiftAbsence, Icons.schedule_rounded, '/shift-absence',
+      'Zeiten & Abwesenheiten', 'Time & absence'),
+  _ShortcutDef(AppNav.daRequests, Icons.request_page_outlined, '/da-requests',
+      'DA Requests', 'DA Requests'),
+  _ShortcutDef(AppNav.academy, Icons.school_outlined, '/academy', 'DA Academy',
+      'DA Academy'),
+  _ShortcutDef(AppNav.safetyTraining, Icons.health_and_safety_outlined,
+      '/safety-training', 'Sicherheitsunterweisung', 'Safety training'),
+  _ShortcutDef(AppNav.incidentReports, Icons.warning_amber_rounded,
+      '/incident-reports', 'Incident Reports', 'Incident Reports'),
+  _ShortcutDef(AppNav.inventory, Icons.inventory_2_outlined, '/inventory',
+      'Inventar', 'Inventory'),
+  _ShortcutDef(AppNav.paymentCheck, Icons.fact_check_outlined, '/payment-check',
+      'Payment Check', 'Payment Check'),
+  _ShortcutDef(AppNav.feedback, Icons.feedback, '/feedback', 'Feedback',
+      'Feedback'),
+  _ShortcutDef(AppNav.faqs, Icons.help_outline, '/faqs', 'FAQs', 'FAQs'),
+];
+
+/// Werkseinstellung, solange nichts angepasst wurde.
+const List<AppNav> _kDefaultShortcuts = <AppNav>[
+  AppNav.fleetStatus,
+  AppNav.drivers,
+  AppNav.dashboard,
+  AppNav.recruiting,
+];
+
+/// Höchstzahl gleichzeitiger Shortlinks — zwei Reihen à vier Icons.
+const int _kMaxShortcuts = 8;
+
+_ShortcutDef? _shortcutByKey(String key) {
+  for (final def in _kShortcutCatalog) {
+    if (def.key == key) return def;
+  }
+  return null;
+}
+
+/// Icon-Reihe der Lieblingsseiten samt Drei-Punkte-Menü zum Anpassen.
+///
+/// Gespeichert wird pro DSP unter `users/{scope}/settings/menu_shortcuts`
+/// (Feld `items`: Liste von [AppNav]-Namen) — dieselbe Ablage wie die
+/// übrigen DSP-Einstellungen, daher ohne neue Firestore-Regel.
+class _ShortcutsBar extends StatelessWidget {
+  const _ShortcutsBar({required this.onOpen});
+
+  final void Function(AppNav nav, String route) onOpen;
+
+  static const Color _accent = Color(0xFF00B287);
+
+  static String? _scopeUidOf(BuildContext context) {
+    final scoped = AdminScope.maybeOf(context)?.adminUid;
+    if (scoped != null && scoped.trim().isNotEmpty) return scoped.trim();
+    return FirebaseAuth.instance.currentUser?.uid;
+  }
+
+  static DocumentReference<Map<String, dynamic>> _docFor(String scope) =>
+      FirebaseFirestore.instance
+          .collection('users')
+          .doc(scope)
+          .collection('settings')
+          .doc('menu_shortcuts');
+
+  List<_ShortcutDef> _read(Map<String, dynamic>? data) {
+    final raw = data?['items'];
+    if (raw is List) {
+      final picked = <_ShortcutDef>[];
+      for (final entry in raw) {
+        final def = _shortcutByKey('$entry'.trim());
+        if (def != null && !picked.contains(def)) picked.add(def);
+        if (picked.length >= _kMaxShortcuts) break;
+      }
+      // Leere gespeicherte Liste ist eine bewusste Entscheidung („keine
+      // Shortlinks") — nur ein fehlendes Feld fällt auf die Vorgabe zurück.
+      return picked;
+    }
+    return <_ShortcutDef>[
+      for (final nav in _kDefaultShortcuts)
+        ...(_kShortcutCatalog.where((d) => d.nav == nav)),
+    ];
+  }
+
+  Future<void> _edit(
+    BuildContext context,
+    String scope,
+    List<_ShortcutDef> current,
+  ) async {
+    // Vor dem await greifen — danach ist der Context ggf. nicht mehr gültig.
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final result = await showDialog<List<_ShortcutDef>>(
+      context: context,
+      builder: (_) => _ShortcutsEditorDialog(initial: current),
+    );
+    if (result == null) return;
+    try {
+      await _docFor(scope).set(<String, dynamic>{
+        'items': result.map((d) => d.key).toList(growable: false),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      messenger?.showSnackBar(
+        SnackBar(
+          content: Text(
+            de ? 'Speichern fehlgeschlagen: $e' : 'Could not save: $e',
+          ),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = _scopeUidOf(context);
+    if (scope == null || scope.isEmpty) return const SizedBox.shrink();
+    final de = Localizations.localeOf(context).languageCode == 'de';
+
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: _docFor(scope).snapshots(),
+      builder: (context, snap) {
+        final items = _read(snap.data?.data());
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 2),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 6, 2, 6),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        de ? 'SHORTLINKS' : 'SHORTCUTS',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.1,
+                          color: Colors.white.withValues(alpha: 0.40),
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      width: 28,
+                      height: 28,
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        iconSize: 18,
+                        splashRadius: 16,
+                        tooltip: de
+                            ? 'Shortlinks anpassen'
+                            : 'Customise shortcuts',
+                        onPressed: () => _edit(context, scope, items),
+                        icon: Icon(
+                          Icons.more_horiz_rounded,
+                          color: Colors.white.withValues(alpha: 0.55),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (items.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+                  child: Text(
+                    de
+                        ? 'Keine — über ⋯ auswählen'
+                        : 'None — pick via ⋯',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white.withValues(alpha: 0.35),
+                    ),
+                  ),
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: LayoutBuilder(
+                    builder: (context, c) {
+                      // Immer vier Kacheln je Reihe — so bleibt das Raster
+                      // ruhig, egal wie viele Shortlinks gewählt sind.
+                      const perRow = 4;
+                      const gap = 8.0;
+                      final tile =
+                          (c.maxWidth - gap * (perRow - 1)) / perRow;
+                      return Wrap(
+                        spacing: gap,
+                        runSpacing: gap,
+                        children: [
+                          for (final def in items)
+                            _ShortcutTile(
+                              def: def,
+                              width: tile,
+                              label: def.label(de),
+                              accent: _accent,
+                              onTap: () => onOpen(def.nav, def.route),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              const SizedBox(height: 6),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ShortcutTile extends StatelessWidget {
+  const _ShortcutTile({
+    required this.def,
+    required this.width,
+    required this.label,
+    required this.accent,
+    required this.onTap,
+  });
+
+  final _ShortcutDef def;
+  final double width;
+  final String label;
+  final Color accent;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: label,
+      waitDuration: const Duration(milliseconds: 350),
+      child: SizedBox(
+        width: width,
+        height: 42,
+        child: Material(
+          color: Colors.white.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(12),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            hoverColor: accent.withValues(alpha: 0.22),
+            child: Center(
+              child: Icon(
+                def.icon,
+                size: 20,
+                color: Colors.white.withValues(alpha: 0.85),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Auswahl-Dialog: welche Seiten liegen als Shortlink oben im Menü?
+class _ShortcutsEditorDialog extends StatefulWidget {
+  const _ShortcutsEditorDialog({required this.initial});
+
+  final List<_ShortcutDef> initial;
+
+  @override
+  State<_ShortcutsEditorDialog> createState() => _ShortcutsEditorDialogState();
+}
+
+class _ShortcutsEditorDialogState extends State<_ShortcutsEditorDialog> {
+  late final List<_ShortcutDef> _selected =
+      List<_ShortcutDef>.from(widget.initial);
+
+  @override
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final full = _selected.length >= _kMaxShortcuts;
+
+    return AlertDialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Text(
+        de ? 'Shortlinks anpassen' : 'Customise shortcuts',
+        style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+      ),
+      content: SizedBox(
+        width: 420,
+        height: 460,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              de
+                  ? 'Bis zu $_kMaxShortcuts Seiten — sie erscheinen oben '
+                      'im Menü in der Reihenfolge der Auswahl.'
+                  : 'Up to $_kMaxShortcuts pages — they appear at the top '
+                      'of the menu in the order you pick them.',
+              style: const TextStyle(
+                fontSize: 12.5,
+                color: Color(0xFF6B7280),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Expanded(
+              child: ListView.builder(
+                itemCount: _kShortcutCatalog.length,
+                itemBuilder: (context, i) {
+                  final def = _kShortcutCatalog[i];
+                  final index = _selected.indexOf(def);
+                  final picked = index >= 0;
+                  return CheckboxListTile(
+                    value: picked,
+                    dense: true,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    // Volle Auswahl: Nicht-Gewählte lassen sich erst
+                    // wieder anhaken, wenn etwas abgewählt wurde.
+                    onChanged: (!picked && full)
+                        ? null
+                        : (v) => setState(() {
+                              if (v == true) {
+                                _selected.add(def);
+                              } else {
+                                _selected.remove(def);
+                              }
+                            }),
+                    secondary: Icon(def.icon, size: 20),
+                    title: Text(
+                      def.label(de),
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    subtitle: picked
+                        ? Text(
+                            de ? 'Position ${index + 1}' : 'Position ${index + 1}',
+                            style: const TextStyle(fontSize: 11.5),
+                          )
+                        : null,
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(de ? 'Abbrechen' : 'Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_selected),
+          child: Text(de ? 'Speichern' : 'Save'),
+        ),
+      ],
     );
   }
 }

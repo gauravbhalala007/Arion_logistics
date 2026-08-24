@@ -4802,12 +4802,18 @@ class _MissingEntry {
   final IconData icon;
   final String subject;
   final List<String> missing;
+
+  /// Stabile Kategorie-Keys parallel zu [missing] (licence / visa /
+  /// zusatzblatt / id / probation / contract / tid / employee_id / tuv)
+  /// — Basis für die Filter-Chips im "Fehlende Daten"-Tab.
+  final List<String> kinds;
   final String tid; // empty for vehicles
 
   const _MissingEntry({
     required this.icon,
     required this.subject,
     required this.missing,
+    required this.kinds,
     this.tid = '',
   });
 }
@@ -4830,6 +4836,24 @@ class _AlertCenterCardState extends State<_AlertCenterCard> {
   /// eine _HomeAlert.kind wie 'probation' / 'zusatzblatt').
   String _alertKindFilter = 'all';
 
+  /// Kategorie-Filter für den "Fehlende Daten"-Tab — bewusst getrennt vom
+  /// Ablauf-Filter, damit ein Tab-Wechsel den anderen Filter nicht ändert.
+  String _missingKindFilter = 'all';
+
+  /// Reihenfolge der Kategorie-Chips (identisch in beiden Tabs, damit die
+  /// Filterzeile beim Tab-Wechsel gleich wirkt).
+  static const List<String> _kKindOrder = [
+    'probation',
+    'zusatzblatt',
+    'visa',
+    'licence',
+    'id',
+    'contract',
+    'tid',
+    'employee_id',
+    'tuv',
+  ];
+
   String _alertKindLabel(String kind) {
     switch (kind) {
       case 'probation':
@@ -4846,6 +4870,10 @@ class _AlertCenterCardState extends State<_AlertCenterCard> {
         return _tr('Vertrag', 'Contract');
       case 'tuv':
         return 'TÜV';
+      case 'tid':
+        return 'Transporter-ID';
+      case 'employee_id':
+        return 'Employee ID';
       default:
         return kind;
     }
@@ -5151,9 +5179,16 @@ class _AlertCenterCardState extends State<_AlertCenterCard> {
       final isEu = _isEuWorkPermit(onboarding);
 
       final missing = <String>[];
+      // Stabile Filter-Keys, index-gleich zu [missing].
+      final kinds = <String>[];
+      void add(String kind, String label) {
+        kinds.add(kind);
+        missing.add(label);
+      }
+
       if (_parseDate(onboarding['licenseExpiry']) == null &&
           onboarding['licenseNoExpiry'] != true) {
-        missing.add(_tr('Führerschein', 'Driving licence'));
+        add('licence', _tr('Führerschein', 'Driving licence'));
       }
       // EU work-permit drivers need no visa / Zusatzblatt — don't flag those.
       if (!isEu &&
@@ -5161,40 +5196,42 @@ class _AlertCenterCardState extends State<_AlertCenterCard> {
                   onboarding['residencePermitExpiry'] ??
                   onboarding['workPermitExpiry']) ==
               null) {
-        missing.add(_tr('Visum / Aufenthaltstitel', 'Visa / residence permit'));
+        add('visa',
+            _tr('Visum / Aufenthaltstitel', 'Visa / residence permit'));
       }
       if (!isEu &&
           _parseDate(onboarding['zusatzblattExpiry']) == null &&
           onboarding['zusatzblattNoExpiry'] != true) {
-        missing.add('Zusatzblatt');
+        add('zusatzblatt', 'Zusatzblatt');
       }
       if (_parseDate(onboarding['idDocExpiry']) == null) {
-        missing.add(_tr('Ausweis', 'ID document'));
+        add('id', _tr('Ausweis', 'ID document'));
       }
       // Probezeit is derived from the work start date — flag when the
       // start date was never entered.
       if (_parseDate(onboarding['workStartDate']) == null) {
-        missing.add(_tr('Arbeitsbeginn (Probezeit)',
-            'Work start (probation)'));
+        add('probation',
+            _tr('Arbeitsbeginn (Probezeit)', 'Work start (probation)'));
       }
       if (onboarding['contractUnlimited'] != true &&
           _parseDate(onboarding['contractExpiry']) == null) {
-        missing.add(_tr('Vertragsende', 'Contract end'));
+        add('contract', _tr('Vertragsende', 'Contract end'));
       }
       // Ticket: fehlende Transporter-ID und fehlende Employee ID
       // (Zeiterfassung) ebenfalls als Missing Data melden.
       if (data['tidPending'] == true ||
           (data['transporterId'] ?? '').toString().trim().isEmpty) {
-        missing.add('Transporter-ID');
+        add('tid', 'Transporter-ID');
       }
       if ((data['employeeNumber'] ?? '').toString().trim().isEmpty) {
-        missing.add('Employee ID');
+        add('employee_id', 'Employee ID');
       }
       if (missing.isNotEmpty) {
         out.add(_MissingEntry(
           icon: Icons.person_outline,
           subject: name,
           missing: missing,
+          kinds: kinds,
           tid: tid,
         ));
       }
@@ -5226,6 +5263,7 @@ class _AlertCenterCardState extends State<_AlertCenterCard> {
         icon: Icons.local_shipping_outlined,
         subject: plate,
         missing: const ['TÜV'],
+        kinds: const ['tuv'],
       ));
     }
     return out;
@@ -5308,22 +5346,28 @@ class _AlertCenterCardState extends State<_AlertCenterCard> {
                       : alerts
                           .where((a) => a.kind == activeKindFilter)
                           .toList();
-                  const kindOrder = [
-                    'probation',
-                    'zusatzblatt',
-                    'visa',
-                    'licence',
-                    'id',
-                    'contract',
-                    'tuv',
-                  ];
-                  final presentKinds = [
-                    for (final k in kindOrder)
-                      if (kindCounts.containsKey(k)) k,
-                    // Unbekannte Kinds (Zukunft) hinten anhängen.
-                    for (final k in kindCounts.keys)
-                      if (!kindOrder.contains(k)) k,
-                  ];
+                  final presentKinds = _presentKinds(kindCounts);
+
+                  // Ticket: dieselben Kategorie-Chips für "Fehlende Daten".
+                  // Ein Eintrag kann mehrere Lücken haben — die Chip-Zahl
+                  // zählt also Einträge, nicht Felder.
+                  final missingCounts = <String, int>{};
+                  for (final m in missing) {
+                    for (final k in m.kinds.toSet()) {
+                      if (k.isEmpty) continue;
+                      missingCounts[k] = (missingCounts[k] ?? 0) + 1;
+                    }
+                  }
+                  final activeMissingFilter =
+                      missingCounts.containsKey(_missingKindFilter)
+                          ? _missingKindFilter
+                          : 'all';
+                  final visibleMissing = activeMissingFilter == 'all'
+                      ? missing
+                      : missing
+                          .where((m) => m.kinds.contains(activeMissingFilter))
+                          .toList();
+                  final presentMissingKinds = _presentKinds(missingCounts);
 
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -5368,24 +5412,28 @@ class _AlertCenterCardState extends State<_AlertCenterCard> {
                               missing.length),
                         ],
                       ),
-                      // Kategorie-Filter (nur im "Ablaufend"-Tab):
-                      // "All" zuerst, dann eine Chip pro Fall mit Anzahl.
+                      // Kategorie-Filter je Tab: "Alle" zuerst, dann eine
+                      // Chip pro vorkommender Kategorie mit Anzahl.
                       if (_tab == 0 && alerts.isNotEmpty) ...[
                         SizedBox(height: _r(8, scale)),
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: [
-                              _kindChip('all',
-                                  _tr('Alle', 'All'), alerts.length,
-                                  activeKindFilter),
-                              for (final k in presentKinds) ...[
-                                const SizedBox(width: 6),
-                                _kindChip(k, _alertKindLabel(k),
-                                    kindCounts[k] ?? 0, activeKindFilter),
-                              ],
-                            ],
-                          ),
+                        _kindFilterRow(
+                          total: alerts.length,
+                          kinds: presentKinds,
+                          counts: kindCounts,
+                          current: activeKindFilter,
+                          onSelect: (k) =>
+                              setState(() => _alertKindFilter = k),
+                        ),
+                      ],
+                      if (_tab == 1 && missing.isNotEmpty) ...[
+                        SizedBox(height: _r(8, scale)),
+                        _kindFilterRow(
+                          total: missing.length,
+                          kinds: presentMissingKinds,
+                          counts: missingCounts,
+                          current: activeMissingFilter,
+                          onSelect: (k) =>
+                              setState(() => _missingKindFilter = k),
                         ),
                       ],
                       SizedBox(height: _r(10, scale)),
@@ -5394,7 +5442,7 @@ class _AlertCenterCardState extends State<_AlertCenterCard> {
                       Expanded(
                         child: (_tab == 0
                                 ? visibleAlerts.isEmpty
-                                : missing.isEmpty)
+                                : visibleMissing.isEmpty)
                             ? Center(
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
@@ -5424,9 +5472,9 @@ class _AlertCenterCardState extends State<_AlertCenterCard> {
                                         _alertRow(visibleAlerts[i], i),
                                   )
                                 : ListView.builder(
-                                    itemCount: missing.length,
+                                    itemCount: visibleMissing.length,
                                     itemBuilder: (context, i) =>
-                                        _missingRow(missing[i], i),
+                                        _missingRow(visibleMissing[i], i),
                                   )),
                       ),
                     ],
@@ -5442,12 +5490,52 @@ class _AlertCenterCardState extends State<_AlertCenterCard> {
     );
   }
 
-  /// Kategorie-Chip für die Ablauf-Warnungen ("Alle (12)", "Probezeit
-  /// (3)" …) — [current] ist der gerade wirksame Filter.
-  Widget _kindChip(String kind, String label, int count, String current) {
+  /// Kategorien in fester Reihenfolge, ohne leere Kategorien —
+  /// unbekannte Keys (Zukunft) hinten anhängen.
+  List<String> _presentKinds(Map<String, int> counts) => [
+        for (final k in _kKindOrder)
+          if (counts.containsKey(k)) k,
+        for (final k in counts.keys)
+          if (!_kKindOrder.contains(k)) k,
+      ];
+
+  /// Horizontal scrollbare Filterzeile — identisch für beide Tabs
+  /// ("Alle (n)" zuerst, danach eine Chip je Kategorie).
+  Widget _kindFilterRow({
+    required int total,
+    required List<String> kinds,
+    required Map<String, int> counts,
+    required String current,
+    required ValueChanged<String> onSelect,
+  }) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _kindChip('all', _tr('Alle', 'All'), total, current,
+              onSelect: onSelect),
+          for (final k in kinds) ...[
+            const SizedBox(width: 6),
+            _kindChip(k, _alertKindLabel(k), counts[k] ?? 0, current,
+                onSelect: onSelect),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Kategorie-Chip für die Filterzeilen ("Alle (12)", "Probezeit (3)" …)
+  /// — [current] ist der gerade wirksame Filter des jeweiligen Tabs.
+  Widget _kindChip(
+    String kind,
+    String label,
+    int count,
+    String current, {
+    required ValueChanged<String> onSelect,
+  }) {
     final selected = current == kind;
     return InkWell(
-      onTap: () => setState(() => _alertKindFilter = kind),
+      onTap: () => onSelect(kind),
       borderRadius: BorderRadius.circular(999),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
