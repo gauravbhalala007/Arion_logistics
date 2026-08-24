@@ -5650,8 +5650,25 @@ class _DriverAbsenceProfile {
       );
 
   /// PTO Balance = verbleibende BEZAHLTE Urlaubstage über alle noch
-  /// gültigen Töpfe.
-  double get ptoBalanceDays => vacationBalance.totalRemaining;
+  /// gültigen Töpfe. MIT Vorzeichen (Ticket „DA Balance"): wer mehr
+  /// genommen hat als erworben, steht im Minus statt bei 0.
+  double get ptoBalanceDays => vacationBalance.totalRemainingSigned;
+
+  /// Kopfzeile „X von Y Urlaubstagen übrig (seit Vertragsbeginn)" —
+  /// nur im Legacy-Modus (ein Topf, Zählung ab Beschäftigungsbeginn,
+  /// Verfall erst zum Vertragsende). Im Topf-Modus tragen die Töpfe
+  /// ihre eigene Aufschlüsselung. `null` = nicht anzeigen.
+  String? ptoHeaderLine(bool de) {
+    final balance = vacationBalance;
+    if (balance.pooled) return null;
+    final total = balance.totalEntitlement;
+    if (total <= 0) return null;
+    final remaining = _daFormatDays(balance.totalRemainingSigned);
+    final totalText = _daFormatDays(total);
+    return de
+        ? '$remaining von $totalText Urlaubstagen übrig seit Beginn'
+        : '$remaining of $totalText PTO days remaining since start';
+  }
 
   /// Overtime Balance über alle erfassten Monate (offen nach Auszahlung).
   int get overtimeBalanceMinutes => overtimeMonths.fold<int>(
@@ -6177,7 +6194,10 @@ class _DriverRow extends StatelessWidget {
         label: 'PTO Balance',
         value: _daFormatDays(profile.ptoBalanceDays),
         unit: de ? 'Tage' : 'days',
-        color: const Color(0xFF1D7F5A),
+        // Negativer Saldo (mehr genommen als erworben) in Rot.
+        color: profile.ptoBalanceDays < 0
+            ? const Color(0xFFB91C1C)
+            : const Color(0xFF1D7F5A),
         tooltip: <String>[
           de
               ? 'Verbleibende BEZAHLTE Urlaubstage — anteilig nach '
@@ -6271,6 +6291,23 @@ class _DriverRow extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                 ),
               ),
+              // Ticket „DA Balance": Gesamt-Anspruch seit Vertragsbeginn
+              // direkt im Kopf — „X von Y Urlaubstagen übrig seit Beginn".
+              if (profile.ptoHeaderLine(de) != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  profile.ptoHeaderLine(de)!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: profile.ptoBalanceDays < 0
+                        ? const Color(0xFFB91C1C)
+                        : const Color(0xFF1D7F5A),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -6517,6 +6554,8 @@ class _DriverAbsenceHistoryView extends StatelessWidget {
       'ID: ${profile.driverId}',
       if (profile.contractPeriodText.isNotEmpty) profile.contractPeriodText,
       de ? 'komplette Abwesenheits-Historie' : 'full absence history',
+      // Ticket „DA Balance": Gesamt-Anspruch seit Vertragsbeginn im Kopf.
+      if (profile.ptoHeaderLine(de) != null) profile.ptoHeaderLine(de)!,
     ];
 
     return SizedBox(

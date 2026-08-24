@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart' as fb_storage;
 import '../widgets/admin_scope.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -16,6 +17,7 @@ import '../models/fleet_vehicle_document.dart';
 import '../services/fleet_vehicle_document_service.dart';
 import '../services/fleet_vehicle_repository.dart';
 import '../services/cortex_vehicle_importer.dart';
+import '../services/incident_reports.dart' show plateKeyOf;
 import '../theme/app_colors.dart';
 import '../widgets/clearable_search_field.dart';
 import '../widgets/co_button.dart';
@@ -1186,18 +1188,20 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
     );
   }
 
-  Future<void> _updateVehicleStatus(
+  /// Returns `true` when the status write went through — callers use this
+  /// to chain follow-up flows (e.g. the ungrounding upload dialog).
+  Future<bool> _updateVehicleStatus(
     FleetVehicle vehicle,
     VehicleStatus status, {
     String? serviceEndDate,
   }) async {
-    if (vehicle.status == status) return;
+    if (vehicle.status == status) return false;
 
     final scope = _scopeUid;
     final t = AppLocalizations.of(context);
     if (scope == null) {
       _showSnack(t.t('fleet_status_empty_scope'), error: true);
-      return;
+      return false;
     }
 
     final plateNumber = vehicle.plateNumber;
@@ -1209,10 +1213,12 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
         status: status,
         serviceEndDate: serviceEndDate,
       );
-      if (!mounted) return;
-      _showSnack(
-        t.tf('fleet_status_save_updated', {'vehicleNumber': plateNumber}),
-      );
+      if (mounted) {
+        _showSnack(
+          t.tf('fleet_status_save_updated', {'vehicleNumber': plateNumber}),
+        );
+      }
+      return true;
     } on FirebaseException catch (e) {
       _showSnack(
         e.code == 'permission-denied'
@@ -1220,14 +1226,17 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
             : t.tf('fleet_status_save_failed', {'error': '$e'}),
         error: true,
       );
+      return false;
     } catch (e) {
       _showSnack(
         t.tf('fleet_status_save_failed', {'error': '$e'}),
         error: true,
       );
+      return false;
     } finally {
-      if (!mounted) return;
-      setState(() => _updatingVehicleStatuses.remove(plateNumber));
+      if (mounted) {
+        setState(() => _updatingVehicleStatuses.remove(plateNumber));
+      }
     }
   }
 
@@ -1254,7 +1263,8 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
       if (!mounted || grounding == null) return;
     }
 
-    await _updateVehicleStatus(
+    final wasGrounded = vehicle.status.isGrounded;
+    final updated = await _updateVehicleStatus(
       vehicle,
       status,
       serviceEndDate: status.isGrounded ? grounding?.serviceEndDate : null,
@@ -1274,6 +1284,106 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
         }
       }
     }
+
+    // Ungrounding (grounded → operational/active): offer to attach the
+    // service report / delivery note etc. as a vehicle event — optional,
+    // skippable via "Später".
+    if (updated &&
+        wasGrounded &&
+        !status.isGrounded &&
+        status != VehicleStatus.inactive &&
+        _canManageVehicles &&
+        mounted) {
+      await _showUngroundingUploadDialog(vehicle);
+    }
+  }
+
+  // ─── Ungrounding: optionaler Service-Bericht-Upload ───────────────────
+  //
+  // Nach dem Statuswechsel grounded → operational kann der Admin direkt
+  // Unterlagen (Servicebericht, Lieferschein, …) hochladen. Das Ergebnis
+  // wird als Event in users/{scope}/fleet_events gespeichert — dieselbe
+  // Collection, die der „+ Event"-Dialog der Detailseite nutzt — und der
+  // Anhang liegt unter vehicles/{scope}/{plate}/events/… (der Storage-Pfad
+  // ist für Admin + Dispatcher bereits freigegeben: PDF/Bilder, max 20 MB).
+
+  Future<void> _showUngroundingUploadDialog(FleetVehicle vehicle) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final scope = _scopeUid;
+    if (scope == null) return;
+
+    final result = await showDialog<_ServiceUploadResult>(
+      context: context,
+      builder: (_) => _ServiceUploadDialog(de: de, plate: vehicle.plateNumber),
+    );
+    if (result == null || !mounted) return;
+
+    try {
+      String fileUrl = '';
+      String fileName = '';
+      String storagePath = '';
+      final bytes = result.fileBytes;
+      if (bytes != null && result.fileName.trim().isNotEmpty) {
+        fileName = result.fileName.trim();
+        final ref = fb_storage.FirebaseStorage.instance.ref().child(
+          'vehicles/'
+          '$scope/'
+          '${normalizePlateNumber(vehicle.plateNumber)}/'
+          'events/'
+          '${DateTime.now().millisecondsSinceEpoch}_$fileName',
+        );
+        await ref.putData(
+          bytes,
+          fb_storage.SettableMetadata(
+            contentType: _serviceUploadContentType(fileName),
+          ),
+        );
+        fileUrl = await ref.getDownloadURL();
+        storagePath = ref.fullPath;
+      }
+
+      final now = DateTime.now();
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(scope)
+          .collection('fleet_events')
+          .add(<String, dynamic>{
+            'plateKey': plateKeyOf(vehicle.plateNumber),
+            'plate': vehicle.plateNumber,
+            'type': 'other',
+            'title': de ? 'Service / Entgrounding' : 'Service / ungrounding',
+            'subtitle': result.note.trim(),
+            'date': Timestamp.fromDate(DateTime(now.year, now.month, now.day)),
+            'km': null,
+            if (fileUrl.isNotEmpty) 'fileUrl': fileUrl,
+            if (fileName.isNotEmpty) 'fileName': fileName,
+            if (storagePath.isNotEmpty) 'storagePath': storagePath,
+            'createdAt': FieldValue.serverTimestamp(),
+            'createdBy': FirebaseAuth.instance.currentUser?.uid ?? '',
+          });
+      if (!mounted) return;
+      _showSnack(
+        de
+            ? 'Service-Event gespeichert.'
+            : 'Service event saved.',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showSnack(
+        de ? 'Speichern fehlgeschlagen: $e' : 'Could not save: $e',
+        error: true,
+      );
+    }
+  }
+
+  /// Content type for the ungrounding upload — the Storage rules only
+  /// accept images and PDFs on this path.
+  static String _serviceUploadContentType(String fileName) {
+    final lower = fileName.toLowerCase();
+    if (lower.endsWith('.pdf')) return 'application/pdf';
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    return 'image/jpeg';
   }
 
   void _showSnack(String message, {bool error = false}) {
@@ -1892,11 +2002,13 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
     );
   }
 
-  // ─── Referenzen — named links (workshops, rental partners, …) ─────────
+  // ─── Referenzen — named contacts (workshops, rental partners, …) ──────
   //
   // Stored under users/{dspUid}/fleet_references/{autoId} with
-  // {name, url, createdAt, updatedAt}; the admin's own subtree, so the
-  // existing rules already allow admin + dispatcher access.
+  // {name, url, email, phone, createdAt, updatedAt}; the admin's own
+  // subtree, so the existing rules already allow admin + dispatcher
+  // access. Only `name` is required — link, e-mail and phone are all
+  // optional (older docs simply lack the newer fields).
 
   /// Chips row with all saved reference links; tapping a chip opens the URL
   /// in a new tab. Admins get a manage button (add / edit / delete).
@@ -2033,11 +2145,19 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
     final data = doc.data();
     final name = (data['name'] ?? '').toString().trim();
     final url = (data['url'] ?? '').toString().trim();
+    final email = (data['email'] ?? '').toString().trim();
+    final phone = (data['phone'] ?? '').toString().trim();
+    final details = [url, email, phone].where((v) => v.isNotEmpty).toList();
+    final tooltip = details.join('\n');
+    final label = name.isEmpty
+        ? (details.isEmpty ? '' : details.first)
+        : name;
     return InkWell(
-      onTap: () => _openReferenceUrl(url),
+      onTap: () =>
+          _openReference(name: name, url: url, email: email, phone: phone),
       borderRadius: BorderRadius.circular(999),
       child: Tooltip(
-        message: url,
+        message: tooltip.isEmpty ? name : tooltip,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
@@ -2048,14 +2168,14 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.open_in_new_rounded,
+              Icon(
+                _referenceIcon(url: url, email: email, phone: phone),
                 size: 13,
-                color: Color(0xFF2563EB),
+                color: const Color(0xFF2563EB),
               ),
               const SizedBox(width: 5),
               Text(
-                name.isEmpty ? url : name,
+                label,
                 style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
@@ -2067,6 +2187,195 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
         ),
       ),
     );
+  }
+
+  /// Icon for a reference chip/row: link beats e-mail beats phone.
+  IconData _referenceIcon({
+    required String url,
+    required String email,
+    required String phone,
+  }) {
+    if (url.trim().isNotEmpty) return Icons.open_in_new_rounded;
+    if (email.trim().isNotEmpty) return Icons.mail_outline_rounded;
+    if (phone.trim().isNotEmpty) return Icons.phone_outlined;
+    return Icons.bookmark_outline_rounded;
+  }
+
+  /// Opens a reference: with exactly one saved action (link, e-mail or
+  /// phone) it launches directly — like the old link-only behaviour. With
+  /// two or more, a small chooser dialog offers all of them as tappable
+  /// actions (mailto: / tel: / URL).
+  Future<void> _openReference({
+    required String name,
+    required String url,
+    required String email,
+    required String phone,
+  }) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final trimmedUrl = url.trim();
+    final trimmedEmail = email.trim();
+    final trimmedPhone = phone.trim();
+    final actionCount = [
+      trimmedUrl,
+      trimmedEmail,
+      trimmedPhone,
+    ].where((v) => v.isNotEmpty).length;
+
+    if (actionCount == 0) {
+      _showSnack(
+        de
+            ? 'Keine Kontaktdaten hinterlegt.'
+            : 'No contact details saved.',
+      );
+      return;
+    }
+    if (actionCount == 1) {
+      if (trimmedUrl.isNotEmpty) return _openReferenceUrl(trimmedUrl);
+      if (trimmedEmail.isNotEmpty) return _openReferenceEmail(trimmedEmail);
+      return _openReferencePhone(trimmedPhone);
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: const BorderSide(color: _kBorder),
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 380),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 8, 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        name.isEmpty ? (de ? 'Referenz' : 'Reference') : name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: _kText,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: de ? 'Schließen' : 'Close',
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      icon: const Icon(Icons.close, color: _kMuted, size: 20),
+                    ),
+                  ],
+                ),
+              ),
+              if (trimmedUrl.isNotEmpty)
+                ListTile(
+                  leading: const Icon(
+                    Icons.open_in_new_rounded,
+                    size: 20,
+                    color: Color(0xFF2563EB),
+                  ),
+                  title: Text(
+                    de ? 'Link öffnen' : 'Open link',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    trimmedUrl,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12, color: _kMuted),
+                  ),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    _openReferenceUrl(trimmedUrl);
+                  },
+                ),
+              if (trimmedEmail.isNotEmpty)
+                ListTile(
+                  leading: const Icon(
+                    Icons.mail_outline_rounded,
+                    size: 20,
+                    color: Color(0xFF1D7F5A),
+                  ),
+                  title: Text(
+                    de ? 'E-Mail schreiben' : 'Send e-mail',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    trimmedEmail,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12, color: _kMuted),
+                  ),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    _openReferenceEmail(trimmedEmail);
+                  },
+                ),
+              if (trimmedPhone.isNotEmpty)
+                ListTile(
+                  leading: const Icon(
+                    Icons.phone_outlined,
+                    size: 20,
+                    color: Color(0xFF1D7F5A),
+                  ),
+                  title: Text(
+                    de ? 'Anrufen' : 'Call',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    trimmedPhone,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12, color: _kMuted),
+                  ),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    _openReferencePhone(trimmedPhone);
+                  },
+                ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openReferenceEmail(String email) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final uri = Uri(scheme: 'mailto', path: email.trim());
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched && mounted) {
+      _showSnack(
+        de
+            ? 'E-Mail-App konnte nicht geöffnet werden.'
+            : 'Could not open the e-mail app.',
+        error: true,
+      );
+    }
+  }
+
+  Future<void> _openReferencePhone(String phone) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    // Keep digits, "+" and common separators out — tel: URIs are picky
+    // about spaces and slashes.
+    final sanitized = phone.trim().replaceAll(RegExp(r'[\s/().-]'), '');
+    final uri = Uri(scheme: 'tel', path: sanitized);
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched && mounted) {
+      _showSnack(
+        de
+            ? 'Telefon-App konnte nicht geöffnet werden.'
+            : 'Could not open the phone app.',
+        error: true,
+      );
+    }
   }
 
   Future<void> _openReferenceUrl(String url) async {
@@ -2180,6 +2489,17 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                           final data = doc.data();
                           final name = (data['name'] ?? '').toString().trim();
                           final url = (data['url'] ?? '').toString().trim();
+                          final email = (data['email'] ?? '')
+                              .toString()
+                              .trim();
+                          final phone = (data['phone'] ?? '')
+                              .toString()
+                              .trim();
+                          final detailLine = [
+                            url,
+                            email,
+                            phone,
+                          ].where((v) => v.isNotEmpty).join(' · ');
                           return Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 12,
@@ -2198,7 +2518,7 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        name.isEmpty ? url : name,
+                                        name.isEmpty ? detailLine : name,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
@@ -2207,28 +2527,39 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                                           fontSize: 13.5,
                                         ),
                                       ),
-                                      Text(
-                                        url,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          color: _kMuted,
+                                      if (detailLine.isNotEmpty)
+                                        Text(
+                                          detailLine,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: _kMuted,
+                                          ),
                                         ),
-                                      ),
                                     ],
                                   ),
                                 ),
-                                IconButton(
-                                  tooltip: de ? 'Öffnen' : 'Open',
-                                  onPressed: () => _openReferenceUrl(url),
-                                  visualDensity: VisualDensity.compact,
-                                  icon: const Icon(
-                                    Icons.open_in_new_rounded,
-                                    size: 18,
-                                    color: Color(0xFF2563EB),
+                                if (detailLine.isNotEmpty)
+                                  IconButton(
+                                    tooltip: de ? 'Öffnen' : 'Open',
+                                    onPressed: () => _openReference(
+                                      name: name,
+                                      url: url,
+                                      email: email,
+                                      phone: phone,
+                                    ),
+                                    visualDensity: VisualDensity.compact,
+                                    icon: Icon(
+                                      _referenceIcon(
+                                        url: url,
+                                        email: email,
+                                        phone: phone,
+                                      ),
+                                      size: 18,
+                                      color: const Color(0xFF2563EB),
+                                    ),
                                   ),
-                                ),
                                 IconButton(
                                   tooltip: de ? 'Bearbeiten' : 'Edit',
                                   onPressed: () => _showReferenceEditor(
@@ -2236,6 +2567,8 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                                     documentId: doc.id,
                                     initialName: name,
                                     initialUrl: url,
+                                    initialEmail: email,
+                                    initialPhone: phone,
                                   ),
                                   visualDensity: VisualDensity.compact,
                                   icon: const Icon(
@@ -2285,10 +2618,14 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
     String? documentId,
     String initialName = '',
     String initialUrl = '',
+    String initialEmail = '',
+    String initialPhone = '',
   }) async {
     final de = Localizations.localeOf(context).languageCode == 'de';
     final nameCtrl = TextEditingController(text: initialName);
     final urlCtrl = TextEditingController(text: initialUrl);
+    final emailCtrl = TextEditingController(text: initialEmail);
+    final phoneCtrl = TextEditingController(text: initialPhone);
     final formKey = GlobalKey<FormState>();
 
     final saved = await showDialog<bool>(
@@ -2325,15 +2662,14 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                 TextFormField(
                   controller: urlCtrl,
                   decoration: _referenceInputDecoration(
-                    de ? 'Link / URL (z. B. Google Maps)' : 'Link / URL',
+                    de
+                        ? 'Link / URL (optional, z. B. Google Maps)'
+                        : 'Link / URL (optional)',
                   ),
                   validator: (value) {
                     final trimmed = (value ?? '').trim();
-                    if (trimmed.isEmpty) {
-                      return de
-                          ? 'Link ist erforderlich.'
-                          : 'Link is required.';
-                    }
+                    // Optional — empty is fine, only validate when set.
+                    if (trimmed.isEmpty) return null;
                     final withScheme =
                         trimmed.startsWith('http://') ||
                             trimmed.startsWith('https://')
@@ -2345,6 +2681,35 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                     }
                     return null;
                   },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: emailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: _referenceInputDecoration(
+                    de ? 'E-Mail (optional)' : 'E-mail (optional)',
+                  ),
+                  validator: (value) {
+                    final trimmed = (value ?? '').trim();
+                    // Optional — empty is fine, only validate when set.
+                    if (trimmed.isEmpty) return null;
+                    final valid = RegExp(
+                      r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
+                    ).hasMatch(trimmed);
+                    return valid
+                        ? null
+                        : (de
+                              ? 'Ungültige E-Mail-Adresse.'
+                              : 'Invalid e-mail address.');
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  decoration: _referenceInputDecoration(
+                    de ? 'Telefon (optional)' : 'Phone (optional)',
+                  ),
                 ),
               ],
             ),
@@ -2369,7 +2734,9 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
 
     if (saved == true) {
       var url = urlCtrl.text.trim();
-      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      if (url.isNotEmpty &&
+          !url.startsWith('http://') &&
+          !url.startsWith('https://')) {
         url = 'https://$url';
       }
       try {
@@ -2377,6 +2744,8 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
           await _referencesCollection(scope).add(<String, dynamic>{
             'name': nameCtrl.text.trim(),
             'url': url,
+            'email': emailCtrl.text.trim(),
+            'phone': phoneCtrl.text.trim(),
             'createdAt': FieldValue.serverTimestamp(),
             'updatedAt': FieldValue.serverTimestamp(),
           });
@@ -2386,6 +2755,8 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
           ).doc(documentId).update(<String, dynamic>{
             'name': nameCtrl.text.trim(),
             'url': url,
+            'email': emailCtrl.text.trim(),
+            'phone': phoneCtrl.text.trim(),
             'updatedAt': FieldValue.serverTimestamp(),
           });
         }
@@ -2398,6 +2769,8 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
     }
     nameCtrl.dispose();
     urlCtrl.dispose();
+    emailCtrl.dispose();
+    phoneCtrl.dispose();
   }
 
   InputDecoration _referenceInputDecoration(String label) {
@@ -2747,14 +3120,23 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                 ),
               for (final doc in docs)
                 MobileSheetOption(
-                  icon: Icons.open_in_new_rounded,
+                  icon: _referenceIcon(
+                    url: (doc.data()['url'] ?? '').toString(),
+                    email: (doc.data()['email'] ?? '').toString(),
+                    phone: (doc.data()['phone'] ?? '').toString(),
+                  ),
                   label: (doc.data()['name'] ?? '').toString().trim().isEmpty
                       ? (doc.data()['url'] ?? '').toString().trim()
                       : (doc.data()['name'] ?? '').toString().trim(),
                   selected: false,
                   onTap: () {
                     Navigator.of(ctx).pop();
-                    _openReferenceUrl((doc.data()['url'] ?? '').toString());
+                    _openReference(
+                      name: (doc.data()['name'] ?? '').toString().trim(),
+                      url: (doc.data()['url'] ?? '').toString().trim(),
+                      email: (doc.data()['email'] ?? '').toString().trim(),
+                      phone: (doc.data()['phone'] ?? '').toString().trim(),
+                    );
                   },
                 ),
               if (_canManageVehicles)
@@ -5777,6 +6159,233 @@ class _HoverRowState extends State<_HoverRow> {
           child: widget.builder(_hover),
         ),
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Ungrounding: „Servicebericht / Unterlagen hochladen?"-Dialog
+// ---------------------------------------------------------------------------
+
+/// Ergebnis des Upload-Dialogs — Notiz und/oder Datei, beides optional.
+class _ServiceUploadResult {
+  const _ServiceUploadResult({
+    required this.note,
+    required this.fileBytes,
+    required this.fileName,
+  });
+
+  final String note;
+  final Uint8List? fileBytes;
+  final String fileName;
+}
+
+/// Optionaler Dialog nach dem Statuswechsel grounded → operational:
+/// Servicebericht / Lieferschein etc. (PDF/Bild, max 20 MB — Limit der
+/// Storage-Rules) plus Notiz. „Später" überspringt ohne Event.
+class _ServiceUploadDialog extends StatefulWidget {
+  const _ServiceUploadDialog({required this.de, required this.plate});
+
+  final bool de;
+  final String plate;
+
+  @override
+  State<_ServiceUploadDialog> createState() => _ServiceUploadDialogState();
+}
+
+class _ServiceUploadDialogState extends State<_ServiceUploadDialog> {
+  static const Color _border = Color(0xFFE5E7EB);
+  static const Color _green = Color(0xFF0D8A60);
+  static const Color _muted = Color(0xFF6B7280);
+  static const Color _red = Color(0xFFB32F2F);
+
+  final TextEditingController _noteCtrl = TextEditingController();
+  Uint8List? _fileBytes;
+  String _fileName = '';
+  String? _error;
+  bool _picking = false;
+
+  String _tr(String de, String en) => widget.de ? de : en;
+
+  @override
+  void dispose() {
+    _noteCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickFile() async {
+    if (_picking) return;
+    setState(() {
+      _picking = true;
+      _error = null;
+    });
+    try {
+      final picked = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'webp'],
+        withData: true,
+      );
+      if (picked == null || picked.files.isEmpty) return;
+      final file = picked.files.first;
+      final bytes = file.bytes;
+      if (bytes == null) {
+        setState(
+          () => _error = _tr(
+            'Datei konnte nicht gelesen werden.',
+            'Could not read the file.',
+          ),
+        );
+        return;
+      }
+      if (bytes.length >= 20 * 1024 * 1024) {
+        setState(
+          () => _error = _tr(
+            'Datei ist zu groß (max. 20 MB).',
+            'File is too large (max. 20 MB).',
+          ),
+        );
+        return;
+      }
+      setState(() {
+        _fileBytes = bytes;
+        _fileName = file.name;
+      });
+    } finally {
+      if (mounted) setState(() => _picking = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      title: Text(
+        _tr(
+          'Servicebericht / Unterlagen hochladen?',
+          'Upload service report / documents?',
+        ),
+        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+      ),
+      content: SizedBox(
+        width: 420,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                _tr(
+                  '${widget.plate} ist wieder einsatzbereit. Optional können '
+                      'Servicebericht, Lieferschein o. Ä. als Fahrzeug-Event '
+                      'hinterlegt werden.',
+                  '${widget.plate} is back in service. Optionally attach the '
+                      'service report, delivery note etc. as a vehicle event.',
+                ),
+                style: const TextStyle(fontSize: 12.5, color: _muted),
+              ),
+              const SizedBox(height: 14),
+              OutlinedButton.icon(
+                onPressed: _picking ? null : _pickFile,
+                icon: Icon(
+                  _fileName.isEmpty
+                      ? Icons.upload_file_outlined
+                      : Icons.description_outlined,
+                  size: 18,
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _fileName.isEmpty ? _muted : _green,
+                  side: const BorderSide(color: _border),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                label: Text(
+                  _fileName.isEmpty
+                      ? _tr('Datei wählen (PDF/Bild)', 'Choose file (PDF/image)')
+                      : _fileName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+              if (_fileName.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: () => setState(() {
+                      _fileBytes = null;
+                      _fileName = '';
+                    }),
+                    icon: const Icon(Icons.close, size: 15),
+                    style: TextButton.styleFrom(foregroundColor: _muted),
+                    label: Text(
+                      _tr('Datei entfernen', 'Remove file'),
+                      style: const TextStyle(fontSize: 12.5),
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 12),
+              TextField(
+                controller: _noteCtrl,
+                maxLines: 2,
+                decoration: InputDecoration(
+                  labelText: _tr('Notiz (optional)', 'Note (optional)'),
+                  hintText: _tr(
+                    'z. B. Bremsen erneuert, Werkstatt Müller',
+                    'e.g. brakes replaced, workshop',
+                  ),
+                  filled: true,
+                  fillColor: const Color(0xFFF9FAFB),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: _border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: _border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: _green, width: 1.4),
+                  ),
+                ),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  _error!,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    color: _red,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(_tr('Später', 'Later')),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: _green),
+          onPressed: () => Navigator.of(context).pop(
+            _ServiceUploadResult(
+              note: _noteCtrl.text.trim(),
+              fileBytes: _fileBytes,
+              fileName: _fileName,
+            ),
+          ),
+          child: Text(_tr('Speichern', 'Save')),
+        ),
+      ],
     );
   }
 }

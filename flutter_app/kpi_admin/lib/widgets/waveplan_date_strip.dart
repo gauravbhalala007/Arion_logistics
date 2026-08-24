@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
@@ -79,12 +80,43 @@ class _WaveplanDateStripState extends State<WaveplanDateStrip> {
     setState(() {
       _shownMonth = DateTime(_shownMonth.year, _shownMonth.month - 1, 1);
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToShownMonth());
   }
 
   void _nextMonth() {
     setState(() {
       _shownMonth = DateTime(_shownMonth.year, _shownMonth.month + 1, 1);
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToShownMonth());
+  }
+
+  /// After month navigation the day range changes but the scroll offset
+  /// would otherwise stay at its old pixel position — leaving the newly
+  /// shown month's days off-screen. Scroll so the shown month is visible:
+  /// centered on the selected day when it falls inside the shown month,
+  /// otherwise aligned to the 1st of the shown month.
+  void _scrollToShownMonth() {
+    if (!_scroll.hasClients) return;
+    final selInShown = widget.selected.year == _shownMonth.year &&
+        widget.selected.month == _shownMonth.month;
+    if (selInShown) {
+      _centerSelected();
+      return;
+    }
+    final days = _days;
+    final idx = days.indexWhere((d) =>
+        d.year == _shownMonth.year && d.month == _shownMonth.month && d.day == 1);
+    if (idx < 0) return;
+    final offset = idx * (_pillWidth + _pillGap);
+    final clamped = offset.clamp(
+      _scroll.position.minScrollExtent,
+      _scroll.position.maxScrollExtent,
+    );
+    _scroll.animateTo(
+      clamped,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   void _centerSelected() {
@@ -110,21 +142,29 @@ class _WaveplanDateStripState extends State<WaveplanDateStrip> {
     );
   }
 
-  String _monthLabel(DateTime d) {
-    const months = [
+  String _monthLabel(DateTime d, bool de) {
+    const monthsDe = [
       'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
       'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
     ];
-    return '${months[d.month - 1]} ${d.year}';
+    const monthsEn = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ];
+    return '${(de ? monthsDe : monthsEn)[d.month - 1]} ${d.year}';
   }
 
-  String _weekdayShort(int w) {
-    const w0 = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-    return w0[(w - 1) % 7];
+  String _weekdayShort(int w, bool de) {
+    const wDe = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+    const wEn = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+    return (de ? wDe : wEn)[(w - 1) % 7];
   }
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    // Same breakpoint as the Waveplan pages (isMobile = width < 700).
+    final isDesktop = MediaQuery.of(context).size.width >= 700;
     final today = DateTime.now();
     final isOnToday = widget.selected.year == today.year &&
         widget.selected.month == today.month &&
@@ -146,12 +186,12 @@ class _WaveplanDateStripState extends State<WaveplanDateStrip> {
                 onPressed: _prevMonth,
                 icon: const Icon(Icons.chevron_left_rounded),
                 color: AppColors.codriverGraphite,
-                tooltip: 'Vorheriger Monat',
+                tooltip: de ? 'Vorheriger Monat' : 'Previous month',
               ),
               Expanded(
                 child: Center(
                   child: Text(
-                    _monthLabel(_shownMonth),
+                    _monthLabel(_shownMonth, de),
                     style: AppTypography.subheadline.copyWith(
                       color: AppColors.codriverGraphite,
                       fontWeight: FontWeight.w800,
@@ -163,7 +203,7 @@ class _WaveplanDateStripState extends State<WaveplanDateStrip> {
                 onPressed: _nextMonth,
                 icon: const Icon(Icons.chevron_right_rounded),
                 color: AppColors.codriverGraphite,
-                tooltip: 'Nächster Monat',
+                tooltip: de ? 'Nächster Monat' : 'Next month',
               ),
               if (!isOnToday)
                 Padding(
@@ -185,7 +225,7 @@ class _WaveplanDateStripState extends State<WaveplanDateStrip> {
                       shape: const StadiumBorder(),
                     ),
                     child: Text(
-                      'Heute',
+                      de ? 'Heute' : 'Today',
                       style: AppTypography.caption1.copyWith(
                         fontWeight: FontWeight.w800,
                         color: AppColors.codriverDeep,
@@ -197,32 +237,74 @@ class _WaveplanDateStripState extends State<WaveplanDateStrip> {
           ),
           const SizedBox(height: 4),
           SizedBox(
-            height: 70,
-            child: ListView.separated(
-              controller: _scroll,
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              itemCount: _days.length,
-              separatorBuilder: (_, __) => const SizedBox(width: _pillGap),
-              itemBuilder: (ctx, i) {
-                final d = _days[i];
-                final isSelected = d.year == widget.selected.year &&
-                    d.month == widget.selected.month &&
-                    d.day == widget.selected.day;
-                final isToday = d.year == today.year &&
-                    d.month == today.month &&
-                    d.day == today.day;
-                final inMonth = d.month == _shownMonth.month;
-                return _DayPill(
-                  width: _pillWidth,
-                  weekday: _weekdayShort(d.weekday),
-                  day: d.day,
-                  isSelected: isSelected,
-                  isToday: isToday,
-                  isMuted: !inMonth,
-                  onTap: () => widget.onSelect(d),
-                );
+            // Desktop reserves extra room below the pills for the
+            // always-visible scrollbar; the pills stay 70 high.
+            height: isDesktop ? 82 : 70,
+            // Translate vertical mouse-wheel movement into horizontal
+            // scrolling — otherwise the wheel does nothing on a
+            // horizontal list and the strip feels "not scrollable".
+            child: Listener(
+              onPointerSignal: (event) {
+                if (event is PointerScrollEvent && _scroll.hasClients) {
+                  final delta =
+                      event.scrollDelta.dx.abs() > event.scrollDelta.dy.abs()
+                          ? event.scrollDelta.dx
+                          : event.scrollDelta.dy;
+                  final target = (_scroll.offset + delta).clamp(
+                    _scroll.position.minScrollExtent,
+                    _scroll.position.maxScrollExtent,
+                  );
+                  _scroll.jumpTo(target);
+                }
               },
+              // Allow click-dragging the strip with a mouse on web/desktop
+              // (Flutter's default behavior only drags via touch).
+              child: ScrollConfiguration(
+                behavior: ScrollConfiguration.of(context).copyWith(
+                  scrollbars: false,
+                  dragDevices: {
+                    PointerDeviceKind.touch,
+                    PointerDeviceKind.mouse,
+                    PointerDeviceKind.stylus,
+                    PointerDeviceKind.trackpad,
+                  },
+                ),
+                child: Scrollbar(
+                  controller: _scroll,
+                  thumbVisibility: isDesktop,
+                  child: ListView.separated(
+                    controller: _scroll,
+                    scrollDirection: Axis.horizontal,
+                    padding: EdgeInsets.only(
+                      left: 8,
+                      right: 8,
+                      bottom: isDesktop ? 12 : 0,
+                    ),
+                    itemCount: _days.length,
+                    separatorBuilder: (_, __) =>
+                        const SizedBox(width: _pillGap),
+                    itemBuilder: (ctx, i) {
+                      final d = _days[i];
+                      final isSelected = d.year == widget.selected.year &&
+                          d.month == widget.selected.month &&
+                          d.day == widget.selected.day;
+                      final isToday = d.year == today.year &&
+                          d.month == today.month &&
+                          d.day == today.day;
+                      final inMonth = d.month == _shownMonth.month;
+                      return _DayPill(
+                        width: _pillWidth,
+                        weekday: _weekdayShort(d.weekday, de),
+                        day: d.day,
+                        isSelected: isSelected,
+                        isToday: isToday,
+                        isMuted: !inMonth,
+                        onTap: () => widget.onSelect(d),
+                      );
+                    },
+                  ),
+                ),
+              ),
             ),
           ),
         ],

@@ -386,6 +386,13 @@ class VacationBalance {
   double get totalRemaining =>
       pools.fold<double>(0, (acc, pool) => acc + pool.remaining);
 
+  /// Saldo MIT Vorzeichen (Ticket „Show negative PTO balance"): wird
+  /// negativ, wenn mehr Urlaub genommen als erworben wurde. Nur im
+  /// Legacy-Modus relevant — im Topf-Modus steckt Übernutzung bewusst in
+  /// [unallocatedDays] und der Topf-Saldo bleibt bei 0 stehen.
+  double get totalRemainingSigned =>
+      pooled ? totalRemaining : totalEntitlement - totalUsed;
+
   double get totalEntitlement =>
       pools.fold<double>(0, (acc, pool) => acc + pool.entitlement);
 

@@ -172,6 +172,22 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
   // Cmd/Ctrl+F fokussiert stattdessen das Suchfeld der Seite.
   final FocusNode _searchFocus = FocusNode();
 
+  /// Kundenticket „Monthly Plan“: Ein Fahrer, der mitten im angezeigten
+  /// Monat austritt (z. B. Austritt am 12.08.), bleibt bis zum Ende dieses
+  /// Monats in der Liste sichtbar — auch wenn er bereits deaktiviert wurde.
+  ///
+  /// Zählt bewusst nur Zeiträume mit **gesetztem** Austrittsdatum
+  /// (`!isOngoing`): Ein deaktivierter Fahrer mit noch offenem Zeitraum
+  /// würde sonst in jedem künftigen Monat dauerhaft auftauchen. Da ein
+  /// beendeter Zeitraum einen späteren Monat nie überlappt, erscheinen
+  /// längst ausgetretene Fahrer in Folgemonaten weiterhin nicht.
+  bool _employmentOverlapsMonth(Map<String, dynamic> driverData) {
+    for (final p in employmentPeriodsOf(driverData)) {
+      if (!p.isOngoing && p.overlapsMonth(_month)) return true;
+    }
+    return false;
+  }
+
   /// Ticket: Beschäftigungszeitraum unter dem Fahrernamen.
   ///
   /// Zeigt „17.06.26 – 30.07.26"; läuft der Vertrag noch, steht statt des
@@ -2188,8 +2204,13 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
                       .snapshots(),
                   builder: (context, driverSnap) {
                     final drivers = (driverSnap.data?.docs ?? const [])
+                        // Kundenticket: Austritt mitten im Monat → Fahrer
+                        // bleibt bis Monatsende sichtbar (Zeitraum
+                        // überlappt den angezeigten Monat).
                         .where((d) =>
-                            _showInactive || isDriverWorking(d.data()))
+                            _showInactive ||
+                            isDriverWorking(d.data()) ||
+                            _employmentOverlapsMonth(d.data()))
                         .where((d) {
                           if (_search.isEmpty) return true;
                           final data = d.data();

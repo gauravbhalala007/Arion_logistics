@@ -84,6 +84,8 @@ Future<void> showAddCalendarEventDialog(BuildContext context) async {
       'category': result.category,
       'location': result.location,
       'dispatcher': result.dispatcher,
+      // Backward compatible: only write the field when it has content.
+      if (result.description.isNotEmpty) 'description': result.description,
       'createdAt': FieldValue.serverTimestamp(),
     });
     if (!context.mounted) return;
@@ -215,6 +217,9 @@ class _AdminCalendarPageState extends State<AdminCalendarSection> {
             'category': result.category,
             'location': result.location,
             'dispatcher': result.dispatcher,
+            // Backward compatible: only write the field when it has content.
+            if (result.description.isNotEmpty)
+              'description': result.description,
             'createdAt': FieldValue.serverTimestamp(),
           });
       if (!mounted) return;
@@ -1238,6 +1243,17 @@ class _EventTile extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
+          if (event.description.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              event.description,
+              style: AppTypography.caption2.copyWith(
+                color: AppColors.labelSecondaryLight,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
           if (event.location.isNotEmpty) ...[
             const SizedBox(height: 2),
             Row(
@@ -1318,44 +1334,63 @@ class _CompactEventTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(9),
         border: Border(left: BorderSide(color: color, width: 3)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            tf.format(event.start),
-            style: AppTypography.caption1.copyWith(
-              color: color,
-              fontWeight: FontWeight.w800,
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
+          Row(
+            children: [
+              Text(
+                tf.format(event.start),
+                style: AppTypography.caption1.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w800,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  event.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.footnote.copyWith(
+                    color: AppColors.codriverGraphite,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              if (event.dispatcher.isNotEmpty) ...[
+                const SizedBox(width: 6),
+                const Icon(
+                  Icons.headset_mic_rounded,
+                  size: 11,
+                  color: AppColors.codriverDeep,
+                ),
+              ],
+              if (event.location.isNotEmpty) ...[
+                const SizedBox(width: 4),
+                const Icon(
+                  Icons.place_rounded,
+                  size: 11,
+                  color: AppColors.labelTertiaryLight,
+                ),
+              ],
+            ],
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              event.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: AppTypography.footnote.copyWith(
-                color: AppColors.codriverGraphite,
-                fontWeight: FontWeight.w700,
+          // Truncated description — one line, secondary color, so the
+          // dashboard tile stays compact. Full text lives in the detail.
+          if (event.description.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 1),
+              child: Text(
+                event.description,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.caption2.copyWith(
+                  color: AppColors.labelSecondaryLight,
+                ),
               ),
             ),
-          ),
-          if (event.dispatcher.isNotEmpty) ...[
-            const SizedBox(width: 6),
-            const Icon(
-              Icons.headset_mic_rounded,
-              size: 11,
-              color: AppColors.codriverDeep,
-            ),
-          ],
-          if (event.location.isNotEmpty) ...[
-            const SizedBox(width: 4),
-            const Icon(
-              Icons.place_rounded,
-              size: 11,
-              color: AppColors.labelTertiaryLight,
-            ),
-          ],
         ],
       ),
     );
@@ -1604,6 +1639,7 @@ Stream<List<_CalEvent>> _streamAllCalendarEvents() {
                   category: (d.data()['category'] ?? '').toString(),
                   location: (d.data()['location'] ?? '').toString(),
                   dispatcher: (d.data()['dispatcher'] ?? '').toString(),
+                  description: (d.data()['description'] ?? '').toString(),
                 ),
           ];
           emit();
@@ -1879,6 +1915,8 @@ Future<void> showCalendarEventDetail(
               detailRow(Icons.place_rounded, event.location),
             if (event.dispatcher.isNotEmpty)
               detailRow(Icons.headset_mic_rounded, event.dispatcher),
+            if (event.description.isNotEmpty)
+              detailRow(Icons.notes_rounded, event.description),
           ],
         ),
       ),
@@ -1985,6 +2023,10 @@ Future<void> editCalendarEvent(
       'category': result.category,
       'location': result.location,
       'dispatcher': result.dispatcher,
+      // Set when filled; remove the field when the admin cleared it.
+      'description': result.description.isEmpty
+          ? FieldValue.delete()
+          : result.description,
       'updatedAt': FieldValue.serverTimestamp(),
     });
     if (!context.mounted) return;
@@ -2022,6 +2064,7 @@ class _CalEvent {
   final String category;
   final String location;
   final String dispatcher; // pinned dispatcher name (optional)
+  final String description; // optional free-text notes (may be empty)
   const _CalEvent({
     required this.id,
     required this.start,
@@ -2030,6 +2073,7 @@ class _CalEvent {
     this.category = '',
     this.location = '',
     this.dispatcher = '',
+    this.description = '',
   }) : end = end ?? start;
 
   bool get isMultiDay =>
@@ -2151,6 +2195,7 @@ class _NewEventResult {
   final String category;
   final String location;
   final String dispatcher;
+  final String description;
   final DateTime start;
   final DateTime end;
   const _NewEventResult({
@@ -2158,6 +2203,7 @@ class _NewEventResult {
     required this.category,
     required this.location,
     required this.dispatcher,
+    required this.description,
     required this.start,
     required this.end,
   });
@@ -2178,6 +2224,7 @@ class _AddEventDialog extends StatefulWidget {
 class _AddEventDialogState extends State<_AddEventDialog> {
   final _titleCtrl = TextEditingController();
   final _locationCtrl = TextEditingController();
+  final _descriptionCtrl = TextEditingController();
   String _category = 'Meeting';
   String _dispatcher = '';
   late DateTime _start;
@@ -2224,6 +2271,7 @@ class _AddEventDialogState extends State<_AddEventDialog> {
     if (initial != null) {
       _titleCtrl.text = initial.title;
       _locationCtrl.text = initial.location;
+      _descriptionCtrl.text = initial.description;
       if (_categories.contains(initial.category)) {
         _category = initial.category;
       } else if (initial.category.isNotEmpty) {
@@ -2246,6 +2294,7 @@ class _AddEventDialogState extends State<_AddEventDialog> {
   void dispose() {
     _titleCtrl.dispose();
     _locationCtrl.dispose();
+    _descriptionCtrl.dispose();
     super.dispose();
   }
 
@@ -2278,6 +2327,30 @@ class _AddEventDialogState extends State<_AddEventDialog> {
     });
   }
 
+  /// Time-of-day picker for start ([start] = true) or end time. Keeps
+  /// the already-chosen date and only swaps hour/minute, mirroring how
+  /// _pickDate keeps the previously chosen time.
+  Future<void> _pickTime(bool start) async {
+    final base = start ? _start : _end;
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: base.hour, minute: base.minute),
+    );
+    if (picked == null) return;
+    setState(() {
+      if (start) {
+        _start = DateTime(
+          _start.year, _start.month, _start.day, picked.hour, picked.minute,
+        );
+        if (_multiDay && _end.isBefore(_start)) _end = _start;
+      } else {
+        _end = DateTime(
+          _end.year, _end.month, _end.day, picked.hour, picked.minute,
+        );
+      }
+    });
+  }
+
   bool get _valid => _titleCtrl.text.trim().isNotEmpty;
 
   void _submit() {
@@ -2288,6 +2361,7 @@ class _AddEventDialogState extends State<_AddEventDialog> {
         category: _category,
         location: _locationCtrl.text.trim(),
         dispatcher: _dispatcher,
+        description: _descriptionCtrl.text.trim(),
         start: _start,
         end: _multiDay ? _end : _start,
       ),
@@ -2296,7 +2370,9 @@ class _AddEventDialogState extends State<_AddEventDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
     final df = DateFormat('EEE, d. MMMM y', _localeForFormat(context));
+    final tfmt = DateFormat.Hm(_localeForFormat(context));
     return AlertDialog(
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.white,
@@ -2349,6 +2425,22 @@ class _AddEventDialogState extends State<_AddEventDialog> {
               ),
             ),
             const SizedBox(height: AppSpacing.md),
+            // Optional multi-line description / notes for the event.
+            TextField(
+              controller: _descriptionCtrl,
+              minLines: 2,
+              maxLines: 4,
+              decoration: InputDecoration(
+                labelText: de
+                    ? 'Beschreibung (optional)'
+                    : 'Description (optional)',
+                hintText: de
+                    ? 'z.B. Agenda, Ansprechpartner, Hinweise …'
+                    : 'e.g. agenda, contact person, notes …',
+                alignLabelWithHint: true,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
             // Dispatcher dropdown — streamed from Dispatcher-Pill page.
             StreamBuilder<List<String>>(
               stream: _dispatcherStream(),
@@ -2394,11 +2486,13 @@ class _AddEventDialogState extends State<_AddEventDialog> {
               ],
             ),
             const SizedBox(height: AppSpacing.sm),
-            // Start date
+            // Start date + time
             _DateRow(
               label: _multiDay ? 'Von' : 'Datum',
               value: df.format(_start),
               onPick: () => _pickDate(true),
+              timeValue: tfmt.format(_start),
+              onPickTime: () => _pickTime(true),
             ),
             if (_multiDay) ...[
               const SizedBox(height: AppSpacing.xs),
@@ -2406,6 +2500,8 @@ class _AddEventDialogState extends State<_AddEventDialog> {
                 label: 'Bis',
                 value: df.format(_end),
                 onPick: () => _pickDate(false),
+                timeValue: tfmt.format(_end),
+                onPickTime: () => _pickTime(false),
               ),
             ],
           ],
@@ -2737,10 +2833,16 @@ class _DateRow extends StatelessWidget {
   final String label;
   final String value;
   final VoidCallback onPick;
+  /// Optional time chip ("09:00") rendered next to the date — taps
+  /// open a time picker via [onPickTime]. Both must be set together.
+  final String? timeValue;
+  final VoidCallback? onPickTime;
   const _DateRow({
     required this.label,
     required this.value,
     required this.onPick,
+    this.timeValue,
+    this.onPickTime,
   });
 
   @override
@@ -2778,11 +2880,15 @@ class _DateRow extends StatelessWidget {
                     color: AppColors.codriverDeep,
                   ),
                   const SizedBox(width: 8),
-                  Text(
-                    value,
-                    style: AppTypography.subheadline.copyWith(
-                      color: AppColors.codriverGraphite,
-                      fontWeight: FontWeight.w600,
+                  Flexible(
+                    child: Text(
+                      value,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.subheadline.copyWith(
+                        color: AppColors.codriverGraphite,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
@@ -2790,6 +2896,42 @@ class _DateRow extends StatelessWidget {
             ),
           ),
         ),
+        if (timeValue != null && onPickTime != null) ...[
+          const SizedBox(width: AppSpacing.xs),
+          CoPressable(
+            onTap: onPickTime,
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.sm,
+                vertical: 10,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceLight,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.access_time_rounded,
+                    size: 14,
+                    color: AppColors.codriverDeep,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    timeValue!,
+                    style: AppTypography.subheadline.copyWith(
+                      color: AppColors.codriverGraphite,
+                      fontWeight: FontWeight.w600,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }

@@ -397,6 +397,238 @@ class _FeedbackPageState extends State<FeedbackPage> {
     }
   }
 
+  /// Creator-only: edit an own, not-yet-done ticket. Opens a dialog with
+  /// the same layout as the "new ticket" form (title, description,
+  /// priority) prefilled. Attachments are intentionally not editable.
+  Future<void> _editFeedback({
+    required String feedbackId,
+    required Map<String, dynamic> data,
+  }) async {
+    final titleCtrl = TextEditingController(
+      text: (data['title'] ?? data['subject'] ?? '').toString().trim(),
+    );
+    final descCtrl = TextEditingController(
+      text: (data['description'] ?? data['message'] ?? '').toString().trim(),
+    );
+    var priority = (data['priority'] ?? 'medium')
+        .toString()
+        .trim()
+        .toLowerCase();
+    if (priority != 'low' && priority != 'medium' && priority != 'high') {
+      priority = 'medium';
+    }
+    var saving = false;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          Future<void> save() async {
+            if (saving) return;
+            final title = titleCtrl.text.trim();
+            final desc = descCtrl.text.trim();
+            if (desc.isEmpty) {
+              ScaffoldMessenger.of(ctx).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    _t(
+                      'Please describe the problem or suggestion.',
+                      'Bitte beschreibe das Problem oder den Vorschlag.',
+                    ),
+                  ),
+                ),
+              );
+              return;
+            }
+            setDialogState(() => saving = true);
+            try {
+              await FirebaseFirestore.instance
+                  .collection('feedback')
+                  .doc(feedbackId)
+                  .update({
+                'title': title,
+                'description': desc,
+                'priority': priority,
+                'updatedAt': FieldValue.serverTimestamp(),
+              });
+              if (ctx.mounted) Navigator.of(ctx).pop();
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    _t('Ticket updated.', 'Ticket aktualisiert.'),
+                  ),
+                ),
+              );
+            } catch (e) {
+              if (!ctx.mounted) return;
+              setDialogState(() => saving = false);
+              ScaffoldMessenger.of(ctx).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    _t(
+                      'Could not update ticket: $e',
+                      'Ticket konnte nicht aktualisiert werden: $e',
+                    ),
+                  ),
+                ),
+              );
+            }
+          }
+
+          return Dialog(
+            backgroundColor: Colors.white,
+            insetPadding: const EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(22),
+            ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(22),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.edit_outlined,
+                          color: _kPrimary,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _t('Edit ticket', 'Ticket bearbeiten'),
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: _kTitle,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: _t('Close', 'Schließen'),
+                          onPressed: saving
+                              ? null
+                              : () => Navigator.of(ctx).pop(),
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: titleCtrl,
+                      enabled: !saving,
+                      decoration: _inputDeco(
+                        label: _t('Title', 'Titel'),
+                        hint: _t(
+                          'Short description...',
+                          'Kurze Beschreibung des Anliegens...',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: descCtrl,
+                      enabled: !saving,
+                      minLines: 6,
+                      maxLines: 10,
+                      decoration: _inputDeco(
+                        label: _t('Description', 'Beschreibung'),
+                        hint: _t(
+                          'Describe the problem or suggestion in detail...',
+                          'Beschreibe das Problem oder den Vorschlag im Detail...',
+                        ),
+                        alignLabelWithHint: true,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Text(
+                      _t('Priority', 'Priorität'),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: _kTitle,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        _PriorityButton(
+                          label: _t('Low', 'Low'),
+                          selected: priority == 'low',
+                          kind: _PriorityKind.low,
+                          onTap: saving
+                              ? null
+                              : () =>
+                                    setDialogState(() => priority = 'low'),
+                        ),
+                        _PriorityButton(
+                          label: _t('Medium', 'Medium'),
+                          selected: priority == 'medium',
+                          kind: _PriorityKind.medium,
+                          onTap: saving
+                              ? null
+                              : () =>
+                                    setDialogState(() => priority = 'medium'),
+                        ),
+                        _PriorityButton(
+                          label: _t('High', 'High'),
+                          selected: priority == 'high',
+                          kind: _PriorityKind.high,
+                          onTap: saving
+                              ? null
+                              : () =>
+                                    setDialogState(() => priority = 'high'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      _t(
+                        'Attachments cannot be changed here.',
+                        'Anhänge können hier nicht geändert werden.',
+                      ),
+                      style: const TextStyle(
+                        color: _kSub,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12.5,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        CoButton(
+                          onPressed: saving
+                              ? null
+                              : () => Navigator.of(ctx).pop(),
+                          label: _t('Cancel', 'Abbrechen'),
+                          variant: CoButtonVariant.quiet,
+                        ),
+                        const SizedBox(width: 8),
+                        CoButton(
+                          onPressed: saving ? null : save,
+                          label: _t('Save', 'Speichern'),
+                          busy: saving,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Future<void> _markResolved({
     required String feedbackId,
     required bool resolved,
@@ -1289,6 +1521,11 @@ class _FeedbackPageState extends State<FeedbackPage> {
                                             .trim();
                                     final canDelete =
                                         isDeveloper || createdByUid == uid;
+                                    // Creator may edit own tickets as long
+                                    // as they are not "done" yet.
+                                    final canEdit =
+                                        createdByUid == uid &&
+                                        status != 'done';
 
                                     return Container(
                                       margin: const EdgeInsets.only(bottom: 10),
@@ -1339,6 +1576,13 @@ class _FeedbackPageState extends State<FeedbackPage> {
                                                   ),
                                                 ),
                                                 onSelected: (v) {
+                                                  if (v == 'edit' &&
+                                                      canEdit) {
+                                                    _editFeedback(
+                                                      feedbackId: d.id,
+                                                      data: data,
+                                                    );
+                                                  }
                                                   if (v == 'resolve' &&
                                                       isStaff) {
                                                     _markResolved(
@@ -1373,6 +1617,30 @@ class _FeedbackPageState extends State<FeedbackPage> {
                                                   }
                                                 },
                                                 itemBuilder: (_) => [
+                                                  if (canEdit)
+                                                    PopupMenuItem<String>(
+                                                      value: 'edit',
+                                                      child: Row(
+                                                        mainAxisSize:
+                                                            MainAxisSize.min,
+                                                        children: [
+                                                          const Icon(
+                                                            Icons.edit_outlined,
+                                                            size: 18,
+                                                            color: _kPrimary,
+                                                          ),
+                                                          const SizedBox(
+                                                              width: 8),
+                                                          Text(
+                                                            _t(
+                                                              'Edit ticket',
+                                                              'Ticket '
+                                                              'bearbeiten',
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
                                                   if (isSuperadmin &&
                                                       status != 'done')
                                                     PopupMenuItem<String>(

@@ -508,6 +508,16 @@ service cloud.firestore {
 
       // Only developers can update/delete feedback.
       allow update, delete: if isFeedbackStaff() && isApproved(request.auth.uid);
+
+      // Ticket „edit ticket": Ersteller dürfen ihre eigenen, noch nicht
+      // erledigten Tickets nachbearbeiten — nur Titel/Beschreibung/
+      // Priorität, Status & Anhänge bleiben unantastbar.
+      allow update: if signedIn()
+        && resource.data.createdByUid == request.auth.uid
+        && resource.data.status != 'done'
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['title', 'description', 'priority', 'updatedAt'])
+        && request.resource.data.priority in ['low', 'medium', 'high'];
     }
 
     // ---------- App-Updates / Changelog (global) ----------
