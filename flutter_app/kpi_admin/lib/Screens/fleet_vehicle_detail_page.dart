@@ -326,6 +326,16 @@ class _FleetEvent {
       fileUrl.trim().isNotEmpty ||
       checkPath.trim().isNotEmpty;
 
+  /// Datum tolerant lesen: reguläre Events tragen einen [Timestamp],
+  /// importierte/ältere Datensätze teils einen ISO-String. Ein falsch
+  /// getypter Wert darf nie das ganze Panel abstürzen lassen.
+  static DateTime? _dateFrom(dynamic raw) {
+    if (raw is Timestamp) return raw.toDate();
+    if (raw is DateTime) return raw;
+    if (raw is String) return DateTime.tryParse(raw.trim());
+    return null;
+  }
+
   static Map<String, String> _accidentFrom(Map<String, dynamic> source) {
     final result = <String, String>{};
     for (final field in kFleetAccidentFields) {
@@ -343,7 +353,7 @@ class _FleetEvent {
       type: _FleetEventTypeX.fromWire((data['type'] ?? '').toString()),
       title: (data['title'] ?? '').toString().trim(),
       subtitle: (data['subtitle'] ?? '').toString().trim(),
-      date: (data['date'] as Timestamp?)?.toDate(),
+      date: _dateFrom(data['date']),
       km: rawKm is num ? rawKm.toInt() : int.tryParse('${rawKm ?? ''}'.trim()),
       legacy: false,
       accident: _accidentFrom(data),
@@ -2853,7 +2863,7 @@ class _FleetVehicleDetailPageState extends State<FleetVehicleDetailPage> {
                   if ('${raw['driverName'] ?? ''}'.trim().isNotEmpty)
                     '${raw['driverName']}',
                 ].join(' · '),
-                date: (raw['at'] as Timestamp?)?.toDate(),
+                date: _FleetEvent._dateFrom(raw['at']),
                 km: km is num ? km.toInt() : null,
                 legacy: false,
                 checkPath: '${raw['path'] ?? ''}'.trim(),
