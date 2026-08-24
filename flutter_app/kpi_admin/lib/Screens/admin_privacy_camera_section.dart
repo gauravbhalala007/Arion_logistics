@@ -32,6 +32,7 @@ import '../data/privacy_camera/privacy_camera_content.dart';
 import '../data/privacy_camera/privacy_camera_repository.dart';
 import '../data/privacy_camera/privacy_camera_texts.dart';
 import '../widgets/academy_visibility_toggle.dart';
+import '../widgets/clearable_search_field.dart';
 
 const Color _kText = Color(0xFF111827);
 const Color _kSub = Color(0xFF4B5563);
@@ -124,12 +125,21 @@ class _AdminPrivacyCameraSectionState extends State<AdminPrivacyCameraSection> {
   Future<_SectionData>? _future;
   String _query = '';
 
+  /// Owned so the search field's clear button can wipe the visible text.
+  final TextEditingController _searchCtrl = TextEditingController();
+
   String get _lang => widget.de ? 'de' : 'en';
 
   @override
   void initState() {
     super.initState();
     _future = _load();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
   }
 
   @override
@@ -367,10 +377,20 @@ class _AdminPrivacyCameraSectionState extends State<AdminPrivacyCameraSection> {
         ),
         const SizedBox(height: 12),
         TextField(
+          controller: _searchCtrl,
           onChanged: (v) => setState(() => _query = v.trim()),
           decoration: InputDecoration(
             isDense: true,
             prefixIcon: const Icon(Icons.search_rounded, size: 19),
+            suffixIcon: buildSearchClearButton(
+              context: context,
+              value: _query,
+              onClear: () {
+                _searchCtrl.clear();
+                setState(() => _query = '');
+              },
+            ),
+            suffixIconConstraints: kSearchClearConstraints,
             hintText: privacyCameraText(_lang, 'admin_search'),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(11)),
           ),

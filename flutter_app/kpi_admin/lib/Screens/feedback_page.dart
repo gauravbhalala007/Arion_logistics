@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
+import '../widgets/clearable_search_field.dart';
 import '../widgets/co_button.dart';
 import '../widgets/co_pressable.dart';
 import '../widgets/web_preview.dart'
@@ -1852,11 +1853,24 @@ class _DevFiltersCard extends StatelessWidget {
             children: [
               Expanded(
                 flex: isNarrow ? 0 : 2,
-                child: TextField(
+                child: ValueListenableBuilder<TextEditingValue>(
+                  // Stateless card: the controller decides when the clear
+                  // button appears.
+                  valueListenable: searchCtrl,
+                  builder: (context, value, _) => TextField(
                   controller: searchCtrl,
                   onChanged: onSearchChanged,
                   decoration: InputDecoration(
                     prefixIcon: const Icon(Icons.search_rounded),
+                    suffixIcon: buildSearchClearButton(
+                      context: context,
+                      value: value.text,
+                      onClear: () {
+                        searchCtrl.clear();
+                        onSearchChanged('');
+                      },
+                    ),
+                    suffixIconConstraints: kSearchClearConstraints,
                     hintText: t(
                       'Search title, text, email...',
                       'Suche Titel, Text, E-Mail...',
@@ -1872,6 +1886,7 @@ class _DevFiltersCard extends StatelessWidget {
                       vertical: 12,
                     ),
                   ),
+                ),
                 ),
               ),
               if (!isNarrow)

@@ -26,6 +26,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../localization/app_localizations.dart';
+import '../widgets/clearable_search_field.dart';
 import 'concessions_week.dart' show kEurPerDnr;
 
 final _intFmt = NumberFormat.decimalPattern('de');
@@ -254,6 +255,15 @@ class _ConcessionsDashboardPageState extends State<ConcessionsDashboardPage> {
                             decoration: InputDecoration(
                               hintText: t.t('concessions_search_hint'),
                               prefixIcon: const Icon(Icons.search),
+                              suffixIcon: buildSearchClearButton(
+                                context: context,
+                                value: _q,
+                                onClear: () {
+                                  _searchCtrl.clear();
+                                  setState(() => _q = '');
+                                },
+                              ),
+                              suffixIconConstraints: kSearchClearConstraints,
                               filled: true,
                               fillColor: Colors.white,
                               contentPadding: const EdgeInsets.symmetric(

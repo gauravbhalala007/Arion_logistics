@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../services/incident_photos.dart';
 import '../services/incident_reports.dart';
 import '../utils/driver_activity.dart';
+import '../widgets/clearable_search_field.dart';
 import '../widgets/co_button.dart';
 import '../widgets/incident_photo_gallery.dart';
 
@@ -1806,19 +1807,33 @@ class _PickerScaffold extends StatelessWidget {
                 style: const TextStyle(fontSize: 12, color: kIncidentMuted),
               ),
               const SizedBox(height: 16),
-              TextField(
-                controller: searchController,
-                autofocus: true,
-                style: const TextStyle(fontSize: 14, color: kIncidentText),
-                decoration: incidentInputDecoration(
-                  hintText: searchHint,
-                  prefixIcon: const Icon(
-                    Icons.search_rounded,
-                    size: 18,
-                    color: kIncidentMuted,
-                  ),
+              ValueListenableBuilder<TextEditingValue>(
+                // Stateless scaffold: the controller tells us when the
+                // clear button has to appear.
+                valueListenable: searchController,
+                builder: (context, value, _) => TextField(
+                  controller: searchController,
+                  autofocus: true,
+                  style: const TextStyle(fontSize: 14, color: kIncidentText),
+                  decoration: incidentInputDecoration(
+                    hintText: searchHint,
+                    prefixIcon: const Icon(
+                      Icons.search_rounded,
+                      size: 18,
+                      color: kIncidentMuted,
+                    ),
+                    suffixIcon: buildSearchClearButton(
+                      context: context,
+                      value: value.text,
+                      color: kIncidentMuted,
+                      onClear: () {
+                        searchController.clear();
+                        onQueryChanged('');
+                      },
+                    ),
+                  ).copyWith(suffixIconConstraints: kSearchClearConstraints),
+                  onChanged: onQueryChanged,
                 ),
-                onChanged: onQueryChanged,
               ),
               if (filterToggle != null) filterToggle!,
               const SizedBox(height: 12),

@@ -6,8 +6,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../Screens/owner_insights_page.dart';
 import '../services/admin_expiry_aggregator.dart';
+import '../services/admin_notifications_service.dart';
 import '../services/auth_service.dart';
-import '../services/da_request_badge.dart';
+import 'admin_scope.dart';
 import '../localization/app_localizations.dart';
 import '../utils/inventory_l10n.dart';
 
@@ -82,36 +83,12 @@ class AppSideMenu extends StatelessWidget {
   });
 
   /// Counts the current user's OWN feedback entries that flipped to
-  /// `done` after they last opened the feedback page. Restricted to
-  /// `createdByUid == self` so the Firestore rule
-  /// (`signedIn() && resource.data.createdByUid == request.auth.uid`)
-  /// permits the read for any approved user, not only developer-staff.
-  Stream<int> _feedbackDoneBadgeStream() {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return Stream.value(0);
-    return FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .snapshots()
-        .asyncExpand((userSnap) async* {
-      final lastSeen = (userSnap.data()?['feedbackLastSeenAt']
-                  as Timestamp?)
-              ?.toDate() ??
-          DateTime.fromMillisecondsSinceEpoch(0);
-      yield* FirebaseFirestore.instance
-          .collection('feedback')
-          .where('createdByUid', isEqualTo: uid)
-          .where('status', isEqualTo: 'done')
-          .snapshots()
-          .map((snap) {
-        return snap.docs.where((d) {
-          final ts = d.data()['doneAt'];
-          if (ts is! Timestamp) return false;
-          return ts.toDate().isAfter(lastSeen);
-        }).length;
-      });
-    });
-  }
+  /// `done` after they last opened the feedback page.
+  ///
+  /// Die Logik liegt in [AdminNotificationsService], damit Menue-Badge
+  /// und Glocken-Panel garantiert dieselbe Zahl zeigen.
+  Stream<int> _feedbackDoneBadgeStream() =>
+      AdminNotificationsService.watchResolvedFeedback();
 
   void _handleNav(BuildContext context, AppNav nav, String routeName) {
     // If AdminShellPage is controlling selection -> no navigation push.
@@ -342,7 +319,9 @@ class AppSideMenu extends StatelessWidget {
         onTap: () => _handleNav(context, AppNav.shiftAbsence, '/shift-absence'),
       ),
       StreamBuilder<int>(
-        stream: DaRequestBadge.watchForContext(context),
+        stream: AdminNotificationsService.watchOpenDaRequests(
+          AdminScope.adminUidOf(context),
+        ),
         builder: (context, snap) => _MenuItem(
           icon: Icons.request_page_outlined,
           label: 'DA Requests',

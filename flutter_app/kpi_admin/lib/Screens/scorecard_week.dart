@@ -23,6 +23,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_elevation.dart';
 import '../theme/app_typography.dart';
 import '../widgets/admin_scope.dart';
+import '../widgets/clearable_search_field.dart';
 import '../widgets/co_button.dart';
 import '../widgets/co_pressable.dart';
 import '../widgets/driver_performance_sections.dart';
@@ -113,6 +114,12 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
   final ScrollController _listScroll = ScrollController();
 
   String _query = '';
+
+  /// Needed so the search field's clear button can wipe the visible text —
+  /// the split and single-column layouts share this one controller because
+  /// only one of them is mounted at a time.
+  final TextEditingController _searchCtrl = TextEditingController();
+
   String _bucket = 'ALL';
 
   bool get _de => Localizations.localeOf(context).languageCode == 'de';
@@ -183,6 +190,7 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
   void dispose() {
     _leftScroll.dispose();
     _listScroll.dispose();
+    _searchCtrl.dispose();
     super.dispose();
   }
 
@@ -974,6 +982,7 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
     final search = SizedBox(
       height: 44,
       child: TextField(
+        controller: _searchCtrl,
         style: AppTypography.subheadline.copyWith(
           color: AppColors.codriverGraphite,
           fontWeight: FontWeight.w500,
@@ -987,6 +996,15 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
             color: AppColors.labelSecondaryLight,
             size: 20,
           ),
+          suffixIcon: buildSearchClearButton(
+            context: context,
+            value: _query,
+            onClear: () {
+              _searchCtrl.clear();
+              setState(() => _query = '');
+            },
+          ),
+          suffixIconConstraints: kSearchClearConstraints,
           hintText: t.t('dash_search_name_or_id'),
           hintStyle: AppTypography.subheadline.copyWith(
             color: AppColors.labelTertiaryLight,

@@ -32,6 +32,7 @@ import '../widgets/vacation_pool_lines.dart';
 import '../widgets/app_side_menu.dart';
 import '../widgets/admin_scope.dart';
 import '../widgets/driver_reviews_card.dart';
+import '../widgets/clearable_search_field.dart';
 import '../widgets/incident_count_chip.dart';
 import '../widgets/web_preview.dart'
     if (dart.library.html) '../widgets/web_preview_web.dart';
@@ -142,6 +143,10 @@ class _DriversHubPageState extends State<DriversHubPage> {
 
   String _search = '';
 
+  /// Owned so the clear button (and the CSV import reset) can wipe the visible
+  /// text, not just [_search].
+  final TextEditingController _searchCtrl = TextEditingController();
+
   // Ticket "CTRL+F": Cmd/Ctrl+F fokussiert das Suchfeld der Seite
   // (Browser-Suche greift in Flutter-Web nicht).
   final FocusNode _searchFocus = FocusNode();
@@ -213,6 +218,7 @@ class _DriversHubPageState extends State<DriversHubPage> {
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_onGlobalKey);
+    _searchCtrl.dispose();
     _searchFocus.dispose();
     _defaultPwdSaveDebounce?.cancel();
     unawaited(_persistDefaultDriverPassword());
@@ -1695,6 +1701,7 @@ class _DriversHubPageState extends State<DriversHubPage> {
       );
 
       if (mounted) {
+        _searchCtrl.clear();
         setState(() {
           _search = '';
           _driverSort = _DriverSort.idAsc;
@@ -6882,6 +6889,7 @@ class _DriversHubPageState extends State<DriversHubPage> {
     final searchField = SizedBox(
       height: isNarrowControls ? 48 : 44,
       child: TextField(
+        controller: _searchCtrl,
         focusNode: _searchFocus,
         style: const TextStyle(
           fontFamily: 'Inter',
@@ -6895,6 +6903,16 @@ class _DriversHubPageState extends State<DriversHubPage> {
             color: Color(0xFF9CA3AF),
             size: 20,
           ),
+          suffixIcon: buildSearchClearButton(
+            context: context,
+            value: _search,
+            focusNode: _searchFocus,
+            onClear: () {
+              _searchCtrl.clear();
+              setState(() => _search = '');
+            },
+          ),
+          suffixIconConstraints: kSearchClearConstraints,
           hintText: t.t('drivers_hub_search_name_or_email'),
           hintStyle: const TextStyle(
             fontFamily: 'Inter',

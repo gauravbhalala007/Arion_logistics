@@ -33,6 +33,7 @@ import '../theme/app_elevation.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import '../utils/driver_activity.dart';
+import '../widgets/clearable_search_field.dart';
 import '../widgets/co_button.dart';
 import '../widgets/co_pressable.dart';
 import '../widgets/waveplan_date_strip.dart';
@@ -176,6 +177,11 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
 
   /// Query of the driver search bar above the route list.
   String _driverSearch = '';
+
+  /// The field used to be uncontrolled, so the clear button could only reset
+  /// [_driverSearch] while the typed text stayed on screen. Owning a
+  /// controller lets the X wipe both.
+  final TextEditingController _driverSearchCtrl = TextEditingController();
 
   // Ticket "CTRL+F": Cmd/Ctrl+F fokussiert die Fahrer-Suchleiste
   // (Browser-Suche greift in Flutter-Web nicht).
@@ -558,6 +564,7 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_onGlobalKey);
+    _driverSearchCtrl.dispose();
     _driverSearchFocus.dispose();
     _publishedSub?.cancel();
     _shiftPlanSub?.cancel();
@@ -1345,6 +1352,7 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
                       // 44px on phones so the field is an easy touch target.
                       height: isMobile ? 44 : 40,
                       child: TextField(
+                        controller: _driverSearchCtrl,
                         focusNode: _driverSearchFocus,
                         onChanged: (v) =>
                             setState(() => _driverSearch = v),
@@ -1359,16 +1367,16 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
                             color: Color(0xFF9CA3AF),
                             size: 19,
                           ),
-                          suffixIcon: _driverSearch.isEmpty
-                              ? null
-                              : IconButton(
-                                  icon: const Icon(Icons.close_rounded,
-                                      size: 16,
-                                      color: Color(0xFF9CA3AF)),
-                                  splashRadius: 14,
-                                  onPressed: () => setState(
-                                      () => _driverSearch = ''),
-                                ),
+                          suffixIcon: buildSearchClearButton(
+                            context: context,
+                            value: _driverSearch,
+                            focusNode: _driverSearchFocus,
+                            onClear: () {
+                              _driverSearchCtrl.clear();
+                              setState(() => _driverSearch = '');
+                            },
+                          ),
+                          suffixIconConstraints: kSearchClearConstraints,
                           hintText: Localizations.localeOf(context)
                                       .languageCode ==
                                   'de'
@@ -6728,6 +6736,15 @@ class _AddMenteeDialogState extends State<_AddMenteeDialog> {
                   hintText:
                       de ? 'Name oder TID suchen…' : 'Search name or TID…',
                   prefixIcon: const Icon(Icons.search, size: 20),
+                  suffixIcon: buildSearchClearButton(
+                    context: context,
+                    value: _query,
+                    onClear: () {
+                      _q.clear();
+                      setState(() => _query = '');
+                    },
+                  ),
+                  suffixIconConstraints: kSearchClearConstraints,
                   filled: true,
                   fillColor: const Color(0xFFF9FAFB),
                   isDense: true,
@@ -7606,6 +7623,15 @@ class _WaveplanDriverPickerDialogState
                   hintText:
                       de ? 'Name oder TID suchen…' : 'Search name or TID…',
                   prefixIcon: const Icon(Icons.search, size: 20),
+                  suffixIcon: buildSearchClearButton(
+                    context: context,
+                    value: _query,
+                    onClear: () {
+                      _q.clear();
+                      setState(() => _query = '');
+                    },
+                  ),
+                  suffixIconConstraints: kSearchClearConstraints,
                   filled: true,
                   fillColor: const Color(0xFFF9FAFB),
                   isDense: true,

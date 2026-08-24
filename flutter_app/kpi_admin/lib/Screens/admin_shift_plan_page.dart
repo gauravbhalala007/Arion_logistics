@@ -16,6 +16,7 @@ import '../utils/xlsx_loader.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../widgets/admin_scope.dart';
+import '../widgets/clearable_search_field.dart';
 import '../widgets/co_button.dart';
 import '../widgets/co_pressable.dart';
 import '../widgets/dispatcher_bar.dart';
@@ -4369,6 +4370,15 @@ class _MenteePickerDialogState extends State<_MenteePickerDialog> {
                 decoration: InputDecoration(
                   hintText: 'Search name or TID…',
                   prefixIcon: const Icon(Icons.search, size: 20),
+                  suffixIcon: buildSearchClearButton(
+                    context: context,
+                    value: _query,
+                    onClear: () {
+                      _q.clear();
+                      setState(() => _query = '');
+                    },
+                  ),
+                  suffixIconConstraints: kSearchClearConstraints,
                   filled: true,
                   fillColor: _AdminShiftPlanPageState._kSoft,
                   isDense: true,

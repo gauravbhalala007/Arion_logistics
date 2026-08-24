@@ -27,6 +27,7 @@ import '../services/recruiting_slug_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../utils/cyrillic_translit.dart';
+import '../widgets/clearable_search_field.dart';
 import '../widgets/co_button.dart';
 import '../widgets/pill_tab_bar.dart';
 import 'add_driver_dialog.dart';
@@ -235,6 +236,8 @@ class _ChannelTabState extends State<_ChannelTab> {
   RecruitingStatus? _filter;
   // Free-text search over name / email / phone.
   String _search = '';
+  // Owned so the clear button can wipe the visible text, not just [_search].
+  final TextEditingController _searchCtrl = TextEditingController();
   // Non-EU only: when true, show just "Arbeitgeberwechsel" applicants.
   bool _employerChangeOnly = false;
 
@@ -243,6 +246,12 @@ class _ChannelTabState extends State<_ChannelTab> {
   /// so we do it here — once per mounted tab, and only if the repository
   /// actually finds something new (the call is idempotent).
   bool _agenciesSynced = false;
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
 
   void _maybeSyncAgencies(List<RecruitingApplication> apps) {
     final sync = widget.onSyncAgencies;
@@ -418,11 +427,21 @@ class _ChannelTabState extends State<_ChannelTab> {
       children: [
         // Search bar — find an applicant by name, email or phone.
         TextField(
+          controller: _searchCtrl,
           onChanged: (v) => setState(() => _search = v.trim().toLowerCase()),
           decoration: InputDecoration(
             isDense: true,
             prefixIcon: const Icon(Icons.search_rounded,
                 size: 20, color: Color(0xFF9CA3AF)),
+            suffixIcon: buildSearchClearButton(
+              context: context,
+              value: _search,
+              onClear: () {
+                _searchCtrl.clear();
+                setState(() => _search = '');
+              },
+            ),
+            suffixIconConstraints: kSearchClearConstraints,
             hintText: de
                 ? 'Bewerber suchen (Name, E-Mail, Telefon) …'
                 : 'Search applicants (name, email, phone) …',

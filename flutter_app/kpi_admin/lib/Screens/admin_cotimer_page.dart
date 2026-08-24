@@ -34,6 +34,7 @@ import '../widgets/pill_tab_bar.dart';
 import '../theme/app_elevation.dart';
 import '../theme/app_typography.dart';
 import '../widgets/admin_scope.dart';
+import '../widgets/clearable_search_field.dart';
 import 'admin_cotimer_employment_dialog.dart';
 import '../widgets/web_preview.dart'
     if (dart.library.html) '../widgets/web_preview_web.dart';
@@ -3858,7 +3859,11 @@ class _FenceEditorDialogState extends State<_FenceEditorDialog> {
               Row(
                 children: [
                   Expanded(
-                    child: TextField(
+                    child: ValueListenableBuilder<TextEditingValue>(
+                      // The field has no onChanged of its own — the
+                      // controller decides when the clear button shows.
+                      valueListenable: _addressCtrl,
+                      builder: (context, value, _) => TextField(
                       controller: _addressCtrl,
                       textInputAction: TextInputAction.search,
                       onSubmitted: (_) => _searchAddress(),
@@ -3869,6 +3874,12 @@ class _FenceEditorDialogState extends State<_FenceEditorDialog> {
                           color: Color(0xFF6B7280),
                           size: 20,
                         ),
+                        suffixIcon: buildSearchClearButton(
+                          context: context,
+                          value: value.text,
+                          onClear: _addressCtrl.clear,
+                        ),
+                        suffixIconConstraints: kSearchClearConstraints,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: const BorderSide(
@@ -3893,6 +3904,7 @@ class _FenceEditorDialogState extends State<_FenceEditorDialog> {
                         ),
                         isDense: true,
                       ),
+                    ),
                     ),
                   ),
                   const SizedBox(width: 8),

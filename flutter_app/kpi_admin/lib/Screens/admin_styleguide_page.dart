@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
+import '../widgets/clearable_search_field.dart';
 import '../widgets/co_button.dart';
 
 class AdminStyleguidePage extends StatefulWidget {
@@ -1930,14 +1931,33 @@ class _PreviewInputLabeled extends StatelessWidget {
   }
 }
 
-class _PreviewInputSearch extends StatelessWidget {
+class _PreviewInputSearch extends StatefulWidget {
   const _PreviewInputSearch();
+
+  @override
+  State<_PreviewInputSearch> createState() => _PreviewInputSearchState();
+}
+
+class _PreviewInputSearchState extends State<_PreviewInputSearch> {
+  /// Stateful only so the preview can demo the shared clear button — every
+  /// search field in the app shows an X once the input is non-empty.
+  final TextEditingController _ctrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final de = Localizations.localeOf(context).languageCode == 'de';
     return SizedBox(
         width: 280,
-        child: TextField(
+        child: ValueListenableBuilder<TextEditingValue>(
+          valueListenable: _ctrl,
+          builder: (context, value, _) => TextField(
+          controller: _ctrl,
           decoration: _styleguideInputDecoration(
             hint: de ? 'Suche nach Artikel…' : 'Search items…',
             prefixIcon: const Padding(
@@ -1949,6 +1969,12 @@ class _PreviewInputSearch extends StatelessWidget {
               ),
             ),
           ).copyWith(
+            suffixIcon: buildSearchClearButton(
+              context: context,
+              value: value.text,
+              onClear: _ctrl.clear,
+            ),
+            suffixIconConstraints: kSearchClearConstraints,
             border: const OutlineInputBorder(
               borderRadius: BorderRadius.all(Radius.circular(999)),
               borderSide: BorderSide(color: Colors.transparent),
@@ -1965,6 +1991,7 @@ class _PreviewInputSearch extends StatelessWidget {
               ),
             ),
           ),
+        ),
         ),
       );
   }

@@ -13,6 +13,7 @@ import '../models/employment_period.dart';
 import '../services/vacation_pools_repository.dart';
 import '../utils/driver_activity.dart';
 import '../utils/vacation_pools.dart';
+import '../widgets/clearable_search_field.dart';
 import '../widgets/vacation_pool_lines.dart';
 import '../widgets/web_preview.dart'
     if (dart.library.html) '../widgets/web_preview_web.dart';
@@ -4304,7 +4305,11 @@ class _AbsenceSearchField extends StatefulWidget {
 class _AbsenceSearchFieldState extends State<_AbsenceSearchField> {
   @override
   Widget build(BuildContext context) {
-    return TextField(
+    // One shared field feeds the page, the "all requests" popup and the time
+    // accounts view — the controller decides when the clear button shows.
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: widget.controller,
+      builder: (context, value, _) => TextField(
       controller: widget.controller,
       focusNode: widget.focusNode,
       onChanged: widget.onChanged,
@@ -4313,6 +4318,16 @@ class _AbsenceSearchFieldState extends State<_AbsenceSearchField> {
             ? 'Nach Fahrername, ID oder Grund suchen'
             : 'Search by driver name, ID, or reason',
         prefixIcon: const Icon(Icons.search_rounded),
+        suffixIcon: buildSearchClearButton(
+          context: context,
+          value: value.text,
+          focusNode: widget.focusNode,
+          onClear: () {
+            widget.controller.clear();
+            widget.onChanged('');
+          },
+        ),
+        suffixIconConstraints: kSearchClearConstraints,
         filled: true,
         fillColor: Colors.white,
         border: OutlineInputBorder(
@@ -4333,6 +4348,7 @@ class _AbsenceSearchFieldState extends State<_AbsenceSearchField> {
             color: _AdminShiftAbsencePageState._kBorder,
           ),
         ),
+      ),
       ),
     );
   }

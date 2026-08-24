@@ -19,6 +19,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../utils/inventory_l10n.dart';
 import '../widgets/admin_scope.dart';
+import '../widgets/clearable_search_field.dart';
 import '../widgets/inventory_shared.dart';
 
 class AdminInventoryPage extends StatefulWidget {
@@ -364,7 +365,11 @@ class _Header extends StatelessWidget {
           const SizedBox(height: 16),
           SizedBox(
             height: 44,
-            child: TextField(
+            child: ValueListenableBuilder<TextEditingValue>(
+              // Stateless header: the controller itself tells us whether the
+              // clear button has to be shown.
+              valueListenable: searchCtrl,
+              builder: (context, value, _) => TextField(
               controller: searchCtrl,
               onChanged: onSearchChanged,
               textInputAction: TextInputAction.search,
@@ -375,6 +380,15 @@ class _Header extends StatelessWidget {
                   color: AppColors.labelHintLight,
                 ),
                 prefixIcon: const Icon(Icons.search, size: 20),
+                suffixIcon: buildSearchClearButton(
+                  context: context,
+                  value: value.text,
+                  onClear: () {
+                    searchCtrl.clear();
+                    onSearchChanged('');
+                  },
+                ),
+                suffixIconConstraints: kSearchClearConstraints,
                 filled: true,
                 fillColor: InvTokens.softSurface,
                 isDense: true,
@@ -396,6 +410,7 @@ class _Header extends StatelessWidget {
                   ),
                 ),
               ),
+            ),
             ),
           ),
         ],

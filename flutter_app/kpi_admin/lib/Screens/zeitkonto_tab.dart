@@ -27,6 +27,7 @@ import '../services/time_account_repository.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_elevation.dart';
 import '../theme/app_typography.dart';
+import '../widgets/clearable_search_field.dart';
 
 // ── Zeit-Helfer (H:MM ↔ Minuten, wie im ARION-Zeitkonto-Beispiel) ──
 
@@ -258,6 +259,9 @@ class ZeitkontoTab extends StatefulWidget {
 class _ZeitkontoTabState extends State<ZeitkontoTab> {
   String _search = '';
 
+  /// Owned so the search field's clear button can wipe the visible text.
+  final TextEditingController _searchCtrl = TextEditingController();
+
   // Ticket "CTRL+F": Cmd/Ctrl+F fokussiert das Suchfeld der Seite
   // (Browser-Suche greift in Flutter-Web nicht).
   final FocusNode _searchFocus = FocusNode();
@@ -284,6 +288,7 @@ class _ZeitkontoTabState extends State<ZeitkontoTab> {
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_onGlobalKey);
+    _searchCtrl.dispose();
     _searchFocus.dispose();
     super.dispose();
   }
@@ -1154,6 +1159,7 @@ class _ZeitkontoTabState extends State<ZeitkontoTab> {
     return SizedBox(
       height: 44,
       child: TextField(
+        controller: _searchCtrl,
         focusNode: _searchFocus,
         onChanged: (v) =>
             setState(() => _search = v.trim().toLowerCase()),
@@ -1168,6 +1174,16 @@ class _ZeitkontoTabState extends State<ZeitkontoTab> {
             color: Color(0xFF9CA3AF),
             size: 20,
           ),
+          suffixIcon: buildSearchClearButton(
+            context: context,
+            value: _search,
+            focusNode: _searchFocus,
+            onClear: () {
+              _searchCtrl.clear();
+              setState(() => _search = '');
+            },
+          ),
+          suffixIconConstraints: kSearchClearConstraints,
           hintText: de ? 'Fahrer suchen …' : 'Search drivers …',
           hintStyle: const TextStyle(
             fontSize: 14,

@@ -27,6 +27,7 @@ import '../services/shift_plan_parser.dart';
 import '../utils/driver_activity.dart';
 import '../utils/vacation_days.dart';
 import '../widgets/admin_scope.dart';
+import '../widgets/clearable_search_field.dart';
 
 /// Standard-Spesensatz in € pro qualifizierendem Tag. Über die
 /// Einstellungen (`users/{uid}/settings/monthly_plan.spesenRate`) frei
@@ -158,6 +159,9 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
 
   // ── Ticket: search + sort controls for the driver rows ──
   String _search = '';
+
+  /// Owned so the field's clear button can wipe the visible text as well.
+  final TextEditingController _searchCtrl = TextEditingController();
 
   /// Ticket: inaktive Fahrer einblenden, um alte Monate nachzuerfassen.
   bool _showInactive = false;
@@ -674,6 +678,7 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_onGlobalKey);
+    _searchCtrl.dispose();
     _searchFocus.dispose();
     _hHeader.dispose();
     _hBody.dispose();
@@ -2505,6 +2510,7 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
   /// 280×38-Box, die schmale Ansicht über die volle Breite.
   Widget _searchField() {
     return TextField(
+      controller: _searchCtrl,
       focusNode: _searchFocus,
       style: const TextStyle(
         fontSize: 13,
@@ -2517,6 +2523,18 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
           color: Color(0xFF9CA3AF),
           size: 18,
         ),
+        suffixIcon: buildSearchClearButton(
+          context: context,
+          value: _search,
+          focusNode: _searchFocus,
+          iconSize: 16,
+          onClear: () {
+            _searchCtrl.clear();
+            setState(() => _search = '');
+          },
+        ),
+        // The desktop box is only 38px tall — keep the X height-neutral.
+        suffixIconConstraints: kSearchClearConstraintsCompact,
         hintText: _tr('Name, TID oder Personalnr. suchen…',
             'Search name, TID or employee ID…'),
         hintStyle: const TextStyle(

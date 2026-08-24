@@ -7,7 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../localization/app_localizations.dart';
-import '../services/da_request_badge.dart';
+import '../services/admin_notifications_service.dart';
+import '../widgets/admin_notifications_panel.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../widgets/admin_scope.dart';
@@ -204,9 +205,10 @@ class _AdminShellPageState extends State<AdminShellPage> {
                           showAdminQuickNotes(context, uid: authUser.uid),
                     ),
                     const SizedBox(width: 12),
-                    // Glocke mit rotem Zaehler: offene DA Requests.
+                    // Glocke mit rotem Zaehler: Summe aller offenen
+                    // Meldungen. Klick oeffnet das Bottom-Sheet-Panel.
                     StreamBuilder<int>(
-                      stream: DaRequestBadge.watchForContext(context),
+                      stream: AdminNotificationsService.watchTotal(context),
                       builder: (context, snap) {
                         final open = snap.data ?? 0;
                         return _HeaderIconAction(
@@ -215,11 +217,14 @@ class _AdminShellPageState extends State<AdminShellPage> {
                           tooltip: open > 0
                               ? _tr(
                                   context,
-                                  'Offene DA Requests: $open',
-                                  'Open DA requests: $open',
+                                  'Meldungen: $open',
+                                  'Notifications: $open',
                                 )
-                              : _tr(context, 'DA Requests', 'DA requests'),
-                          onTap: () => _openNav(AppNav.daRequests),
+                              : _tr(context, 'Meldungen', 'Notifications'),
+                          onTap: () => showAdminNotificationsSheet(
+                            context: context,
+                            onNavigate: _openNav,
+                          ),
                         );
                       },
                     ),
@@ -315,7 +320,7 @@ class _AdminShellPageState extends State<AdminShellPage> {
                           _materialized.add(AppNav.appUpdates);
                         });
                       },
-                      onOpenDaRequests: () => _openNav(AppNav.daRequests),
+                      onOpenNav: _openNav,
                     ),
                   _TrialCountdownBanner(profile: data),
                   Expanded(

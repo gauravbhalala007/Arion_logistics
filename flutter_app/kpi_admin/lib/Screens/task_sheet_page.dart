@@ -8,6 +8,7 @@ import '../localization/app_localizations.dart';
 import '../models/task_sheet_task.dart';
 import '../theme/app_colors.dart';
 import '../utils/driver_activity.dart';
+import '../widgets/clearable_search_field.dart';
 import '../widgets/co_button.dart';
 import '../widgets/co_pressable.dart';
 import '../widgets/operative_tasks_card.dart';
@@ -57,6 +58,10 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
   String? _selectedTransporterId;
   String? _selectedDriverName;
   String _driverQuery = '';
+
+  /// Owned so both the clear button and the programmatic resets below can
+  /// wipe the visible text, not just [_driverQuery].
+  final TextEditingController _driverQueryCtrl = TextEditingController();
   _TaskComposerKind _taskKind = _TaskComposerKind.standard;
   bool _showOperative = false;
 
@@ -84,6 +89,7 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
   void dispose() {
     _titleCtrl.dispose();
     _descCtrl.dispose();
+    _driverQueryCtrl.dispose();
     _composerScrollCtrl.dispose();
     for (final controller in _feedbackOptionCtrls) {
       controller.dispose();
@@ -344,6 +350,7 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
       for (final controller in _feedbackOptionCtrls) {
         controller.clear();
       }
+      _driverQueryCtrl.clear();
       _driverQuery = '';
       _taskKind = _TaskComposerKind.standard;
     } catch (e) {
@@ -888,6 +895,7 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
                             _assignToEveryone = true;
                             _selectedTransporterId = null;
                             _selectedDriverName = null;
+                            _driverQueryCtrl.clear();
                             _driverQuery = '';
                           });
                         },
@@ -973,9 +981,19 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           TextField(
+                            controller: _driverQueryCtrl,
                             decoration: InputDecoration(
                               hintText: l10n.t('task_sheet_search_driver_hint'),
                               prefixIcon: const Icon(Icons.search),
+                              suffixIcon: buildSearchClearButton(
+                                context: context,
+                                value: _driverQuery,
+                                onClear: () {
+                                  _driverQueryCtrl.clear();
+                                  setState(() => _driverQuery = '');
+                                },
+                              ),
+                              suffixIconConstraints: kSearchClearConstraints,
                               filled: true,
                               fillColor: const Color(0xFFF6F7F9),
                               border: OutlineInputBorder(

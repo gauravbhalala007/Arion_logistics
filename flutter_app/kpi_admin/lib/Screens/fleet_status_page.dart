@@ -17,6 +17,7 @@ import '../services/fleet_vehicle_document_service.dart';
 import '../services/fleet_vehicle_repository.dart';
 import '../services/cortex_vehicle_importer.dart';
 import '../theme/app_colors.dart';
+import '../widgets/clearable_search_field.dart';
 import '../widgets/co_button.dart';
 import '../widgets/license_plate.dart';
 import '../widgets/mobile_filter_controls.dart';
@@ -2450,6 +2451,19 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
             minWidth: isMobile ? 46 : 38,
             minHeight: isMobile ? 48 : 38,
           ),
+          suffixIcon: buildSearchClearButton(
+            context: context,
+            value: _search,
+            iconSize: isMobile ? 18 : 16,
+            onClear: () {
+              _searchCtrl.clear();
+              setState(() => _search = '');
+            },
+          ),
+          // Desktop pill is only 38px tall — keep the X height-neutral there.
+          suffixIconConstraints: isMobile
+              ? kSearchClearConstraints
+              : kSearchClearConstraintsCompact,
           isDense: true,
           contentPadding: const EdgeInsets.fromLTRB(0, 0, 16, 0),
           filled: true,

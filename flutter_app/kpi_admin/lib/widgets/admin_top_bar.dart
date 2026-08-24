@@ -12,7 +12,9 @@ import 'package:flutter/services.dart';
 import '../localization/app_localizations.dart';
 import '../models/app_update.dart';
 import '../services/app_updates_service.dart';
-import '../services/da_request_badge.dart';
+import '../services/admin_notifications_service.dart';
+import '../widgets/admin_notifications_panel.dart';
+import '../widgets/app_side_menu.dart' show AppNav;
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 
@@ -23,7 +25,7 @@ class AdminTopBar extends StatelessWidget {
     required this.profile,
     required this.onOpenProfile,
     required this.onOpenUpdates,
-    required this.onOpenDaRequests,
+    required this.onOpenNav,
   });
 
   /// The admin's own uid (quick notes + station live on this user doc).
@@ -38,8 +40,9 @@ class AdminTopBar extends StatelessWidget {
   /// Navigates to the updates page inside the shell.
   final VoidCallback onOpenUpdates;
 
-  /// Navigates to the DA-Requests page inside the shell (bell icon).
-  final VoidCallback onOpenDaRequests;
+  /// Wechselt den Shell-Tab — genutzt vom Benachrichtigungs-Panel hinter
+  /// der Glocke, das je nach Meldung auf verschiedene Seiten springt.
+  final ValueChanged<AppNav> onOpenNav;
 
   DocumentReference<Map<String, dynamic>> get _userRef =>
       FirebaseFirestore.instance.collection('users').doc(uid);
@@ -301,23 +304,27 @@ class AdminTopBar extends StatelessWidget {
             },
           ),
           const SizedBox(width: 8),
-          // Glocke mit rotem Zaehler: offene DA Requests der Fahrer.
+          // Glocke mit rotem Zaehler: Summe aller offenen Meldungen.
+          // Klick oeffnet das Panel direkt unter dem Icon.
           StreamBuilder<int>(
-            stream: DaRequestBadge.watchForContext(context),
+            stream: AdminNotificationsService.watchTotal(context),
             builder: (context, snap) {
               final open = snap.data ?? 0;
               final de =
                   Localizations.localeOf(context).languageCode == 'de';
-              return _BarIcon(
-                tooltip: open > 0
-                    ? (de
-                        ? 'Offene DA Requests: $open'
-                        : 'Open DA requests: $open')
-                    : (de ? 'DA Requests' : 'DA requests'),
-                icon: Icons.notifications_outlined,
-                badgeCount: open,
-                badgeColor: AppColors.error,
-                onTap: onOpenDaRequests,
+              return Builder(
+                builder: (iconContext) => _BarIcon(
+                  tooltip: open > 0
+                      ? (de ? 'Meldungen: $open' : 'Notifications: $open')
+                      : (de ? 'Meldungen' : 'Notifications'),
+                  icon: Icons.notifications_outlined,
+                  badgeCount: open,
+                  badgeColor: AppColors.error,
+                  onTap: () => showAdminNotificationsMenu(
+                    anchorContext: iconContext,
+                    onNavigate: onOpenNav,
+                  ),
+                ),
               );
             },
           ),
