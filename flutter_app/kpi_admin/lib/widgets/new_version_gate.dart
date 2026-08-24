@@ -52,7 +52,7 @@ class _NewVersionGateState extends State<NewVersionGate> {
     try {
       // Cache-Buster zusätzlich zum no-cache-Header — doppelt hält besser.
       final uri = Uri.parse(
-        '/version.json?ts=${DateTime.now().millisecondsSinceEpoch}',
+        '/build_version.json?ts=${DateTime.now().millisecondsSinceEpoch}',
       );
       final res = await http.get(uri).timeout(const Duration(seconds: 10));
       if (res.statusCode != 200) return null;
