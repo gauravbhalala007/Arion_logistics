@@ -75,116 +75,36 @@ class FleetVehicleDocumentRepository {
         );
   }
 
+  /// Alle Fahrzeug-Dokumente eines Scopes als EINE CollectionGroup-Query.
+  ///
+  /// Ersetzt den früheren Fan-out (ein Abo pro Fahrzeug, 60+ Listener):
+  /// der staute sich hinter den übrigen Live-Abos der App und ließ die
+  /// TÜV-/Fahrzeugschein-Chips teils dauerhaft im Ladezustand hängen.
+  /// Voraussetzungen: CollectionGroup-Index (dspUid, isDeleted) und die
+  /// CollectionGroup-Lese-Regel in firestore.rules. Der erste Snapshot
+  /// ist vollständig — Konsumenten dürfen `hasData` als „fertig geladen"
+  /// werten. Dokumente gelöschter Fahrzeuge sind enthalten; Konsumenten
+  /// mappen per Kennzeichen und ignorieren sie dadurch.
   Stream<List<FleetVehicleDocument>> watchScopeDocuments({
     required String dspUid,
   }) {
-    late final StreamController<List<FleetVehicleDocument>> controller;
-    StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? vehiclesSubscription;
-    final documentSubscriptions =
-        <String, StreamSubscription<List<FleetVehicleDocument>>>{};
-    final documentsByPlate = <String, List<FleetVehicleDocument>>{};
-    // Erst emittieren, wenn jedes abonnierte Fahrzeug einmal geliefert hat
-    // (Fehler zählen als geliefert) — sonst halten Konsumenten den leeren
-    // Zwischenstand für „keine Dokumente vorhanden" und zeigen z. B. in der
-    // Fleet-Liste kurz überall „TÜV fehlt".
-    final deliveredPlates = <String>{};
-    var vehiclesReady = false;
-
-    bool ready() =>
-        vehiclesReady && deliveredPlates.containsAll(documentSubscriptions.keys);
-
-    void emit() {
-      if (!ready()) return;
-      final items = documentsByPlate.values
-          .expand((docs) => docs)
-          .toList()
-        ..sort((a, b) {
-          final aDate = a.updatedAt ?? a.createdAt;
-          final bDate = b.updatedAt ?? b.createdAt;
-          if (aDate == null && bDate == null) return 0;
-          if (aDate == null) return 1;
-          if (bDate == null) return -1;
-          return bDate.compareTo(aDate);
+    return _firestore
+        .collectionGroup('documents')
+        .where('dspUid', isEqualTo: dspUid)
+        .where('isDeleted', isEqualTo: false)
+        .snapshots()
+        .map((snapshot) {
+          final items = snapshot.docs.map(FleetVehicleDocument.fromDoc).toList()
+            ..sort((a, b) {
+              final aDate = a.updatedAt ?? a.createdAt;
+              final bDate = b.updatedAt ?? b.createdAt;
+              if (aDate == null && bDate == null) return 0;
+              if (aDate == null) return 1;
+              if (bDate == null) return -1;
+              return bDate.compareTo(aDate);
+            });
+          return items;
         });
-      if (!controller.isClosed) {
-        controller.add(items);
-      }
-    }
-
-    Future<void> syncVehicleSubscriptions(
-      QuerySnapshot<Map<String, dynamic>> snapshot,
-    ) async {
-      final activePlates = snapshot.docs
-          .map((doc) => normalizePlateNumber(doc.id))
-          .toSet();
-
-      final removedPlates = documentSubscriptions.keys
-          .where((plate) => !activePlates.contains(plate))
-          .toList();
-      for (final plate in removedPlates) {
-        await documentSubscriptions.remove(plate)?.cancel();
-        documentsByPlate.remove(plate);
-        deliveredPlates.remove(plate);
-      }
-
-      for (final plate in activePlates) {
-        if (documentSubscriptions.containsKey(plate)) continue;
-        documentSubscriptions[plate] = watchDocuments(
-          dspUid: dspUid,
-          plateNumber: plate,
-        ).listen(
-          (docs) {
-            deliveredPlates.add(plate);
-            documentsByPlate[plate] = docs;
-            emit();
-          },
-          onError: (Object error, StackTrace stackTrace) {
-            // Als „geliefert" werten, damit ein einzelnes defektes Abo den
-            // Gesamtstream nicht dauerhaft blockiert.
-            deliveredPlates.add(plate);
-            documentsByPlate[plate] = const <FleetVehicleDocument>[];
-            if (!controller.isClosed) {
-              controller.addError(error, stackTrace);
-            }
-            emit();
-          },
-        );
-      }
-
-      vehiclesReady = true;
-      emit();
-    }
-
-    controller = StreamController<List<FleetVehicleDocument>>(
-      onListen: () {
-        vehiclesSubscription = _firestore
-            .collection('users')
-            .doc(dspUid)
-            .collection('vehicles')
-            .where('isDeleted', isEqualTo: false)
-            .snapshots()
-            .listen(
-              (snapshot) {
-                unawaited(syncVehicleSubscriptions(snapshot));
-              },
-              onError: (Object error, StackTrace stackTrace) {
-                if (!controller.isClosed) {
-                  controller.addError(error, stackTrace);
-                }
-              },
-            );
-      },
-      onCancel: () async {
-        await vehiclesSubscription?.cancel();
-        for (final subscription in documentSubscriptions.values) {
-          await subscription.cancel();
-        }
-        documentSubscriptions.clear();
-        documentsByPlate.clear();
-      },
-    );
-
-    return controller.stream;
   }
 
   Future<FleetVehicleDocument?> getDocument({

@@ -573,6 +573,17 @@ service cloud.firestore {
         && resource.data.adminUid == request.auth.uid;
     }
 
+    // ---------- Fleet-Hub Dokumente CollectionGroup ----------
+    // Die Fleet-Liste lädt TÜV-/Fahrzeugschein-Status über EINE
+    // CollectionGroup-Query (where dspUid == scope, isDeleted == false)
+    // statt eines Abos pro Fahrzeug. Gleiche Berechtigung wie die
+    // nested Rule unter /users/{userId}/vehicles/{plate}/documents.
+    // Fahrer-Dokumente (users/.../drivers/.../documents) tragen kein
+    // dspUid-Feld und können diese Query nie matchen.
+    match /{path=**}/documents/{documentId} {
+      allow read: if isVehicleDocumentManager(resource.data.dspUid);
+    }
+
     match /users/{userId} {
 
     	// ---------- admin notifications ----------
