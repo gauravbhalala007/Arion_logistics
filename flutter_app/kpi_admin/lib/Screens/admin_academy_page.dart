@@ -509,6 +509,7 @@ class _AdminAcademyPageState extends State<AdminAcademyPage> {
                   // Registry steht.
                   extraTrainings: 1,
                   extraFullyDone: data.cameraOpen == 0 ? 1 : 0,
+                  cameraOpen: data.cameraOpen,
                 ),
                 const SizedBox(height: 14),
                 for (final s in stats)
@@ -621,6 +622,11 @@ class _OverviewCard extends StatelessWidget {
   final int extraTrainings;
   final int extraFullyDone;
 
+  /// Offene Kenntnisnahmen des Kameramoduls. `null` = Modul ausblenden.
+  /// Ohne diese Zeile fehlte das Modul im Balkendiagramm, obwohl es in
+  /// den Kacheln oben schon mitgezählt wurde.
+  final int? cameraOpen;
+
   const _OverviewCard({
     required this.de,
     required this.narrow,
@@ -628,6 +634,7 @@ class _OverviewCard extends StatelessWidget {
     required this.stats,
     this.extraTrainings = 0,
     this.extraFullyDone = 0,
+    this.cameraOpen,
   });
 
   @override
@@ -687,6 +694,21 @@ class _OverviewCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: _MiniProgressRow(de: de, narrow: narrow, stats: s),
+            ),
+          if (cameraOpen != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _MiniProgressRow(
+                de: de,
+                narrow: narrow,
+                icon: Icons.photo_camera_outlined,
+                accent: const Color(0xFF7C3AED),
+                title: de
+                    ? 'Kameras im Fahrzeug'
+                    : 'Cameras in the vehicle',
+                doneCount: activeDrivers - cameraOpen!,
+                totalCount: activeDrivers,
+              ),
             ),
           if (activeDrivers == 0)
             Text(
@@ -750,26 +772,45 @@ class _StatTile extends StatelessWidget {
 class _MiniProgressRow extends StatelessWidget {
   final bool de;
   final bool narrow;
-  final _TrainingStats stats;
+
+  /// Registry-Schulung. Für Module außerhalb der Registry (Kamera-
+  /// Datenschutz) stattdessen [icon], [accent], [title] und die Zähler
+  /// direkt übergeben.
+  final _TrainingStats? stats;
+  final IconData? icon;
+  final Color? accent;
+  final String? title;
+  final int? doneCount;
+  final int? totalCount;
 
   const _MiniProgressRow({
     required this.de,
     required this.narrow,
-    required this.stats,
+    this.stats,
+    this.icon,
+    this.accent,
+    this.title,
+    this.doneCount,
+    this.totalCount,
   });
 
   @override
   Widget build(BuildContext context) {
-    final t = stats.training;
-    final counter = '${stats.doneCount}/${stats.totalCount}';
+    final rowIcon = stats?.training.icon ?? icon ?? Icons.school_outlined;
+    final rowAccent = stats?.training.accent ?? accent ?? _kGreen;
+    final rowTitle = stats?.training.title(de) ?? title ?? '';
+    final done = stats?.doneCount ?? doneCount ?? 0;
+    final total = stats?.totalCount ?? totalCount ?? 0;
+    final ratio = stats?.ratio ?? (total == 0 ? 0.0 : done / total);
+    final counter = '$done/$total';
 
     final label = Row(
       children: [
-        Icon(t.icon, size: 16, color: t.accent),
+        Icon(rowIcon, size: 16, color: rowAccent),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
-            t.title(de),
+            rowTitle,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
@@ -782,7 +823,7 @@ class _MiniProgressRow extends StatelessWidget {
       ],
     );
 
-    final bar = _ProgressBar(ratio: stats.ratio, color: t.accent);
+    final bar = _ProgressBar(ratio: ratio, color: rowAccent);
 
     final value = Text(
       counter,
