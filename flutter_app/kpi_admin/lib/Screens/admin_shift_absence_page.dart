@@ -87,6 +87,11 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
   /// Mechanik wie beim Kranktage-Ranking oben).
   bool _historyExpanded = false;
 
+  /// Ticket „TIME & ABSENCE - HISTORY": Sortierung der Historie.
+  /// Vorbelegung = bisheriges Verhalten (Erfassungs-/Prüfzeitpunkt,
+  /// neueste zuerst).
+  _HistorySort _historySort = _HistorySort.addedAt;
+
   void _refreshRanking() {
     if (widget.requestType != 'sick_leave') return;
     if (_scopeUid == null) return;
@@ -155,6 +160,13 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
     required String requestId,
     required String driverId,
     required String status,
+    /// Ticket „TIME & ABSENCE - HISTORY": Pflicht-Begründung beim
+    /// Ablehnen — wird am Antrag gespeichert und dem Fahrer in der
+    /// Benachrichtigung mitgeschickt.
+    String rejectionReason = '',
+    /// Antragsdaten für die Fahrer-Benachrichtigung (Zeitraum + Art).
+    /// `null` = keine Benachrichtigung schreiben.
+    _AbsenceAdminItem? notifySource,
   }) async {
     final scope = _scopeUid;
     if (scope == null) {
@@ -184,6 +196,7 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
       // UNANGETASTET — sonst ginge verloren, wer den Antrag ursprünglich
       // genehmigt hat. Die Stornierung bekommt eigene Felder.
       final isCancel = status == 'cancelled';
+      final reason = rejectionReason.trim();
       final payload = <String, dynamic>{
         'status': status,
         if (isCancel) ...{
@@ -193,12 +206,30 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
           'reviewedBy': _uid,
           'reviewedAt': FieldValue.serverTimestamp(),
         },
+        // Der Grund gehört nur an eine Ablehnung. Wird ein Antrag später
+        // doch genehmigt, verschwindet die alte Begründung wieder.
+        if (status == 'rejected' && reason.isNotEmpty)
+          'rejectionReason': reason
+        else if (status == 'approved')
+          'rejectionReason': FieldValue.delete(),
         'updatedAt': FieldValue.serverTimestamp(),
       };
       final batch = db.batch();
       batch.set(rootRef, payload, SetOptions(merge: true));
       batch.set(driverRef, payload, SetOptions(merge: true));
       await batch.commit();
+
+      // Fahrer über die Entscheidung informieren — bewusst NACH dem
+      // Commit und in einem eigenen try/catch: schlägt allein die
+      // Benachrichtigung fehl, ist der Statuswechsel trotzdem gültig.
+      if (notifySource != null && (status == 'approved' || status == 'rejected')) {
+        await _notifyDriverAboutDecision(
+          scope: scope,
+          item: notifySource,
+          status: status,
+          rejectionReason: reason,
+        );
+      }
 
       _showSnack(
         status == 'approved'
@@ -221,6 +252,228 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
             : 'Failed to update request: $e',
         error: true,
       );
+    }
+  }
+
+  /// Ticket „TIME & ABSENCE - HISTORY": Fahrer über die Entscheidung
+  /// informieren.
+  ///
+  /// Schreibt EINEN neuen Eintrag in
+  /// `users/{dspUid}/drivers/{TID}/notifications` — exakt im Bestands-
+  /// format der Fahrer-Benachrichtigungen (siehe `notifications_page`
+  /// und `models/driver_notification.dart`): `type`/`title`/`body`/
+  /// `sourceLang`/`translations`/`status`/`readAt`/`confirmedAt`/
+  /// `requiresConfirmation`/`createdAt`.
+  ///
+  ///  * `type: 'message'` — die Fahrer-App filtert danach („Nachrichten"),
+  ///    `rule` ist den bestätigungspflichtigen Regeln vorbehalten.
+  ///  * `requiresConfirmation: false` — wie bei jeder Nachricht, die
+  ///    keine Unterschrift verlangt (`notifications_page` setzt das Flag
+  ///    ebenfalls nur für `rule`).
+  ///  * `translations` mit `de` + `en`; die Fahrer-App zieht daraus die
+  ///    Fassung ihrer eigenen Sprache und fällt sonst auf `title`/`body`
+  ///    in der Sprache des Admins zurück.
+  ///
+  /// Bewusst immer ein NEUES Dokument (`doc()` ohne ID): die Rules
+  /// erlauben dem DSP an dieser Stelle nur `create`, kein `update`.
+  Future<void> _notifyDriverAboutDecision({
+    required String scope,
+    required _AbsenceAdminItem item,
+    required String status,
+    required String rejectionReason,
+  }) async {
+    if (item.driverId.isEmpty) return;
+    final approved = status == 'approved';
+    final reason = rejectionReason.trim();
+
+    String bodyFor(bool de) {
+      final range = '${item.fromDateText} – ${item.toDateText}';
+      final head = de
+          ? '${item.typeLabel(true)}: $range (${item.daysLabel(true)})'
+          : '${item.typeLabel(false)}: $range (${item.daysLabel(false)})';
+      if (approved) {
+        return de
+            ? '$head wurde genehmigt.'
+            : '$head has been approved.';
+      }
+      final rejected = de
+          ? '$head wurde abgelehnt.'
+          : '$head has been rejected.';
+      if (reason.isEmpty) return rejected;
+      return de
+          ? '$rejected\n\nGrund: $reason'
+          : '$rejected\n\nReason: $reason';
+    }
+
+    String titleFor(bool de) {
+      if (approved) {
+        return de
+            ? 'Abwesenheitsantrag genehmigt'
+            : 'Absence request approved';
+      }
+      return de
+          ? 'Abwesenheitsantrag abgelehnt'
+          : 'Absence request rejected';
+    }
+
+    try {
+      final sourceLang = _de ? 'de' : 'en';
+      final ref = FirebaseFirestore.instance
+          .collection('users')
+          .doc(scope)
+          .collection('drivers')
+          .doc(item.driverId.toUpperCase())
+          .collection('notifications')
+          .doc();
+      final now = FieldValue.serverTimestamp();
+      await ref.set({
+        'notificationId': ref.id,
+        'type': 'message',
+        'title': titleFor(_de),
+        'body': bodyFor(_de),
+        'sourceLang': sourceLang,
+        'translations': <String, dynamic>{
+          'de': {'title': titleFor(true), 'body': bodyFor(true)},
+          'en': {'title': titleFor(false), 'body': bodyFor(false)},
+        },
+        'status': 'unread',
+        'readAt': null,
+        'confirmedAt': null,
+        'requiresConfirmation': false,
+        'createdAt': now,
+        'updatedAt': now,
+      });
+    } catch (e) {
+      // Der Statuswechsel ist bereits gespeichert — hier nur informieren,
+      // damit der Admin den Fahrer notfalls anders erreicht.
+      _showSnack(
+        _de
+            ? 'Status gespeichert, aber die Benachrichtigung an den Fahrer '
+                'konnte nicht zugestellt werden: $e'
+            : 'Status saved, but the driver notification could not be '
+                'delivered: $e',
+        error: true,
+      );
+    }
+  }
+
+  /// Ablehnen mit Pflicht-Begründung (Ticket „TIME & ABSENCE -
+  /// HISTORY"). Der Text landet am Antrag (`rejectionReason`) und in der
+  /// Benachrichtigung an den Fahrer.
+  Future<void> _confirmRejectAbsence(_AbsenceAdminItem item) async {
+    final de = _de;
+    final controller = TextEditingController();
+    try {
+      final reason = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) {
+          String? error;
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              void submit() {
+                final value = controller.text.trim();
+                if (value.isEmpty) {
+                  setDialogState(() {
+                    error = de
+                        ? 'Bitte einen Grund angeben.'
+                        : 'Please provide a reason.';
+                  });
+                  return;
+                }
+                Navigator.of(dialogContext).pop(value);
+              }
+
+              return AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                title: Text(
+                  de ? 'Antrag ablehnen?' : 'Reject request?',
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+                content: SizedBox(
+                  width: 420,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${item.driverName} · ${item.typeLabel(de)}\n'
+                        '${item.fromDateText} – ${item.toDateText} · '
+                        '${item.daysLabel(de)}',
+                        style: const TextStyle(
+                          color: _kText,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: controller,
+                        autofocus: true,
+                        minLines: 3,
+                        maxLines: 5,
+                        maxLength: 500,
+                        textInputAction: TextInputAction.newline,
+                        onChanged: (_) {
+                          if (error == null) return;
+                          setDialogState(() => error = null);
+                        },
+                        decoration: InputDecoration(
+                          labelText: de
+                              ? 'Grund der Ablehnung'
+                              : 'Reason for rejection',
+                          hintText: de
+                              ? 'Wird dem Fahrer mitgeteilt.'
+                              : 'Will be sent to the driver.',
+                          errorText: error,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                      ),
+                      Text(
+                        de
+                            ? 'Der Fahrer erhält eine Benachrichtigung mit '
+                                'Status und Begründung.'
+                            : 'The driver receives a notification with the '
+                                'status and this explanation.',
+                        style: const TextStyle(
+                          color: _kMuted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    child: Text(de ? 'Abbrechen' : 'Cancel'),
+                  ),
+                  FilledButton(
+                    onPressed: submit,
+                    style: FilledButton.styleFrom(backgroundColor: _kRed),
+                    child: Text(de ? 'Ablehnen' : 'Reject'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+
+      if (reason == null || reason.trim().isEmpty) return;
+      await _updateAbsenceStatus(
+        requestId: item.requestId,
+        driverId: item.driverId,
+        status: 'rejected',
+        rejectionReason: reason,
+        notifySource: item,
+      );
+    } finally {
+      controller.dispose();
     }
   }
 
@@ -1524,6 +1777,7 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
                 requestType: widget.requestType,
                 search: _search,
                 de: _de,
+                historySort: _historySort,
               );
               final pending = buckets.pending;
               final approvedUpcoming = buckets.upcoming;
@@ -2210,6 +2464,94 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
     );
   }
 
+  /// Sortier-Auswahl der Historie — bewusst ein schlankes Dropdown im
+  /// Stil der übrigen Filter dieser Seite (Ticket „TIME & ABSENCE -
+  /// HISTORY").
+  Widget _buildHistorySortSelector(bool de) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Auf schmalen Karten entfällt das Präfix „Sortierung:" — sonst
+        // bräuchte die längste Option mehr Platz, als die Zeile hat.
+        final compact = constraints.maxWidth < 420;
+        return Align(
+          alignment: Alignment.centerLeft,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: constraints.maxWidth),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: _kBorder),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<_HistorySort>(
+                  value: _historySort,
+                  isDense: true,
+                  borderRadius: BorderRadius.circular(16),
+                  icon: const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 18,
+                    color: _kMuted,
+                  ),
+                  style: const TextStyle(
+                    color: _kText,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                  selectedItemBuilder: (context) => [
+                    for (final sort in _HistorySort.values)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.swap_vert_rounded,
+                            size: 16,
+                            color: _kMuted,
+                          ),
+                          const SizedBox(width: 7),
+                          Flexible(
+                            child: Text(
+                              compact
+                                  ? _historySortLabel(sort, de)
+                                  : '${de ? 'Sortierung' : 'Sort'}: '
+                                      '${_historySortLabel(sort, de)}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: _kText,
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
+                  items: [
+                    for (final sort in _HistorySort.values)
+                      DropdownMenuItem<_HistorySort>(
+                        value: sort,
+                        child: Text(
+                          _historySortLabel(sort, de),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: (value) {
+                    if (value == null || value == _historySort) return;
+                    setState(() => _historySort = value);
+                  },
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   /// Hauptbereich der Seite. [embedded] = im Seiten-Scroll eingebettet
   /// (schmale Fenster), sonst füllt die Karte den Restplatz.
   Widget _buildHistorySection(
@@ -2234,6 +2576,9 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
       icon: Icons.history_rounded,
       countLabel: '${items.length}',
       countAccent: const Color(0xFF475569),
+      // Ticket „TIME & ABSENCE - HISTORY": Sortierung direkt unter der
+      // Kopfzeile — sie gilt für die Karte UND das „Alle anzeigen"-Popup.
+      headerExtra: _buildHistorySortSelector(de),
       footer: items.isEmpty
           ? null
           : Column(
@@ -2296,15 +2641,14 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
             requestId: item.requestId,
             driverId: item.driverId,
             status: 'approved',
+            // Genehmigungen werden dem Fahrer ebenfalls gemeldet — er
+            // soll nicht nur bei einem Nein etwas hören.
+            notifySource: item,
           );
 
-  VoidCallback? _rejectOf(_AbsenceAdminItem item) => item.driverId.isEmpty
-      ? null
-      : () => _updateAbsenceStatus(
-            requestId: item.requestId,
-            driverId: item.driverId,
-            status: 'rejected',
-          );
+  /// Ablehnen läuft immer über den Dialog mit Pflicht-Begründung.
+  VoidCallback? _rejectOf(_AbsenceAdminItem item) =>
+      item.driverId.isEmpty ? null : () => _confirmRejectAbsence(item);
 
   /// Bezahlt/unbezahlt lässt sich nur an Urlaubsanträgen mit bekanntem
   /// Fahrer umstellen (die Fahrer-Kopie braucht die Transporter-ID).
@@ -2382,6 +2726,7 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
             bucket: bucket,
             title: _bucketTitle(bucket, de),
             initialSearch: _search,
+            historySort: _historySort,
             onApproveOf: _approveOf,
             onRejectOf: _rejectOf,
             onSetPaidOf: _setPaidOf,
@@ -2426,6 +2771,10 @@ class _SectionCard extends StatelessWidget {
   /// Optionale Fußzeile (z. B. "Mehr anzeigen").
   final Widget? footer;
 
+  /// Optionale Zeile direkt unter der Kopfzeile (z. B. die Sortier-
+  /// Auswahl der Historie).
+  final Widget? headerExtra;
+
   const _SectionCard({
     required this.title,
     required this.subtitle,
@@ -2436,6 +2785,7 @@ class _SectionCard extends StatelessWidget {
     this.countLabel,
     this.countAccent,
     this.footer,
+    this.headerExtra,
   });
 
   @override
@@ -2513,6 +2863,10 @@ class _SectionCard extends StatelessWidget {
                 ],
               ],
             ),
+            if (headerExtra != null) ...[
+              SizedBox(height: dense ? 10 : 12),
+              headerExtra!,
+            ],
             SizedBox(height: dense ? 12 : 16),
             if (constraints.maxHeight.isFinite)
               Expanded(child: child)
@@ -2903,6 +3257,53 @@ class _HistoryAbsenceTile extends StatelessWidget {
                 fontWeight: FontWeight.w500,
               ),
             ),
+          ],
+          // Ticket „TIME & ABSENCE - HISTORY": Ablehngrund direkt am
+          // Eintrag — sonst wäre nach der Entscheidung nirgends mehr
+          // nachvollziehbar, warum abgelehnt wurde.
+          if (item.rejectionReason.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Builder(builder: (context) {
+              final de =
+                  Localizations.localeOf(context).languageCode == 'de';
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF2F2),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFFECACA)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      de ? 'Grund der Ablehnung' : 'Reason for rejection',
+                      style: const TextStyle(
+                        color: Color(0xFFB91C1C),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      item.rejectionReason,
+                      style: const TextStyle(
+                        color: Color(0xFF7F1D1D),
+                        fontSize: 12.5,
+                        height: 1.3,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
           ],
           const SizedBox(height: 8),
           Text(
@@ -3676,6 +4077,7 @@ class _AbsenceAllRequestsView extends StatefulWidget {
     required this.bucket,
     required this.title,
     required this.initialSearch,
+    required this.historySort,
     required this.onApproveOf,
     required this.onRejectOf,
     required this.onSetPaidOf,
@@ -3689,6 +4091,10 @@ class _AbsenceAllRequestsView extends StatefulWidget {
   final _AbsenceBucket bucket;
   final String title;
   final String initialSearch;
+
+  /// Sortierung der Historie — kommt aus der Seite, damit das Popup
+  /// dieselbe Reihenfolge zeigt wie die Karte darunter.
+  final _HistorySort historySort;
   final VoidCallback? Function(_AbsenceAdminItem) onApproveOf;
   final VoidCallback? Function(_AbsenceAdminItem) onRejectOf;
   final ValueChanged<bool>? Function(_AbsenceAdminItem) onSetPaidOf;
@@ -3821,6 +4227,7 @@ class _AbsenceAllRequestsViewState extends State<_AbsenceAllRequestsView> {
                   requestType: widget.requestType,
                   search: _search,
                   de: de,
+                  historySort: widget.historySort,
                 ).of(widget.bucket);
 
                 if (items.isEmpty) {
@@ -3881,6 +4288,65 @@ class _AbsenceAllRequestsViewState extends State<_AbsenceAllRequestsView> {
 
 enum _AbsenceBucket { pending, upcoming, history }
 
+/// Ticket „TIME & ABSENCE - HISTORY": Sortier-Optionen der Historie.
+///
+///  * [addedAt]         — Erfassungs-/Prüfzeitpunkt (`historySortDate`,
+///                        also die Bestandskette cancelledAt → reviewedAt
+///                        → submittedAt). Das ist die Vorbelegung und
+///                        entspricht exakt dem bisherigen Verhalten.
+///  * [occurrence]      — Datum des Vorgangs (`fromDate`).
+///  * [driverFirstName] — Vorname des Fahrers, A–Z.
+enum _HistorySort { addedAt, occurrence, driverFirstName }
+
+String _historySortLabel(_HistorySort sort, bool de) {
+  switch (sort) {
+    case _HistorySort.addedAt:
+      return de ? 'Erfasst am (neu → alt)' : 'Added (new → old)';
+    case _HistorySort.occurrence:
+      return de
+          ? 'Datum des Vorgangs (neu → alt)'
+          : 'Date of occurrence (new → old)';
+    case _HistorySort.driverFirstName:
+      return de ? 'Fahrer-Vorname (A–Z)' : 'Driver first name (A–Z)';
+  }
+}
+
+/// Vorname für die A–Z-Sortierung.
+///
+/// Bestandsdaten kommen in beiden Schreibweisen vor: „Vorname Nachname"
+/// und — vor allem aus CSV-Importen — „Nachname, Vorname". Steht ein
+/// Komma im Namen, ist der Vorname der Teil DAHINTER, sonst das erste
+/// Wort.
+String _driverFirstNameKey(String driverName) {
+  final name = driverName.trim();
+  if (name.isEmpty) return '';
+  final commaIndex = name.indexOf(',');
+  final relevant =
+      commaIndex >= 0 ? name.substring(commaIndex + 1).trim() : name;
+  final parts = relevant.split(RegExp(r'\s+')).where((p) => p.isNotEmpty);
+  return (parts.isEmpty ? relevant : parts.first).toLowerCase();
+}
+
+/// Vergleicher für die gewählte Historien-Sortierung. Bei Gleichstand
+/// fällt jede Variante auf den Erfassungszeitpunkt zurück, damit die
+/// Reihenfolge stabil bleibt.
+int _compareHistory(_AbsenceAdminItem a, _AbsenceAdminItem b,
+    _HistorySort sort) {
+  switch (sort) {
+    case _HistorySort.addedAt:
+      return b.historySortDate.compareTo(a.historySortDate);
+    case _HistorySort.occurrence:
+      final byDate = b.fromDate.compareTo(a.fromDate);
+      if (byDate != 0) return byDate;
+      return b.historySortDate.compareTo(a.historySortDate);
+    case _HistorySort.driverFirstName:
+      final byName = _driverFirstNameKey(a.driverName)
+          .compareTo(_driverFirstNameKey(b.driverName));
+      if (byName != 0) return byName;
+      return b.historySortDate.compareTo(a.historySortDate);
+  }
+}
+
 class _AbsenceBuckets {
   final List<_AbsenceAdminItem> pending;
   final List<_AbsenceAdminItem> upcoming;
@@ -3911,6 +4377,7 @@ _AbsenceBuckets _splitAbsenceBuckets({
   required String? requestType,
   required String search,
   required bool de,
+  _HistorySort historySort = _HistorySort.addedAt,
 }) {
   final needle = search.trim().toLowerCase();
   final items = docs
@@ -3927,9 +4394,16 @@ _AbsenceBuckets _splitAbsenceBuckets({
 
   final pending = items.where((item) => item.status == 'pending').toList()
     ..sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
+  // Ticket „TIME & ABSENCE - HISTORY": In „Bevorstehend" gehören
+  // ausschließlich GENEHMIGTE Abwesenheiten. Abgelehnte (und stornierte,
+  // Ticket jlmRu2T) Anträge sind hier explizit ausgeschlossen — sie
+  // bleiben nur in der Historie sichtbar.
   final upcoming = items
       .where((item) =>
-          item.status == 'approved' && !item.toDate.isBefore(today))
+          item.status == 'approved' &&
+          item.status != 'rejected' &&
+          item.status != 'cancelled' &&
+          !item.toDate.isBefore(today))
       .toList()
     ..sort((a, b) => a.fromDate.compareTo(b.fromDate));
   // Ticket jlmRu2T: stornierte Einträge verschwinden aus „Bevorstehend"
@@ -3940,9 +4414,7 @@ _AbsenceBuckets _splitAbsenceBuckets({
           item.status == 'cancelled' ||
           (item.status == 'approved' && item.toDate.isBefore(today)))
       .toList()
-    ..sort((a, b) {
-      return b.historySortDate.compareTo(a.historySortDate);
-    });
+    ..sort((a, b) => _compareHistory(a, b, historySort));
 
   return _AbsenceBuckets(
     pending: pending,
@@ -4038,6 +4510,11 @@ class _AbsenceAdminItem {
   /// siehe `_softDeleteAbsence` für die Begründung.
   final bool deleted;
 
+  /// Ticket „TIME & ABSENCE - HISTORY": Begründung der Ablehnung.
+  /// Pflichtfeld beim Ablehnen, leer bei allen anderen Status und bei
+  /// Altfällen, die vor dem Ticket abgelehnt wurden.
+  final String rejectionReason;
+
   /// Krankmeldung-AU upload (Arbeitsunfähigkeitsbescheinigung), only
   /// set for sick-leave requests. Stored as base64 inline in Firestore.
   final String auFileBase64;
@@ -4059,6 +4536,7 @@ class _AbsenceAdminItem {
     this.cancelledAt,
     this.paid = true,
     this.deleted = false,
+    this.rejectionReason = '',
     this.auFileBase64 = '',
     this.auFilename = '',
     this.auMimeType = '',
@@ -4106,6 +4584,7 @@ class _AbsenceAdminItem {
       // Fehlt das Feld (alle Bestandsdaten), gilt der Urlaub als bezahlt.
       paid: data['paid'] is bool ? data['paid'] as bool : true,
       deleted: data['deleted'] == true,
+      rejectionReason: _stringOf(data['rejectionReason']),
       auFileBase64: _stringOf(data['auFileBase64']),
       auFilename: _stringOf(data['auFilename']),
       auMimeType: _stringOf(data['auMimeType']),
@@ -5567,6 +6046,50 @@ String _daFormatDays(double value) {
       .replaceFirst(RegExp(r'\.$'), '');
 }
 
+/// Tages-Sollstunden des DSP in MINUTEN — aus dem Admin-Dokument
+/// (`users/{dspUid}.cotimerEmployment`).
+///
+/// Ticket „TIME & BALANCE". Die Konfiguration ist DSP-weit (siehe
+/// `admin_cotimer_employment_dialog.dart`; die Function
+/// `computeMonthlyAccount` liest dasselbe Feld und kennt ebenfalls
+/// keine Fahrer-Overrides). Reihenfolge der Quellen:
+///   1. `dailyContractHours`
+///   2. `weeklyContractHours` / Anzahl `workingDays`
+///   3. 8 h — derselbe Default wie in der Function
+///
+/// `sollMode == 'fixed_monthly'` bleibt bewusst außen vor: ein
+/// Monatssoll lässt sich nicht verlässlich auf einen einzelnen
+/// Urlaubstag herunterbrechen; dort greift der Tagesstunden-Wert des
+/// Dialogs (Default 8 h) — dieselbe Näherung, die auch die Gutschrift
+/// bezahlter Urlaubstage in der Function verwendet.
+int _dailyContractMinutesOf(Map<String, dynamic> adminData) {
+  const fallbackMinutes = 8 * 60;
+  final raw = adminData['cotimerEmployment'];
+  if (raw is! Map) return fallbackMinutes;
+  final emp = raw.map((k, v) => MapEntry(k.toString(), v));
+
+  double? asHours(dynamic value) {
+    if (value is num) return value.toDouble();
+    if (value is String) {
+      return double.tryParse(value.trim().replaceAll(',', '.'));
+    }
+    return null;
+  }
+
+  final daily = asHours(emp['dailyContractHours']);
+  if (daily != null && daily > 0) return (daily * 60).round();
+
+  final weekly = asHours(emp['weeklyContractHours']);
+  final workingDays = emp['workingDays'];
+  final dayCount = workingDays is List && workingDays.isNotEmpty
+      ? workingDays.length
+      : 5;
+  if (weekly != null && weekly > 0) {
+    return (weekly * 60 / dayCount).round();
+  }
+  return fallbackMinutes;
+}
+
 /// Abwesenheits- und Zeitkonto-Profil eines Fahrers.
 class _DriverAbsenceProfile {
   final String driverId;
@@ -5602,6 +6125,16 @@ class _DriverAbsenceProfile {
   /// = bisheriges Ein-Topf-Verhalten.
   final VacationPoolsConfig poolsConfig;
 
+  /// Tages-Sollstunden in MINUTEN.
+  ///
+  /// Ticket „TIME & BALANCE": Quelle ist die DSP-weite Vertrags-
+  /// konfiguration `users/{dspUid}.cotimerEmployment` — dasselbe
+  /// Dokument, aus dem auch die Cloud Function `computeMonthlyAccount`
+  /// ihre Sollstunden zieht (`dailyContractHours`, Fallback
+  /// `weeklyContractHours / Anzahl Arbeitstage`, sonst 8 h). Bewusst
+  /// KEINE eigene Konstante: sonst liefen App und Function auseinander.
+  final int dailyContractMinutes;
+
   const _DriverAbsenceProfile({
     required this.driverId,
     required this.driverName,
@@ -5615,6 +6148,7 @@ class _DriverAbsenceProfile {
     required this.vacationOverride,
     required this.vacationOverrideAt,
     required this.poolsConfig,
+    required this.dailyContractMinutes,
   });
 
   static int _approvedDays(List<_AbsenceAdminItem> items) => items
@@ -5686,11 +6220,43 @@ class _DriverAbsenceProfile {
         : '$remaining of $totalText PTO days remaining since start';
   }
 
-  /// Overtime Balance über alle erfassten Monate (offen nach Auszahlung).
-  int get overtimeBalanceMinutes => overtimeMonths.fold<int>(
+  /// Überstunden der erfassten Monate (offen nach Auszahlung), OHNE die
+  /// Belastung durch unbezahlten Urlaub.
+  int get recordedOvertimeMinutes => overtimeMonths.fold<int>(
       0, (acc, m) => acc + m.remainingMinutes);
 
-  bool get hasOvertime => overtimeMonths.isNotEmpty;
+  /// Ticket „TIME & BALANCE": Sollstunden der bereits genommenen
+  /// UNBEZAHLTEN Urlaubstage.
+  ///
+  /// Unbezahlter Urlaub erzeugt keine Gutschrift, das Soll des Tages
+  /// bleibt aber bestehen — dem Fahrer fehlen also genau diese Stunden
+  /// (identische Regel wie serverseitig in `computeMonthlyAccount`, wo
+  /// nur bezahlte Urlaubstage dem Ist gutgeschrieben werden).
+  ///
+  /// Gezählt werden nur WERKTAGE ([approvedUnpaidVacationDays] nutzt
+  /// `vacationChargeableDays`): Wochenenden und bundesweite Feiertage
+  /// haben ohnehin kein Soll.
+  ///
+  /// Warum die App das selbst rechnet: das hier angezeigte Konto kommt
+  /// aus dem Map-Feld `overtimeAccount` (Excel-Import im Zeitkonto-Tab,
+  /// Soll = Arbeitstage × Std./Tag). Dieser Import weiß nichts von
+  /// Abwesenheiten — anders als die Function, die auf
+  /// `time_account/{YYYY-MM}` schreibt. Ohne diesen Abzug bliebe
+  /// unbezahlter Urlaub im DA-Balance-Blatt folgenlos.
+  int get unpaidVacationChargeMinutes =>
+      approvedUnpaidVacationDays * dailyContractMinutes;
+
+  /// Overtime Balance über alle erfassten Monate (offen nach Auszahlung),
+  /// abzüglich der Sollstunden unbezahlter Urlaubstage. Darf negativ
+  /// werden — die Anzeige färbt negative Werte rot.
+  int get overtimeBalanceMinutes =>
+      recordedOvertimeMinutes - unpaidVacationChargeMinutes;
+
+  /// Gibt es überhaupt etwas anzuzeigen? Auch ein Fahrer ganz ohne
+  /// erfasste Monate bekommt einen Wert, sobald unbezahlter Urlaub das
+  /// Konto belastet (genau der Fall aus dem Ticket).
+  bool get hasOvertime =>
+      overtimeMonths.isNotEmpty || unpaidVacationChargeMinutes > 0;
 
   bool get isEmpty =>
       vacation.isEmpty && sick.isEmpty && overtimeMonths.isEmpty;
@@ -5805,6 +6371,12 @@ class _AbsenceDriversOverviewPageState
     // Urlaubs-Töpfe des DSP (ohne Konfiguration: Ein-Topf-Bestandslogik).
     final poolsConfig = await VacationPoolsRepository.load(scope);
 
+    // Ticket „TIME & BALANCE": Tages-Sollstunden aus derselben Quelle,
+    // die auch `computeMonthlyAccount` nutzt.
+    final scopeSnap = await db.collection('users').doc(scope).get();
+    final dailyContractMinutes =
+        _dailyContractMinutesOf(scopeSnap.data() ?? const {});
+
     // Anträge einmal nach Transporter-ID gruppieren (Fallback driverId,
     // damit auch Bestandsdaten ohne `driverTransporterId` landen).
     final byDriver = <String, List<_AbsenceAdminItem>>{};
@@ -5882,6 +6454,7 @@ class _AbsenceDriversOverviewPageState
           vacationOverride: override,
           vacationOverrideAt: overrideAt,
           poolsConfig: poolsConfig.forDriver(onboarding),
+          dailyContractMinutes: dailyContractMinutes,
         ),
       );
     }
@@ -6236,11 +6809,25 @@ class _DriverRow extends StatelessWidget {
             : (overtime < 0
                 ? const Color(0xFFB91C1C)
                 : const Color(0xFF006047)),
-        tooltip: de
-            ? 'Offene Überstunden über alle erfassten Monate '
-                '(Ist − Soll − bereits ausgezahlt)'
-            : 'Open overtime across all recorded months '
-                '(worked − target − already paid out)',
+        tooltip: <String>[
+          de
+              ? 'Offene Überstunden (Ist − Soll − ausgezahlt), abzüglich '
+                  'der Sollstunden unbezahlter Urlaubstage'
+              : 'Open overtime (worked − target − paid out), minus the '
+                  'target hours of unpaid vacation days',
+          // Ticket „TIME & BALANCE": die Herkunft des Abzugs offenlegen,
+          // sonst wirkt ein negativer Saldo unerklärlich.
+          if (profile.unpaidVacationChargeMinutes > 0)
+            de
+                ? 'davon unbezahlter Urlaub: '
+                    '${profile.approvedUnpaidVacationDays} Werktage × '
+                    '${_daFormatDuration(profile.dailyContractMinutes)} h = '
+                    '−${_daFormatDuration(profile.unpaidVacationChargeMinutes)} h'
+                : 'thereof unpaid vacation: '
+                    '${profile.approvedUnpaidVacationDays} working days × '
+                    '${_daFormatDuration(profile.dailyContractMinutes)} h = '
+                    '−${_daFormatDuration(profile.unpaidVacationChargeMinutes)} h',
+        ].join('\n'),
       ),
     ];
 
@@ -6853,6 +7440,27 @@ class _DriverOvertimeCategory extends StatelessWidget {
     final preview = months.take(_kDriverOvertimePreview).toList(growable: false);
     final hidden = months.length - preview.length;
     final total = profile.overtimeBalanceMinutes;
+    final unpaidCharge = profile.unpaidVacationChargeMinutes;
+    final subSummaryLines = <String>[
+      if (months.isNotEmpty)
+        de
+            ? 'über ${months.length} erfasste Monate (Ist − Soll − '
+                'ausgezahlt): '
+                '${_daFormatDuration(profile.recordedOvertimeMinutes)} h'
+            : 'across ${months.length} recorded months (worked − target − '
+                'paid out): '
+                '${_daFormatDuration(profile.recordedOvertimeMinutes)} h',
+      if (unpaidCharge > 0)
+        de
+            ? 'abzüglich unbezahlter Urlaub: '
+                '${profile.approvedUnpaidVacationDays} Werktage × '
+                '${_daFormatDuration(profile.dailyContractMinutes)} h = '
+                '−${_daFormatDuration(unpaidCharge)} h'
+            : 'minus unpaid vacation: '
+                '${profile.approvedUnpaidVacationDays} working days × '
+                '${_daFormatDuration(profile.dailyContractMinutes)} h = '
+                '−${_daFormatDuration(unpaidCharge)} h',
+    ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -6869,13 +7477,11 @@ class _DriverOvertimeCategory extends StatelessWidget {
           summary: de
               ? 'Gesamtsaldo: ${_daFormatDuration(total)} h'
               : 'Total balance: ${_daFormatDuration(total)} h',
-          subSummary: months.isEmpty
+          // Ticket „TIME & BALANCE": unbezahlter Urlaub wird als eigener
+          // Posten ausgewiesen, damit der Abzug nachvollziehbar bleibt.
+          subSummary: subSummaryLines.isEmpty
               ? null
-              : (de
-                  ? 'über ${months.length} erfasste Monate '
-                      '(Ist − Soll − ausgezahlt)'
-                  : 'across ${months.length} recorded months '
-                      '(worked − target − paid out)'),
+              : subSummaryLines.join('\n'),
         ),
         const SizedBox(height: 10),
         if (months.isEmpty)
@@ -7064,6 +7670,22 @@ class _DriverAbsenceEntryTile extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
+                // Ticket „TIME & ABSENCE - HISTORY": Ablehngrund auch im
+                // Fahrer-Blatt sichtbar.
+                if (item.rejectionReason.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    '${de ? 'Grund' : 'Reason'}: ${item.rejectionReason}',
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFFB91C1C),
+                      fontSize: 12,
+                      height: 1.3,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

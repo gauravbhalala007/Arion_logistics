@@ -150,6 +150,7 @@ enum FleetEventType {
   accident,
   handover,
   document,
+
   /// Geführte Foto-Inspektion aus der Fahrer-App. Der Spiegel wird von der
   /// Cloud Function `onVehicleCheckCreated` geschrieben (wire:
   /// [kVehicleCheckEventType]).
@@ -564,6 +565,15 @@ class _FleetVehicleDetailPageState extends State<FleetVehicleDetailPage> {
 
   static String _str(dynamic raw) => (raw ?? '').toString().trim();
 
+  /// Tolerantes Datum-Lesen aus Firestore: `Timestamp`, `DateTime` oder
+  /// ISO-String — alles andere (inkl. `null`) ergibt `null`.
+  static DateTime? _asDateTime(dynamic raw) {
+    if (raw is Timestamp) return raw.toDate();
+    if (raw is DateTime) return raw;
+    if (raw is String) return DateTime.tryParse(raw.trim());
+    return null;
+  }
+
   // ── Build ───────────────────────────────────────────────────────────────
 
   @override
@@ -905,57 +915,155 @@ class _FleetVehicleDetailPageState extends State<FleetVehicleDetailPage> {
           : 'VIN ${vehicle.vinNumber.trim()}',
     );
 
+    final groundedBanner = _groundedReasonBanner(vehicle, extras);
+
     return Container(
       decoration: const BoxDecoration(
         color: _C.surface,
         border: Border(bottom: BorderSide(color: _C.border)),
       ),
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          // Schmale Bänder halten die vier Kacheln als kompaktes 2×2 statt
-          // sie zu vier vollbreiten Zeilen zu stapeln.
-          final tiles = _statusTiles(
-            vehicle,
-            extras,
-            twoColumns: constraints.maxWidth < 720,
-          );
-          if (constraints.maxWidth < 720) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          LayoutBuilder(
+            builder: (context, constraints) {
+              // Schmale Bänder halten die vier Kacheln als kompaktes 2×2 statt
+              // sie zu vier vollbreiten Zeilen zu stapeln.
+              final tiles = _statusTiles(
+                vehicle,
+                extras,
+                twoColumns: constraints.maxWidth < 720,
+              );
+              if (constraints.maxWidth < 720) {
+                return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Flexible(child: plateBlock),
-                    const SizedBox(width: 16),
-                    qr,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Flexible(child: plateBlock),
+                        const SizedBox(width: 16),
+                        qr,
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    tiles,
+                  ],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  plateBlock,
+                  const SizedBox(width: 16),
+                  qr,
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 620),
+                        child: tiles,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          if (groundedBanner != null) ...[
+            const SizedBox(height: 14),
+            groundedBanner,
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Warum steht das Fahrzeug? Solange es stillgelegt ist, sitzt der Grund
+  /// aus `fleet_vehicle_extras.groundedReason` gut sichtbar unter den
+  /// Status-Kacheln — Fahrzeuge ohne Grund (Bestand) zeigen nichts.
+  Widget? _groundedReasonBanner(
+    FleetVehicle vehicle,
+    Map<String, dynamic> extras,
+  ) {
+    if (!vehicle.status.isGrounded) return null;
+    final reason = _str(extras['groundedReason']);
+    if (reason.isEmpty) return null;
+
+    final since = _asDateTime(extras['groundedAt']);
+    final sinceLabel = since == null
+        ? ''
+        : '${_tr('seit', 'since')} ${_fmtDate(since)}';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 11),
+      decoration: BoxDecoration(
+        color: _C.redBg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _C.redBorder),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 1),
+            child: Icon(
+              Icons.report_problem_outlined,
+              size: 16,
+              color: _C.redValue,
+            ),
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _tr('GRUND DER STILLLEGUNG', 'REASON FOR GROUNDING'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.4,
+                          color: _C.redText,
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                    if (sinceLabel.isNotEmpty)
+                      Text(
+                        sinceLabel,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: _C.redText,
+                          height: 1.3,
+                        ),
+                      ),
                   ],
                 ),
-                const SizedBox(height: 14),
-                tiles,
-              ],
-            );
-          }
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              plateBlock,
-              const SizedBox(width: 16),
-              qr,
-              const SizedBox(width: 20),
-              Expanded(
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 620),
-                    child: tiles,
+                const SizedBox(height: 2),
+                Text(
+                  reason,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: _C.redValue,
+                    height: 1.35,
                   ),
                 ),
-              ),
-            ],
-          );
-        },
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -2930,10 +3038,7 @@ class _FleetVehicleDetailPageState extends State<FleetVehicleDetailPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _tr(
-                    'LETZTER FAHRZEUG-CHECK',
-                    'LAST VEHICLE CHECK',
-                  ),
+                  _tr('LETZTER FAHRZEUG-CHECK', 'LAST VEHICLE CHECK'),
                   style: const TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w700,
@@ -2984,12 +3089,13 @@ class _FleetVehicleDetailPageState extends State<FleetVehicleDetailPage> {
     );
   }
 
-  Future<void> _openVehicleCheck(String checkPath) => openAdminVehicleCheckDetail(
-    context,
-    dspUid: widget.dspUid,
-    checkPath: checkPath,
-    canManage: widget.canManage,
-  );
+  Future<void> _openVehicleCheck(String checkPath) =>
+      openAdminVehicleCheckDetail(
+        context,
+        dspUid: widget.dspUid,
+        checkPath: checkPath,
+        canManage: widget.canManage,
+      );
 
   Widget _eventFilterPill() {
     final label = _eventFilter == null

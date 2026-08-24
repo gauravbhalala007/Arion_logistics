@@ -108,6 +108,11 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
   // Leasing provider per plate (fleet_vehicle_extras.leasingProvider) — shown
   // as the handshake line inside each fleet row.
   Map<String, String> _leasingByPlate = <String, String>{};
+  // Grund der Stilllegung je Kennzeichen (fleet_vehicle_extras.groundedReason)
+  // plus Zeitpunkt (…​.groundedAt). Beide Felder gibt es erst seit dem
+  // Grounding-Dialog — Bestandsfahrzeuge liefern schlicht nichts.
+  Map<String, String> _groundedReasonByPlate = <String, String>{};
+  Map<String, DateTime> _groundedAtByPlate = <String, DateTime>{};
   Map<String, FleetVehicleDocument> _tuvDocByPlate =
       <String, FleetVehicleDocument>{};
   // Plates with an uploaded vehicle registration ("Fahrzeugschein") — drives
@@ -581,6 +586,46 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
     final parsed = DateTime.tryParse(value);
     if (parsed == null) return value;
     return MaterialLocalizations.of(context).formatShortDate(parsed);
+  }
+
+  /// Tolerantes Datum-Lesen aus Firestore: `Timestamp`, `DateTime` oder
+  /// ISO-String — alles andere (inkl. `null`) ergibt `null`.
+  static DateTime? _asDateTime(dynamic raw) {
+    if (raw is Timestamp) return raw.toDate();
+    if (raw is DateTime) return raw;
+    if (raw is String) return DateTime.tryParse(raw.trim());
+    return null;
+  }
+
+  /// Der Grund der Stilllegung hängt als Tooltip am Status-Chip der Liste —
+  /// Fahrzeuge ohne `groundedReason` (Bestand) bekommen den Chip unverändert.
+  Widget _withGroundedReasonTooltip(
+    BuildContext context,
+    FleetVehicle vehicle,
+    Widget child,
+  ) {
+    if (!vehicle.status.isGrounded) return child;
+    final plate = normalizePlateNumber(vehicle.plateNumber);
+    final reason = (_groundedReasonByPlate[plate] ?? '').trim();
+    if (reason.isEmpty) return child;
+
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final shortened = reason.length > 160
+        ? '${reason.substring(0, 157).trimRight()}…'
+        : reason;
+    final since = _groundedAtByPlate[plate];
+    final sinceLine = since == null
+        ? ''
+        : '\n${de ? 'seit' : 'since'} '
+              '${MaterialLocalizations.of(context).formatShortDate(since)}';
+
+    return Tooltip(
+      message:
+          '${de ? 'Grund der Stilllegung' : 'Reason for grounding'}: '
+          '$shortened$sinceLine',
+      waitDuration: const Duration(milliseconds: 300),
+      child: child,
+    );
   }
 
   String _friendlyLoadError(AppLocalizations t, Object? error) {
@@ -1246,9 +1291,10 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
   ) async {
     if (vehicle.status == status) return;
 
+    final normalizedPlate = normalizePlateNumber(vehicle.plateNumber);
+
     _GroundingDialogResult? grounding;
     if (status.isGrounded) {
-      final normalizedPlate = normalizePlateNumber(vehicle.plateNumber);
       grounding = await showDialog<_GroundingDialogResult>(
         context: context,
         builder: (_) => _ServiceEndDateDialog(
@@ -1258,6 +1304,10 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
           // vehicle was sent to.
           askWorkshop: status == VehicleStatus.groundedService,
           initialWorkshop: _workshopByPlate[normalizedPlate] ?? '',
+          // Stilllegungsgrund — optional, aber der eigentliche Zweck des
+          // Dialogs (Kundenticket „why is it grounded").
+          askReason: true,
+          initialReason: _groundedReasonByPlate[normalizedPlate] ?? '',
         ),
       );
       if (!mounted || grounding == null) return;
@@ -1285,6 +1335,18 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
       }
     }
 
+    // Grounding: Grund am Fahrzeug ablegen (fleet_vehicle_extras) und als
+    // Event in die Fahrzeug-Historie schreiben.
+    if (updated && status.isGrounded && grounding != null && mounted) {
+      await _persistGroundingReason(vehicle, status, grounding.reason);
+    }
+
+    // Wieder im Einsatz? Dann ist der alte Grund hinfällig — das Event in
+    // der Historie bleibt selbstverständlich stehen.
+    if (updated && wasGrounded && !status.isGrounded) {
+      await _clearGroundingReason(vehicle);
+    }
+
     // Ungrounding (grounded → operational/active): offer to attach the
     // service report / delivery note etc. as a vehicle event — optional,
     // skippable via "Später".
@@ -1295,6 +1357,71 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
         _canManageVehicles &&
         mounted) {
       await _showUngroundingUploadDialog(vehicle);
+    }
+  }
+
+  // ─── Grounding: Grund speichern / räumen ──────────────────────────────
+  //
+  // Der Grund lebt neben Werkstatt/Bemerkungen im Extras-Dokument
+  // (`users/{scope}/fleet_vehicle_extras/{plate}`) — das Fahrzeug-Dokument
+  // selbst hat in den Rules eine feste Feld-Whitelist. Zusätzlich landet
+  // ein Event in `users/{scope}/fleet_events`, exakt im Format des
+  // „+ Event"-Dialogs der Detailseite.
+
+  Future<void> _persistGroundingReason(
+    FleetVehicle vehicle,
+    VehicleStatus status,
+    String reason,
+  ) async {
+    final scope = _scopeUid;
+    if (scope == null) return;
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final trimmed = reason.trim();
+    final statusLabel = _statusLabel(context, status);
+
+    try {
+      await _saveVehicleExtras(scope, vehicle.plateNumber, <String, dynamic>{
+        'groundedReason': trimmed,
+        'groundedAt': FieldValue.serverTimestamp(),
+        'groundedBy': FirebaseAuth.instance.currentUser?.uid ?? '',
+      });
+    } catch (_) {
+      // Non-fatal: the status change itself already went through.
+    }
+
+    try {
+      final now = DateTime.now();
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(scope)
+          .collection('fleet_events')
+          .add(<String, dynamic>{
+            'plateKey': plateKeyOf(vehicle.plateNumber),
+            'plate': vehicle.plateNumber,
+            'type': 'other',
+            'title': de ? 'Stillgelegt' : 'Grounded',
+            'subtitle': trimmed.isEmpty ? statusLabel : trimmed,
+            'date': Timestamp.fromDate(DateTime(now.year, now.month, now.day)),
+            'km': null,
+            'createdAt': FieldValue.serverTimestamp(),
+            'createdBy': FirebaseAuth.instance.currentUser?.uid ?? '',
+          });
+    } catch (_) {
+      // Non-fatal — der Grund steht bereits am Fahrzeug.
+    }
+  }
+
+  Future<void> _clearGroundingReason(FleetVehicle vehicle) async {
+    final scope = _scopeUid;
+    if (scope == null) return;
+    try {
+      await _saveVehicleExtras(scope, vehicle.plateNumber, <String, dynamic>{
+        'groundedReason': FieldValue.delete(),
+        'groundedAt': FieldValue.delete(),
+        'groundedBy': FieldValue.delete(),
+      });
+    } catch (_) {
+      // Non-fatal: the status change itself already went through.
     }
   }
 
@@ -1362,11 +1489,7 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
             'createdBy': FirebaseAuth.instance.currentUser?.uid ?? '',
           });
       if (!mounted) return;
-      _showSnack(
-        de
-            ? 'Service-Event gespeichert.'
-            : 'Service event saved.',
-      );
+      _showSnack(de ? 'Service-Event gespeichert.' : 'Service event saved.');
     } catch (e) {
       if (!mounted) return;
       _showSnack(
@@ -1674,6 +1797,8 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                       final workshopByPlate = <String, String>{};
                       final remarksByPlate = <String, String>{};
                       final leasingByPlate = <String, String>{};
+                      final groundedReasonByPlate = <String, String>{};
+                      final groundedAtByPlate = <String, DateTime>{};
                       if (extrasSnapshot.hasData) {
                         for (final doc in extrasSnapshot.data!.docs) {
                           final workshop = (doc.data()['workshop'] ?? '')
@@ -1697,11 +1822,30 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                             leasingByPlate[normalizePlateNumber(doc.id)] =
                                 leasing;
                           }
+                          final groundedReason =
+                              (doc.data()['groundedReason'] ?? '')
+                                  .toString()
+                                  .trim();
+                          if (groundedReason.isNotEmpty) {
+                            groundedReasonByPlate[normalizePlateNumber(
+                                  doc.id,
+                                )] =
+                                groundedReason;
+                          }
+                          final groundedAt = _asDateTime(
+                            doc.data()['groundedAt'],
+                          );
+                          if (groundedAt != null) {
+                            groundedAtByPlate[normalizePlateNumber(doc.id)] =
+                                groundedAt;
+                          }
                         }
                       }
                       _workshopByPlate = workshopByPlate;
                       _remarksByPlate = remarksByPlate;
                       _leasingByPlate = leasingByPlate;
+                      _groundedReasonByPlate = groundedReasonByPlate;
+                      _groundedAtByPlate = groundedAtByPlate;
 
                       final vehicles = _filteredVehicles(
                         snapshot.data ?? const [],
@@ -2149,9 +2293,7 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
     final phone = (data['phone'] ?? '').toString().trim();
     final details = [url, email, phone].where((v) => v.isNotEmpty).toList();
     final tooltip = details.join('\n');
-    final label = name.isEmpty
-        ? (details.isEmpty ? '' : details.first)
-        : name;
+    final label = name.isEmpty ? (details.isEmpty ? '' : details.first) : name;
     return InkWell(
       onTap: () =>
           _openReference(name: name, url: url, email: email, phone: phone),
@@ -2223,9 +2365,7 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
 
     if (actionCount == 0) {
       _showSnack(
-        de
-            ? 'Keine Kontaktdaten hinterlegt.'
-            : 'No contact details saved.',
+        de ? 'Keine Kontaktdaten hinterlegt.' : 'No contact details saved.',
       );
       return;
     }
@@ -2489,12 +2629,8 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                           final data = doc.data();
                           final name = (data['name'] ?? '').toString().trim();
                           final url = (data['url'] ?? '').toString().trim();
-                          final email = (data['email'] ?? '')
-                              .toString()
-                              .trim();
-                          final phone = (data['phone'] ?? '')
-                              .toString()
-                              .trim();
+                          final email = (data['email'] ?? '').toString().trim();
+                          final phone = (data['phone'] ?? '').toString().trim();
                           final detailLine = [
                             url,
                             email,
@@ -3414,18 +3550,22 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
       _vehicleModelMeta(context, vehicle).replaceAll(' | ', ' · '),
     ].where((part) => part.trim().isNotEmpty).join(' · ');
 
-    final status = _canManageVehicles
-        ? _buildTableStatusDropdown(
-            context,
-            vehicle: vehicle,
-            isBusy: _updatingVehicleStatuses.contains(vehicle.plateNumber),
-            compact: true,
-          )
-        : _fleetChip(
-            label: _statusLabel(context, vehicle.status),
-            foreground: _statusColor(vehicle.status),
-            background: _statusColor(vehicle.status).withValues(alpha: 0.12),
-          );
+    final status = _withGroundedReasonTooltip(
+      context,
+      vehicle,
+      _canManageVehicles
+          ? _buildTableStatusDropdown(
+              context,
+              vehicle: vehicle,
+              isBusy: _updatingVehicleStatuses.contains(vehicle.plateNumber),
+              compact: true,
+            )
+          : _fleetChip(
+              label: _statusLabel(context, vehicle.status),
+              foreground: _statusColor(vehicle.status),
+              background: _statusColor(vehicle.status).withValues(alpha: 0.12),
+            ),
+    );
 
     return _HoverRow(
       onTap: () => _showVehicleDetails(vehicle),
@@ -3741,20 +3881,26 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
       vehicle.plateNumber,
     );
 
-    final status = _canManageVehicles
-        ? _buildTableStatusDropdown(
-            context,
-            vehicle: vehicle,
-            isBusy: isUpdatingStatus,
-          )
-        : Align(
-            alignment: Alignment.centerLeft,
-            child: _fleetChip(
-              label: _statusLabel(context, vehicle.status),
-              foreground: _statusColor(vehicle.status),
-              background: _statusColor(vehicle.status).withValues(alpha: 0.12),
+    final status = _withGroundedReasonTooltip(
+      context,
+      vehicle,
+      _canManageVehicles
+          ? _buildTableStatusDropdown(
+              context,
+              vehicle: vehicle,
+              isBusy: isUpdatingStatus,
+            )
+          : Align(
+              alignment: Alignment.centerLeft,
+              child: _fleetChip(
+                label: _statusLabel(context, vehicle.status),
+                foreground: _statusColor(vehicle.status),
+                background: _statusColor(
+                  vehicle.status,
+                ).withValues(alpha: 0.12),
+              ),
             ),
-          );
+    );
 
     final workshopLabel = _workshopRowLabel(context, vehicle);
     final serviceBlock = _rowCaptioned(
@@ -5449,17 +5595,34 @@ class _DateInputField extends StatelessWidget {
   }
 }
 
-/// Result of the grounding dialog: optional "back in service" date plus —
-/// for Grounded (Service) — the workshop the vehicle was sent to.
+/// Result of the grounding dialog: optional "back in service" date, the
+/// reason the vehicle was grounded plus — for Grounded (Service) — the
+/// workshop the vehicle was sent to.
 class _GroundingDialogResult {
   const _GroundingDialogResult({
     required this.serviceEndDate,
     this.workshop = '',
+    this.reason = '',
   });
 
   final String serviceEndDate;
   final String workshop;
+
+  /// Freitext „Grund der Stilllegung". Leer, wenn der Admin „Ohne Grund"
+  /// gewählt hat — der Statuswechsel läuft dann trotzdem durch.
+  final String reason;
 }
+
+/// Schnellauswahl für den Stilllegungsgrund — tippen setzt den Freitext,
+/// nochmal tippen räumt ihn wieder.
+const List<(String, String)> _kGroundingReasonPresets = <(String, String)>[
+  ('Unfallschaden', 'Accident damage'),
+  ('Technischer Defekt', 'Technical defect'),
+  ('In der Werkstatt', 'In the workshop'),
+  ('TÜV abgelaufen', 'Inspection overdue'),
+  ('Reifenschaden', 'Tyre damage'),
+  ('Sonstiges', 'Other'),
+];
 
 class _ServiceEndDateDialog extends StatefulWidget {
   const _ServiceEndDateDialog({
@@ -5467,6 +5630,8 @@ class _ServiceEndDateDialog extends StatefulWidget {
     required this.requiredValue,
     this.askWorkshop = false,
     this.initialWorkshop = '',
+    this.askReason = false,
+    this.initialReason = '',
   });
 
   final String initialValue;
@@ -5476,6 +5641,10 @@ class _ServiceEndDateDialog extends StatefulWidget {
   final bool askWorkshop;
   final String initialWorkshop;
 
+  /// Stilllegung: zusätzlich den Grund abfragen (mehrzeilig + Schnellauswahl).
+  final bool askReason;
+  final String initialReason;
+
   @override
   State<_ServiceEndDateDialog> createState() => _ServiceEndDateDialogState();
 }
@@ -5484,19 +5653,103 @@ class _ServiceEndDateDialogState extends State<_ServiceEndDateDialog> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   late final TextEditingController _controller;
   late final TextEditingController _workshopController;
+  late final TextEditingController _reasonController;
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.initialValue);
     _workshopController = TextEditingController(text: widget.initialWorkshop);
+    _reasonController = TextEditingController(text: widget.initialReason);
   }
 
   @override
   void dispose() {
     _controller.dispose();
     _workshopController.dispose();
+    _reasonController.dispose();
     super.dispose();
+  }
+
+  /// Preset antippen: setzt den Freitext, ein zweiter Tipp auf dasselbe
+  /// Preset räumt das Feld wieder.
+  void _applyPreset(String label) {
+    final isActive = _reasonController.text.trim() == label;
+    final next = isActive ? '' : label;
+    _reasonController.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: next.length),
+    );
+    setState(() {});
+  }
+
+  void _submit({required bool withReason}) {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    Navigator.of(context).pop(
+      _GroundingDialogResult(
+        serviceEndDate: _controller.text.trim(),
+        workshop: _workshopController.text.trim(),
+        reason: withReason ? _reasonController.text.trim() : '',
+      ),
+    );
+  }
+
+  Widget _reasonSection(bool de) {
+    final active = _reasonController.text.trim();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        TextFormField(
+          controller: _reasonController,
+          autofocus: true,
+          minLines: 3,
+          maxLines: 5,
+          textCapitalization: TextCapitalization.sentences,
+          onChanged: (_) => setState(() {}),
+          decoration: InputDecoration(
+            labelText: de ? 'Grund der Stilllegung' : 'Reason for grounding',
+            hintText: de
+                ? 'z. B. Unfallschaden hinten links, Werkstatt Müller'
+                : 'e.g. rear-left accident damage, workshop',
+            alignLabelWithHint: true,
+            filled: true,
+            fillColor: const Color(0xFFF9FAFB),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(
+                color: _FleetStatusPageState._kBorder,
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(
+                color: _FleetStatusPageState._kBorder,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(
+                color: _FleetStatusPageState._kGreen,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final preset in _kGroundingReasonPresets)
+              _GroundingReasonChip(
+                label: de ? preset.$1 : preset.$2,
+                selected: active == (de ? preset.$1 : preset.$2),
+                onTap: () => _applyPreset(de ? preset.$1 : preset.$2),
+              ),
+          ],
+        ),
+      ],
+    );
   }
 
   Future<void> _pickDate() async {
@@ -5521,63 +5774,89 @@ class _ServiceEndDateDialogState extends State<_ServiceEndDateDialog> {
     final t = AppLocalizations.of(context);
     final de = Localizations.localeOf(context).languageCode == 'de';
     return AlertDialog(
-      title: Text(t.t('fleet_status_field_service_end_date')),
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      title: Text(
+        widget.askReason
+            ? (de ? 'Fahrzeug stilllegen' : 'Ground vehicle')
+            : t.t('fleet_status_field_service_end_date'),
+        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+      ),
       content: SizedBox(
-        width: 360,
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _DateInputField(
-                controller: _controller,
-                label: t.t('fleet_status_field_service_end_date'),
-                onPick: _pickDate,
-                validator: (value) {
-                  final trimmed = (value ?? '').trim();
-                  if (widget.requiredValue && trimmed.isEmpty) {
-                    return t.tf('error_required', {
-                      'field': t.t('fleet_status_field_service_end_date'),
-                    });
-                  }
-                  if (trimmed.isNotEmpty && !isValidVehicleDate(trimmed)) {
-                    return t.t('fleet_status_invalid_date');
-                  }
-                  return null;
-                },
-              ),
-              if (widget.askWorkshop) ...[
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: _workshopController,
-                  decoration: InputDecoration(
-                    labelText: de
-                        ? 'Werkstatt (wohin wurde das Fahrzeug gebracht?)'
-                        : 'Workshop (where was the vehicle sent?)',
-                    filled: true,
-                    fillColor: const Color(0xFFF9FAFB),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(
-                        color: _FleetStatusPageState._kBorder,
-                      ),
+        width: 420,
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (widget.askReason) ...[
+                  Text(
+                    de
+                        ? 'Warum steht das Fahrzeug? Der Grund landet am '
+                              'Fahrzeug und in der Historie.'
+                        : 'Why is the vehicle off the road? The reason is '
+                              'stored on the vehicle and in its history.',
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      color: _FleetStatusPageState._kMuted,
                     ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(
-                        color: _FleetStatusPageState._kBorder,
+                  ),
+                  const SizedBox(height: 14),
+                  _reasonSection(de),
+                  const SizedBox(height: 14),
+                ],
+                _DateInputField(
+                  controller: _controller,
+                  label: t.t('fleet_status_field_service_end_date'),
+                  onPick: _pickDate,
+                  validator: (value) {
+                    final trimmed = (value ?? '').trim();
+                    if (widget.requiredValue && trimmed.isEmpty) {
+                      return t.tf('error_required', {
+                        'field': t.t('fleet_status_field_service_end_date'),
+                      });
+                    }
+                    if (trimmed.isNotEmpty && !isValidVehicleDate(trimmed)) {
+                      return t.t('fleet_status_invalid_date');
+                    }
+                    return null;
+                  },
+                ),
+                if (widget.askWorkshop) ...[
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: _workshopController,
+                    decoration: InputDecoration(
+                      labelText: de
+                          ? 'Werkstatt (wohin wurde das Fahrzeug gebracht?)'
+                          : 'Workshop (where was the vehicle sent?)',
+                      filled: true,
+                      fillColor: const Color(0xFFF9FAFB),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(
+                          color: _FleetStatusPageState._kBorder,
+                        ),
                       ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(
-                        color: _FleetStatusPageState._kGreen,
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(
+                          color: _FleetStatusPageState._kBorder,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(
+                          color: _FleetStatusPageState._kGreen,
+                        ),
                       ),
                     ),
                   ),
-                ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -5587,19 +5866,81 @@ class _ServiceEndDateDialogState extends State<_ServiceEndDateDialog> {
           label: t.t('button_close'),
           variant: CoButtonVariant.quiet,
         ),
+        // Schneller Statuswechsel ohne Begründung — der Grund ist erwünscht,
+        // aber nie Pflicht.
+        if (widget.askReason)
+          CoButton(
+            onPressed: () => _submit(withReason: false),
+            label: de ? 'Ohne Grund' : 'Skip',
+            variant: CoButtonVariant.secondaryOutlined,
+          ),
         CoButton(
-          onPressed: () {
-            if (!(_formKey.currentState?.validate() ?? false)) return;
-            Navigator.of(context).pop(
-              _GroundingDialogResult(
-                serviceEndDate: _controller.text.trim(),
-                workshop: _workshopController.text.trim(),
-              ),
-            );
-          },
+          onPressed: () => _submit(withReason: true),
           label: t.t('button_save'),
         ),
       ],
+    );
+  }
+}
+
+/// Antippbarer Vorschlag im Grounding-Dialog — setzt den Freitext-Grund.
+class _GroundingReasonChip extends StatelessWidget {
+  const _GroundingReasonChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected
+          ? _FleetStatusPageState._kAccentGreenTint
+          : const Color(0xFFF9FAFB),
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: selected
+                  ? _FleetStatusPageState._kAccentGreen
+                  : _FleetStatusPageState._kBorder,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (selected) ...[
+                const Icon(
+                  Icons.check,
+                  size: 14,
+                  color: _FleetStatusPageState._kAccentGreen,
+                ),
+                const SizedBox(width: 4),
+              ],
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: selected
+                      ? _FleetStatusPageState._kAccentGreen
+                      : _FleetStatusPageState._kSubtle,
+                  height: 1.2,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -6312,7 +6653,10 @@ class _ServiceUploadDialogState extends State<_ServiceUploadDialog> {
                 ),
                 label: Text(
                   _fileName.isEmpty
-                      ? _tr('Datei wählen (PDF/Bild)', 'Choose file (PDF/image)')
+                      ? _tr(
+                          'Datei wählen (PDF/Bild)',
+                          'Choose file (PDF/image)',
+                        )
                       : _fileName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
