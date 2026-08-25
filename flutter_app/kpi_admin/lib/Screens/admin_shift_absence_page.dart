@@ -6095,6 +6095,11 @@ class _DriverAbsenceProfile {
   final String driverId;
   final String driverName;
 
+  /// `false` = archivierter (ausgetretener/deaktivierter) Fahrer. Solche
+  /// wurden frueher gar nicht geladen; jetzt liegen sie hinter dem
+  /// Archiv-Umschalter, damit alte Salden nachvollziehbar bleiben.
+  final bool isActive;
+
   /// Personalnummer (`employeeNumber`) — leer, wenn nicht gepflegt.
   final String employeeNumber;
 
@@ -6138,6 +6143,7 @@ class _DriverAbsenceProfile {
   const _DriverAbsenceProfile({
     required this.driverId,
     required this.driverName,
+    required this.isActive,
     required this.employeeNumber,
     required this.contractPeriodText,
     required this.vacation,
@@ -6290,6 +6296,9 @@ class _AbsenceDriversOverviewPageState
   final FocusNode _searchFocus = FocusNode();
   String _search = '';
 
+  /// `true` = Archiv-Ansicht (ausgetretene/deaktivierte Fahrer).
+  bool _showArchived = false;
+
   Future<List<_DriverAbsenceProfile>>? _future;
 
   /// Aufgelöster DSP-Scope (`dspUid`, sonst eigene UID). Wird von
@@ -6397,8 +6406,10 @@ class _AbsenceDriversOverviewPageState
     final out = <_DriverAbsenceProfile>[];
     for (final doc in driversSnap.docs) {
       final data = doc.data();
-      // Nur aktive DAs — gleiche Quelle wie im Drivers Hub.
-      if (!isDriverWorking(data)) continue;
+      // Archivierte DAs werden mitgeladen und in der Ansicht ueber den
+      // Archiv-Umschalter getrennt (Ticket „DA balance: show ARCHIVE
+      // employees"). Quelle der Aktiv-Kennung wie im Drivers Hub.
+      final isActive = isDriverWorking(data);
       final tid =
           ((data['transporterId'] ?? doc.id).toString()).trim().toUpperCase();
       if (tid.isEmpty) continue;
@@ -6434,6 +6445,7 @@ class _AbsenceDriversOverviewPageState
       out.add(
         _DriverAbsenceProfile(
           driverId: tid,
+          isActive: isActive,
           driverName: _AbsenceAdminItem._firstNonEmpty([
             (data['driverName'] ?? '').toString(),
             (data['name'] ?? '').toString(),
@@ -6493,10 +6505,17 @@ class _AbsenceDriversOverviewPageState
           }
 
           final all = snap.data ?? const <_DriverAbsenceProfile>[];
+          // Aktive und archivierte Fahrer sind zwei getrennte Ansichten —
+          // der Umschalter oben entscheidet, welche gezeigt wird.
+          final activeCount = all.where((d) => d.isActive).length;
+          final archivedCount = all.length - activeCount;
+          final scoped = all
+              .where((d) => d.isActive != _showArchived)
+              .toList(growable: false);
           final needle = _search.trim().toLowerCase();
           final drivers = needle.isEmpty
-              ? all
-              : all
+              ? scoped
+              : scoped
                   .where((d) =>
                       d.driverName.toLowerCase().contains(needle) ||
                       d.driverId.toLowerCase().contains(needle) ||
@@ -6524,8 +6543,17 @@ class _AbsenceDriversOverviewPageState
                         const SizedBox(height: 4),
                         Text(
                           de
-                              ? 'Aktive DAs mit Krankheitstagen, PTO- und Overtime-Balance — auf einen Fahrer tippen für die komplette Historie.'
-                              : 'Active DAs with sick days, PTO and overtime balance — tap a driver for the full history.',
+                              ? (_showArchived
+                                  ? 'Archivierte DAs — Salden ausgetretener '
+                                        'Fahrer bleiben nachvollziehbar. Auf '
+                                        'einen Fahrer tippen für die '
+                                        'komplette Historie.'
+                                  : 'Aktive DAs mit Krankheitstagen, PTO- und Overtime-Balance — auf einen Fahrer tippen für die komplette Historie.')
+                              : (_showArchived
+                                  ? 'Archived DAs — balances of former '
+                                        'drivers stay available. Tap a driver '
+                                        'for the full history.'
+                                  : 'Active DAs with sick days, PTO and overtime balance — tap a driver for the full history.'),
                           style: const TextStyle(
                             color: _kMuted,
                             fontSize: 13,
@@ -6555,13 +6583,27 @@ class _AbsenceDriversOverviewPageState
                 ],
               ),
               const SizedBox(height: 16),
-              _AbsenceSearchField(
-                controller: _searchCtrl,
-                focusNode: _searchFocus,
-                onChanged: (value) {
-                  if (_search == value) return;
-                  setState(() => _search = value);
-                },
+              Row(
+                children: [
+                  Expanded(
+                    child: _AbsenceSearchField(
+                      controller: _searchCtrl,
+                      focusNode: _searchFocus,
+                      onChanged: (value) {
+                        if (_search == value) return;
+                        setState(() => _search = value);
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  _ArchiveToggle(
+                    showArchived: _showArchived,
+                    activeCount: activeCount,
+                    archivedCount: archivedCount,
+                    de: de,
+                    onChanged: (v) => setState(() => _showArchived = v),
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
               Expanded(
@@ -6575,9 +6617,13 @@ class _AbsenceDriversOverviewPageState
                   child: drivers.isEmpty
                       ? _EmptyState(
                           title: de ? 'Keine Fahrer' : 'No drivers',
-                          subtitle: de
-                              ? 'Für diese Suche gibt es keinen aktiven Fahrer.'
-                              : 'No active driver matches this search.',
+                          subtitle: _showArchived
+                              ? (de
+                                  ? 'Im Archiv gibt es dazu keinen Fahrer.'
+                                  : 'No archived driver matches this.')
+                              : (de
+                                  ? 'Für diese Suche gibt es keinen aktiven Fahrer.'
+                                  : 'No active driver matches this search.'),
                         )
                       : ListView.separated(
                           padding: EdgeInsets.zero,
@@ -7770,6 +7816,87 @@ class _DriverOvertimeTile extends StatelessWidget {
                 fontWeight: FontWeight.w900,
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Umschalter „Aktiv ↔ Archiv" über der DA-Balance-Liste.
+///
+/// Archivierte Fahrer wurden früher gar nicht geladen; ihre Urlaubs- und
+/// Überstundensalden waren nach dem Austritt nicht mehr einsehbar. Der
+/// Umschalter blendet sie auf Wunsch ein, ohne die Alltagsansicht zu
+/// überfrachten — Vorgabe bleibt „Aktiv".
+class _ArchiveToggle extends StatelessWidget {
+  const _ArchiveToggle({
+    required this.showArchived,
+    required this.activeCount,
+    required this.archivedCount,
+    required this.de,
+    required this.onChanged,
+  });
+
+  final bool showArchived;
+  final int activeCount;
+  final int archivedCount;
+  final bool de;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget segment({
+      required String label,
+      required int count,
+      required bool active,
+      required VoidCallback onTap,
+    }) {
+      return Material(
+        color: active ? const Color(0xFF111827) : Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: active ? null : onTap,
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 40),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            alignment: Alignment.center,
+            child: Text(
+              '$label $count',
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w800,
+                color: active ? Colors.white : const Color(0xFF6B7280),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          segment(
+            label: de ? 'Aktiv' : 'Active',
+            count: activeCount,
+            active: !showArchived,
+            onTap: () => onChanged(false),
+          ),
+          const SizedBox(width: 3),
+          segment(
+            label: de ? 'Archiv' : 'Archive',
+            count: archivedCount,
+            active: showArchived,
+            onTap: () => onChanged(true),
           ),
         ],
       ),
