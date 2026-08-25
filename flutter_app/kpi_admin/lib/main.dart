@@ -260,6 +260,9 @@ class App extends StatelessWidget {
             '/incident-reports': (_) => _wrapSelectable(
               const AdminShellPage(initialNav: AppNav.incidentReports),
             ),
+            '/vehicle-check': (_) => _wrapSelectable(
+              const AdminShellPage(initialNav: AppNav.vehicleCheck),
+            ),
             '/academy': (_) => _wrapSelectable(
               const AdminShellPage(initialNav: AppNav.academy),
             ),

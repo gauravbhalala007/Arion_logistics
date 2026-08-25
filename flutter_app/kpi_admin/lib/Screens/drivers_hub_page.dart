@@ -2994,6 +2994,112 @@ class _DriversHubPageState extends State<DriversHubPage> {
   /// validiert das neue Format (Buchstaben + Zahlen, optional leer um die
   /// TID zu entfernen) und verschiebt das Driver-Doc bei Änderung auf die
   /// neue ID. Vermeidet einen Konflikt, falls die Ziel-TID schon existiert.
+  /// Nach einem TID-Wechsel: fragt, ob damit eine neue Beschaeftigung
+  /// beginnt. Sagt der Admin ja und nennt ein Startdatum, schliesst der
+  /// bisherige Zeitraum am Vortag (die alte ID ist damit inaktiv) und ein
+  /// neuer Zeitraum mit der neuen ID beginnt — der Fahrer wird wieder
+  /// aktiv gesetzt.
+  Future<void> _offerRehirePeriodAfterTidChange({
+    required DocumentReference<Map<String, dynamic>> driverRef,
+    required String oldTid,
+    required String newTid,
+  }) async {
+    if (!mounted) return;
+    final de = Localizations.localeOf(context).languageCode == 'de';
+
+    final wantsNewPeriod = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Text(
+          de ? 'Neue Beschäftigung?' : 'New employment?',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+        ),
+        content: Text(
+          de
+              ? 'Beginnt mit der ID "$newTid" ein neuer Vertrag? Dann wird '
+                  '"$oldTid" als abgeschlossener Zeitraum abgelegt und damit '
+                  'inaktiv, und ab dem gewählten Vertragsbeginn läuft die '
+                  'neue ID.'
+              : 'Does ID "$newTid" start a new contract? Then "$oldTid" is '
+                  'filed as a closed period — and therefore inactive — and '
+                  'the new ID runs from the contract start you pick.',
+          style: const TextStyle(fontSize: 13, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(de ? 'Nein, nur umbenannt' : 'No, just renamed'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(de ? 'Vertragsbeginn wählen' : 'Pick contract start'),
+          ),
+        ],
+      ),
+    );
+    if (wantsNewPeriod != true || !mounted) return;
+
+    final today = DateTime.now();
+    final start = await showDatePicker(
+      context: context,
+      initialDate: today,
+      firstDate: DateTime(today.year - 10),
+      lastDate: DateTime(today.year + 2),
+      helpText: de ? 'Vertragsbeginn' : 'Contract start',
+    );
+    if (start == null || !mounted) return;
+
+    final snap = await driverRef.get();
+    final data = snap.data() ?? <String, dynamic>{};
+    final periods = employmentPeriodsOf(data);
+    final dayBefore = start.subtract(const Duration(days: 1));
+
+    final next = <EmploymentPeriod>[];
+    for (final period in periods) {
+      // Laufende Zeiträume vor dem neuen Start schliessen — offen bleiben
+      // darf nur der neue.
+      if (period.endDate == null &&
+          (period.startDate == null || period.startDate!.isBefore(start))) {
+        next.add(period.copyWith(
+          end: formatIsoDate(dayBefore),
+          transporterId:
+              period.transporterId.trim().isEmpty ? oldTid : null,
+        ));
+      } else {
+        next.add(period);
+      }
+    }
+    next.add(EmploymentPeriod(
+      start: formatIsoDate(start),
+      end: '',
+      transporterId: newTid,
+    ));
+
+    await _saveEmploymentPeriods(
+      driverRef: driverRef,
+      periods: next,
+      previousTid: oldTid,
+    );
+    await driverRef.set(<String, dynamic>{
+      'active': true,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          de
+              ? '"$oldTid" endet am ${formatShortDate(dayBefore)}, '
+                  '"$newTid" ist ab ${formatShortDate(start)} aktiv.'
+              : '"$oldTid" ends on ${formatShortDate(dayBefore)}, '
+                  '"$newTid" is active from ${formatShortDate(start)}.',
+        ),
+      ),
+    );
+  }
+
   Future<void> _editTransporterId(
     DocumentSnapshot<Map<String, dynamic>> driverDoc,
     String currentTid,
@@ -3159,6 +3265,18 @@ class _DriversHubPageState extends State<DriversHubPage> {
           'tidPending': false,
           'updatedAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
+      }
+
+      // Neue ID + neuer Vertragsbeginn = neue Beschaeftigung: die alte ID
+      // wandert als abgeschlossener Zeitraum in die Historie (damit
+      // inaktiv), die neue laeuft ab dem gewaehlten Datum. Der Admin
+      // entscheidet, ob es ein Wiedereintritt ist — geraten wird nichts.
+      if (newTid.isNotEmpty && oldTid.isNotEmpty) {
+        await _offerRehirePeriodAfterTidChange(
+          driverRef: driversCol.doc(newTid),
+          oldTid: oldTid,
+          newTid: newTid,
+        );
       }
 
       if (!mounted) return;
@@ -4898,6 +5016,7 @@ class _DriversHubPageState extends State<DriversHubPage> {
             current: current,
           ),
           editTransporterId: _editTransporterId,
+          toggleActive: _onToggleActiveDriver,
           settingsMenuBuilder: _driverSettingsMenu,
           profileImage: _profileImageFromOnboarding,
           workPermitTypeLabel: (raw, fallbackExpiry) => _workPermitTypeLabel(

@@ -166,12 +166,18 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
   late DateTime _selectedDate;
 
   // Page-level dispatcher coordination — one bar at the top covers
-  // every wave. Up to 3 dispatchers; each one has its own shift
-  // bracket (independent picker). One free-form notes line is shown
+  // every wave. Jeder ausgewählte Dispatcher hat seine eigene Schicht
+  // (unabhängiger Picker). One free-form notes line is shown
   // to drivers after publish.
+  //
+  // Ticket "mehr als 3 Dispatcher": Die Auswahl war hart auf 3 gedeckelt.
+  // Die Obergrenze dient nur noch als Vernunftbremse (die Leiste bzw. der
+  // Fahrer-Strip bleiben lesbar) — das Speicherformat ist unverändert eine
+  // Liste `[{name, start, end}]`, bestehende Pläne mit 3 Einträgen laufen
+  // ohne Migration weiter.
   final List<String> _selectedDispatchers = [];
   final Map<String, _ShiftRange> _shiftByDispatcher = {};
-  static const int _maxDispatchers = 3;
+  static const int _maxDispatchers = 10;
 
   String _generalNotes = '';
 
@@ -5113,10 +5119,18 @@ class _RouteList extends StatelessWidget {
   }
 }
 
+/// Ab so vielen noch wählbaren Namen wird die Auswahl zu **einem**
+/// „Dispatcher hinzufügen“-Button zusammengefasst. Darunter bleiben die
+/// Namen als Ein-Klick-Chips stehen (der Alltagsfall: zwei bis drei
+/// Dispatcher). Zehn Chips nebeneinander sprengen sonst die Pillen-Leiste
+/// und mobil erst recht das Bottom-Sheet.
+const int _kInlineDispatcherChipLimit = 3;
+
 /// Page-level dispatcher selector. One bar covers all waves of the
-/// day. Up to 3 named dispatchers can be picked from the existing
-/// Dispatcher Pill list; **each one** carries its own shift bracket
-/// (start + end times in 30-minute steps, picked independently).
+/// day. Beliebig viele Namen (bis [_AdminWaveplanPageState._maxDispatchers])
+/// können aus der bestehenden Dispatcher-Pill-Liste gewählt werden;
+/// **each one** carries its own shift bracket (start + end times in
+/// 30-minute steps, picked independently).
 class _DispatcherBar extends StatelessWidget {
   final List<String> available;
   final List<String> selected;
@@ -5196,12 +5210,20 @@ class _DispatcherBar extends StatelessWidget {
                           onShiftChanged: (r) => onShiftChanged(name, r),
                           onRemove: () => onRemoveDispatcher(name),
                         ),
-                      if (canAddMore && remaining.isNotEmpty)
+                      if (canAddMore &&
+                          remaining.isNotEmpty &&
+                          remaining.length <= _kInlineDispatcherChipLimit)
                         for (final name in remaining)
                           _AddDispatcherChip(
                             name: name,
                             onTap: () => onAddDispatcher(name),
                           ),
+                      if (canAddMore &&
+                          remaining.length > _kInlineDispatcherChipLimit)
+                        _AddDispatcherMenu(
+                          names: remaining,
+                          onSelected: onAddDispatcher,
+                        ),
                       if (!canAddMore)
                         Text(
                           t.tf('waveplan_dispatcher_max', {
@@ -5216,6 +5238,109 @@ class _DispatcherBar extends StatelessWidget {
                   ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Ein einzelner „Dispatcher hinzufügen“-Button, der die noch freien
+/// Namen in einem Menü anbietet. Greift, sobald mehr als
+/// [_kInlineDispatcherChipLimit] Namen zur Wahl stehen.
+class _AddDispatcherMenu extends StatelessWidget {
+  final List<String> names;
+  final ValueChanged<String> onSelected;
+  const _AddDispatcherMenu({required this.names, required this.onSelected});
+
+  @override
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final label = de ? 'Dispatcher hinzufügen' : 'Add dispatcher';
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: PopupMenuButton<String>(
+        tooltip: label,
+        position: PopupMenuPosition.under,
+        padding: EdgeInsets.zero,
+        onSelected: onSelected,
+        itemBuilder: (_) => [
+          for (final name in names)
+            PopupMenuItem<String>(
+              value: name,
+              height: 40,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.person_add_alt_1_rounded,
+                    size: 15,
+                    color: AppColors.codriverDeep,
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.footnote.copyWith(
+                        color: AppColors.codriverGraphite,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+        child: Container(
+          // 36 px hoch statt 44: die Pillen-Leiste ist bewusst flach; das
+          // Tap-Ziel liegt mit Padding trotzdem über der Mindestgröße der
+          // umliegenden Chips.
+          constraints: const BoxConstraints(minHeight: 32),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: 6,
+          ),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceLight,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: AppColors.codriverGreen.withValues(alpha: 0.5),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.add_circle_outline_rounded,
+                size: 13,
+                color: AppColors.codriverDeep,
+              ),
+              const SizedBox(width: 4),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 180),
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.footnote.copyWith(
+                    color: AppColors.codriverGraphite,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 2),
+              Text(
+                '(${names.length})',
+                style: AppTypography.caption2.copyWith(
+                  color: AppColors.labelTertiaryLight,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

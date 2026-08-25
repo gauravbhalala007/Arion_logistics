@@ -160,6 +160,7 @@ class DriverHubDetailActions {
     required this.editEmployeeNumber,
     required this.editLicenseType,
     required this.editTransporterId,
+    required this.toggleActive,
     required this.settingsMenuBuilder,
     required this.profileImage,
     required this.workPermitTypeLabel,
@@ -220,6 +221,15 @@ class DriverHubDetailActions {
     DocumentSnapshot<Map<String, dynamic>> driverDoc,
     String currentTid,
   ) editTransporterId;
+
+  /// `_onToggleActiveDriver` — setzt die Transporter-ID des Fahrers auf
+  /// aktiv bzw. inaktiv. Beim Deaktivieren fragt der Bestandsdialog nach
+  /// dem Vertragsende, beim Reaktivieren bietet er an, ein vergangenes
+  /// Vertragsende wieder zu loeschen.
+  final void Function(
+    DocumentSnapshot<Map<String, dynamic>> driverDoc,
+    bool currentlyActive,
+  ) toggleActive;
 
   /// `_driverSettingsMenu` — das bestehende Zahnrad-Menü der Detailseite.
   final Widget Function(DocumentSnapshot<Map<String, dynamic>> driverDoc)
@@ -778,7 +788,7 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
                   ),
                 ),
                 const SizedBox(height: 2),
-                _identityLine(doc, employeeNumber, tid),
+                _identityLine(doc, data, employeeNumber, tid),
                 const SizedBox(height: 10),
                 _badges(data),
               ],
@@ -846,6 +856,7 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
   /// Bestands-Editor.
   Widget _identityLine(
     DocumentSnapshot<Map<String, dynamic>> doc,
+    Map<String, dynamic> data,
     String employeeNumber,
     String tid,
   ) {
@@ -882,7 +893,71 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
             ),
           ),
         ),
+        if (tid.isNotEmpty) ...[
+          const SizedBox(width: 6),
+          _tidStatusPill(doc, data),
+        ],
       ],
+    );
+  }
+
+  /// Aktiv/Inaktiv der Transporter-ID — direkt neben der ID, weil Admins
+  /// den Status genau dort suchen. Ein Klick oeffnet den Bestandsdialog
+  /// (Vertragsende erfassen bzw. wieder loeschen).
+  Widget _tidStatusPill(
+    DocumentSnapshot<Map<String, dynamic>> doc,
+    Map<String, dynamic> data,
+  ) {
+    final active = (data['active'] as bool?) ?? true;
+    final bg = active ? _C.greenTint : _C.redBg;
+    final fg = active ? _C.green : _C.redValue;
+
+    return Tooltip(
+      message: active
+          ? _tr('Transporter-ID auf inaktiv setzen',
+              'Mark transporter ID as inactive')
+          : _tr('Transporter-ID wieder aktivieren',
+              'Mark transporter ID as active'),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(99),
+          onTap: () => widget.actions.toggleActive(doc, active),
+          child: Padding(
+            // Grosszuegige Trefferflaeche um die kleine Pille herum.
+            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: bg,
+                borderRadius: BorderRadius.circular(99),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    active
+                        ? Icons.check_circle_outline
+                        : Icons.pause_circle_outline,
+                    size: 12,
+                    color: fg,
+                  ),
+                  const SizedBox(width: 3),
+                  Text(
+                    active ? _tr('Aktiv', 'Active') : _tr('Inaktiv', 'Inactive'),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: fg,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 

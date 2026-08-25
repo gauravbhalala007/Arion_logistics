@@ -53,6 +53,7 @@ import 'admin_cart_page.dart';
 import 'admin_shift_plan_page.dart';
 import 'admin_payment_check_page.dart';
 import 'admin_monthly_plan_page.dart';
+import 'admin_vehicle_check_page.dart';
 import '../widgets/admin_top_bar.dart';
 
 class AdminShellPage extends StatefulWidget {
@@ -424,6 +425,10 @@ class _AdminShellPageState extends State<AdminShellPage> {
                           AppNav.contactCompliance,
                           () => const ContactComplianceOverviewPage(),
                         ),
+                        _lazy(
+                          AppNav.vehicleCheck,
+                          () => const AdminVehicleCheckPage(),
+                        ),
                       ],
                     ),
                   ),
@@ -577,6 +582,8 @@ class _AdminShellPageState extends State<AdminShellPage> {
         return 32;
       case AppNav.contactCompliance:
         return 33;
+      case AppNav.vehicleCheck:
+        return 34;
       default:
         return 0;
     }

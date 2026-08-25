@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../services/incident_reports.dart';
+import '../services/vehicle_check_service.dart' show kVehicleCheckKind;
 import '../widgets/admin_scope.dart';
 import '../widgets/co_button.dart';
 import '../widgets/co_pressable.dart';
@@ -525,6 +526,17 @@ class _IncidentListTabState extends State<_IncidentListTab> {
         }
 
         final all = (snap.data?.docs ?? const [])
+            // Soft-gelöschte Vorfälle sind für den Admin weg — das
+            // Dokument bleibt (Haftung), taucht aber weder in der Liste
+            // noch in der Statistik oder den Jahres-Zählern auf.
+            .where((d) => !isIncidentDeleted(d.data()))
+            // Sicherheitsnetz: Fahrzeug-Checks liegen zwar unter
+            // `users/{dsp}/drivers/{TID}/incident_reports` und damit gar
+            // nicht in diesem Stream — falls das Pfad-TODO in
+            // `vehicle_check_service.dart` je umgestellt wird, dürfen sie
+            // hier trotzdem nicht als Vorfall auftauchen (und schon gar
+            // nicht über den Löschweg dieser Seite verschwinden).
+            .where((d) => !_isVehicleCheckDoc(d.data()))
             .where((d) => incidentCategoryOf(d.data()) == widget.category)
             .toList();
         final years = <int>{
@@ -1021,10 +1033,194 @@ class _IncidentListTabState extends State<_IncidentListTab> {
         docRef: doc.reference,
         initialData: doc.data(),
         onEdit: () => _openForm(docId: doc.id, initialData: doc.data()),
+        onDelete: () => _deleteIncident(doc.reference, doc.data()),
       ),
     );
   }
+
+  // ── Löschen (Soft-Delete + Undo) ───────────────────────────────────────
+
+  /// Bestätigt und blendet einen Vorfall aus.
+  ///
+  /// Bewusst **kein** `delete()`: Unfall- und Arbeitsunfalldaten sind
+  /// haftungs- und versicherungsrelevant (Regress, Gegenpartei,
+  /// BG-Meldung). Gesetzt wird nur [kIncidentDeletedField]; das Dokument
+  /// samt Fotos bleibt erhalten und lässt sich über die Undo-Snackbar
+  /// (5 s) sofort zurückholen.
+  ///
+  /// Rechte: identisch zum Rest der Seite. `users/{dsp}/incident_reports`
+  /// ist per Rules für den DSP selbst schreibbar und über die
+  /// Blanket-Regel `match /{document=**}` auch für seine Dispatcher — wer
+  /// die Seite öffnen kann, darf hier auch löschen. `deletedBy` hält die
+  /// tatsächlich handelnde Auth-UID fest.
+  Future<void> _deleteIncident(
+    DocumentReference<Map<String, dynamic>> ref,
+    Map<String, dynamic> data,
+  ) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final messenger = ScaffoldMessenger.of(context);
+
+    if (_isVehicleCheckDoc(data)) {
+      messenger.showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(
+            de
+                ? 'Fahrzeug-Checks werden hier nicht gelöscht.'
+                : 'Vehicle checks cannot be deleted here.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(
+          Icons.warning_amber_rounded,
+          color: kIncidentDanger,
+          size: 28,
+        ),
+        title: Text(
+          de ? 'Vorfall löschen?' : 'Delete incident?',
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF3F2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFECDCA)),
+              ),
+              child: Text(
+                _deleteSubject(data, de),
+                style: const TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFFB42318),
+                  height: 1.4,
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              de
+                  ? 'Unfalldaten sind haftungs- und versicherungsrelevant. '
+                        'Der Vorfall verschwindet aus allen Listen, Statistiken '
+                        'und Schadenzählern.'
+                  : 'Incident data is liability and insurance relevant. '
+                        'The incident disappears from every list, statistic and '
+                        'damage counter.',
+              style: const TextStyle(
+                fontSize: 13,
+                color: kIncidentMuted,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              de
+                  ? 'Du kannst das direkt danach 5 Sekunden lang rückgängig '
+                        'machen.'
+                  : 'You can undo this for 5 seconds afterwards.',
+              style: const TextStyle(
+                fontSize: 13,
+                color: kIncidentMuted,
+                height: 1.5,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          CoButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            label: de ? 'Abbrechen' : 'Cancel',
+            variant: CoButtonVariant.quiet,
+          ),
+          CoButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            icon: Icons.delete_outline_rounded,
+            label: de ? 'Löschen' : 'Delete',
+            variant: CoButtonVariant.destructive,
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final actorUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    try {
+      await setIncidentDeleted(ref, deleted: true, by: actorUid);
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: kIncidentDanger,
+          content: Text(
+            de ? 'Löschen fehlgeschlagen: $e' : 'Delete failed: $e',
+          ),
+        ),
+      );
+      return;
+    }
+
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 5),
+        content: Text(de ? 'Vorfall gelöscht.' : 'Incident deleted.'),
+        action: SnackBarAction(
+          label: de ? 'Rückgängig' : 'Undo',
+          onPressed: () async {
+            try {
+              await setIncidentDeleted(ref, deleted: false);
+            } catch (e) {
+              messenger.showSnackBar(
+                SnackBar(
+                  behavior: SnackBarBehavior.floating,
+                  backgroundColor: kIncidentDanger,
+                  content: Text(
+                    de
+                        ? 'Wiederherstellen fehlgeschlagen: $e'
+                        : 'Restore failed: $e',
+                  ),
+                ),
+              );
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  /// „Fahrer · Datum" für den Bestätigungsdialog — der Admin muss sehen,
+  /// **welchen** Vorfall er gerade wegklickt.
+  static String _deleteSubject(Map<String, dynamic> data, bool de) {
+    final driver = incidentDriverName(data);
+    final occurredAt = incidentOccurredAt(data);
+    final plate = incidentPlate(data);
+    final parts = <String>[
+      driver.isEmpty ? (de ? 'Fahrer unbekannt' : 'Driver unknown') : driver,
+      if (occurredAt != null)
+        DateFormat('dd.MM.yyyy').format(occurredAt)
+      else
+        (de ? 'ohne Datum' : 'no date'),
+      if (plate.isNotEmpty) plate.toUpperCase(),
+    ];
+    return parts.join(' · ');
+  }
 }
+
+/// Fahrzeug-Check statt echter Vorfallmeldung (Marker `kind`).
+bool _isVehicleCheckDoc(Map<String, dynamic> data) =>
+    (data['kind'] ?? '').toString().trim() == kVehicleCheckKind;
 
 // ═════════════════════════════════════════════════════════════════════════
 // Karte
@@ -1400,11 +1596,16 @@ class _IncidentDetailDialog extends StatelessWidget {
     required this.docRef,
     required this.initialData,
     required this.onEdit,
+    required this.onDelete,
   });
 
   final DocumentReference<Map<String, dynamic>> docRef;
   final Map<String, dynamic> initialData;
   final VoidCallback onEdit;
+
+  /// Soft-Delete mit Bestätigung + Undo (siehe
+  /// `_IncidentListTabState._deleteIncident`).
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -1487,25 +1688,47 @@ class _IncidentDetailDialog extends StatelessWidget {
                 const Divider(height: 1, color: kIncidentBorder),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      CoButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        label: de ? 'Schließen' : 'Close',
-                        variant: CoButtonVariant.quiet,
-                      ),
-                      const SizedBox(width: 8),
-                      CoButton(
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                          onEdit();
-                        },
-                        icon: Icons.edit_outlined,
-                        label: de ? 'Bearbeiten' : 'Edit',
-                        variant: CoButtonVariant.secondaryOutlined,
-                      ),
-                    ],
+                  // Wrap statt Row: mobil (Dialogbreite ≈ Bildschirm minus
+                  // 40 px) passen Löschen + Schließen + Bearbeiten nicht in
+                  // eine Zeile. Das `SizedBox` erzwingt die volle Breite,
+                  // sonst schrumpft der Wrap auf die Buttonbreite und die
+                  // Gruppe stünde mittig statt rechts.
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: Wrap(
+                      alignment: WrapAlignment.end,
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        // Fahrzeug-Checks sind hier nicht löschbar — sie
+                        // gehören nicht in diese Liste (siehe
+                        // `_isVehicleCheckDoc`).
+                        if (!_isVehicleCheckDoc(data))
+                          CoButton(
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                              onDelete();
+                            },
+                            icon: Icons.delete_outline_rounded,
+                            label: de ? 'Löschen' : 'Delete',
+                            variant: CoButtonVariant.destructiveQuiet,
+                          ),
+                        CoButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          label: de ? 'Schließen' : 'Close',
+                          variant: CoButtonVariant.quiet,
+                        ),
+                        CoButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            onEdit();
+                          },
+                          icon: Icons.edit_outlined,
+                          label: de ? 'Bearbeiten' : 'Edit',
+                          variant: CoButtonVariant.secondaryOutlined,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],

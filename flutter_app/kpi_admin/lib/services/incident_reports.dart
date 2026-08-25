@@ -70,6 +70,45 @@ const List<String> kGroundingValues = <String>[
 const String kIncidentSourceCoDriver = 'codriver';
 const String kIncidentSourceDriverApp = 'driver_app';
 
+// ── Soft-Delete ──────────────────────────────────────────────────────────
+
+/// Marker-Feld des Soft-Deletes.
+///
+/// Vorfälle werden **nie** hart gelöscht: Unfalldaten sind haftungs- und
+/// versicherungsrelevant (BG-Meldung, Regress, Gegenpartei) und ein
+/// Fehlklick wäre unwiederbringlich. Stattdessen setzt das Admin-Center
+/// `isDeleted: true` (+ [kIncidentDeletedAtField]/[kIncidentDeletedByField])
+/// und blendet den Vorfall aus Listen und Zählern aus.
+///
+/// Bestandsdokumente tragen das Feld nicht — `!= true` gilt als „sichtbar",
+/// deshalb ist **keine** Datenmigration nötig.
+const String kIncidentDeletedField = 'isDeleted';
+const String kIncidentDeletedAtField = 'deletedAt';
+const String kIncidentDeletedByField = 'deletedBy';
+
+/// True, wenn der Vorfall soft-gelöscht ist. Fehlendes Feld = sichtbar.
+bool isIncidentDeleted(Map<String, dynamic> data) =>
+    data[kIncidentDeletedField] == true;
+
+/// Setzt bzw. entfernt den Soft-Delete-Marker.
+///
+/// [by] ist die Auth-UID des Handelnden (Admin **oder** Dispatcher) —
+/// wer den Vorfall ausgeblendet hat, muss nachvollziehbar bleiben. Beim
+/// Zurücknehmen (`deleted: false`) werden die Audit-Felder wieder entfernt,
+/// damit ein rückgängig gemachter Klick keine falsche Löschspur hinterlässt.
+Future<void> setIncidentDeleted(
+  DocumentReference<Map<String, dynamic>> ref, {
+  required bool deleted,
+  String by = '',
+}) {
+  return ref.update(<String, dynamic>{
+    kIncidentDeletedField: deleted,
+    kIncidentDeletedAtField:
+        deleted ? FieldValue.serverTimestamp() : FieldValue.delete(),
+    kIncidentDeletedByField: deleted ? by : FieldValue.delete(),
+  });
+}
+
 // ── Labels (DE/EN) ───────────────────────────────────────────────────────
 
 String incidentTypeLabel(String value, {required bool de}) {
@@ -493,24 +532,36 @@ CollectionReference<Map<String, dynamic>> incidentReportsCol(String dspUid) {
       .collection('incident_reports');
 }
 
+/// Alles, was **nicht** in den Fahrzeug-Vorfall-Zähler gehört.
+///
 /// Ein Dokument gilt als Arbeitsunfall, wenn **eines** der beiden Felder
 /// `work_accident` sagt: `category` (Admin-Center und Import) oder das
-/// Altfeld `type` (Fahrer-App).
+/// Altfeld `type` (Fahrer-App). Dazu kommen soft-gelöschte Vorfälle
+/// ([kIncidentDeletedField]) — sonst zeigte die Fahrzeug-Kachel im Fleet
+/// Hub weiter einen Schaden, den die Vorfallsliste längst ausblendet.
 ///
-/// Als **eine** `Filter.or`-Bedingung formuliert und nicht als zwei
-/// getrennte Zählungen: ein Dokument, das beide Felder trägt — etwa ein im
-/// Admin-Center nachbearbeiteter Alt-Arbeitsunfall — würde sonst zweimal
-/// abgezogen und den Fahrzeug-Zähler zu niedrig ausweisen.
-final Filter _workAccidentFilter = Filter.or(
+/// Als **eine** `Filter.or`-Bedingung formuliert und nicht als getrennte
+/// Zählungen: ein Dokument, das mehrere Kriterien trägt — etwa ein
+/// gelöschter Alt-Arbeitsunfall — würde sonst mehrfach abgezogen und den
+/// Fahrzeug-Zähler zu niedrig ausweisen.
+///
+/// Alle drei Zweige sind reine Gleichheitsfilter; zusammen mit dem
+/// Match-Feld (`plateKey` bzw. `driverTransporterId`) bedient Firestore sie
+/// über Index-Merge der Einzelfeld-Indizes — es ist **kein** neuer
+/// Composite-Index nötig.
+final Filter _excludedFromVehicleCountFilter = Filter.or(
   Filter('category', isEqualTo: kIncidentWorkAccident),
   Filter('type', isEqualTo: kIncidentWorkAccident),
+  Filter(kIncidentDeletedField, isEqualTo: true),
 );
 
-/// Zählt Fahrzeug-Vorfälle über Gegenrechnung: `alle − arbeitsunfälle`.
+/// Zählt Fahrzeug-Vorfälle über Gegenrechnung:
+/// `alle − (arbeitsunfälle | gelöscht)`.
 ///
 /// Firestore kann „Feld fehlt" nicht abfragen, Bestandsdokumente der
-/// Fahrer-App tragen aber kein `category` — ein direktes
-/// `where('category','==','vehicle')` würde sie unterschlagen.
+/// Fahrer-App tragen aber kein `category` und kein `isDeleted` — ein
+/// direktes `where('category','==','vehicle')` bzw.
+/// `where('isDeleted','!=',true)` würde sie unterschlagen.
 ///
 /// Beides sind reine count()-Aggregationen; es werden keine Dokumente
 /// übertragen.
@@ -521,7 +572,10 @@ Future<int> _countVehicleIncidents({
   final col = incidentReportsCol(dspUid);
   final results = await Future.wait(<Future<AggregateQuerySnapshot>>[
     col.where(match).count().get(),
-    col.where(Filter.and(match, _workAccidentFilter)).count().get(),
+    col
+        .where(Filter.and(match, _excludedFromVehicleCountFilter))
+        .count()
+        .get(),
   ]);
   final value = (results[0].count ?? 0) - (results[1].count ?? 0);
   return value < 0 ? 0 : value;

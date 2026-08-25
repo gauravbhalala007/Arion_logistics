@@ -19,6 +19,7 @@ import '../widgets/vacation_pool_lines.dart';
 import '../widgets/web_preview.dart'
     if (dart.library.html) '../widgets/web_preview_web.dart';
 import 'driver_privacy_notice_page.dart';
+import 'driver_profile_sections.dart';
 
 const _kBg = Color(0xFFF3F6F7);
 const _kText = Color(0xFF22252F);
@@ -116,6 +117,23 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
                     transporterId: transporterId,
                   ),
                 if (transporterId.isNotEmpty) const SizedBox(height: 16),
+                // Ticket „Your driving History": alle Vorfälle dieses
+                // Fahrers, gelesen aus dem Fahrer-Unterpfad (Root-
+                // Sammlung ist für den Fahrer nicht listbar).
+                DriverDrivingHistorySection(
+                  dspUid: widget.dspUid,
+                  transporterId: widget.driverTransporterId,
+                ),
+                const SizedBox(height: 16),
+                // Ticket „Your Attendance": Überstunden je Monat,
+                // Krankmeldungen, Urlaub + Resturlaub.
+                DriverAttendanceSection(
+                  dspUid: widget.dspUid,
+                  transporterId: widget.driverTransporterId,
+                  driverData: data,
+                  poolsConfig: _poolsConfig,
+                ),
+                const SizedBox(height: 16),
                 _buildDetailsCard(
                   context: context,
                   driverRef: driverRef,

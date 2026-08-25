@@ -66,3 +66,24 @@ DateTime _easterSunday(int year) {
   final day = ((h + l - 7 * m + 114) % 31) + 1;
   return DateTime(year, month, day);
 }
+
+/// Arbeitstage eines Monats nach deutschem Kalender.
+///
+/// Montag bis Freitag ohne die neun bundesweiten Feiertage — die Basis
+/// für die gesetzlichen Sollstunden eines Monats (Arbeitstage × Stunden
+/// pro Tag). Länder-Feiertage (z. B. Fronleichnam) sind bewusst NICHT
+/// enthalten: Sie gelten nicht überall, und die Sollstunden lassen sich
+/// im Zeitkonto ohnehin je Monat übersteuern.
+int germanWorkdaysInMonth(int year, int month) {
+  final firstOfNext = month == 12
+      ? DateTime(year + 1, 1, 1)
+      : DateTime(year, month + 1, 1);
+  var count = 0;
+  for (var day = DateTime(year, month, 1);
+      day.isBefore(firstOfNext);
+      day = day.add(const Duration(days: 1))) {
+    if (_isWeekend(day) || _isGermanyPublicHoliday(day)) continue;
+    count += 1;
+  }
+  return count;
+}

@@ -37,6 +37,7 @@ enum AppNav {
   safetyTraining,
   driverReviews,
   incidentReports,
+  vehicleCheck,
   academy,
   dispatcherPill,
   notifications,
@@ -362,15 +363,11 @@ class AppSideMenu extends StatelessWidget {
         onTap: () =>
             _handleNav(context, AppNav.safetyTraining, '/safety-training'),
       ),
-      _MenuItem(
-        icon: Icons.warning_amber_rounded,
-        label: 'Incident Reports',
-        active: active == AppNav.incidentReports,
-        onTap: () =>
-            _handleNav(context, AppNav.incidentReports, '/incident-reports'),
-      ),
 
-      // ── Fleet & Supplies (role-gated) ──
+      // ── Fleet (role-gated) ──
+      // Kundenwunsch: Fleet Hub, Incident Reports und Vehicle Check stehen
+      // gemeinsam unter EINER Überschrift „Fleet"; das Inventar bleibt als
+      // Material der Flotte am Ende derselben Gruppe.
       _roleSection(context, _groupTitle(context, 'fleet'), [
         _MenuItem(
           icon: Icons.local_shipping_outlined,
@@ -378,6 +375,22 @@ class AppSideMenu extends StatelessWidget {
           active: active == AppNav.fleetStatus,
           onTap: () =>
               _handleNav(context, AppNav.fleetStatus, '/fleet-status'),
+        ),
+        _MenuItem(
+          icon: Icons.warning_amber_rounded,
+          label: 'Incident Reports',
+          active: active == AppNav.incidentReports,
+          onTap: () =>
+              _handleNav(context, AppNav.incidentReports, '/incident-reports'),
+        ),
+        _MenuItem(
+          icon: Icons.checklist_rounded,
+          label: Localizations.localeOf(context).languageCode == 'de'
+              ? 'Fahrzeug-Check'
+              : 'Vehicle Check',
+          active: active == AppNav.vehicleCheck,
+          onTap: () =>
+              _handleNav(context, AppNav.vehicleCheck, '/vehicle-check'),
         ),
         _MenuItem(
           icon: Icons.inventory_2_outlined,
@@ -1010,7 +1023,7 @@ String _groupTitle(BuildContext context, String key) {
     'performance': 'Performance',
     'planning': 'Planung & Betrieb',
     'team': 'Team',
-    'fleet': 'Flotte & Material',
+    'fleet': 'Flotte',
     'finance': 'Finanzen',
     'system': 'System & Hilfe',
   };
@@ -1019,7 +1032,7 @@ String _groupTitle(BuildContext context, String key) {
     'performance': 'Performance',
     'planning': 'Planning & Operations',
     'team': 'Team',
-    'fleet': 'Fleet & Supplies',
+    'fleet': 'Fleet',
     'finance': 'Finance',
     'system': 'System & Help',
   };
@@ -1261,6 +1274,9 @@ const List<_ShortcutDef> _kShortcutCatalog = <_ShortcutDef>[
   _ShortcutDef(AppNav.incidentReports, Icons.warning_amber_rounded,
       '/incident-reports', 'Incident Reports', 'Incident Reports',
       sDe: 'Incidents', sEn: 'Incidents'),
+  _ShortcutDef(AppNav.vehicleCheck, Icons.checklist_rounded,
+      '/vehicle-check', 'Fahrzeug-Check', 'Vehicle Check',
+      sDe: 'Check', sEn: 'Check'),
   _ShortcutDef(AppNav.inventory, Icons.inventory_2_outlined, '/inventory',
       'Inventar', 'Inventory'),
   _ShortcutDef(AppNav.paymentCheck, Icons.fact_check_outlined, '/payment-check',

@@ -14,6 +14,8 @@
 // Bewusst KEINE eigene Subcollection — so sind keine Rules-Änderungen
 // nötig und die bestehende Drivers-Hub-Stream-Abfrage liefert alles mit.
 
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -27,6 +29,7 @@ import '../services/time_account_repository.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_elevation.dart';
 import '../theme/app_typography.dart';
+import '../utils/vacation_days.dart';
 import '../widgets/clearable_search_field.dart';
 
 // ── Zeit-Helfer (H:MM ↔ Minuten, wie im ARION-Zeitkonto-Beispiel) ──
@@ -283,6 +286,65 @@ class _ZeitkontoTabState extends State<ZeitkontoTab> {
     return _driversStreamCache!;
   }
 
+  /// Sollstunden-Vorgabe eines Monats (Ticket „Time Account").
+  ///
+  /// Gespeichert unter `users/{dspUid}/settings/monthly_targets` als
+  /// `{ '2026-08': {workdays: 21, minutesPerDay: 480} }`. Beim Erfassen
+  /// des Zeitkontos wird der Monat damit vorbelegt; ist nichts
+  /// hinterlegt, greifen die gesetzlichen Arbeitstage des Monats.
+  Future<Map<String, _MonthlyTarget>> _loadMonthlyTargets() async {
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.dspUid)
+          .collection('settings')
+          .doc('monthly_targets')
+          .get();
+      final raw = snap.data()?['months'];
+      if (raw is! Map) return const <String, _MonthlyTarget>{};
+      final out = <String, _MonthlyTarget>{};
+      raw.forEach((key, value) {
+        if (value is! Map) return;
+        final days = _minutesFromAny(value['workdays']);
+        final perDay = _minutesFromAny(value['minutesPerDay']);
+        if (days <= 0 || perDay <= 0) return;
+        out['$key'] = _MonthlyTarget(workdays: days, minutesPerDay: perDay);
+      });
+      return out;
+    } catch (_) {
+      // Ohne Leserecht o. Ae. einfach ohne Vorbelegung weiterarbeiten.
+      return const <String, _MonthlyTarget>{};
+    }
+  }
+
+  /// Merkt sich die zuletzt verwendete Vorgabe eines Monats, damit der
+  /// naechste Import sie vorschlaegt.
+  Future<void> _rememberMonthlyTarget(
+    String monthKey,
+    int workdays,
+    int minutesPerDay,
+  ) async {
+    if (workdays <= 0 || minutesPerDay <= 0) return;
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.dspUid)
+          .collection('settings')
+          .doc('monthly_targets')
+          .set(<String, dynamic>{
+        'months': <String, dynamic>{
+          monthKey: <String, dynamic>{
+            'workdays': workdays,
+            'minutesPerDay': minutesPerDay,
+          },
+        },
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (_) {
+      // Nicht fatal — der Import selbst ist bereits geschrieben.
+    }
+  }
+
   /// Owned so the search field's clear button can wipe the visible text.
   final TextEditingController _searchCtrl = TextEditingController();
 
@@ -459,8 +521,27 @@ class _ZeitkontoTabState extends State<ZeitkontoTab> {
     var year = initialYear;
     // Monats-Soll = Arbeitstage × Stunden/Tag (Monate haben je nach
     // Feiertagen 20–23 Arbeitstage).
-    final workdaysCtrl = TextEditingController(text: '21');
-    final hoursPerDayCtrl = TextEditingController(text: '8:00');
+    // Sollstunden je Monat (Ticket „Time Account"): Reihenfolge
+    //   1. gespeicherter Wert fuer genau diesen Monat,
+    //   2. sonst die gesetzlichen Arbeitstage des Monats (Mo-Fr ohne
+    //      bundesweite Feiertage) — bisher stand hier stur „21",
+    //      was in Feiertagsmonaten schlicht falsch war.
+    final savedTargets = await _loadMonthlyTargets();
+    _MonthlyTarget targetFor(int y, int m) {
+      final saved = savedTargets[_monthKey(y, m)];
+      if (saved != null) return saved;
+      return _MonthlyTarget(
+        workdays: germanWorkdaysInMonth(y, m),
+        minutesPerDay: 480,
+      );
+    }
+
+    final initialTarget = targetFor(initialYear, initialMonth);
+    final workdaysCtrl =
+        TextEditingController(text: '${initialTarget.workdays}');
+    final hoursPerDayCtrl = TextEditingController(
+      text: _formatDuration(initialTarget.minutesPerDay),
+    );
     // Stundenlohn €/h — ändert sich von Monat zu Monat.
     final rateCtrl = TextEditingController();
 
@@ -539,8 +620,17 @@ class _ZeitkontoTabState extends State<ZeitkontoTab> {
                                 child: Text(_monthNames(de)[m - 1]),
                               ),
                           ],
-                          onChanged: (v) =>
-                              setLocal(() => month = v ?? month),
+                          onChanged: (v) => setLocal(() {
+                            month = v ?? month;
+                            // Vorbelegung des neuen Monats uebernehmen,
+                            // solange der Nutzer nichts von Hand geaendert
+                            // hat bzw. der Wert dem alten Vorschlag
+                            // entspricht.
+                            final t = targetFor(year, month);
+                            workdaysCtrl.text = '${t.workdays}';
+                            hoursPerDayCtrl.text =
+                                _formatDuration(t.minutesPerDay);
+                          }),
                         ),
                       ),
                       SizedBox(
@@ -695,8 +785,11 @@ class _ZeitkontoTabState extends State<ZeitkontoTab> {
 
     final hourlyRate = _parseEuro(rateCtrl.text);
     // Ein Soll für alle: Arbeitstage × Std./Tag aus dem Dialog.
-    final targetMinutes = (int.tryParse(workdaysCtrl.text.trim()) ?? 0) *
-        _parseDuration(hoursPerDayCtrl.text);
+    final workdaysValue = int.tryParse(workdaysCtrl.text.trim()) ?? 0;
+    final minutesPerDayValue = _parseDuration(hoursPerDayCtrl.text);
+    final targetMinutes = workdaysValue * minutesPerDayValue;
+    // Vorgabe dieses Monats merken — der naechste Import startet damit.
+    unawaited(_rememberMonthlyTarget(key, workdaysValue, minutesPerDayValue));
     var written = 0;
     final batch = FirebaseFirestore.instance.batch();
     for (final r in rows) {
@@ -2201,4 +2294,14 @@ class _ZeitkontoProfile extends StatelessWidget {
           'zeitkonto-${name.replaceAll(RegExp(r'\s+'), '-').toLowerCase()}.pdf',
     );
   }
+}
+
+/// Sollstunden-Vorgabe eines Monats: Arbeitstage × Minuten pro Tag.
+class _MonthlyTarget {
+  const _MonthlyTarget({required this.workdays, required this.minutesPerDay});
+
+  final int workdays;
+  final int minutesPerDay;
+
+  int get targetMinutes => workdays * minutesPerDay;
 }
