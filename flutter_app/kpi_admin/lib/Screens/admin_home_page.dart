@@ -5007,7 +5007,9 @@ class _AlertCenterCardState extends State<_AlertCenterCard> {
             tid: tid, kind: 'licence');
       }
       final idDoc = _parseDate(onboarding['idDocExpiry']);
-      if (idDoc != null) {
+      // „Kein Ablaufdatum" ausdruecklich gesetzt → keine Warnung, auch
+      // wenn irgendwann einmal ein Datum eingetragen war.
+      if (idDoc != null && onboarding['idDocNoExpiry'] != true) {
         add(Icons.credit_card_outlined, _tr('Ausweis', 'ID document'), name,
             idDoc, tid: tid, kind: 'id');
       }
@@ -5686,14 +5688,31 @@ class _AlertCenterCardState extends State<_AlertCenterCard> {
   }
 
   /// Opens the tapped driver's profile inside a pushed Drivers-Hub route.
-  void _openDriverProfile(String tid) {
+  /// Ordnet die Kategorie einer Warnung dem `onboarding`-Feld zu, dessen
+  /// Editor sich beim Antippen sofort öffnen soll.
+  static String? _editFieldForAlertKind(String kind) => switch (kind) {
+        'id' => 'idDocExpiry',
+        'visa' => 'workVisaExpiry',
+        'zusatzblatt' => 'zusatzblattExpiry',
+        'licence' => 'licenseExpiry',
+        _ => null,
+      };
+
+  void _openDriverProfile(String tid, {String kind = ''}) {
     Navigator.of(context).push(MaterialPageRoute<void>(
       // Ohne eigene AppBar: die Fahrer-Detailseite bringt ihren eigenen
       // Kopf mit (Zurück-Pfeil, Titel, Einstellungen) — ein Rahmen-Header
       // darüber ergäbe zwei gestapelte Kopfzeilen.
       builder: (_) => Scaffold(
         backgroundColor: AdminHomePage._kPageBg,
-        body: SafeArea(child: DriversHubPage(initialOpenTid: tid)),
+        body: SafeArea(
+          child: DriversHubPage(
+            initialOpenTid: tid,
+            // Aus einer Warnung heraus: passenden Datums-Editor gleich
+            // aufziehen, statt den Admin die Zeile suchen zu lassen.
+            initialEditField: _editFieldForAlertKind(kind),
+          ),
+        ),
       ),
     ));
   }
@@ -5717,7 +5736,9 @@ class _AlertCenterCardState extends State<_AlertCenterCard> {
         '${two(a.date.day)}.${two(a.date.month)}.${a.date.year % 100}';
 
     return InkWell(
-      onTap: a.tid.isEmpty ? null : () => _openDriverProfile(a.tid),
+      onTap: a.tid.isEmpty
+          ? null
+          : () => _openDriverProfile(a.tid, kind: a.kind),
       child: Container(
       // Alternating white / light grey for readability.
       color: index.isOdd ? const Color(0xFFF6F7F9) : Colors.white,

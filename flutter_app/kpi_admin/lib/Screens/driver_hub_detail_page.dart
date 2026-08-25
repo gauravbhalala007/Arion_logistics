@@ -247,7 +247,17 @@ class DriverHubDetailPage extends StatefulWidget {
     required this.dspUid,
     required this.actions,
     this.onBack,
+    this.autoEditField,
   });
+
+  /// Feld, dessen Editor beim Öffnen sofort aufgehen soll.
+  ///
+  /// Wird gesetzt, wenn der Admin in den Benachrichtigungen auf eine
+  /// ablaufende Unterlage tippt: Dann will er das Datum ändern und nicht
+  /// erst die passende Zeile suchen. Erlaubte Werte sind die
+  /// `onboarding`-Feldnamen (`idDocExpiry`, `workVisaExpiry`,
+  /// `zusatzblattExpiry`, `licenseExpiry`).
+  final String? autoEditField;
 
   /// Eingebetteter Modus: statt Navigator.pop räumt der Zurück-Pfeil
   /// den Detail-State der umgebenden Seite (Shell-Menü bleibt sichtbar).
@@ -307,6 +317,63 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
   void initState() {
     super.initState();
     unawaited(_loadPoolsOnce());
+    // Aus einer Benachrichtigung heraus geöffnet: den passenden
+    // Datums-Editor sofort aufziehen. Nach dem ersten Frame, damit der
+    // Dialog einen fertigen Context vorfindet.
+    final field = (widget.autoEditField ?? '').trim();
+    if (field.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _openEditorFor(field);
+      });
+    }
+  }
+
+  /// Öffnet den Editor eines Ablaufdatums anhand des `onboarding`-Feldes.
+  ///
+  /// Felder mit der Option „kein Ablaufdatum" (Zusatzblatt, Führerschein)
+  /// bekommen den kombinierten Editor, alle anderen den reinen
+  /// Datumswähler — genau wie beim Klick auf die Zeile selbst.
+  Future<void> _openEditorFor(String field) async {
+    final snap = await widget.driverRef.get();
+    if (!mounted) return;
+    final onboarding = _mapOf((snap.data() ?? const {})['onboarding']);
+    switch (field) {
+      case 'zusatzblattExpiry':
+        widget.actions.editExpiryOrNone(
+          dateKey: 'zusatzblattExpiry',
+          noExpiryKey: 'zusatzblattNoExpiry',
+          currentDate: _str(onboarding['zusatzblattExpiry']),
+        );
+      case 'licenseExpiry':
+        widget.actions.editExpiryOrNone(
+          dateKey: 'licenseExpiry',
+          noExpiryKey: 'licenseNoExpiry',
+          currentDate: _str(onboarding['licenseExpiry']),
+        );
+      case 'workVisaExpiry':
+        widget.actions.pickOnboardingDate(
+          fieldKey: 'workVisaExpiry',
+          current: _str(
+            onboarding['workVisaExpiry'] ??
+                onboarding['residencePermitExpiry'],
+          ),
+        );
+      case 'idDocExpiry':
+        // Gleicher Dialog wie beim Klick auf die Zeile: Fuer Nicht-Visa
+        // mit der Option „kein Ablaufdatum".
+        if (_normalizePermit(onboarding) == 'working_visa') {
+          widget.actions.pickOnboardingDate(
+            fieldKey: 'idDocExpiry',
+            current: _str(onboarding['idDocExpiry']),
+          );
+        } else {
+          widget.actions.editExpiryOrNone(
+            dateKey: 'idDocExpiry',
+            noExpiryKey: 'idDocNoExpiry',
+            currentDate: _str(onboarding['idDocExpiry']),
+          );
+        }
+    }
   }
 
   @override
@@ -1224,6 +1291,30 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
 
     final rows = <Widget>[];
 
+    // Ausweis-/Passablauf gilt fuer JEDEN Fahrer, nicht nur fuer
+    // Visa-Inhaber. Vorher stand die Zeile im Visa-Block — EU-Fahrer
+    // bekamen zwar die Warnung "ID expiring", fanden aber kein Feld,
+    // um das Datum zu pflegen.
+    // Ein Reisepass laeuft immer ab; ein EU-Personalausweis nicht
+    // zwingend — es gibt aber sehr wohl Ausweise mit Ablaufdatum.
+    // Deshalb hier der kombinierte Editor: Datum eintragen ODER
+    // ausdruecklich „kein Ablaufdatum" setzen.
+    rows.add(_expiryRow(
+      label: isVisa ? _tr('Reisepass', 'Passport') : _tr('Ausweis', 'ID document'),
+      date: parseFlexibleDate(onboarding['idDocExpiry']),
+      noExpiry: onboarding['idDocNoExpiry'] == true,
+      onEdit: isVisa
+          ? () => widget.actions.pickOnboardingDate(
+                fieldKey: 'idDocExpiry',
+                current: _str(onboarding['idDocExpiry']),
+              )
+          : () => widget.actions.editExpiryOrNone(
+                dateKey: 'idDocExpiry',
+                noExpiryKey: 'idDocNoExpiry',
+                currentDate: _str(onboarding['idDocExpiry']),
+              ),
+    ));
+
     if (isVisa) {
       final visaRaw =
           onboarding['workVisaExpiry'] ?? onboarding['residencePermitExpiry'];
@@ -1233,14 +1324,6 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
         onEdit: () => widget.actions.pickOnboardingDate(
           fieldKey: 'workVisaExpiry',
           current: _str(visaRaw),
-        ),
-      ));
-      rows.add(_expiryRow(
-        label: _tr('Reisepass', 'Passport'),
-        date: parseFlexibleDate(onboarding['idDocExpiry']),
-        onEdit: () => widget.actions.pickOnboardingDate(
-          fieldKey: 'idDocExpiry',
-          current: _str(onboarding['idDocExpiry']),
         ),
       ));
       rows.add(_expiryRow(

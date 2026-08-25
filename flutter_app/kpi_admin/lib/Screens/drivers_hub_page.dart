@@ -78,7 +78,12 @@ class _DeactivateChoice {
 }
 
 class DriversHubPage extends StatefulWidget {
-  const DriversHubPage({super.key, this.initialOpenTid});
+  const DriversHubPage({super.key, this.initialOpenTid, this.initialEditField});
+
+  /// Ablaufdatum-Feld, dessen Editor nach dem Öffnen sofort aufgehen
+  /// soll (aus den Benachrichtigungen heraus). Siehe
+  /// [DriverHubDetailPage.autoEditField].
+  final String? initialEditField;
 
   /// When set, the driver with this transporter ID is opened right after
   /// the page mounts (deep link from the home notifications).
@@ -334,6 +339,7 @@ class _DriversHubPageState extends State<DriversHubPage> {
         driverRef: detailDoc.reference,
         dspUid: _uid,
         actions: _detailActionsFor(detailDoc.reference),
+        autoEditField: _detailFromDeepLink ? widget.initialEditField : null,
         onBack: () {
           // Direkt angesprungen (Deep-Link): zurück zur aufrufenden
           // Seite. Sonst wie bisher zurück auf die Fahrerliste.
