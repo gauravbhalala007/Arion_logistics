@@ -8828,6 +8828,13 @@ Future<Uint8List> _buildDriverBalancePdf({
           ],
         ),
 
+        // ── Monatsübersicht Soll / Ist ──
+        //
+        // Kundenwunsch: „für jeden Monat aufgelistet die Soll- und
+        // Iststunden und die Differenz". Quelle ist dasselbe Zeitkonto,
+        // aus dem auch der Überstunden-Saldo oben stammt.
+        _overtimeMonthsTable(profile: profile, de: de),
+
         // ── Einzelposten ──
         table(
           title: de
@@ -8875,4 +8882,167 @@ Future<Uint8List> _buildDriverBalancePdf({
   );
 
   return doc.save();
+}
+
+/// Monatsweise Gegenüberstellung von Soll- und Iststunden für das
+/// Fahrer-PDF.
+///
+/// Zeigt je Monat: Sollstunden, Iststunden, Differenz (Ist − Soll),
+/// bereits ausgezahlte Überstunden und den daraus offenen Rest — genau
+/// die Rechnung, die auch den Saldo oben im Blatt ergibt. Ohne erfasste
+/// Monate erscheint statt der Tabelle ein Hinweis, damit im PDF nicht
+/// stillschweigend ein Block fehlt.
+pw.Widget _overtimeMonthsTable({
+  required _DriverAbsenceProfile profile,
+  required bool de,
+}) {
+  const ink = PdfColor.fromInt(0xFF111827);
+  const muted = PdfColor.fromInt(0xFF6B7280);
+  const line = PdfColor.fromInt(0xFFE5E7EB);
+  const zebra = PdfColor.fromInt(0xFFF7F8FA);
+
+  final months = profile.overtimeMonths.toList()
+    // Neuester Monat zuerst — wie in der Bildschirmansicht.
+    ..sort((a, b) => b.month.compareTo(a.month));
+
+  String hhmm(int minutes) => _daFormatDuration(minutes);
+
+  final title = de
+      ? 'Arbeitszeit je Monat (Soll / Ist)'
+      : 'Working time per month (target / actual)';
+
+  if (months.isEmpty) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.SizedBox(height: 16),
+        pw.Text(
+          _daPdfSafe(title),
+          style: pw.TextStyle(
+            fontSize: 11,
+            color: ink,
+            fontWeight: pw.FontWeight.bold,
+          ),
+        ),
+        pw.SizedBox(height: 6),
+        pw.Text(
+          _daPdfSafe(
+            de
+                ? 'Fuer diesen Fahrer ist kein Zeitkonto erfasst.'
+                : 'No time account recorded for this driver.',
+          ),
+          style: const pw.TextStyle(fontSize: 9, color: muted),
+        ),
+      ],
+    );
+  }
+
+  final totalTarget =
+      months.fold<int>(0, (acc, m) => acc + m.targetMinutes);
+  final totalWorked =
+      months.fold<int>(0, (acc, m) => acc + m.workedMinutes);
+  final totalPaid = months.fold<int>(0, (acc, m) => acc + m.paidMinutes);
+  final totalDiff = totalWorked - totalTarget;
+  final totalOpen = totalDiff - totalPaid;
+  final unpaidCharge = profile.unpaidVacationChargeMinutes;
+
+  String signed(int minutes) =>
+      '${minutes < 0 ? '-' : ''}${hhmm(minutes.abs())}';
+
+  return pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: [
+      pw.SizedBox(height: 16),
+      pw.Text(
+        _daPdfSafe(title),
+        style: pw.TextStyle(
+          fontSize: 11,
+          color: ink,
+          fontWeight: pw.FontWeight.bold,
+        ),
+      ),
+      pw.SizedBox(height: 6),
+      pw.TableHelper.fromTextArray(
+        headerHeight: 20,
+        cellHeight: 18,
+        headerDecoration: const pw.BoxDecoration(color: zebra),
+        headerStyle: pw.TextStyle(
+          fontSize: 8,
+          color: muted,
+          fontWeight: pw.FontWeight.bold,
+        ),
+        cellStyle: const pw.TextStyle(fontSize: 8.5, color: ink),
+        border: pw.TableBorder.all(color: line, width: 0.4),
+        cellAlignments: {
+          0: pw.Alignment.centerLeft,
+          1: pw.Alignment.centerRight,
+          2: pw.Alignment.centerRight,
+          3: pw.Alignment.centerRight,
+          4: pw.Alignment.centerRight,
+          5: pw.Alignment.centerRight,
+        },
+        headers: <String>[
+          de ? 'Monat' : 'Month',
+          de ? 'Soll' : 'Target',
+          de ? 'Ist' : 'Actual',
+          de ? 'Differenz' : 'Difference',
+          de ? 'ausgezahlt' : 'paid out',
+          de ? 'offen' : 'open',
+        ],
+        data: <List<String>>[
+          for (final m in months)
+            <String>[
+              _daPdfSafe(m.monthLabel(de)),
+              hhmm(m.targetMinutes),
+              hhmm(m.workedMinutes),
+              signed(m.overtimeMinutes),
+              hhmm(m.paidMinutes),
+              signed(m.remainingMinutes),
+            ],
+          <String>[
+            de ? 'Summe' : 'Total',
+            hhmm(totalTarget),
+            hhmm(totalWorked),
+            signed(totalDiff),
+            hhmm(totalPaid),
+            signed(totalOpen),
+          ],
+          // Unbezahlter Urlaub belastet das Konto (Ticket „TIME &
+          // BALANCE"). Ohne diese Zeile ergaebe die Summenspalte nicht
+          // den Saldo, der oben im Blatt steht.
+          if (unpaidCharge > 0)
+            <String>[
+              de ? 'abzgl. unbezahlter Urlaub' : 'less unpaid leave',
+              '',
+              '',
+              '',
+              '',
+              signed(-unpaidCharge),
+            ],
+          if (unpaidCharge > 0)
+            <String>[
+              de ? 'Saldo' : 'Balance',
+              '',
+              '',
+              '',
+              '',
+              signed(totalOpen - unpaidCharge),
+            ],
+        ],
+      ),
+      pw.SizedBox(height: 4),
+      pw.Text(
+        _daPdfSafe(
+          de
+              ? 'Differenz = Ist − Soll. „offen" = Differenz abzueglich '
+                  'bereits ausgezahlter Ueberstunden. Der letzte Wert '
+                  'entspricht dem Ueberstunden-Saldo oben im Blatt.'
+              : 'Difference = actual − target. "open" = difference minus '
+                  'overtime already paid out. The final value matches the '
+                  'overtime balance shown above.',
+        ),
+        style: const pw.TextStyle(fontSize: 7.5, color: muted),
+      ),
+    ],
+  );
 }
