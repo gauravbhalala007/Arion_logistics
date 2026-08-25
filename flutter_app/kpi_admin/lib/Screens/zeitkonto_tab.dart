@@ -259,6 +259,30 @@ class ZeitkontoTab extends StatefulWidget {
 class _ZeitkontoTabState extends State<ZeitkontoTab> {
   String _search = '';
 
+  /// Fahrerliste als EINMALIG erzeugter Stream.
+  ///
+  /// Vorher stand `...snapshots()` direkt im `build()`. Damit entstand bei
+  /// jedem `setState` — also bei jedem getippten Buchstaben in der Suche —
+  /// ein neues Stream-Objekt. Der StreamBuilder meldete daraufhin wieder
+  /// `waiting`, zeigte den Ladekreis und verwarf den kompletten Teilbaum
+  /// samt Suchfeld: Der Fokus ging verloren und man musste nach jedem
+  /// Buchstaben erneut ins Feld klicken (Ticket „Time Balance").
+  Stream<QuerySnapshot<Map<String, dynamic>>>? _driversStreamCache;
+  String? _driversStreamUid;
+
+  Stream<QuerySnapshot<Map<String, dynamic>>> get _driversStream {
+    // Neu aufsetzen nur, wenn sich das Konto wirklich aendert.
+    if (_driversStreamUid != widget.dspUid || _driversStreamCache == null) {
+      _driversStreamUid = widget.dspUid;
+      _driversStreamCache = FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.dspUid)
+          .collection('drivers')
+          .snapshots();
+    }
+    return _driversStreamCache!;
+  }
+
   /// Owned so the search field's clear button can wipe the visible text.
   final TextEditingController _searchCtrl = TextEditingController();
 
@@ -875,13 +899,13 @@ class _ZeitkontoTabState extends State<ZeitkontoTab> {
     return Container(
       color: const Color(0xFFF3F6F7),
       child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: FirebaseFirestore.instance
-            .collection('users')
-            .doc(widget.dspUid)
-            .collection('drivers')
-            .snapshots(),
+        stream: _driversStream,
         builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
+          // Nur beim allerersten Laden einen Ladekreis zeigen. Danach hat
+          // der Stream Daten und der Teilbaum bleibt bestehen — sonst
+          // verlöre das Suchfeld bei jeder Aktualisierung den Fokus.
+          if (snap.connectionState == ConnectionState.waiting &&
+              !snap.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
           if (snap.hasError) {
