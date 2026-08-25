@@ -7253,7 +7253,10 @@ class _AbsenceDriversOverviewPageState
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(24),
         ),
-        child: _DriverAbsenceHistoryView(profile: profile),
+        child: _DriverAbsenceHistoryView(
+          profile: profile,
+          company: _companyName,
+        ),
       ),
     );
   }
@@ -7803,9 +7806,15 @@ Future<void> _openAllDriverEntries(
 /// „Krankmeldungen" und „Überstunden / Overtime" — je Sektion nur die
 /// jüngsten Einträge inline, der Rest per „Mehr anzeigen"-Popup.
 class _DriverAbsenceHistoryView extends StatelessWidget {
-  const _DriverAbsenceHistoryView({required this.profile});
+  const _DriverAbsenceHistoryView({
+    required this.profile,
+    this.company = '',
+  });
 
   final _DriverAbsenceProfile profile;
+
+  /// Firmenname für die Kopfzeile des Fahrer-PDFs.
+  final String company;
 
   @override
   Widget build(BuildContext context) {
@@ -7906,6 +7915,18 @@ class _DriverAbsenceHistoryView extends StatelessWidget {
                       ],
                     ],
                   ),
+                ),
+                // Ticket „per employee profile": Blatt dieses Fahrers als
+                // PDF — mit allen einzelnen Kranken- und Urlaubszeiträumen.
+                IconButton(
+                  tooltip: de ? 'Als PDF herunterladen' : 'Download as PDF',
+                  onPressed: () => exportDriverBalancePdf(
+                    context: context,
+                    profile: profile,
+                    company: company,
+                    de: de,
+                  ),
+                  icon: const Icon(Icons.picture_as_pdf_outlined),
                 ),
                 IconButton(
                   tooltip: de ? 'Schließen' : 'Close',
@@ -8499,4 +8520,359 @@ class _ArchiveToggle extends StatelessWidget {
       ),
     );
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  PDF je Fahrer (Ticket: „The data to be generated per employee profile")
+// ═══════════════════════════════════════════════════════════════════════
+//
+// Der Listen-Export deckt die Übersicht ab; hier geht es um das Blatt
+// EINES Fahrers — mit allen einzelnen Kranken- und Urlaubszeiträumen
+// statt nur der Summen. Gleiche Bausteine wie dort: Pakete `pdf` +
+// `printing`, PDF-Standardschrift (deshalb [_daPdfSafe] für jeden Text)
+// und `Printing.sharePdf` als Ausgabeweg.
+
+/// Erzeugt das Fahrerblatt und reicht es an den Browser weiter.
+Future<void> exportDriverBalancePdf({
+  required BuildContext context,
+  required _DriverAbsenceProfile profile,
+  required String company,
+  required bool de,
+}) async {
+  final messenger = ScaffoldMessenger.of(context);
+  try {
+    final bytes = await _buildDriverBalancePdf(
+      profile: profile,
+      de: de,
+      company: company,
+    );
+    final slug = _daPdfSafe(profile.driverName)
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+        .replaceAll(RegExp(r'^-+|-+$'), '');
+    await Printing.sharePdf(
+      bytes: bytes,
+      filename: 'da-balance_'
+          '${slug.isEmpty ? profile.driverId.toLowerCase() : slug}_'
+          '${formatIsoDate(DateTime.now())}.pdf',
+    );
+  } catch (e) {
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          de
+              ? 'PDF konnte nicht erstellt werden: $e'
+              : 'Could not create the PDF: $e',
+        ),
+      ),
+    );
+  }
+}
+
+Future<Uint8List> _buildDriverBalancePdf({
+  required _DriverAbsenceProfile profile,
+  required bool de,
+  required String company,
+}) async {
+  const ink = PdfColor.fromInt(0xFF111827);
+  const muted = PdfColor.fromInt(0xFF6B7280);
+  const line = PdfColor.fromInt(0xFFE5E7EB);
+  const green = PdfColor.fromInt(0xFF1D7F5A);
+  const red = PdfColor.fromInt(0xFFB91C1C);
+  const zebra = PdfColor.fromInt(0xFFF7F8FA);
+
+  final today = DateTime.now();
+  final reference = profile.balanceReferenceDate(today);
+  final ended = profile.contractEndedBy(today);
+  final balance = profile.vacationBalance;
+
+  String fmt(DateTime d) => formatShortDate(d);
+  String days(double v) => _daFormatDays(v);
+
+  pw.Widget label(String text) => pw.Text(
+        _daPdfSafe(text),
+        style: const pw.TextStyle(fontSize: 8, color: muted),
+      );
+
+  pw.Widget value(String text, {PdfColor? color, double size = 12}) => pw.Text(
+        _daPdfSafe(text),
+        style: pw.TextStyle(
+          fontSize: size,
+          color: color ?? ink,
+          fontWeight: pw.FontWeight.bold,
+        ),
+      );
+
+  /// Kennzahlen-Kachel im Kopf.
+  pw.Widget metric(String title, String text, {PdfColor? color}) =>
+      pw.Container(
+        width: 122,
+        padding: const pw.EdgeInsets.all(8),
+        decoration: pw.BoxDecoration(
+          border: pw.Border.all(color: line, width: 0.5),
+          borderRadius: pw.BorderRadius.circular(6),
+        ),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [label(title), pw.SizedBox(height: 3), value(text, color: color)],
+        ),
+      );
+
+  /// Tabelle über eine Abwesenheitsart.
+  pw.Widget table({
+    required String title,
+    required List<_AbsenceAdminItem> items,
+    required String emptyText,
+    required bool showPaid,
+  }) {
+    final rows = items.where((i) => i.status == 'approved').toList()
+      ..sort((a, b) => b.fromDate.compareTo(a.fromDate));
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.SizedBox(height: 16),
+        pw.Text(
+          _daPdfSafe(title),
+          style: pw.TextStyle(
+            fontSize: 11,
+            color: ink,
+            fontWeight: pw.FontWeight.bold,
+          ),
+        ),
+        pw.SizedBox(height: 6),
+        if (rows.isEmpty)
+          pw.Text(
+            _daPdfSafe(emptyText),
+            style: const pw.TextStyle(fontSize: 9, color: muted),
+          )
+        else
+          pw.TableHelper.fromTextArray(
+            headerHeight: 20,
+            cellHeight: 18,
+            headerDecoration: const pw.BoxDecoration(color: zebra),
+            headerStyle: pw.TextStyle(
+              fontSize: 8,
+              color: muted,
+              fontWeight: pw.FontWeight.bold,
+            ),
+            cellStyle: const pw.TextStyle(fontSize: 8.5, color: ink),
+            cellAlignments: {
+              0: pw.Alignment.centerLeft,
+              1: pw.Alignment.centerRight,
+              2: pw.Alignment.centerLeft,
+              3: pw.Alignment.centerLeft,
+            },
+            border: pw.TableBorder.all(color: line, width: 0.4),
+            headers: <String>[
+              de ? 'Zeitraum' : 'Period',
+              de ? 'Tage' : 'Days',
+              if (showPaid) (de ? 'Bezahlt' : 'Paid'),
+              de ? 'Grund / Notiz' : 'Reason / note',
+            ],
+            data: <List<String>>[
+              for (final r in rows)
+                <String>[
+                  _daPdfSafe('${fmt(r.fromDate)} - ${fmt(r.toDate)}'),
+                  '${r.totalDays}',
+                  if (showPaid)
+                    _daPdfSafe(
+                      r.hasPaidFlag
+                          ? r.paidLabel(de)
+                          : (de ? 'Bezahlt' : 'Paid'),
+                    ),
+                  _daPdfSafe(r.reason.trim()),
+                ],
+            ],
+          ),
+      ],
+    );
+  }
+
+  final doc = pw.Document();
+  final entitlement = balance.totalEntitlement;
+  final taken = balance.totalUsed;
+  final remaining = balance.totalRemainingSigned;
+
+  doc.addPage(
+    pw.MultiPage(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.fromLTRB(28, 28, 28, 32),
+      footer: (ctx) => pw.Container(
+        alignment: pw.Alignment.centerRight,
+        child: pw.Text(
+          _daPdfSafe(
+            de
+                ? 'Seite ${ctx.pageNumber} von ${ctx.pagesCount}'
+                : 'Page ${ctx.pageNumber} of ${ctx.pagesCount}',
+          ),
+          style: const pw.TextStyle(fontSize: 7.5, color: muted),
+        ),
+      ),
+      build: (ctx) => [
+        // ── Kopf ──
+        pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  _daPdfSafe(profile.driverName),
+                  style: pw.TextStyle(
+                    fontSize: 18,
+                    color: ink,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.SizedBox(height: 3),
+                pw.Text(
+                  _daPdfSafe(
+                    <String>[
+                      if (profile.employeeNumber.isNotEmpty)
+                        '${de ? 'Personalnr.' : 'Emp. no.'} ${profile.employeeNumber}',
+                      'ID: ${profile.driverId}',
+                      if (profile.contractPeriodText.isNotEmpty)
+                        profile.contractPeriodText,
+                    ].join('  ·  '),
+                  ),
+                  style: const pw.TextStyle(fontSize: 9, color: muted),
+                ),
+              ],
+            ),
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.end,
+              children: [
+                pw.Text(
+                  _daPdfSafe(company.isEmpty ? 'CoDriver' : company),
+                  style: pw.TextStyle(
+                    fontSize: 10,
+                    color: ink,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.Text(
+                  _daPdfSafe(
+                    de
+                        ? 'DA Balance · erstellt am ${fmt(today)}'
+                        : 'DA balance · created on ${fmt(today)}',
+                  ),
+                  style: const pw.TextStyle(fontSize: 8, color: muted),
+                ),
+              ],
+            ),
+          ],
+        ),
+        pw.SizedBox(height: 6),
+        pw.Divider(color: line, height: 12),
+
+        // ── Stichtag ──
+        pw.Container(
+          padding: const pw.EdgeInsets.all(8),
+          decoration: pw.BoxDecoration(
+            color: zebra,
+            borderRadius: pw.BorderRadius.circular(6),
+          ),
+          child: pw.Text(
+            _daPdfSafe(
+              ended
+                  ? (de
+                      ? 'Alle Zahlen sind bis zum letzten Vertragstag am '
+                          '${fmt(reference)} gerechnet. Nach dem Vertragsende '
+                          'entsteht kein weiterer Urlaubsanspruch.'
+                      : 'All figures are counted until the last day of the '
+                          'contract on ${fmt(reference)}. No further holiday '
+                          'entitlement accrues after the contract ends.')
+                  : (de
+                      ? 'Alle Zahlen sind bis heute (${fmt(reference)}) '
+                          'gerechnet; der Vertrag laeuft weiter. Der '
+                          'Urlaubsanspruch waechst anteilig ab Vertragsbeginn.'
+                      : 'All figures are counted until today '
+                          '(${fmt(reference)}); the contract is still running. '
+                          'Entitlement accrues pro rata from the start date.'),
+            ),
+            style: const pw.TextStyle(fontSize: 8.5, color: ink),
+          ),
+        ),
+        pw.SizedBox(height: 12),
+
+        // ── Kennzahlen ──
+        pw.Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            metric(
+              de ? 'Urlaub genommen' : 'PTO taken',
+              '${days(taken)} / ${days(entitlement)}',
+            ),
+            metric(
+              de ? 'Urlaub verbleibend' : 'PTO remaining',
+              '${days(remaining)} ${de ? 'Tage' : 'days'}',
+              color: remaining < 0 ? red : green,
+            ),
+            metric(
+              de ? 'davon unbezahlt' : 'thereof unpaid',
+              '${profile.approvedUnpaidVacationDays} ${de ? 'Tage' : 'days'}',
+            ),
+            metric(
+              de ? 'Krankheitstage' : 'Sick leave days',
+              '${profile.approvedSickDays} ${de ? 'Tage' : 'days'}',
+            ),
+            metric(
+              de ? 'Ueberstunden' : 'Overtime',
+              profile.hasOvertime
+                  ? '${_daFormatDuration(profile.overtimeBalanceMinutes)} h'
+                  : '-',
+              color: profile.overtimeBalanceMinutes < 0 ? red : null,
+            ),
+          ],
+        ),
+
+        // ── Einzelposten ──
+        table(
+          title: de
+              ? 'Urlaub & Sonderurlaub (genehmigt)'
+              : 'Vacation & special leave (approved)',
+          items: profile.vacation,
+          emptyText: de ? 'Kein Urlaub erfasst.' : 'No vacation recorded.',
+          showPaid: true,
+        ),
+        table(
+          title: de ? 'Krankmeldungen (genehmigt)' : 'Sick leave (approved)',
+          items: profile.sick,
+          emptyText:
+              de ? 'Keine Krankmeldung erfasst.' : 'No sick leave recorded.',
+          showPaid: false,
+        ),
+
+        pw.SizedBox(height: 14),
+        pw.Text(
+          _daPdfSafe(
+            de
+                ? 'Wochenenden und bundesweite Feiertage zaehlen nicht als '
+                    'Urlaubstage. Krankmeldungen werden kalendarisch gezaehlt.'
+                : 'Weekends and nationwide public holidays do not count as '
+                    'holiday. Sick leave is counted in calendar days.',
+          ),
+          style: const pw.TextStyle(fontSize: 7.5, color: muted),
+        ),
+        if (balance.overrideApplied)
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(top: 4),
+            child: pw.Text(
+              _daPdfSafe(
+                de
+                    ? 'Fuer diesen Fahrer wurde der Resturlaub manuell '
+                        'gesetzt; "genommen" zaehlt ab diesem Zeitpunkt.'
+                    : 'Remaining holiday was set manually for this driver; '
+                        '"taken" counts from that point on.',
+              ),
+              style: const pw.TextStyle(fontSize: 7.5, color: muted),
+            ),
+          ),
+      ],
+    ),
+  );
+
+  return doc.save();
 }
