@@ -878,6 +878,10 @@ class RecruitingApplicationDetailPage extends StatefulWidget {
 class _RecruitingApplicationDetailPageState
     extends State<RecruitingApplicationDetailPage> {
   late RecruitingStatus _status = widget.app.status;
+
+  /// Nach einer Änderung im Blatt gesetzt, damit das Datum sofort steht
+  /// und nicht erst mit dem nächsten Firestore-Snapshot nachzieht.
+  DateTime? _statusChangedAt;
   bool _busy = false;
   bool _onboardingBusy = false;
   late Map<String, dynamic>? _convertedToDriver = widget.app.convertedToDriver;
@@ -1018,10 +1022,16 @@ class _RecruitingApplicationDetailPageState
         shape: const Border(
           bottom: BorderSide(color: Color(0xFFE5E7EB)),
         ),
+        // Name mittig — er ist die Überschrift des Blattes, nicht ein
+        // Anhängsel des Zurück-Pfeils.
+        centerTitle: true,
         title: Text(
           hasCyrillic(app.displayName)
               ? '${app.displayName} · ${transliterateCyrillic(app.displayName)}'
               : app.displayName,
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: AppTypography.title3.copyWith(
             color: const Color(0xFF111827),
             fontWeight: FontWeight.w800,
@@ -1086,20 +1096,22 @@ class _RecruitingApplicationDetailPageState
                 // Team sofort sieht, an wen es sich wendet.
                 if (app.customAnswers['viaAgency'] == true)
                   _AgencyContactBlock(answers: app.customAnswers),
+                // EINE Zeitleiste, die zugleich der Schalter ist. Vorher
+                // stand darunter dieselbe Abfolge noch einmal als
+                // Pillen-Reihe — doppelt und verwirrend.
                 _PipelineStrip(
                   current: _status,
                   channel: app.channel,
-                ),
-                const SizedBox(height: 16),
-                _StatusSelector(
-                  value: _status,
-                  channel: app.channel,
+                  busy: _busy,
+                  changedAt: _statusChangedAt ?? app.statusUpdatedAt,
                   onChanged: (s) async {
                     setState(() => _busy = true);
                     await widget.onUpdateStatus(s);
                     if (mounted) {
                       setState(() {
                         _status = s;
+                        // Sofort sichtbar, ohne auf den Stream zu warten.
+                        _statusChangedAt = DateTime.now();
                         _busy = false;
                       });
                     }
@@ -1305,9 +1317,25 @@ class _RecruitingApplicationDetailPageState
 /// for upcoming. Helps the admin instantly see where the applicant
 /// is in the funnel (Neu / ZAV / Vorabzustimmung / Vertrag / Hired).
 class _PipelineStrip extends StatelessWidget {
-  const _PipelineStrip({required this.current, required this.channel});
+  const _PipelineStrip({
+    required this.current,
+    required this.channel,
+    this.onChanged,
+    this.changedAt,
+    this.busy = false,
+  });
+
   final RecruitingStatus current;
   final RecruitingChannel channel;
+
+  /// Direkt in der Zeitleiste umschalten. Die frühere zweite Pillen-Reihe
+  /// darunter zeigte dieselbe Abfolge ein zweites Mal — jetzt gibt es nur
+  /// noch diese eine, und sie ist selbst der Schalter.
+  final ValueChanged<RecruitingStatus>? onChanged;
+
+  /// Zeitpunkt der letzten Statusaenderung, klein unter der Leiste.
+  final DateTime? changedAt;
+  final bool busy;
 
   @override
   Widget build(BuildContext context) {
@@ -1317,20 +1345,28 @@ class _PipelineStrip extends StatelessWidget {
     final isRejected = current == RecruitingStatus.rejected;
     final idx = pipeline.indexOf(current);
 
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final stamp = changedAt;
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFE5E7EB)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
         children: [
           for (var i = 0; i < pipeline.length; i++) ...[
             _PipelineDot(
               label: pipeline[i].label,
               reached: !isRejected && idx >= i,
               active: !isRejected && idx == i,
+              onTap: (onChanged == null || busy || pipeline[i] == current)
+                  ? null
+                  : () => onChanged!(pipeline[i]),
             ),
             if (i < pipeline.length - 1)
               Expanded(
@@ -1363,6 +1399,24 @@ class _PipelineStrip extends StatelessWidget {
               ),
             ),
           ],
+            ],
+          ),
+          // Zeitpunkt der letzten Aenderung, klein und dezent darunter.
+          if (stamp != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              de
+                  ? 'Zuletzt geändert am '
+                        '${DateFormat('dd.MM.yyyy · HH:mm').format(stamp)}'
+                  : 'Last changed on '
+                        '${DateFormat('dd/MM/yyyy · HH:mm').format(stamp)}',
+              textAlign: TextAlign.center,
+              style: AppTypography.caption2.copyWith(
+                color: const Color(0xFF9CA3AF),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -1374,14 +1428,19 @@ class _PipelineDot extends StatelessWidget {
     required this.label,
     required this.reached,
     required this.active,
+    this.onTap,
   });
   final String label;
   final bool reached;
   final bool active;
 
+  /// `null` = aktueller Schritt oder nicht änderbar.
+  final VoidCallback? onTap;
+
   @override
   Widget build(BuildContext context) {
-    return Column(
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final dot = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
@@ -1426,53 +1485,23 @@ class _PipelineDot extends StatelessWidget {
         ),
       ],
     );
-  }
-}
 
-class _StatusSelector extends StatelessWidget {
-  const _StatusSelector({
-    required this.value,
-    required this.channel,
-    required this.onChanged,
-  });
-  final RecruitingStatus value;
-  final RecruitingChannel channel;
-  final ValueChanged<RecruitingStatus> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final pipeline = RecruitingStatus.pipelineFor(channel);
-    return Wrap(
-      spacing: 6,
-      runSpacing: 6,
-      children: [
-        for (final s in pipeline)
-          ChoiceChip(
-            label: Text(s.label),
-            selected: value == s,
-            onSelected: (_) => onChanged(s),
-            selectedColor: s == RecruitingStatus.rejected
-                ? const Color(0xFFB91C1C)
-                : AppColors.codriverGreen,
-            backgroundColor: const Color(0xFFF9FAFB),
-            side: BorderSide(
-              color: value == s
-                  ? (s == RecruitingStatus.rejected
-                      ? const Color(0xFFB91C1C)
-                      : AppColors.codriverGreen)
-                  : const Color(0xFFE5E7EB),
-            ),
-            labelStyle: AppTypography.caption1.copyWith(
-              color: value == s
-                  ? Colors.white
-                  : const Color(0xFF111827),
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-      ],
+    if (onTap == null) return dot;
+    return Tooltip(
+      message: de ? 'Auf „$label" setzen' : 'Set to "$label"',
+      waitDuration: const Duration(milliseconds: 400),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+          child: dot,
+        ),
+      ),
     );
   }
 }
+
 
 class _DetailGroup extends StatelessWidget {
   const _DetailGroup({required this.title, required this.rows});
@@ -1495,20 +1524,30 @@ class _DetailGroup extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 6,
-            ),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF9FAFB),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
-            ),
-            child: Column(
-              children: [
-                for (final r in rows) r,
-              ],
+          // Zeilen abwechselnd weiß/grau — bei zwanzig Feldern
+          // untereinander findet das Auge sonst die Zeile nicht wieder.
+          // Die Streifen sitzen im Container (nicht in der Zeile), damit
+          // sie die volle Breite einnehmen; das Innenpolster wandert
+          // deshalb in die Zeile selbst.
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+              ),
+              child: Column(
+                children: [
+                  for (var i = 0; i < rows.length; i++)
+                    ColoredBox(
+                      color: i.isOdd
+                          ? const Color(0xFFF3F4F6)
+                          : Colors.white,
+                      child: rows[i],
+                    ),
+                ],
+              ),
             ),
           ),
         ],
@@ -1525,20 +1564,33 @@ class _DetailRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 140,
+            width: 150,
             child: Text(
-              label,
+              // Feldnamen aus dem Formular sind teils Code
+              // (`dsgvoConsentAT`) — hier als lesbarer Titel ausgeben.
+              prettyFieldLabel(label),
               style: AppTypography.caption1.copyWith(
                 color: const Color(0xFF6B7280),
                 fontWeight: FontWeight.w700,
               ),
             ),
           ),
+          // Deutlicher Abstand zwischen Titel und Wert.
+          const SizedBox(width: 18),
+          // Kopieren direkt VOR dem Wert, damit der Daumen dort landet,
+          // wo der Wert beginnt.
+          SizedBox(
+            width: 26,
+            child: value.trim().isEmpty
+                ? null
+                : _CopyValueButton(label: label, value: value),
+          ),
+          const SizedBox(width: 4),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1566,37 +1618,54 @@ class _DetailRow extends StatelessWidget {
               ],
             ),
           ),
-          if (value.trim().isNotEmpty)
-            InkWell(
-              onTap: () async {
-                // Kyrillische Werte in lateinischer Umschrift kopieren —
-                // die wird im Tagesgeschäft (Verträge, Systeme) gebraucht.
-                final copyText = hasCyrillic(value)
-                    ? transliterateCyrillic(value.trim())
-                    : value.trim();
-                await Clipboard.setData(ClipboardData(text: copyText));
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                        Localizations.localeOf(context).languageCode == 'de'
-                            ? '„${label.trim()}" kopiert.'
-                            : '"${label.trim()}" copied.'),
-                    duration: const Duration(seconds: 1),
-                  ),
-                );
-              },
-              borderRadius: BorderRadius.circular(6),
-              child: const Padding(
-                padding: EdgeInsets.all(4),
-                child: Icon(
-                  Icons.copy_rounded,
-                  size: 15,
-                  color: Color(0xFF9CA3AF),
-                ),
-              ),
-            ),
         ],
+      ),
+    );
+  }
+}
+
+/// Kopier-Knopf einer Detailzeile — sitzt direkt vor dem Wert.
+class _CopyValueButton extends StatelessWidget {
+  const _CopyValueButton({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    return Tooltip(
+      message: de ? 'Wert kopieren' : 'Copy value',
+      waitDuration: const Duration(milliseconds: 400),
+      child: InkWell(
+        onTap: () async {
+          // Kyrillische Werte in lateinischer Umschrift kopieren — die
+          // wird im Tagesgeschäft (Verträge, Systeme) gebraucht.
+          final copyText = hasCyrillic(value)
+              ? transliterateCyrillic(value.trim())
+              : value.trim();
+          await Clipboard.setData(ClipboardData(text: copyText));
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                de
+                    ? '„${prettyFieldLabel(label)}" kopiert.'
+                    : '"${prettyFieldLabel(label)}" copied.',
+              ),
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(6),
+        child: const Padding(
+          padding: EdgeInsets.all(4),
+          child: Icon(
+            Icons.copy_rounded,
+            size: 15,
+            color: Color(0xFF9CA3AF),
+          ),
+        ),
       ),
     );
   }
@@ -2473,4 +2542,74 @@ class _DocumentPreview extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Macht aus einem Formular-Feldnamen einen lesbaren Titel.
+///
+/// Die eingebauten Felder haben gepflegte Bezeichnungen; frei
+/// konfigurierte Fragen und neu hinzugekommene Felder rutschten bisher
+/// als roher Code durch (`dsgvoConsentAT`, `health_insurance`). Diese
+/// Funktion ist der letzte Rettungsanker davor:
+///
+///   dsgvoConsentAT     → „DSGVO Consent AT"
+///   health_insurance   → „Health insurance"
+///   ibanSubmitLater    → „IBAN submit later"
+///
+/// Bereits lesbare Titel (mit Leerzeichen) bleiben unangetastet.
+String prettyFieldLabel(String raw) {
+  final input = raw.trim();
+  if (input.isEmpty) return '';
+  // Enthält der Titel schon Leerzeichen, ist er von Hand gepflegt.
+  if (input.contains(' ')) return input;
+
+  // Kürzel, die groß bleiben müssen — sonst stünde dort „Dsgvo".
+  const acronyms = <String>{
+    'dsgvo', 'iban', 'id', 'tid', 'ezb', 'zav', 'aok', 'eu', 'at', 'de',
+    'pdf', 'url', 'sms', 'pin', 'vin', 'tuv', 'hu', 'kfz', 'dsp', 'da',
+  };
+
+  final words = <String>[];
+  final buffer = StringBuffer();
+
+  void flush() {
+    if (buffer.isEmpty) return;
+    words.add(buffer.toString());
+    buffer.clear();
+  }
+
+  for (var i = 0; i < input.length; i++) {
+    final ch = input[i];
+    if (ch == '_' || ch == '-' || ch == '.') {
+      flush();
+      continue;
+    }
+    final isUpper = ch.toUpperCase() == ch && ch.toLowerCase() != ch;
+    if (isUpper && buffer.isNotEmpty) {
+      // Neues Wort nur, wenn davor ein Kleinbuchstabe stand — so bleibt
+      // eine Großbuchstaben-Folge wie „AT" zusammen.
+      final prev = input[i - 1];
+      final prevIsLower = prev.toLowerCase() == prev && prev.toUpperCase() != prev;
+      final nextIsLower = i + 1 < input.length &&
+          input[i + 1].toLowerCase() == input[i + 1] &&
+          input[i + 1].toUpperCase() != input[i + 1];
+      if (prevIsLower || nextIsLower) flush();
+    }
+    buffer.write(ch);
+  }
+  flush();
+
+  if (words.isEmpty) return input;
+
+  final out = <String>[];
+  for (var i = 0; i < words.length; i++) {
+    final w = words[i];
+    if (acronyms.contains(w.toLowerCase())) {
+      out.add(w.toUpperCase());
+    } else if (i == 0) {
+      out.add(w[0].toUpperCase() + w.substring(1));
+    } else {
+      out.add(w.toLowerCase());
+    }
+  }
+  return out.join(' ');
 }

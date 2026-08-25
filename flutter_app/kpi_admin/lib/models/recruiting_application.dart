@@ -193,6 +193,7 @@ class RecruitingApplication {
     required this.channel,
     required this.status,
     required this.submittedAt,
+    this.statusUpdatedAt,
     required this.firstName,
     required this.lastName,
     required this.birthDate,
@@ -222,6 +223,10 @@ class RecruitingApplication {
   final RecruitingChannel channel;
   final RecruitingStatus status;
   final DateTime submittedAt;
+
+  /// Zeitpunkt der letzten Statusaenderung. Das Repository schreibt das
+  /// Feld bei jedem Wechsel; alte Datensaetze haben es nicht (`null`).
+  final DateTime? statusUpdatedAt;
 
   // ── Personal info (Google Form Q1–9) ────────────────────────────
   final String firstName;
@@ -309,6 +314,7 @@ class RecruitingApplication {
       status: RecruitingStatus.fromValue(d['status']),
       submittedAt:
           (d['submittedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      statusUpdatedAt: (d['statusUpdatedAt'] as Timestamp?)?.toDate(),
       firstName: (d['firstName'] ?? '').toString(),
       lastName: (d['lastName'] ?? '').toString(),
       birthDate: (d['birthDate'] as Timestamp?)?.toDate(),
