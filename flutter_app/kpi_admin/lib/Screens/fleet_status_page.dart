@@ -136,6 +136,8 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
 
   @override
   void dispose() {
+    _scopeDocsSub?.cancel();
+    _scopeExtrasSub?.cancel();
     _searchCtrl.dispose();
     _referencesScrollCtrl.dispose();
     super.dispose();
@@ -1736,23 +1738,70 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
     return result;
   }
 
-  Stream<List<FleetVehicleDocument>>? _scopeDocsStream;
-  String? _scopeDocsStreamFor_;
+  // Fahrzeug-Dokumente (TÜV, Fahrzeugschein) als EIN festgehaltenes Abo.
+  //
+  // Hier lag zuvor ein per `asBroadcastStream()` gecachter Stream. Der
+  // hatte einen tückischen Haken: Verlässt der letzte Zuhörer den Stream
+  // — etwa beim Wechsel auf die Fahrzeug-Detailseite —, beendet ein
+  // Broadcast-Stream die darunterliegende Firestore-Verbindung. Beim
+  // Zurückkommen lauschte die Seite an einem toten Stream, und neue
+  // TÜV-Daten erschienen erst nach komplettem Neuladen der Seite.
+  //
+  // Jetzt hält der State das Abo selbst: Es lebt so lange wie die Seite,
+  // liefert Änderungen sofort und wird in `dispose()` beendet.
+  StreamSubscription<List<FleetVehicleDocument>>? _scopeDocsSub;
+  String? _scopeDocsScope;
+  List<FleetVehicleDocument> _scopeDocs = const <FleetVehicleDocument>[];
 
-  /// Gecachter Dokumenten-Stream je Admin-Scope (siehe Kommentar am
-  /// StreamBuilder — Neuerzeugung pro Build lässt die Chips leer laufen).
-  Stream<List<FleetVehicleDocument>> _scopeDocumentsStreamFor(String scope) {
-    if (_scopeDocsStreamFor_ != scope || _scopeDocsStream == null) {
-      _scopeDocsStreamFor_ = scope;
-      _scopeDocsStream = _documentService
-          .watchScopeDocuments(dspUid: scope)
-          .asBroadcastStream();
-    }
-    return _scopeDocsStream!;
+  /// Extras-Dokumente je Scope — gleiche Begruendung wie oben.
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _scopeExtrasSub;
+  String? _scopeExtrasScope;
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> _scopeExtras =
+      const <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+
+  void _ensureScopeExtrasSubscription(String scope) {
+    if (_scopeExtrasScope == scope && _scopeExtrasSub != null) return;
+    _scopeExtrasSub?.cancel();
+    _scopeExtrasScope = scope;
+    _scopeExtras = const <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+    _scopeExtrasSub = _extrasCollection(scope).snapshots().listen(
+      (snap) {
+        if (!mounted) return;
+        setState(() => _scopeExtras = snap.docs);
+      },
+      // Exotische Rollen ohne Leserecht: einfach keine Extras.
+      onError: (_) {},
+    );
+  }
+
+  void _ensureScopeDocsSubscription(String scope) {
+    if (_scopeDocsScope == scope && _scopeDocsSub != null) return;
+    _scopeDocsSub?.cancel();
+    _scopeDocsScope = scope;
+    _scopeDocsLoaded = false;
+    _scopeDocs = const <FleetVehicleDocument>[];
+    _scopeDocsSub =
+        _documentService.watchScopeDocuments(dspUid: scope).listen(
+      (docs) {
+        if (!mounted) return;
+        setState(() {
+          _scopeDocs = docs;
+          _scopeDocsLoaded = true;
+        });
+      },
+      onError: (_) {
+        // Kein Leserecht o. Ä.: Chips zeigen „fehlt" statt ewig „…".
+        if (!mounted) return;
+        setState(() => _scopeDocsLoaded = true);
+      },
+    );
   }
 
   Widget _buildVehiclesTab(BuildContext context, String scope) {
     final t = AppLocalizations.of(context);
+    // Abos sicherstellen (einmal je Scope, ueberleben Rebuilds).
+    _ensureScopeDocsSubscription(scope);
+    _ensureScopeExtrasSubscription(scope);
     return LayoutBuilder(
       builder: (context, constraints) {
         final isNarrow = constraints.maxWidth < 1024;
@@ -1766,19 +1815,14 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                   ? _friendlyLoadError(t, snapshot.error)
                   : null;
 
-              return StreamBuilder<List<FleetVehicleDocument>>(
-                // WICHTIG: Stream cachen statt bei jedem Build neu erzeugen —
-                // watchScopeDocuments baut 61 Sub-Abos auf und beginnt bei
-                // jeder Neuerzeugung wieder leer. Ohne Cache blieben die
-                // TÜV-/Fahrzeugschein-Chips dauerhaft auf „fehlt".
-                stream: _scopeDocumentsStreamFor(scope),
-                builder: (context, docsSnapshot) {
-                  final scopeDocuments =
-                      docsSnapshot.data ?? const <FleetVehicleDocument>[];
+              // Dokumente kommen aus dem festgehaltenen Abo (siehe
+              // `_ensureScopeDocsSubscription`) — kein Stream im Build.
+              return Builder(
+                builder: (context) {
+                  final scopeDocuments = _scopeDocs;
                   final complianceByPlate = _buildComplianceByPlate(
                     scopeDocuments,
                   );
-                  _scopeDocsLoaded = docsSnapshot.hasData;
                   _tuvDocByPlate = _latestTuvDocsByPlate(scopeDocuments);
                   _registrationPlates = <String>{
                     for (final doc in scopeDocuments)
@@ -1789,9 +1833,15 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                         normalizePlateNumber(doc.plateNumber),
                   };
 
-                  return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                    stream: _extrasCollection(scope).snapshots(),
-                    builder: (context, extrasSnapshot) {
+                  // Extras (Werkstatt, Leasinggeber, Bemerkungen,
+                  // Stilllegungsgrund) ebenfalls aus einem festgehaltenen
+                  // Abo — ein im Build erzeugter Stream begann bei jedem
+                  // Rebuild wieder leer, wodurch z. B. der eben gesetzte
+                  // Leasinggeber kurzzeitig wieder als „Kein Leasinggeber"
+                  // erschien.
+                  return Builder(
+                    builder: (context) {
+                      final extrasDocs = _scopeExtras;
                       // Errors (e.g. exotic roles without access) degrade to
                       // "no workshop data" instead of breaking the page.
                       final workshopByPlate = <String, String>{};
@@ -1799,8 +1849,8 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                       final leasingByPlate = <String, String>{};
                       final groundedReasonByPlate = <String, String>{};
                       final groundedAtByPlate = <String, DateTime>{};
-                      if (extrasSnapshot.hasData) {
-                        for (final doc in extrasSnapshot.data!.docs) {
+                      {
+                        for (final doc in extrasDocs) {
                           final workshop = (doc.data()['workshop'] ?? '')
                               .toString()
                               .trim();
