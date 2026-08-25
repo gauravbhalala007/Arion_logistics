@@ -7,6 +7,9 @@ import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/employment_period.dart';
@@ -6046,6 +6049,43 @@ String _daFormatDays(double value) {
       .replaceFirst(RegExp(r'\.$'), '');
 }
 
+/// Ersetzt Zeichen, die die PDF-Standardschrift (Latin-1) nicht
+/// darstellen kann — sie erscheinen sonst als leere Kästchen.
+///
+/// Gleiche Tabelle wie `_pdfSafe` im Vorschuss-PDF
+/// (`driver_da_requests_view.dart`); der Report nutzt bewusst dieselbe
+/// Lösung wie der Bestand, statt einen Unicode-Font einzubetten.
+String _daPdfSafe(String input) {
+  const map = {
+    '\u2013': '-', // – Halbgeviertstrich
+    '\u2014': '-', // — Geviertstrich
+    '\u2010': '-',
+    '\u2011': '-',
+    '\u2012': '-',
+    '\u2018': "'",
+    '\u2019': "'",
+    '\u201A': ',',
+    '\u201C': '"',
+    '\u201D': '"',
+    '\u201E': '"',
+    '\u2026': '...',
+    '\u00A0': ' ',
+    '\u202F': ' ',
+    '\u2009': ' ',
+    '\u20AC': 'EUR',
+    '\u2192': '->',
+    '\u2022': '-',
+    '\u2713': 'x',
+    '\u2714': 'x',
+    '\u221E': '-', // ∞ = offener Vertragszeitraum
+  };
+  var out = input;
+  map.forEach((k, v) => out = out.replaceAll(k, v));
+  // Alles, was darüber hinaus außerhalb von Latin-1 liegt, entfernen.
+  out = out.replaceAll(RegExp(r'[^\u0000-\u00FF]'), '');
+  return out;
+}
+
 /// Tages-Sollstunden des DSP in MINUTEN — aus dem Admin-Dokument
 /// (`users/{dspUid}.cotimerEmployment`).
 ///
@@ -6107,6 +6147,13 @@ class _DriverAbsenceProfile {
   /// Beschäftigungszeitraums, bereits als Text.
   final String contractPeriodText;
 
+  /// Derselbe Zeitraum als Datum — der Text oben ist gekürzt (`dd.MM.yy`)
+  /// und enthält „∞“ für offene Verträge, taugt also nicht zum Rechnen
+  /// oder für den PDF-Export (Ticket „DA balance PDF": dort muss der
+  /// letzte Vertragstag ausgeschrieben stehen).
+  final DateTime? contractStart;
+  final DateTime? contractEnd;
+
   /// Urlaub + Sonderurlaub — beides ist bezahlte/geplante Freizeit und
   /// gehört im Fahrer-Blatt unter „Urlaub (PTO)".
   final List<_AbsenceAdminItem> vacation;
@@ -6146,6 +6193,8 @@ class _DriverAbsenceProfile {
     required this.isActive,
     required this.employeeNumber,
     required this.contractPeriodText,
+    required this.contractStart,
+    required this.contractEnd,
     required this.vacation,
     required this.sick,
     required this.overtimeMonths,
@@ -6196,6 +6245,12 @@ class _DriverAbsenceProfile {
         workStartDate: workStartDate,
         manualOverride: vacationOverride,
         manualOverrideAt: vacationOverrideAt,
+        // Ticket „DA balance PDF": bis zum letzten Vertragstag rechnen.
+        // Ohne diesen Stichtag wuechse der anteilige Anspruch eines
+        // ausgetretenen Fahrers Monat fuer Monat weiter, obwohl er gar
+        // nicht mehr beschaeftigt ist. Bei laufendem Vertrag ist der
+        // Stichtag schlicht heute — dort aendert sich nichts.
+        now: balanceReferenceDate(DateTime.now()),
       );
 
   /// PTO Balance = verbleibende BEZAHLTE Urlaubstage über alle noch
@@ -6266,6 +6321,27 @@ class _DriverAbsenceProfile {
 
   bool get isEmpty =>
       vacation.isEmpty && sick.isEmpty && overtimeMonths.isEmpty;
+
+  /// Ist der Vertrag am Stichtag [today] bereits beendet?
+  bool contractEndedBy(DateTime today) {
+    final end = contractEnd;
+    return end != null && end.isBefore(DateTime(today.year, today.month, today.day));
+  }
+
+  /// Stichtag der Auswertung (Ticket „DA balance PDF": „counted until the
+  /// last day of the contract"): laufender Vertrag → heute, beendeter
+  /// Vertrag → letzter Vertragstag.
+  ///
+  /// Dieser Stichtag geht auch in die BERECHNUNG ein (siehe
+  /// [vacationBalance]): Wer ausgetreten ist, erwirbt danach keinen
+  /// weiteren Urlaubsanspruch mehr. Bildschirm und PDF zeigen deshalb
+  /// dieselben Zahlen.
+  DateTime balanceReferenceDate(DateTime today) {
+    final day = DateTime(today.year, today.month, today.day);
+    final end = contractEnd;
+    if (end == null) return day;
+    return end.isBefore(day) ? end : day;
+  }
 }
 
 class AbsenceDriversOverviewPage extends StatefulWidget {
@@ -6304,6 +6380,13 @@ class _AbsenceDriversOverviewPageState
   /// Aufgelöster DSP-Scope (`dspUid`, sonst eigene UID). Wird von
   /// [_load] gesetzt und vom „Zeitkonto verwalten"-Dialog gebraucht.
   String? _scope;
+
+  /// Firmenname aus `users/{scope}` — Kopfzeile und Dateiname des
+  /// PDF-Exports. Leer, solange [_load] nicht durch ist.
+  String _companyName = '';
+
+  /// Verhindert doppelte Exporte bei schnellen Mehrfach-Klicks.
+  bool _exportingPdf = false;
 
   TabController? _tabController;
   int? _lastTabIndex;
@@ -6383,8 +6466,15 @@ class _AbsenceDriversOverviewPageState
     // Ticket „TIME & BALANCE": Tages-Sollstunden aus derselben Quelle,
     // die auch `computeMonthlyAccount` nutzt.
     final scopeSnap = await db.collection('users').doc(scope).get();
-    final dailyContractMinutes =
-        _dailyContractMinutesOf(scopeSnap.data() ?? const {});
+    final scopeData = scopeSnap.data() ?? const <String, dynamic>{};
+    final dailyContractMinutes = _dailyContractMinutesOf(scopeData);
+    // Firmenname für den PDF-Kopf — gleiche Feldkette wie im
+    // Vorschuss-PDF (`driver_da_requests_view.dart`).
+    _companyName = _AbsenceAdminItem._firstNonEmpty([
+      (scopeData['companyName'] ?? '').toString(),
+      (scopeData['dspName'] ?? '').toString(),
+      (scopeData['company'] ?? '').toString(),
+    ]);
 
     // Anträge einmal nach Transporter-ID gruppieren (Fallback driverId,
     // damit auch Bestandsdaten ohne `driverTransporterId` landen).
@@ -6454,6 +6544,8 @@ class _AbsenceDriversOverviewPageState
           ]),
           employeeNumber: (data['employeeNumber'] ?? '').toString().trim(),
           contractPeriodText: periodText,
+          contractStart: start,
+          contractEnd: end,
           vacation: sorted
               .where((it) => it.type != 'sick_leave')
               .toList(growable: false),
@@ -6575,6 +6667,13 @@ class _AbsenceDriversOverviewPageState
                     onPressed: _openZeitkontoManager,
                   ),
                   const SizedBox(width: 4),
+                  // Ticket „DA balance PDF": exportiert exakt die gerade
+                  // sichtbare Liste (Suche + Aktiv/Archiv-Umschalter).
+                  _DaBalancePdfButton(
+                    enabled: !_exportingPdf,
+                    onPressed: () => _exportPdf(drivers),
+                  ),
+                  const SizedBox(width: 4),
                   IconButton(
                     tooltip: de ? 'Aktualisieren' : 'Refresh',
                     onPressed: _reload,
@@ -6642,6 +6741,444 @@ class _AbsenceDriversOverviewPageState
         },
       ),
     );
+  }
+
+  // ── PDF-Export „DA Balance" (Ticket: download as PDF) ──────────────
+  //
+  // Vorbild ist bewusst der Zeitkonto-Report in `zeitkonto_tab.dart`:
+  // dieselben Pakete (`pdf` + `printing`), dieselbe PDF-Standardschrift
+  // (Helvetica, Latin-1 — deshalb [_daPdfSafe] für alle Texte) und
+  // derselbe Ausgabeweg `Printing.sharePdf` (im Web ein Download, auf
+  // Mobile das Share-Sheet).
+
+  /// Exportiert GENAU die übergebene Liste — also die Ansicht inklusive
+  /// Suchbegriff und Aktiv/Archiv-Umschalter.
+  Future<void> _exportPdf(List<_DriverAbsenceProfile> drivers) async {
+    final de = _de;
+    final messenger = ScaffoldMessenger.of(context);
+    if (drivers.isEmpty) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            de
+                ? 'Keine Fahrer in dieser Ansicht — es gibt nichts zu '
+                    'exportieren.'
+                : 'No drivers in this view — nothing to export.',
+          ),
+        ),
+      );
+      return;
+    }
+    if (_exportingPdf) return;
+    setState(() => _exportingPdf = true);
+    final archived = _showArchived;
+    try {
+      final bytes = await _buildBalancePdf(drivers, de: de, archived: archived);
+      final stamp = formatIsoDate(DateTime.now());
+      final company = _companyName.isEmpty ? 'codriver' : _companyName;
+      final slug = _daPdfSafe(company)
+          .toLowerCase()
+          .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+          .replaceAll(RegExp(r'^-+|-+$'), '');
+      await Printing.sharePdf(
+        bytes: bytes,
+        filename: 'da-balance_'
+            '${slug.isEmpty ? 'codriver' : slug}_'
+            '${archived ? 'archiv_' : ''}$stamp.pdf',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            de
+                ? 'PDF konnte nicht erstellt werden: $e'
+                : 'Could not create the PDF: $e',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _exportingPdf = false);
+    }
+  }
+
+  Future<Uint8List> _buildBalancePdf(
+    List<_DriverAbsenceProfile> drivers, {
+    required bool de,
+    required bool archived,
+  }) async {
+    final doc = pw.Document();
+    final brand = PdfColor.fromInt(0xFF00B287);
+    final brandDeep = PdfColor.fromInt(0xFF006047);
+    final ink = PdfColor.fromInt(0xFF111827);
+    final muted = PdfColor.fromInt(0xFF6B7280);
+    final soft = PdfColor.fromInt(0xFFF3F6F7);
+    final line = PdfColor.fromInt(0xFFE5E7EB);
+    final danger = PdfColor.fromInt(0xFFB91C1C);
+
+    final today = DateTime.now();
+    final todayText = DateFormat('dd.MM.yyyy').format(today);
+    String dateText(DateTime d) => DateFormat('dd.MM.yyyy').format(d);
+
+    // Fußnoten nur setzen, wenn sie in dieser Liste auch vorkommen.
+    final hasEnded = drivers.any((d) => d.contractEndedBy(today));
+    final hasOverride =
+        drivers.any((d) => d.vacationBalance.overrideApplied);
+
+    pw.Widget cell(
+      String text, {
+      bool bold = false,
+      PdfColor? color,
+      pw.TextAlign align = pw.TextAlign.left,
+      double size = 8,
+    }) =>
+        pw.Padding(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          child: pw.Text(
+            _daPdfSafe(text),
+            textAlign: align,
+            style: pw.TextStyle(
+              fontSize: size,
+              color: color ?? ink,
+              fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+            ),
+          ),
+        );
+
+    pw.Widget headerCell(String text, {pw.TextAlign align = pw.TextAlign.left}) =>
+        pw.Padding(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+          child: pw.Text(
+            _daPdfSafe(text),
+            textAlign: align,
+            style: pw.TextStyle(
+              fontSize: 7.5,
+              color: muted,
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
+        );
+
+    final headers = de
+        ? const [
+            'Fahrer',
+            'Personalnr.',
+            'Transporter-ID',
+            'Vertragszeitraum',
+            'Gerechnet bis',
+            'Krankheits-\ntage',
+            'Urlaub\ngenommen',
+            'Urlaub\nAnspruch',
+            'Rest',
+            'davon\nunbezahlt',
+            'Überstunden-\nSaldo',
+          ]
+        : const [
+            'Driver',
+            'Employee no.',
+            'Transporter ID',
+            'Contract period',
+            'Counted until',
+            'Sick leave\ndays',
+            'PTO\ntaken',
+            'PTO\nentitlement',
+            'Remaining',
+            'thereof\nunpaid',
+            'Overtime\nbalance',
+          ];
+
+    final rows = <pw.TableRow>[
+      pw.TableRow(
+        repeat: true,
+        decoration: pw.BoxDecoration(color: soft),
+        children: [
+          for (var i = 0; i < headers.length; i++)
+            headerCell(
+              headers[i],
+              align: i >= 5 ? pw.TextAlign.right : pw.TextAlign.left,
+            ),
+        ],
+      ),
+    ];
+
+    var sumSick = 0;
+    var sumTaken = 0.0;
+    var sumUnpaid = 0;
+
+    for (final d in drivers) {
+      final balance = d.vacationBalance;
+      final taken = balance.totalUsed;
+      final entitlement = balance.totalEntitlement;
+      final remaining = d.ptoBalanceDays;
+      final ended = d.contractEndedBy(today);
+      final reference = d.balanceReferenceDate(today);
+      final overtime = d.overtimeBalanceMinutes;
+
+      sumSick += d.approvedSickDays;
+      sumTaken += taken;
+      sumUnpaid += d.approvedUnpaidVacationDays;
+
+      // Zweite Zeile der „Rest"-Spalte. Ein negativer Saldo heißt
+      // „zu viel genommen" — „-3 Tage übrig" läse sich falsch.
+      final restLine = remaining < 0
+          ? (de
+              ? '${_daFormatDays(-remaining)} Tage zu viel'
+              : '${_daFormatDays(-remaining)} days over')
+          : (de
+              ? '${_daFormatDays(remaining)} '
+                  '${remaining == 1 ? 'Tag' : 'Tage'} übrig'
+              : '${_daFormatDays(remaining)} '
+                  '${remaining == 1 ? 'day' : 'days'} left');
+
+      final start = d.contractStart;
+      final end = d.contractEnd;
+      // Zweizeilig, sonst passen zwei volle Daten nicht in die Spalte.
+      final periodText = start == null
+          ? (d.contractPeriodText.isEmpty ? '-' : d.contractPeriodText)
+          : '${dateText(start)}\n${de ? 'bis' : 'to'} '
+              '${end == null ? (de ? 'offen' : 'open') : dateText(end)}';
+
+      rows.add(
+        pw.TableRow(
+          children: [
+            cell(d.driverName, bold: true),
+            cell(d.employeeNumber.isEmpty ? '-' : d.employeeNumber),
+            // Transporter-IDs sind reine Versalien und damit breit —
+            // eine halbe Stufe kleiner, sonst brechen sie um.
+            cell(d.driverId, size: 7.5),
+            cell(periodText),
+            cell(
+              '${dateText(reference)}\n'
+              '${ended ? (de ? 'Vertragsende *' : 'contract end *') : (de ? 'heute' : 'today')}',
+              color: ended ? brandDeep : muted,
+            ),
+            cell('${d.approvedSickDays}', align: pw.TextAlign.right),
+            cell(_daFormatDays(taken), align: pw.TextAlign.right),
+            cell(_daFormatDays(entitlement), align: pw.TextAlign.right),
+            cell(
+              '${_daFormatDays(taken)} / ${_daFormatDays(entitlement)}\n'
+              '$restLine',
+              bold: true,
+              align: pw.TextAlign.right,
+              color: remaining < 0 ? danger : ink,
+            ),
+            cell(
+              d.approvedUnpaidVacationDays == 0
+                  ? '-'
+                  : '${d.approvedUnpaidVacationDays}',
+              align: pw.TextAlign.right,
+            ),
+            cell(
+              d.hasOvertime ? '${_daFormatDuration(overtime)} h' : '-',
+              align: pw.TextAlign.right,
+              bold: d.hasOvertime && overtime < 0,
+              color: d.hasOvertime && overtime < 0 ? danger : ink,
+            ),
+          ],
+        ),
+      );
+    }
+
+    rows.add(
+      pw.TableRow(
+        decoration: pw.BoxDecoration(color: soft),
+        children: [
+          cell(
+            de
+                ? 'Summe — ${drivers.length} Fahrer'
+                : 'Total — ${drivers.length} drivers',
+            bold: true,
+          ),
+          cell(''),
+          cell(''),
+          cell(''),
+          cell(''),
+          cell('$sumSick', bold: true, align: pw.TextAlign.right),
+          cell(_daFormatDays(sumTaken), bold: true, align: pw.TextAlign.right),
+          cell(''),
+          cell(''),
+          cell(
+            sumUnpaid == 0 ? '-' : '$sumUnpaid',
+            bold: true,
+            align: pw.TextAlign.right,
+          ),
+          cell(''),
+        ],
+      ),
+    );
+
+    doc.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4.landscape,
+        margin: const pw.EdgeInsets.fromLTRB(24, 24, 24, 30),
+        footer: (ctx) => pw.Container(
+          alignment: pw.Alignment.centerRight,
+          margin: const pw.EdgeInsets.only(top: 8),
+          child: pw.Text(
+            _daPdfSafe(
+              de
+                  ? '${_companyName.isEmpty ? 'CoDriver' : _companyName}  ·  '
+                      'Seite ${ctx.pageNumber} von ${ctx.pagesCount}'
+                  : '${_companyName.isEmpty ? 'CoDriver' : _companyName}  ·  '
+                      'Page ${ctx.pageNumber} of ${ctx.pagesCount}',
+            ),
+            style: pw.TextStyle(fontSize: 7.5, color: muted),
+          ),
+        ),
+        build: (ctx) => [
+          pw.Container(
+            width: double.infinity,
+            padding: const pw.EdgeInsets.all(14),
+            color: brand,
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  'DA Balance',
+                  style: pw.TextStyle(
+                    fontSize: 20,
+                    color: PdfColors.white,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.SizedBox(height: 3),
+                pw.Text(
+                  _daPdfSafe([
+                    if (_companyName.isNotEmpty) _companyName,
+                    de
+                        ? (archived
+                            ? 'Archivierte DAs'
+                            : 'Aktive DAs')
+                        : (archived ? 'Archived DAs' : 'Active DAs'),
+                    de
+                        ? 'Erstellt am $todayText'
+                        : 'Created on $todayText',
+                    de
+                        ? '${drivers.length} Fahrer'
+                        : '${drivers.length} drivers',
+                  ].join('  |  ')),
+                  style: const pw.TextStyle(
+                    fontSize: 9,
+                    color: PdfColors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          pw.SizedBox(height: 10),
+          pw.Container(
+            width: double.infinity,
+            padding: const pw.EdgeInsets.all(10),
+            decoration: pw.BoxDecoration(
+              color: soft,
+              border: pw.Border.all(color: line),
+            ),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  _daPdfSafe(
+                    de
+                        ? 'Urlaubsanspruch anteilig ab Vertragsbeginn, '
+                            'gerechnet bis zum letzten Vertragstag. '
+                            'Wochenenden und bundesweite Feiertage zählen '
+                            'nicht als Urlaubstage. Berücksichtigt werden '
+                            'nur genehmigte Anträge; unbezahlter Urlaub '
+                            'belastet das Urlaubskonto nicht, wohl aber den '
+                            'Überstunden-Saldo.'
+                        : 'PTO entitlement accrues pro rata from the start '
+                            'of the contract and is counted until the last '
+                            'day of the contract. Weekends and nationwide '
+                            'public holidays do not count as vacation days. '
+                            'Only approved requests are included; unpaid '
+                            'leave does not reduce the PTO pool, but it does '
+                            'reduce the overtime balance.',
+                  ),
+                  style: pw.TextStyle(fontSize: 8, color: ink),
+                ),
+                pw.SizedBox(height: 4),
+                pw.Text(
+                  _daPdfSafe(
+                    de
+                        ? 'Spalte „Rest": genommene / zustehende Urlaubstage '
+                            '(z. B. 12 / 21) mit den verbleibenden Tagen '
+                            'darunter. Die Spalte „Gerechnet bis" nennt je '
+                            'Fahrer den Stichtag der Auswertung.'
+                        : 'Column "Remaining": PTO taken / PTO entitlement '
+                            '(e.g. 12 / 21) with the remaining days below. '
+                            'The column "Counted until" states the cut-off '
+                            'date used for each driver.',
+                  ),
+                  style: pw.TextStyle(fontSize: 8, color: muted),
+                ),
+              ],
+            ),
+          ),
+          pw.SizedBox(height: 10),
+          pw.Table(
+            border: pw.TableBorder(
+              horizontalInside: pw.BorderSide(color: line, width: 0.6),
+              top: pw.BorderSide(color: line, width: 0.6),
+              bottom: pw.BorderSide(color: line, width: 0.6),
+            ),
+            // Summe der festen Spalten = 632 pt; der Rest (~162 pt der
+            // 794 pt Satzspiegel im Querformat) bleibt dem Namen.
+            columnWidths: const {
+              0: pw.FlexColumnWidth(),
+              1: pw.FixedColumnWidth(50),
+              2: pw.FixedColumnWidth(84),
+              3: pw.FixedColumnWidth(74),
+              4: pw.FixedColumnWidth(74),
+              5: pw.FixedColumnWidth(50),
+              6: pw.FixedColumnWidth(54),
+              7: pw.FixedColumnWidth(52),
+              8: pw.FixedColumnWidth(82),
+              9: pw.FixedColumnWidth(50),
+              10: pw.FixedColumnWidth(62),
+            },
+            children: rows,
+          ),
+          if (hasEnded || hasOverride) ...[
+            pw.SizedBox(height: 8),
+            if (hasEnded)
+              pw.Text(
+                _daPdfSafe(
+                  de
+                      ? '* Vertrag beendet — der Stichtag ist der letzte '
+                          'Vertragstag. Die ausgewiesenen Werte entsprechen '
+                          'exakt der Bildschirmansicht; der anteilige '
+                          'Urlaubsanspruch wird dort systemseitig bis zum '
+                          'aktuellen Tagesdatum fortgeschrieben.'
+                      : '* Contract ended — the cut-off date is the last day '
+                          'of the contract. The figures match the on-screen '
+                          'view exactly; there the pro-rata PTO entitlement '
+                          'keeps accruing up to the current date.',
+                ),
+                style: pw.TextStyle(fontSize: 7.5, color: muted),
+              ),
+            if (hasOverride) ...[
+              pw.SizedBox(height: 3),
+              pw.Text(
+                _daPdfSafe(
+                  de
+                      ? 'Bei einzelnen Fahrern ist ein manueller Startwert '
+                          '(Override) hinterlegt: „Urlaub Anspruch" zeigt '
+                          'dann diesen Wert, „Urlaub genommen" nur die seit '
+                          'der Erfassung genehmigten Tage.'
+                      : 'Some drivers have a manual starting value '
+                          '(override): "PTO entitlement" then shows that '
+                          'value and "PTO taken" only the days approved '
+                          'since it was set.',
+                ),
+                style: pw.TextStyle(fontSize: 7.5, color: muted),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+
+    return doc.save();
   }
 
   /// Öffnet den [ZeitkontoTab] als Vollbild-Dialog. Er ist der einzige
@@ -6765,6 +7302,66 @@ class _ManageTimeAccountsButton extends StatelessWidget {
         style: TextButton.styleFrom(
           foregroundColor: const Color(0xFF006047),
           backgroundColor: const Color(0xFFE6F8F2),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          textStyle: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w900,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Header-Aktion „PDF" der DA-Balance-Ansicht (Ticket „DA balance:
+/// option to download as PDF").
+///
+/// Gleiche Responsive-Regel wie [_ManageTimeAccountsButton]: ab 560 px
+/// mit Label, darunter nur das Icon mit Tooltip.
+class _DaBalancePdfButton extends StatelessWidget {
+  const _DaBalancePdfButton({
+    required this.enabled,
+    required this.onPressed,
+  });
+
+  final bool enabled;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final tooltip = de
+        ? 'Aktuelle Liste als PDF exportieren — Krankheitstage, '
+            'genommener und verfügbarer Urlaub, gerechnet bis zum '
+            'letzten Vertragstag'
+        : 'Export the current list as PDF — sick leave days, PTO taken '
+            'and available, counted until the last day of the contract';
+    final wide = MediaQuery.sizeOf(context).width >= 560;
+    if (!wide) {
+      return IconButton(
+        tooltip: tooltip,
+        onPressed: enabled ? onPressed : null,
+        icon: const Icon(Icons.picture_as_pdf_outlined),
+      );
+    }
+    return Tooltip(
+      message: tooltip,
+      child: TextButton.icon(
+        onPressed: enabled ? onPressed : null,
+        icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+        // „PDF" ist in beiden Sprachen identisch — die zweisprachige
+        // Erklärung steckt im Tooltip.
+        label: const Text(
+          'PDF',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        style: TextButton.styleFrom(
+          foregroundColor: const Color(0xFF374151),
+          backgroundColor: const Color(0xFFF3F4F6),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           textStyle: const TextStyle(
             fontSize: 13,
