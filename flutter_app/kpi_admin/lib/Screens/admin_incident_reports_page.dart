@@ -64,7 +64,13 @@ Future<void> openIncidentForm(
 /// Ablauf: Vorfall zuerst hier erfassen, danach den fertigen Bericht per
 /// Kopier-Button in die WhatsApp-Gruppe einfügen.
 class AdminIncidentReportsPage extends StatefulWidget {
-  const AdminIncidentReportsPage({super.key});
+  const AdminIncidentReportsPage({super.key, this.initialPlate});
+
+  /// Vorbelegter Fahrzeug-Filter. Wird gesetzt, wenn die Seite aus der
+  /// Fahrzeug-Detailseite heraus geoeffnet wird ("Schäden"-Kachel) —
+  /// dann zeigt die Liste nur die Vorfaelle dieses Fahrzeugs statt der
+  /// ganzen Flotte. Der Filter laesst sich in der Liste loeschen.
+  final String? initialPlate;
 
   @override
   State<AdminIncidentReportsPage> createState() =>
@@ -246,6 +252,7 @@ class _AdminIncidentReportsPageState extends State<AdminIncidentReportsPage>
                       key: const ValueKey('vehicle'),
                       dspUid: scope,
                       category: kIncidentVehicle,
+                      initialPlate: widget.initialPlate,
                     ),
                     _IncidentListTab(
                       key: const ValueKey('work_accident'),
@@ -332,10 +339,14 @@ class _IncidentListTab extends StatefulWidget {
     super.key,
     required this.dspUid,
     required this.category,
+    this.initialPlate,
   });
 
   final String dspUid;
   final String category;
+
+  /// Siehe [AdminIncidentReportsPage.initialPlate].
+  final String? initialPlate;
 
   @override
   State<_IncidentListTab> createState() => _IncidentListTabState();
@@ -366,6 +377,25 @@ class _IncidentListTabState extends State<_IncidentListTab> {
   bool _statsExpanded = false;
 
   bool get _isWorkAccident => widget.category == kIncidentWorkAccident;
+
+  @override
+  void initState() {
+    super.initState();
+    // Aus der Fahrzeug-Detailseite geoeffnet: sofort auf dieses Fahrzeug
+    // filtern. Dafuer gibt es den Fokus-Mechanismus schon — bisher wurde
+    // er nur durch einen Klick in der Statistik gesetzt, weshalb die
+    // Liste trotz Titel "Vorfaelle · KENNZEICHEN" die ganze Flotte zeigte.
+    final plate = (widget.initialPlate ?? '').trim();
+    if (plate.isNotEmpty && !_isWorkAccident) {
+      _focus = _StatFocus(
+        kind: 'plate',
+        key: plateKeyOf(plate),
+        label: plate.toUpperCase(),
+      );
+      // Damit der Nutzer die Fahrzeug-Verteilung neben der Liste sieht.
+      _statsMode = 'plate';
+    }
+  }
 
   @override
   void dispose() {

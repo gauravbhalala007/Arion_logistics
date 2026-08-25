@@ -2614,7 +2614,9 @@ class _FleetVehicleDetailPageState extends State<FleetVehicleDetailPage> {
                 ),
               ),
             ),
-            body: const AdminIncidentReportsPage(),
+            // Vorgefiltert auf dieses Fahrzeug — der Titel verspricht es,
+            // also muss die Liste es auch halten.
+            body: AdminIncidentReportsPage(initialPlate: _plate),
           ),
         ),
       ),
