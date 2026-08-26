@@ -6374,6 +6374,9 @@ class _AbsenceDriversOverviewPageState
 
   /// `true` = Archiv-Ansicht (ausgetretene/deaktivierte Fahrer).
   bool _showArchived = false;
+  /// Sortierung der DA-Balance-Liste. Standard bleibt alphabetisch —
+  /// wer nach Ueberstunden sucht, schaltet bewusst um.
+  _DaSort _sort = _DaSort.name;
 
   Future<List<_DriverAbsenceProfile>>? _future;
 
@@ -6605,7 +6608,7 @@ class _AbsenceDriversOverviewPageState
               .where((d) => d.isActive != _showArchived)
               .toList(growable: false);
           final needle = _search.trim().toLowerCase();
-          final drivers = needle.isEmpty
+          final matched = needle.isEmpty
               ? scoped
               : scoped
                   .where((d) =>
@@ -6613,6 +6616,20 @@ class _AbsenceDriversOverviewPageState
                       d.driverId.toLowerCase().contains(needle) ||
                       d.employeeNumber.toLowerCase().contains(needle))
                   .toList(growable: false);
+          // Nach Ueberstunden sortieren heisst: nach dem Saldo, den die
+          // Zeile auch anzeigt (erfasste Monate minus unbezahltem
+          // Urlaub) — sonst weicht die Reihenfolge vom sichtbaren Wert ab.
+          final drivers = [...matched];
+          switch (_sort) {
+            case _DaSort.name:
+              break; // _load() liefert bereits alphabetisch
+            case _DaSort.overtimeDesc:
+              drivers.sort((a, b) =>
+                  b.overtimeBalanceMinutes.compareTo(a.overtimeBalanceMinutes));
+            case _DaSort.overtimeAsc:
+              drivers.sort((a, b) =>
+                  a.overtimeBalanceMinutes.compareTo(b.overtimeBalanceMinutes));
+          }
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -6693,6 +6710,12 @@ class _AbsenceDriversOverviewPageState
                         setState(() => _search = value);
                       },
                     ),
+                  ),
+                  const SizedBox(width: 10),
+                  _DaSortMenu(
+                    value: _sort,
+                    de: de,
+                    onChanged: (v) => setState(() => _sort = v),
                   ),
                   const SizedBox(width: 10),
                   _ArchiveToggle(
@@ -7918,15 +7941,34 @@ class _DriverAbsenceHistoryView extends StatelessWidget {
                 ),
                 // Ticket „per employee profile": Blatt dieses Fahrers als
                 // PDF — mit allen einzelnen Kranken- und Urlaubszeiträumen.
-                IconButton(
-                  tooltip: de ? 'Als PDF herunterladen' : 'Download as PDF',
-                  onPressed: () => exportDriverBalancePdf(
-                    context: context,
-                    profile: profile,
-                    company: company,
-                    de: de,
+                // Beschriftet statt nur als Icon: als blosses Symbol neben
+                // dem X wurde der Export schlicht uebersehen.
+                Padding(
+                  padding: const EdgeInsets.only(top: 4, right: 2),
+                  child: TextButton.icon(
+                    onPressed: () => exportDriverBalancePdf(
+                      context: context,
+                      profile: profile,
+                      company: company,
+                      de: de,
+                    ),
+                    icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                    label: const Text('PDF'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFF1D7F5A),
+                      backgroundColor: const Color(0xFF1D7F5A)
+                          .withValues(alpha: 0.08),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      minimumSize: const Size(0, 40),
+                      textStyle: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(11),
+                      ),
+                    ),
                   ),
-                  icon: const Icon(Icons.picture_as_pdf_outlined),
                 ),
                 IconButton(
                   tooltip: de ? 'Schließen' : 'Close',
@@ -8447,6 +8489,143 @@ class _DriverOvertimeTile extends StatelessWidget {
 /// Überstundensalden waren nach dem Austritt nicht mehr einsehbar. Der
 /// Umschalter blendet sie auf Wunsch ein, ohne die Alltagsansicht zu
 /// überfrachten — Vorgabe bleibt „Aktiv".
+/// Sortierung der DA-Balance-Liste.
+enum _DaSort {
+  /// Alphabetisch nach Fahrername (Standard).
+  name,
+
+  /// Meiste Ueberstunden zuerst.
+  overtimeDesc,
+
+  /// Wenigste zuerst — zeigt zugleich die Minusstunden ganz oben.
+  overtimeAsc,
+}
+
+/// Sortier-Auswahl neben dem Archiv-Umschalter.
+///
+/// Bewusst ein Menue und keine dritte Segment-Leiste: die Kopfzeile
+/// traegt schon Suche und Aktiv/Archiv, eine weitere Leiste wuerde auf
+/// dem Handy umbrechen.
+class _DaSortMenu extends StatelessWidget {
+  const _DaSortMenu({
+    required this.value,
+    required this.de,
+    required this.onChanged,
+  });
+
+  final _DaSort value;
+  final bool de;
+  final ValueChanged<_DaSort> onChanged;
+
+  String _label(_DaSort sort) {
+    switch (sort) {
+      case _DaSort.name:
+        return de ? 'Name A–Z' : 'Name A–Z';
+      case _DaSort.overtimeDesc:
+        return de ? 'Überstunden: meiste zuerst' : 'Overtime: most first';
+      case _DaSort.overtimeAsc:
+        return de ? 'Überstunden: wenigste zuerst' : 'Overtime: fewest first';
+    }
+  }
+
+  String _shortLabel(_DaSort sort) {
+    switch (sort) {
+      case _DaSort.name:
+        return de ? 'Name' : 'Name';
+      case _DaSort.overtimeDesc:
+        return de ? 'Meiste Ü-Std.' : 'Most OT';
+      case _DaSort.overtimeAsc:
+        return de ? 'Wenigste Ü-Std.' : 'Fewest OT';
+    }
+  }
+
+  IconData _icon(_DaSort sort) {
+    switch (sort) {
+      case _DaSort.name:
+        return Icons.sort_by_alpha_rounded;
+      case _DaSort.overtimeDesc:
+        return Icons.arrow_downward_rounded;
+      case _DaSort.overtimeAsc:
+        return Icons.arrow_upward_rounded;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final active = value != _DaSort.name;
+    return PopupMenuButton<_DaSort>(
+      tooltip: de ? 'Sortieren' : 'Sort',
+      initialValue: value,
+      onSelected: onChanged,
+      position: PopupMenuPosition.under,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      itemBuilder: (context) => _DaSort.values
+          .map(
+            (sort) => PopupMenuItem<_DaSort>(
+              value: sort,
+              child: Row(
+                children: [
+                  Icon(
+                    _icon(sort),
+                    size: 18,
+                    color: sort == value
+                        ? const Color(0xFF111827)
+                        : const Color(0xFF6B7280),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    _label(sort),
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight:
+                          sort == value ? FontWeight.w800 : FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+          .toList(growable: false),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 44),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: active ? const Color(0xFF111827) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: active ? const Color(0xFF111827) : const Color(0xFFE5E7EB),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              _icon(value),
+              size: 17,
+              color: active ? Colors.white : const Color(0xFF6B7280),
+            ),
+            const SizedBox(width: 7),
+            Text(
+              _shortLabel(value),
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w800,
+                color: active ? Colors.white : const Color(0xFF6B7280),
+              ),
+            ),
+            const SizedBox(width: 3),
+            Icon(
+              Icons.expand_more_rounded,
+              size: 17,
+              color: active ? Colors.white : const Color(0xFF9CA3AF),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ArchiveToggle extends StatelessWidget {
   const _ArchiveToggle({
     required this.showArchived,
