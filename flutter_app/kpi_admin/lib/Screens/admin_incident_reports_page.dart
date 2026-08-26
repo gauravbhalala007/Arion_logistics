@@ -3,7 +3,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../services/incident_attachments.dart';
 import '../services/incident_reports.dart';
 import '../services/vehicle_check_service.dart' show kVehicleCheckKind;
 import '../widgets/admin_scope.dart';
@@ -1241,6 +1243,7 @@ class _IncidentCard extends StatelessWidget {
     final plate = incidentPlate(data);
     final description = incidentDescription(data);
     final photoCount = incidentPhotoCount(data);
+    final docCount = incidentAttachmentCount(data);
 
     return CoPressable(
       onTap: onOpen,
@@ -1295,6 +1298,7 @@ class _IncidentCard extends StatelessWidget {
                           fg: _typeFg(incidentTypeOf(data)),
                         ),
                       if (photoCount > 0) IncidentPhotoBadge(count: photoCount),
+                      if (docCount > 0) _DocumentBadge(count: docCount),
                     ],
                   ),
                   if (description.isNotEmpty) ...[
@@ -1681,6 +1685,17 @@ class _IncidentDetailDialog extends StatelessWidget {
                           _IncidentWorkflow(docRef: docRef),
                         ],
                         ..._photos(context, data, de),
+                        // Belege (Polizeibericht, Schadenmeldung, …).
+                        // Fahrzeug-Checks liegen in einer anderen
+                        // Collection — dort stimmt weder der Storage-
+                        // Scope noch der Anwendungsfall.
+                        if (!_isVehicleCheckDoc(data)) ...[
+                          const SizedBox(height: 20),
+                          _IncidentAttachmentsSection(
+                            docRef: docRef,
+                            data: data,
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -1919,6 +1934,433 @@ class _IncidentDetailDialog extends StatelessWidget {
       IncidentPhotoGallery(photos: photos),
     ];
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+//  DOKUMENTE / ANHÄNGE
+// ─────────────────────────────────────────────────────────────────────────
+
+/// Zähler-Badge auf der Vorfall-Kachel — Gegenstück zu
+/// [IncidentPhotoBadge], damit man ohne Öffnen sieht, dass Belege
+/// hinterlegt sind.
+class _DocumentBadge extends StatelessWidget {
+  const _DocumentBadge({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    return Tooltip(
+      message: de
+          ? '$count ${count == 1 ? 'Dokument' : 'Dokumente'}'
+          : '$count ${count == 1 ? 'document' : 'documents'}',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEFF1F5),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            const Icon(
+              Icons.attach_file_rounded,
+              size: 13,
+              color: Color(0xFF475467),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '$count',
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF475467),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Dokumenten-Block im Detail-Dialog: hochladen, öffnen, entfernen.
+///
+/// Sitzt bewusst hier und nicht im Erfassungsformular: das Dokument muss
+/// existieren, bevor Dateien darunter abgelegt werden können (der
+/// Storage-Pfad enthält die Report-ID), und Belege wie der
+/// Polizeibericht treffen typischerweise Tage nach der Meldung ein.
+class _IncidentAttachmentsSection extends StatefulWidget {
+  const _IncidentAttachmentsSection({
+    required this.docRef,
+    required this.data,
+  });
+
+  final DocumentReference<Map<String, dynamic>> docRef;
+
+  /// Live-Daten aus dem `StreamBuilder` des Dialogs — nach dem Upload
+  /// rendert die Liste dadurch von selbst neu.
+  final Map<String, dynamic> data;
+
+  @override
+  State<_IncidentAttachmentsSection> createState() =>
+      _IncidentAttachmentsSectionState();
+}
+
+class _IncidentAttachmentsSectionState
+    extends State<_IncidentAttachmentsSection> {
+  bool _busy = false;
+
+  /// `users/{dspUid}/incident_reports/{id}` → das Großeltern-Dokument ist
+  /// der DSP.
+  String get _dspUid => widget.docRef.parent.parent?.id ?? '';
+
+  void _snack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Text(message),
+      ),
+    );
+  }
+
+  Future<void> _pickAndUpload() async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    if (_dspUid.isEmpty) {
+      _snack(de ? 'Kein DSP-Zugriff.' : 'No DSP scope.');
+      return;
+    }
+
+    IncidentAttachmentPickResult picked;
+    try {
+      picked = await pickIncidentAttachments();
+    } catch (_) {
+      _snack(
+        de
+            ? 'Datei-Auswahl fehlgeschlagen.'
+            : 'File selection failed.',
+      );
+      return;
+    }
+    if (!mounted) return;
+
+    if (picked.hasRejections) {
+      final reasons = <String>[
+        if (picked.tooLarge > 0)
+          de
+              ? '${picked.tooLarge} über 15 MB'
+              : '${picked.tooLarge} over 15 MB',
+        if (picked.wrongType > 0)
+          de
+              ? '${picked.wrongType} kein PDF/Bild'
+              : '${picked.wrongType} not PDF/image',
+        if (picked.unreadable > 0)
+          de
+              ? '${picked.unreadable} nicht lesbar'
+              : '${picked.unreadable} unreadable',
+      ];
+      _snack(
+        de
+            ? 'Übersprungen: ${reasons.join(', ')}.'
+            : 'Skipped: ${reasons.join(', ')}.',
+      );
+    }
+    if (picked.files.isEmpty) return;
+
+    setState(() => _busy = true);
+    final uploaded = <IncidentAttachment>[];
+    var failed = 0;
+    for (var i = 0; i < picked.files.length; i++) {
+      try {
+        uploaded.add(
+          await uploadIncidentAttachment(
+            dspUid: _dspUid,
+            reportId: widget.docRef.id,
+            file: picked.files[i],
+            index: i,
+          ),
+        );
+      } catch (_) {
+        failed++;
+      }
+    }
+    // Auch bei Teilfehlern speichern: was oben liegt, gehört ins
+    // Dokument — sonst bleibt die Datei verwaist im Bucket.
+    try {
+      await addIncidentAttachments(widget.docRef, uploaded);
+    } catch (_) {
+      // Firestore-Schreibrecht fehlt (nur das DSP-Konto selbst darf
+      // Vorfälle ändern — siehe `firestore.rules`, `isSelf(userId)`).
+      // Die schon hochgeladenen Dateien wieder wegräumen, sonst liegen
+      // sie ohne Referenz im Bucket.
+      for (final att in uploaded) {
+        await deleteIncidentAttachmentFile(att.path);
+      }
+      failed += uploaded.length;
+      uploaded.clear();
+    }
+    if (!mounted) return;
+    setState(() => _busy = false);
+
+    if (failed > 0) {
+      _snack(
+        de
+            ? '$failed Datei(en) konnten nicht hochgeladen werden.'
+            : '$failed file(s) could not be uploaded.',
+      );
+    } else if (uploaded.isNotEmpty) {
+      _snack(
+        de
+            ? '${uploaded.length} Dokument(e) hinzugefügt.'
+            : '${uploaded.length} document(s) added.',
+      );
+    }
+  }
+
+  Future<void> _open(IncidentAttachment att) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final uri = Uri.tryParse(att.url);
+    if (uri == null) {
+      _snack(de ? 'Link ist ungültig.' : 'Invalid link.');
+      return;
+    }
+    var opened = false;
+    try {
+      opened = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+        webOnlyWindowName: '_blank',
+      );
+    } catch (_) {
+      opened = false;
+    }
+    if (!opened) {
+      _snack(
+        de
+            ? 'Dokument konnte nicht geöffnet werden.'
+            : 'Could not open the document.',
+      );
+    }
+  }
+
+  Future<void> _remove(IncidentAttachment att) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Text(de ? 'Dokument entfernen?' : 'Remove document?'),
+        content: Text(
+          de
+              ? '„${att.name}" wird endgültig gelöscht.'
+              : '"${att.name}" will be deleted permanently.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(de ? 'Abbrechen' : 'Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: kIncidentDanger),
+            child: Text(de ? 'Entfernen' : 'Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _busy = true);
+    try {
+      // Erst der Array-Eintrag: scheitert das Storage-Delete (Rolle ohne
+      // Delete-Recht, Bestandseintrag ohne `path`), verschwindet der
+      // Anhang trotzdem sauber aus der Ansicht.
+      await removeIncidentAttachment(widget.docRef, att);
+      await deleteIncidentAttachmentFile(att.path);
+      if (!mounted) return;
+      setState(() => _busy = false);
+      _snack(de ? 'Dokument entfernt.' : 'Document removed.');
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      _snack(
+        de
+            ? 'Dokument konnte nicht entfernt werden.'
+            : 'Could not remove the document.',
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final attachments = incidentAttachmentsOf(widget.data);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: Text(
+                de
+                    ? 'Dokumente (${attachments.length})'
+                    : 'Documents (${attachments.length})',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: kIncidentMuted,
+                  letterSpacing: 0.4,
+                ),
+              ),
+            ),
+            // Kein `busy: true`: der Spinner von `CoButton` ist weiß und
+            // damit auf der weißen Outlined-Fläche unsichtbar. Das Label
+            // übernimmt die Rückmeldung.
+            CoButton(
+              onPressed: _busy ? null : _pickAndUpload,
+              icon: Icons.upload_file_rounded,
+              label: _busy
+                  ? (de ? 'Lädt hoch …' : 'Uploading …')
+                  : (de ? 'Hochladen' : 'Upload'),
+              variant: CoButtonVariant.secondaryOutlined,
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (attachments.isEmpty)
+          Text(
+            de
+                ? 'Noch keine Dokumente. PDF oder Bild bis 15 MB — z. B. '
+                      'Polizeibericht oder Zusammenfassung der Schadenmeldung.'
+                : 'No documents yet. PDF or image up to 15 MB — e.g. police '
+                      'report or damage claim summary.',
+            style: const TextStyle(fontSize: 13, color: kIncidentMuted),
+          )
+        else
+          for (final att in attachments)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _IncidentAttachmentTile(
+                attachment: att,
+                onOpen: () => _open(att),
+                onRemove: _busy ? null : () => _remove(att),
+              ),
+            ),
+      ],
+    );
+  }
+}
+
+/// Eine Zeile der Dokumentenliste: Typ-Icon, Name, Größe, Entfernen.
+class _IncidentAttachmentTile extends StatelessWidget {
+  const _IncidentAttachmentTile({
+    required this.attachment,
+    required this.onOpen,
+    required this.onRemove,
+  });
+
+  final IncidentAttachment attachment;
+  final VoidCallback onOpen;
+  final VoidCallback? onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final isPdf = attachment.isPdf;
+    final icon = isPdf
+        ? Icons.picture_as_pdf_rounded
+        : attachment.isImage
+        ? Icons.image_outlined
+        : Icons.insert_drive_file_outlined;
+    final iconColor = isPdf ? kIncidentDanger : const Color(0xFF475467);
+    final meta = <String>[
+      if (isPdf) 'PDF' else if (attachment.isImage) (de ? 'Bild' : 'Image'),
+      _formatFileSize(attachment.size, de),
+    ].where((e) => e.isNotEmpty).join(' · ');
+
+    return Container(
+      decoration: BoxDecoration(
+        color: kIncidentFieldFill,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: kIncidentBorder),
+      ),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: CoPressable(
+              onTap: onOpen,
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+                child: Row(
+                  children: <Widget>[
+                    Icon(icon, size: 20, color: iconColor),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          Text(
+                            attachment.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: kIncidentText,
+                            ),
+                          ),
+                          if (meta.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              meta,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: kIncidentMuted,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.open_in_new_rounded,
+                      size: 16,
+                      color: kIncidentMuted,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          IconButton(
+            onPressed: onRemove,
+            icon: const Icon(Icons.delete_outline_rounded, size: 18),
+            color: kIncidentMuted,
+            tooltip: de ? 'Entfernen' : 'Remove',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Dateigröße kompakt — im Deutschen mit Komma als Dezimaltrenner.
+String _formatFileSize(int bytes, bool de) {
+  if (bytes <= 0) return '';
+  if (bytes < 1024) return '$bytes B';
+  final kb = bytes / 1024;
+  if (kb < 1024) return '${kb.toStringAsFixed(0)} KB';
+  final mb = kb / 1024;
+  final text = mb.toStringAsFixed(mb < 10 ? 1 : 0);
+  return '${de ? text.replaceAll('.', ',') : text} MB';
 }
 
 class _DetailRow extends StatelessWidget {

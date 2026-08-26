@@ -3599,6 +3599,7 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
       if (modelName.isNotEmpty) modelName,
       _vehicleModelMeta(context, vehicle).replaceAll(' | ', ' · '),
     ].where((part) => part.trim().isNotEmpty).join(' · ');
+    final remarkLine = _vehicleRemarkLine(context, vehicle, fontSize: 11);
 
     final status = _withGroundedReasonTooltip(
       context,
@@ -3762,6 +3763,14 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                           );
                         },
                       ),
+                      // Ticket FLEETHUB: Bemerkung direkt unter das
+                      // Kennzeichen — noch oberhalb des Trenners, damit sie
+                      // zum Kopf gehört und nicht zwischen TÜV-Datum und
+                      // Modellzeile untergeht.
+                      if (remarkLine != null) ...[
+                        const SizedBox(height: 8),
+                        remarkLine,
+                      ],
                       const SizedBox(height: 8),
                       const Divider(height: 1, thickness: 1, color: _kRowLine),
                       const SizedBox(height: 8),
@@ -4075,6 +4084,62 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
     );
   }
 
+  /// Bemerkung des Fahrzeugs (`fleet_vehicle_extras.remarks`) als dezente
+  /// Notizzeile für den Karten-/Zeilenkopf.
+  ///
+  /// Ticket FLEETHUB: „Remarks of the vehicle to be shown in the header of
+  /// the vehicle". Die Bemerkung stand bisher nur in der Detailseite unter
+  /// „Notizen & Bemerkungen" — ein Hinweis wie „Schiebetür klemmt" erreichte
+  /// den Disponenten damit nie beim Überfliegen der Liste.
+  ///
+  /// Gibt `null` zurück, wenn keine Bemerkung hinterlegt ist: Fahrzeuge ohne
+  /// Notiz behalten exakt den bisherigen, kompakten Kopf.
+  Widget? _vehicleRemarkLine(
+    BuildContext context,
+    FleetVehicle vehicle, {
+    double fontSize = 11.5,
+  }) {
+    final remark =
+        (_remarksByPlate[normalizePlateNumber(vehicle.plateNumber)] ?? '')
+            .trim();
+    if (remark.isEmpty) return null;
+    // Amber statt Grau: die Bemerkung ist ein Hinweis, kein Stammdatum —
+    // sie darf im Grau-Raster der Zeile auffallen, ohne wie ein Fehler
+    // (rot) zu wirken. Tooltip trägt den vollen Text, weil die Zeile nach
+    // zwei Zeilen abschneidet.
+    return Tooltip(
+      message: remark,
+      waitDuration: const Duration(milliseconds: 400),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 1.5),
+            child: Icon(
+              Icons.sticky_note_2_outlined,
+              size: 13,
+              color: _kAccentAmber,
+            ),
+          ),
+          const SizedBox(width: 5),
+          Expanded(
+            child: Text(
+              remark,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: fontSize,
+                fontWeight: FontWeight.w600,
+                color: _kAccentAmber,
+                height: 1.3,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// Kennzeichen-Schild + Besitz-Badge + Leasingzeile.
   Widget _rowPlateBlock(BuildContext context, FleetVehicle vehicle) {
     final de = Localizations.localeOf(context).languageCode == 'de';
@@ -4136,6 +4201,7 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
   Widget _rowModelBlock(BuildContext context, FleetVehicle vehicle) {
     final t = AppLocalizations.of(context);
     final modelName = '${vehicle.brand} ${vehicle.model}'.trim();
+    final remark = _vehicleRemarkLine(context, vehicle);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -4160,6 +4226,7 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(fontSize: 12, color: _kFaint, height: 1.3),
         ),
+        if (remark != null) ...[const SizedBox(height: 4), remark],
       ],
     );
   }

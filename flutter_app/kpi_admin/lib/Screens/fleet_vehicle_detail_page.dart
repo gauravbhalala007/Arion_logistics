@@ -890,6 +890,7 @@ class _FleetVehicleDetailPageState extends State<FleetVehicleDetailPage> {
 
   Widget _profileHeaderBand(FleetVehicle vehicle, Map<String, dynamic> extras) {
     final leasing = _str(extras['leasingProvider']);
+    final remarkLine = _headerRemarkLine(extras);
 
     final plateBlock = SizedBox(
       width: 260,
@@ -904,6 +905,7 @@ class _FleetVehicleDetailPageState extends State<FleetVehicleDetailPage> {
             runSpacing: 6,
             children: [_statusBadge(vehicle), _leasingBadge(vehicle, leasing)],
           ),
+          if (remarkLine != null) ...[const SizedBox(height: 9), remarkLine],
         ],
       ),
     );
@@ -976,6 +978,51 @@ class _FleetVehicleDetailPageState extends State<FleetVehicleDetailPage> {
             const SizedBox(height: 14),
             groundedBanner,
           ],
+        ],
+      ),
+    );
+  }
+
+  /// Bemerkung des Fahrzeugs (`fleet_vehicle_extras.remarks`) im Kopfband,
+  /// direkt unter Kennzeichen und Badges.
+  ///
+  /// Ticket FLEETHUB: „Remarks of the vehicle to be shown in the header of
+  /// the vehicle (for example, below of the license plate)". Die Bemerkung
+  /// bleibt zusätzlich in der Karte „Notizen & Bemerkungen" — dort ist sie
+  /// editierbar, hier nur sichtbar. Ohne Bemerkung: `null`, das Kopfband
+  /// bleibt dann unverändert.
+  Widget? _headerRemarkLine(Map<String, dynamic> extras) {
+    final remark = _str(extras['remarks']).trim();
+    if (remark.isEmpty) return null;
+    return Tooltip(
+      message: remark,
+      waitDuration: const Duration(milliseconds: 400),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 1.5),
+            child: Icon(
+              Icons.sticky_note_2_outlined,
+              size: 14,
+              color: _C.amberValue,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              remark,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: _C.amberValue,
+                height: 1.3,
+              ),
+            ),
+          ),
         ],
       ),
     );

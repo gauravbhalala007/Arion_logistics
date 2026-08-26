@@ -2066,84 +2066,30 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
                   ),
                 )
               else ...[
-                for (var i = 0; i < shown.length; i++)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: 26,
-                          child: Text(
-                            '${i + 1}.',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w900,
-                              color: i < 3 ? _kRed : _kMuted,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          flex: 3,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                shown[i].name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: _kText,
-                                ),
-                              ),
-                              const SizedBox(height: 3),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(999),
-                                child: LinearProgressIndicator(
-                                  value: _rankingByPercent
-                                      ? (maxPct <= 0
-                                          ? 0
-                                          : (shown[i].percent ?? 0) / maxPct)
-                                      : shown[i].totalDays / maxTotal,
-                                  minHeight: 4,
-                                  backgroundColor: const Color(0xFFF3F4F6),
-                                  valueColor:
-                                      const AlwaysStoppedAnimation<Color>(
-                                          _kRed),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          _rankingByPercent
-                              ? pctLabel(shown[i])
-                              : (de
-                                  ? '${shown[i].totalDays} Tage'
-                                  : '${shown[i].totalDays} days'),
-                          style: const TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w900,
-                            color: _kText,
-                          ),
-                        ),
-                        if (!isNarrow) ...[
-                          const SizedBox(width: 8),
-                          Text(
-                            _rankingByPercent
-                                ? (de
-                                    ? '· ${shown[i].totalDays} Tage'
-                                    : '· ${shown[i].totalDays} days')
-                                : '· ${pctLabel(shown[i])}',
-                            style: const TextStyle(
-                                fontSize: 12, color: _kMuted),
-                          ),
-                        ],
-                      ],
+                // Aufgeklappt bekommen die Zeilen eine EIGENE, in der
+                // Hoehe gedeckelte Scrollflaeche. Vorher wuchs die Karte
+                // mit ~90 Zeilen ueber den Bildschirm hinaus — im breiten
+                // Layout sitzt sie in einer nicht scrollenden Column, die
+                // Historie darunter wurde auf null gequetscht und die
+                // Seite wirkte eingefroren.
+                if (_rankingExpanded)
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 380),
+                    child: Scrollbar(
+                      thumbVisibility: true,
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: shown.length,
+                        itemBuilder: (context, i) =>
+                            _sickRankRow(shown, i, maxTotal, maxPct,
+                                pctLabel, isNarrow, de),
+                      ),
                     ),
-                  ),
+                  )
+                else
+                for (var i = 0; i < shown.length; i++)
+                  _sickRankRow(
+                      shown, i, maxTotal, maxPct, pctLabel, isNarrow, de),
                 if (entries.length > 8)
                   Align(
                     alignment: Alignment.centerLeft,
@@ -2167,6 +2113,94 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
             ],
           );
         },
+      ),
+    );
+  }
+
+  /// Eine Zeile des Kranktage-Rankings — von der Inline-Schleife und
+  /// der aufgeklappten Scroll-Liste gemeinsam genutzt.
+  Widget _sickRankRow(
+    List<_SickRankEntry> shown,
+    int i,
+    int maxTotal,
+    double maxPct,
+    String Function(_SickRankEntry) pctLabel,
+    bool isNarrow,
+    bool de,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 26,
+            child: Text(
+              '${i + 1}.',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+                color: i < 3 ? _kRed : _kMuted,
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  shown[i].name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: _kText,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    value: _rankingByPercent
+                        ? (maxPct <= 0
+                            ? 0
+                            : (shown[i].percent ?? 0) / maxPct)
+                        : shown[i].totalDays / maxTotal,
+                    minHeight: 4,
+                    backgroundColor: const Color(0xFFF3F4F6),
+                    valueColor:
+                        const AlwaysStoppedAnimation<Color>(_kRed),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            _rankingByPercent
+                ? pctLabel(shown[i])
+                : (de
+                    ? '${shown[i].totalDays} Tage'
+                    : '${shown[i].totalDays} days'),
+            style: const TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w900,
+              color: _kText,
+            ),
+          ),
+          if (!isNarrow) ...[
+            const SizedBox(width: 8),
+            Text(
+              _rankingByPercent
+                  ? (de
+                      ? '\u00b7 ${shown[i].totalDays} Tage'
+                      : '\u00b7 ${shown[i].totalDays} days')
+                  : '\u00b7 ${pctLabel(shown[i])}',
+              style: const TextStyle(fontSize: 12, color: _kMuted),
+            ),
+          ],
+        ],
       ),
     );
   }

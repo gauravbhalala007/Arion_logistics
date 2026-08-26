@@ -94,6 +94,13 @@ String _normalizeServiceType(String raw) {
   return s;
 }
 
+/// Single normalised comparison key for a transporter-ID, so the three
+/// candidate forms indexed in the names map (raw / uppercase /
+/// alphanumeric-only) all collapse onto one value. Used to match a
+/// names-map entry against the list of currently working drivers.
+String _tidMatchKey(String raw) =>
+    raw.trim().toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+
 /// Route-id prefix marking a **synthetic Atlas-only entry**: an Atlas
 /// route code that carries tracking IDs but has no normal route in the
 /// wave. Such entries are materialised on the fly (never typed by the
@@ -230,6 +237,16 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
   // Latest merged names map (driver names + manual), captured during build
   // so bottom sheets / dialogs opened off the main tree can reuse it.
   Map<String, String> _lastNamesMap = const {};
+
+  /// Normalised transporter-IDs of every **currently working** driver,
+  /// captured during build from [_activeDriversStream]. `null` means the
+  /// stream hasn't delivered yet — in that case we do NOT filter, so a
+  /// slow first frame can never show an empty picker.
+  ///
+  /// Used exclusively to keep inactive employees out of the driver
+  /// *pickers* (add / replace / mentee / manual autocomplete). Name
+  /// resolution for already-planned entries keeps using the full map.
+  Set<String>? _lastActiveTidKeys;
 
   static bool _isManualTid(String? tid) =>
       tid != null && tid.startsWith('MANUAL-');
@@ -1017,6 +1034,22 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
     return '';
   }
 
+  /// [namesMap] reduced to drivers that are currently working
+  /// ([isDriverWorking]). This is what every driver **picker** must be
+  /// fed — inactive employees must not be selectable for a new
+  /// assignment. Already-planned entries are untouched: they keep
+  /// resolving their name through the full [namesMap].
+  Map<String, String> _pickableNames(Map<String, String> namesMap) {
+    final active = _lastActiveTidKeys;
+    // Stream not loaded yet → don't filter (never show an empty picker).
+    if (active == null) return namesMap;
+    final out = <String, String>{};
+    namesMap.forEach((key, value) {
+      if (active.contains(_tidMatchKey(key))) out[key] = value;
+    });
+    return out;
+  }
+
   // ─── Wave helpers ───────────────────────────────────────────────────────
 
   /// Total number of imported Atlas tracking IDs across all route codes.
@@ -1424,13 +1457,25 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
                       builder: (context, activeSnap) {
                         final activeDrivers = activeSnap.data ??
                             const <_PickableDriver>[];
+                        if (activeSnap.hasData) {
+                          _lastActiveTidKeys = {
+                            for (final d in activeDrivers)
+                              if (_tidMatchKey(d.tid).isNotEmpty)
+                                _tidMatchKey(d.tid),
+                          };
+                        }
+                        // Pickers (replace / mentee) only ever see the
+                        // working drivers; name resolution below keeps
+                        // the full map so planned-but-inactive drivers
+                        // still render with their name.
+                        final pickableNames = _pickableNames(namesMap);
                         final visibleRoutes =
                             _filterRoutesBySearch(routes, namesMap);
                         return isNarrow
                             ? _StackedLayout(
                                 routes: visibleRoutes,
                                 unassigned: _unassigned,
-                                namesMap: namesMap,
+                                pickableNamesMap: pickableNames,
                                 anchorFor: _anchorFor,
                                 atlasFor: (code) =>
                                     _atlasByRoute[code] ?? const [],
@@ -1447,7 +1492,7 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
                             : _SideBySideLayout(
                                 routes: visibleRoutes,
                                 unassigned: _unassigned,
-                                namesMap: namesMap,
+                                pickableNamesMap: pickableNames,
                                 anchorFor: _anchorFor,
                                 atlasFor: (code) =>
                                     _atlasByRoute[code] ?? const [],
@@ -2015,8 +2060,11 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
     TimeOfDay? endTime = isEdit ? parseHhmm(existing.shiftEndTime) : null;
     String parkSide = isEdit ? existing.waitingAreaSpur : ''; // '', 'links', 'rechts'
 
-    // Distinct, sorted driver names for the autocomplete suggestions.
-    final suggestions = namesMap.values
+    // Distinct, sorted driver names for the autocomplete suggestions —
+    // only drivers that are currently working (inactive employees must
+    // not be suggested). Typing a free-text name stays possible.
+    final suggestions = _pickableNames(namesMap)
+        .values
         .map((e) => e.trim())
         .where((e) => e.isNotEmpty)
         .toSet()
@@ -4276,7 +4324,10 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
 class _SideBySideLayout extends StatelessWidget {
   final List<WaveplanRoute> routes;
   final List<String> unassigned;
-  final Map<String, String> namesMap;
+  /// transporterId → name, **already reduced to working drivers**. Only
+  /// used to fill driver pickers (replace / mentee) — never for the name
+  /// of an already-planned driver (that comes from [resolveName]).
+  final Map<String, String> pickableNamesMap;
   final GlobalKey Function(String wave) anchorFor;
   final List<String> Function(String routeCode) atlasFor;
   final String Function(String? transporterId) resolveName;
@@ -4291,7 +4342,7 @@ class _SideBySideLayout extends StatelessWidget {
   const _SideBySideLayout({
     required this.routes,
     required this.unassigned,
-    required this.namesMap,
+    required this.pickableNamesMap,
     required this.anchorFor,
     required this.atlasFor,
     required this.resolveName,
@@ -4320,7 +4371,7 @@ class _SideBySideLayout extends StatelessWidget {
             onUnassign: onUnassign,
             onMenteeChange: onMenteeChange,
             onSpurChange: onSpurChange,
-            namesMap: namesMap,
+            pickableNamesMap: pickableNamesMap,
             inWaveTids: inWaveTids,
           ),
         ),
@@ -4344,7 +4395,8 @@ class _SideBySideLayout extends StatelessWidget {
 class _StackedLayout extends StatelessWidget {
   final List<WaveplanRoute> routes;
   final List<String> unassigned;
-  final Map<String, String> namesMap;
+  /// See [_SideBySideLayout.pickableNamesMap] — working drivers only.
+  final Map<String, String> pickableNamesMap;
   final GlobalKey Function(String wave) anchorFor;
   final List<String> Function(String routeCode) atlasFor;
   final String Function(String? transporterId) resolveName;
@@ -4359,7 +4411,7 @@ class _StackedLayout extends StatelessWidget {
   const _StackedLayout({
     required this.routes,
     required this.unassigned,
-    required this.namesMap,
+    required this.pickableNamesMap,
     required this.anchorFor,
     required this.atlasFor,
     required this.resolveName,
@@ -4398,7 +4450,7 @@ class _StackedLayout extends StatelessWidget {
             onUnassign: onUnassign,
             onMenteeChange: onMenteeChange,
             onSpurChange: onSpurChange,
-            namesMap: namesMap,
+            pickableNamesMap: pickableNamesMap,
             inWaveTids: inWaveTids,
           ),
         ),
@@ -5035,7 +5087,8 @@ class _RouteList extends StatelessWidget {
   final void Function(String routeId) onUnassign;
   final void Function(String routeId, String? menteeTid) onMenteeChange;
   final void Function(String routeId) onSpurChange;
-  final Map<String, String> namesMap;
+  /// See [_SideBySideLayout.pickableNamesMap] — working drivers only.
+  final Map<String, String> pickableNamesMap;
   final Set<String> inWaveTids;
 
   const _RouteList({
@@ -5047,7 +5100,7 @@ class _RouteList extends StatelessWidget {
     required this.onUnassign,
     required this.onMenteeChange,
     required this.onSpurChange,
-    required this.namesMap,
+    required this.pickableNamesMap,
     required this.inWaveTids,
   });
 
@@ -5110,7 +5163,7 @@ class _RouteList extends StatelessWidget {
           onMenteeChange: (mTid) =>
               onMenteeChange(routeItem.route.routeId, mTid),
           onSpurChange: () => onSpurChange(routeItem.route.routeId),
-          namesMap: namesMap,
+          pickableNamesMap: pickableNamesMap,
           inWaveTids: inWaveTids,
           isAlternate: routeItem.isAlternate,
         );
@@ -5646,7 +5699,8 @@ class _RouteCard extends StatelessWidget {
   final VoidCallback onUnassign;
   final ValueChanged<String?> onMenteeChange;
   final VoidCallback onSpurChange;
-  final Map<String, String> namesMap;
+  /// See [_SideBySideLayout.pickableNamesMap] — working drivers only.
+  final Map<String, String> pickableNamesMap;
   final Set<String> inWaveTids;
   final bool isAlternate;
 
@@ -5659,7 +5713,7 @@ class _RouteCard extends StatelessWidget {
     required this.onUnassign,
     required this.onMenteeChange,
     required this.onSpurChange,
-    required this.namesMap,
+    required this.pickableNamesMap,
     required this.inWaveTids,
     required this.isAlternate,
   });
@@ -5734,7 +5788,7 @@ class _RouteCard extends StatelessWidget {
                                 onRemove: onUnassign,
                                 onMenteeChange: onMenteeChange,
                                 onReplaceDriver: onAssign,
-                                namesMap: namesMap,
+                                pickableNamesMap: pickableNamesMap,
                                 inWaveTids: inWaveTids,
                                 compact: true,
                               )
@@ -5761,7 +5815,7 @@ class _RouteCard extends StatelessWidget {
                                 onRemove: onUnassign,
                                 onMenteeChange: onMenteeChange,
                                 onReplaceDriver: onAssign,
-                                namesMap: namesMap,
+                                pickableNamesMap: pickableNamesMap,
                                 inWaveTids: inWaveTids,
                               )
                             : (atlasOnly
@@ -6247,7 +6301,12 @@ class _DriverChip extends StatelessWidget {
   final String? menteeTransporterId;
   final String menteeName;
   final ValueChanged<String?> onMenteeChange;
-  final Map<String, String> namesMap;
+  /// Driver pool the chip menu offers for "Fahrer ersetzen" / mentee —
+  /// **only currently working drivers** (see
+  /// [_SideBySideLayout.pickableNamesMap]). The already-assigned driver
+  /// and mentee of this chip are re-added by the menu itself, so an
+  /// entry that went inactive after being planned never disappears.
+  final Map<String, String> pickableNamesMap;
   final Set<String> inWaveTids;
   /// Called when the admin uses "Fahrer ersetzen" in the chip menu.
   /// `null` disables the menu entry (used in the unassigned pool where
@@ -6263,7 +6322,7 @@ class _DriverChip extends StatelessWidget {
     required this.driverName,
     required this.onRemove,
     required this.onMenteeChange,
-    required this.namesMap,
+    required this.pickableNamesMap,
     required this.inWaveTids,
     this.menteeTransporterId,
     this.menteeName = '',
@@ -6283,7 +6342,7 @@ class _DriverChip extends StatelessWidget {
       onRemove: onRemove,
       onMenteeChange: onMenteeChange,
       onReplaceDriver: onReplaceDriver,
-      namesMap: namesMap,
+      pickableNamesMap: pickableNamesMap,
       inWaveTids: inWaveTids,
       compact: compact,
     );
@@ -6303,7 +6362,7 @@ class _DriverChip extends StatelessWidget {
             menteeName: menteeName,
             onRemove: onRemove,
             onMenteeChange: onMenteeChange,
-            namesMap: namesMap,
+            pickableNamesMap: pickableNamesMap,
             inWaveTids: inWaveTids,
             elevated: true,
             compact: compact,
@@ -6325,7 +6384,8 @@ class _ChipBody extends StatelessWidget {
   final String menteeName;
   final ValueChanged<String?> onMenteeChange;
   final ValueChanged<String>? onReplaceDriver;
-  final Map<String, String> namesMap;
+  /// See [_DriverChip.pickableNamesMap] — working drivers only.
+  final Map<String, String> pickableNamesMap;
   final Set<String> inWaveTids;
   final bool elevated;
   final bool compact;
@@ -6335,7 +6395,7 @@ class _ChipBody extends StatelessWidget {
     required this.driverName,
     required this.onRemove,
     required this.onMenteeChange,
-    required this.namesMap,
+    required this.pickableNamesMap,
     required this.inWaveTids,
     this.menteeTransporterId,
     this.menteeName = '',
@@ -6547,10 +6607,21 @@ class _ChipBody extends StatelessWidget {
         );
         break;
       case 'mentee':
+        // Only working drivers are selectable. The mentee already on
+        // this route stays in the list even if they went inactive, so
+        // the existing pairing keeps rendering its "current" state.
+        final menteeCandidates = <String, String>{...pickableNamesMap};
+        final currentMentee = (menteeTransporterId ?? '').trim().toUpperCase();
+        if (currentMentee.isNotEmpty &&
+            !menteeCandidates.keys
+                .any((k) => _tidMatchKey(k) == _tidMatchKey(currentMentee))) {
+          menteeCandidates[currentMentee] =
+              menteeName.trim().isEmpty ? currentMentee : menteeName.trim();
+        }
         final pickedTid = await showDialog<String>(
           context: context,
           builder: (ctx) => _AddMenteeDialog(
-            namesMap: namesMap,
+            namesMap: menteeCandidates,
             disabledTids: {
               ...inWaveTids,
               transporterId.trim().toUpperCase(),
@@ -6567,12 +6638,23 @@ class _ChipBody extends StatelessWidget {
         break;
       case 'replace_driver':
         if (onReplaceDriver == null) break;
+        // Candidates are the currently working drivers only — inactive
+        // employees must never show up as a replacement.
         final namedDrivers = <String, String>{};
-        for (final entry in namesMap.entries) {
+        for (final entry in pickableNamesMap.entries) {
           final tid = entry.key.trim().toUpperCase();
           if (tid.isEmpty || tid.length < 4) continue;
           if (namedDrivers.containsKey(tid)) continue;
           namedDrivers[tid] = entry.value.trim();
+        }
+        // Keep the driver currently on this route in the list (marked as
+        // "current") even if they are no longer active — the existing
+        // assignment must stay visible and intact.
+        final currentUpper = transporterId.trim().toUpperCase();
+        if (currentUpper.isNotEmpty &&
+            !namedDrivers.containsKey(currentUpper)) {
+          namedDrivers[currentUpper] =
+              driverName.trim().isEmpty ? currentUpper : driverName.trim();
         }
         final drivers = namedDrivers.entries
             .map((e) => _PickableDriver(tid: e.key, name: e.value))
@@ -6752,7 +6834,9 @@ class _AddMenteeDialog extends StatefulWidget {
     required this.currentMenteeTid,
   });
 
-  /// transporterId (UPPERCASE) → driver name
+  /// transporterId (UPPERCASE) → driver name. Must already be reduced
+  /// to **selectable** drivers by the caller (working drivers plus, if
+  /// present, the mentee currently assigned to this route).
   final Map<String, String> namesMap;
 
   /// transporterIds that are already used (primary or mentee) in
@@ -7444,7 +7528,7 @@ class _UnassignedPoolState extends State<_UnassignedPool> {
                               onRemove: () {},
                               // Mentee picker not applicable in the pool.
                               onMenteeChange: (_) {},
-                              namesMap: const <String, String>{},
+                              pickableNamesMap: const <String, String>{},
                               inWaveTids: const <String>{},
                             ),
                           ),

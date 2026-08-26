@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart' as fb;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -10,9 +11,12 @@ import 'package:printing/printing.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../data/driver_profile/driver_vehicle_issue_texts.dart';
 import '../data/privacy_notice/privacy_notice_content.dart';
 import '../data/privacy_notice/privacy_notice_texts.dart';
 import '../localization/app_localizations.dart';
+import '../services/incident_reports.dart'
+    show kIncidentSourceDriverApp, kIncidentVehicle, plateKeyOf, transporterIdOf;
 import '../services/vacation_pools_repository.dart';
 import '../utils/vacation_pools.dart';
 import '../widgets/vacation_pool_lines.dart';
@@ -46,16 +50,54 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
   // Ohne Konfigurationsdokument bleibt es beim Ein-Topf-Bestandsverhalten.
   VacationPoolsConfig _poolsConfig = VacationPoolsConfig.disabled;
 
+  // ── Flotte des DSP (für die Mangel-Meldung) ─────────────────────────
+  // Kennzeichen der Fahrzeuge des DSP. Die Firestore-Rules erlauben
+  // approved Fahrern `get, list` auf `users/{dsp}/vehicles` (siehe
+  // firestore.rules, Block `match /vehicles/{plateNumber}`) — genau wie
+  // im Fahrzeug-Check. Scheitert der Read, bleibt die Liste leer und der
+  // Dialog fällt auf ein Freitext-Kennzeichen zurück.
+  List<String> _fleetPlates = const <String>[];
+  bool _fleetLoading = true;
+
   @override
   void initState() {
     super.initState();
     _loadPools();
+    _loadFleet();
   }
 
   Future<void> _loadPools() async {
     final config = await VacationPoolsRepository.load(widget.dspUid);
     if (!mounted) return;
     setState(() => _poolsConfig = config);
+  }
+
+  /// Fahrzeugliste des DSP laden — Lade-Muster identisch zu
+  /// `driver_vehicle_check_page.dart` (`_loadFleet`): bewusst
+  /// fehlertolerant, damit eine fehlende Freigabe die Profilseite nie
+  /// blockiert.
+  Future<void> _loadFleet() async {
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.dspUid)
+          .collection('vehicles')
+          .get();
+      final plates =
+          <String>{
+            for (final doc in snap.docs)
+              if (doc.data()['isDeleted'] != true)
+                ('${doc.data()['plateNumber'] ?? doc.id}').trim().toUpperCase(),
+          }.where((p) => p.isNotEmpty).toList()..sort();
+      if (!mounted) return;
+      setState(() {
+        _fleetPlates = plates;
+        _fleetLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _fleetLoading = false);
+    }
   }
 
   @override
@@ -125,6 +167,10 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
                   transporterId: widget.driverTransporterId,
                 ),
                 const SizedBox(height: 16),
+                // Ticket FLEETHUB: Fahrzeug-Mangel direkt aus dem Profil
+                // melden — Fahrzeug wählen, Problem beschreiben.
+                _buildVehicleIssueCard(context: context, driverName: name),
+                const SizedBox(height: 16),
                 // Ticket „Your Attendance": Überstunden je Monat,
                 // Krankmeldungen, Urlaub + Resturlaub.
                 DriverAttendanceSection(
@@ -145,6 +191,110 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  /// Karte „Fahrzeug-Mangel melden".
+  ///
+  /// Ticket FLEETHUB: „Also need an option to have the drivers report the
+  /// issues from their profile, by selecting the vehicle and giving a
+  /// description." Bewusst als eigene, schlanke Meldung — nicht als
+  /// Abkürzung ins Unfallformular: ein klemmender Schiebetürgriff braucht
+  /// weder Ort, Verschuldensfrage noch Fotopflicht, und genau diese Hürden
+  /// sind der Grund, warum kleine Mängel heute per WhatsApp gemeldet
+  /// werden (oder gar nicht).
+  Widget _buildVehicleIssueCard({
+    required BuildContext context,
+    required String driverName,
+  }) {
+    final lang = Localizations.localeOf(context).languageCode;
+    String t(String key) => driverVehicleIssueText(lang, key);
+
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () => _openVehicleIssueDialog(driverName),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF1E7),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.car_repair,
+                  size: 20,
+                  color: Color(0xFFB45309),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      t('card_title'),
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: _kText,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      t('card_subtitle'),
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        height: 1.35,
+                        color: _kMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.chevron_right_rounded,
+                size: 22,
+                color: Color(0xFF9CA3AF),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openVehicleIssueDialog(String driverName) async {
+    final lang = Localizations.localeOf(context).languageCode;
+    final plate = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _DriverVehicleIssueDialog(
+        dspUid: widget.dspUid,
+        driverTransporterId: widget.driverTransporterId,
+        driverName: driverName,
+        fleetPlates: _fleetPlates,
+        fleetLoading: _fleetLoading,
+      ),
+    );
+    if (!mounted || plate == null) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color(0xFF067647),
+        content: Text(
+          driverVehicleIssueText(lang, 'snack_ok', vars: {'plate': plate}),
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
       ),
     );
   }
@@ -2036,4 +2186,500 @@ String _driverProfileDownloadNameForDoc({
     ext = fileExtension(path.split('/').last);
   }
   return ext.isEmpty ? base : '$base.$ext';
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Fahrzeug-Mangel melden (Ticket FLEETHUB)
+// ═══════════════════════════════════════════════════════════════════════
+
+/// Dialog: Fahrzeug auswählen + Mangel beschreiben.
+///
+/// Schreibt in **beide** kanonischen Vorfall-Sammlungen, exakt wie
+/// `driver_incident_report_page.dart`:
+///   * `users/{dsp}/incident_reports/{id}` — Quelle des Admin-Incident-
+///     Centers und des Schäden-Zählers im Fleet Hub (Match über `plateKey`).
+///   * `users/{dsp}/drivers/{TID}/incident_reports/{id}` — Quelle der
+///     Sektion „Deine Fahrhistorie" im Fahrerprofil (die Root-Sammlung ist
+///     für den Fahrer nicht listbar).
+/// Beides ist über die bestehenden Firestore-Rules für approved Fahrer
+/// erlaubt; es wurde **keine** Rule geändert.
+class _DriverVehicleIssueDialog extends StatefulWidget {
+  const _DriverVehicleIssueDialog({
+    required this.dspUid,
+    required this.driverTransporterId,
+    required this.driverName,
+    required this.fleetPlates,
+    required this.fleetLoading,
+  });
+
+  final String dspUid;
+  final String driverTransporterId;
+  final String driverName;
+  final List<String> fleetPlates;
+  final bool fleetLoading;
+
+  @override
+  State<_DriverVehicleIssueDialog> createState() =>
+      _DriverVehicleIssueDialogState();
+}
+
+class _DriverVehicleIssueDialogState extends State<_DriverVehicleIssueDialog> {
+  static const Color _kGreen = Color(0xFF067647);
+  static const Color _kLine = Color(0xFFE5E7EB);
+  static const Color _kFieldBg = Color(0xFFF7F8F8);
+
+  final _searchCtrl = TextEditingController();
+  final _manualPlateCtrl = TextEditingController();
+  final _descriptionCtrl = TextEditingController();
+
+  String _selectedPlate = '';
+  String _error = '';
+  bool _submitting = false;
+
+  String get _lang => Localizations.localeOf(context).languageCode;
+  String _t(String key, [Map<String, String>? vars]) =>
+      driverVehicleIssueText(_lang, key, vars: vars);
+
+  /// Leere Flotte = der Read war nicht möglich (oder es gibt schlicht kein
+  /// Fahrzeug). Dann bleibt ein Freitextfeld der Weg — die Meldung ist nie
+  /// blockiert.
+  bool get _manualMode => !widget.fleetLoading && widget.fleetPlates.isEmpty;
+
+  List<String> get _matches {
+    final q = _searchCtrl.text.trim().toUpperCase().replaceAll(
+      RegExp('[^A-Z0-9]'),
+      '',
+    );
+    if (q.isEmpty) return widget.fleetPlates;
+    return widget.fleetPlates
+        .where(
+          (p) => p.toUpperCase().replaceAll(RegExp('[^A-Z0-9]'), '').contains(q),
+        )
+        .toList();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    _manualPlateCtrl.dispose();
+    _descriptionCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final plate = _manualMode
+        ? _manualPlateCtrl.text.trim().toUpperCase()
+        : _selectedPlate;
+    final description = _descriptionCtrl.text.trim();
+    if (plate.isEmpty) {
+      setState(() => _error = _t('err_vehicle'));
+      return;
+    }
+    if (description.isEmpty) {
+      setState(() => _error = _t('err_description'));
+      return;
+    }
+
+    setState(() {
+      _submitting = true;
+      _error = '';
+    });
+    try {
+      final db = FirebaseFirestore.instance;
+      final dspRef = db.collection('users').doc(widget.dspUid);
+      final rootRef = dspRef.collection('incident_reports').doc();
+      final reportId = rootRef.id;
+      final driverId = transporterIdOf(widget.driverTransporterId);
+      final now = DateTime.now();
+      String two(int v) => v.toString().padLeft(2, '0');
+
+      // Kanonisches Incident-Schema (siehe services/incident_reports.dart).
+      // `incidentType: 'wear_defect'` ist der Vorfalltyp „Verschleiß/Mangel"
+      // — dieselbe Kachel, die das Admin-Center für Mängel führt.
+      final payload = <String, dynamic>{
+        'reportId': reportId,
+        'category': kIncidentVehicle,
+        // Altfeld der Fahrer-App; die Zähler-Logik prüft beide Felder.
+        'type': kIncidentVehicle,
+        'incidentType': 'wear_defect',
+        // Eigener Marker, damit das Büro eine Fahrer-Mangelmeldung von
+        // einem Unfallbericht unterscheiden kann, ohne sie zu trennen.
+        'kind': 'vehicle_issue',
+        'source': kIncidentSourceDriverApp,
+        'plate': plate,
+        'plateRaw': plate,
+        'plateKey': plateKeyOf(plate),
+        'occurredAt': Timestamp.fromDate(now),
+        'timeText': '${two(now.hour)}:${two(now.minute)}',
+        'dspUid': widget.dspUid,
+        'driverUid': FirebaseAuth.instance.currentUser?.uid ?? '',
+        // Pflicht laut Rules: muss der eigenen Transporter-ID entsprechen.
+        'driverTransporterId': driverId,
+        'driverName': widget.driverName,
+        'description': description,
+        'status': 'submitted',
+        'isDeleted': false,
+        'photos': const <Map<String, dynamic>>[],
+        'photoCount': 0,
+        'reportedAt': FieldValue.serverTimestamp(),
+        'submittedAt': FieldValue.serverTimestamp(),
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      final driverDocRef = dspRef
+          .collection('drivers')
+          .doc(driverId)
+          .collection('incident_reports')
+          .doc(reportId);
+
+      final batch = db.batch();
+      batch.set(rootRef, payload, SetOptions(merge: true));
+      batch.set(driverDocRef, payload, SetOptions(merge: true));
+      await batch.commit();
+
+      if (!mounted) return;
+      Navigator.of(context).pop(plate);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _submitting = false;
+        _error = _t('snack_err', {'error': '$e'});
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final maxHeight = MediaQuery.of(context).size.height * 0.86;
+    return Dialog(
+      backgroundColor: Colors.white,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: 460, maxHeight: maxHeight),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _header(),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(18, 4, 18, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _label(_t('field_vehicle')),
+                    const SizedBox(height: 6),
+                    if (widget.fleetLoading)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: LinearProgressIndicator(minHeight: 2),
+                      )
+                    else if (_manualMode)
+                      _field(
+                        controller: _manualPlateCtrl,
+                        hint: _t('fleet_empty_hint'),
+                        textCapitalization: TextCapitalization.characters,
+                      )
+                    else ...[
+                      _field(
+                        controller: _searchCtrl,
+                        hint: _t('search_hint'),
+                        prefixIcon: Icons.search,
+                        onChanged: (_) => setState(() {}),
+                      ),
+                      const SizedBox(height: 8),
+                      _plateList(),
+                    ],
+                    const SizedBox(height: 16),
+                    _label(_t('field_description')),
+                    const SizedBox(height: 6),
+                    _field(
+                      controller: _descriptionCtrl,
+                      hint: _t('description_hint'),
+                      maxLines: 4,
+                    ),
+                    if (_error.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        _error,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          height: 1.35,
+                          color: Color(0xFFB91C1C),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            _footer(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _header() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 18, 10, 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF1E7),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.car_repair,
+              size: 20,
+              color: Color(0xFFB45309),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _t('dialog_title'),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: _kText,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  _t('dialog_subtitle'),
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    height: 1.35,
+                    color: _kMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: _t('cancel'),
+            icon: const Icon(Icons.close, size: 20, color: _kMuted),
+            onPressed: _submitting ? null : () => Navigator.of(context).pop(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _footer() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 6, 18, 16),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextButton(
+              onPressed: _submitting ? null : () => Navigator.of(context).pop(),
+              style: TextButton.styleFrom(
+                minimumSize: const Size.fromHeight(46),
+                foregroundColor: _kMuted,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: Text(
+                _t('cancel'),
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            flex: 2,
+            child: FilledButton(
+              onPressed: _submitting ? null : _submit,
+              style: FilledButton.styleFrom(
+                backgroundColor: _kGreen,
+                minimumSize: const Size.fromHeight(46),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: _submitting
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Flexible(
+                          child: Text(
+                            _t('sending'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
+                    )
+                  : Text(
+                      _t('submit'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Auswahlliste der Kennzeichen. Fest gedeckelte Höhe: die Flotte kann
+  /// dreistellig sein, der Dialog darf davon nicht auseinandergezogen
+  /// werden.
+  Widget _plateList() {
+    final matches = _matches;
+    if (matches.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        decoration: BoxDecoration(
+          color: _kFieldBg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: _kLine),
+        ),
+        child: Text(
+          _t('no_match'),
+          style: const TextStyle(fontSize: 12.5, color: _kMuted),
+        ),
+      );
+    }
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 180),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _kLine),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: ListView.separated(
+        shrinkWrap: true,
+        padding: EdgeInsets.zero,
+        itemCount: matches.length,
+        separatorBuilder: (_, _) =>
+            const Divider(height: 1, thickness: 1, color: Color(0xFFF1F3F4)),
+        itemBuilder: (context, i) {
+          final plate = matches[i];
+          final selected = plate == _selectedPlate;
+          return InkWell(
+            onTap: _submitting
+                ? null
+                : () => setState(() {
+                    _selectedPlate = plate;
+                    _error = '';
+                  }),
+            child: Container(
+              color: selected ? const Color(0xFFEAF7F1) : Colors.transparent,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+              child: Row(
+                children: [
+                  Icon(
+                    selected
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked,
+                    size: 18,
+                    color: selected ? _kGreen : const Color(0xFFB6BEC8),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      plate,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: selected
+                            ? FontWeight.w800
+                            : FontWeight.w600,
+                        letterSpacing: 0.4,
+                        color: _kText,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _label(String text) {
+    return Text(
+      text,
+      style: const TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w700,
+        color: _kText,
+      ),
+    );
+  }
+
+  Widget _field({
+    required TextEditingController controller,
+    required String hint,
+    IconData? prefixIcon,
+    int maxLines = 1,
+    TextCapitalization textCapitalization = TextCapitalization.sentences,
+    ValueChanged<String>? onChanged,
+  }) {
+    return TextField(
+      controller: controller,
+      enabled: !_submitting,
+      maxLines: maxLines,
+      textCapitalization: textCapitalization,
+      onChanged: onChanged,
+      style: const TextStyle(fontSize: 13.5, color: _kText, height: 1.35),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF9CA3AF)),
+        prefixIcon: prefixIcon == null
+            ? null
+            : Icon(prefixIcon, size: 18, color: _kMuted),
+        filled: true,
+        fillColor: _kFieldBg,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 12,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: _kLine),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: _kLine),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: _kGreen, width: 1.4),
+        ),
+      ),
+    );
+  }
 }

@@ -26,6 +26,9 @@ import 'package:intl/intl.dart';
 ///   notes, source, confidence, reviewFlag, reportedAt, reportedBy
 ///   photos              [{url, path, uploadedBy, uploadedAt}]  (additiv)
 ///   photoCount          int — gespiegelte Länge von `photos`
+///   attachments         [{url, path, name, size, contentType,
+///                         uploadedBy, uploadedAt}]  (Dokumente, additiv)
+///   attachmentCount     int — gespiegelte Länge von `attachments`
 ///   (work_accident) injuryType, bodyPart, activityAtTime, firstAid,
 ///                   firstAidBy, doctorVisited, witnesses, expectedDaysOff,
 ///                   bgReportRequired
@@ -444,6 +447,168 @@ List<IncidentPhoto> incidentPhotosOf(Map<String, dynamic> data) {
 /// Anzahl der Fotos — für das Kachel-Badge und den Kopier-Bericht.
 int incidentPhotoCount(Map<String, dynamic> data) =>
     incidentPhotosOf(data).length;
+
+// ── Dokumente / Anhänge ──────────────────────────────────────────────────
+
+/// Firestore-Feld mit den Vorfall-Dokumenten (PDF/Bild).
+const String kIncidentAttachmentsField = 'attachments';
+
+/// Gespiegelte Länge von [kIncidentAttachmentsField] — analog zu
+/// `photoCount`, damit Listen/Badges nicht das ganze Array lesen müssen.
+const String kIncidentAttachmentCountField = 'attachmentCount';
+
+/// Ein Beleg am Vorfall: Polizeibericht, Zusammenfassung der Schaden-
+/// meldung, Kostenvoranschlag, Gutachten …
+///
+/// Bewusst getrennt von [IncidentPhoto]: Fotos werden komprimiert, in der
+/// Galerie/Lightbox gezeigt und liegen unter `incident_reports/…`.
+/// Dokumente bleiben unangetastet, öffnen im neuen Tab und liegen auf dem
+/// PDF-fähigen Storage-Pfad (siehe `incident_attachments.dart`).
+///
+/// `path` ist der Storage-Pfad und wird zum echten Löschen der Datei
+/// gebraucht; fehlt er, bleibt beim Entfernen nur der Array-Eintrag weg.
+class IncidentAttachment {
+  const IncidentAttachment({
+    required this.url,
+    required this.name,
+    this.path = '',
+    this.size = 0,
+    this.contentType = '',
+    this.uploadedBy = '',
+    this.uploadedAt,
+  });
+
+  final String url;
+
+  /// Klarname der hochgeladenen Datei (inkl. Endung) — nur Anzeige.
+  final String name;
+  final String path;
+  final int size;
+  final String contentType;
+
+  /// Auth-UID des Hochladenden.
+  final String uploadedBy;
+  final DateTime? uploadedAt;
+
+  bool get isPdf =>
+      contentType == 'application/pdf' || name.toLowerCase().endsWith('.pdf');
+
+  bool get isImage => contentType.startsWith('image/');
+
+  Map<String, dynamic> toMap() => <String, dynamic>{
+        'url': url,
+        'path': path,
+        'name': name,
+        'size': size,
+        'contentType': contentType,
+        'uploadedBy': uploadedBy,
+        'uploadedAt':
+            uploadedAt == null ? null : Timestamp.fromDate(uploadedAt!),
+      };
+
+  static IncidentAttachment? fromMap(Object? raw) {
+    if (raw is String) {
+      final url = raw.trim();
+      return url.isEmpty
+          ? null
+          : IncidentAttachment(url: url, name: _fileNameFromUrl(url));
+    }
+    if (raw is! Map) return null;
+    final url = _s(raw['url']);
+    if (url.isEmpty) return null;
+    final name = _s(raw['name']);
+    final size = raw['size'];
+    final at = raw['uploadedAt'];
+    return IncidentAttachment(
+      url: url,
+      name: name.isEmpty ? _fileNameFromUrl(url) : name,
+      path: _s(raw['path']),
+      size: size is num ? size.toInt() : 0,
+      contentType: _s(raw['contentType']),
+      uploadedBy: _s(raw['uploadedBy']),
+      uploadedAt: at is Timestamp
+          ? at.toDate()
+          : at is DateTime
+              ? at
+              : null,
+    );
+  }
+
+  /// Identität eines Anhangs für „diesen einen entfernen".
+  ///
+  /// Der Storage-Pfad ist eindeutig (Zeitstempel + Index im Namen); nur
+  /// wenn er fehlt, entscheidet die URL.
+  bool sameAs(IncidentAttachment other) => path.isNotEmpty
+      ? path == other.path
+      : url == other.url;
+}
+
+/// Notnagel für Einträge ohne `name`: letztes Pfadsegment der Download-URL.
+String _fileNameFromUrl(String url) {
+  final decoded = Uri.decodeComponent(url.split('?').first);
+  final last = decoded.split('/').last.trim();
+  return last.isEmpty ? 'Dokument' : last;
+}
+
+/// Alle Dokumente eines Vorfalls (leer, wenn keine erfasst sind).
+List<IncidentAttachment> incidentAttachmentsOf(Map<String, dynamic> data) {
+  final raw = data[kIncidentAttachmentsField];
+  if (raw is! List) return const <IncidentAttachment>[];
+  final out = <IncidentAttachment>[];
+  for (final entry in raw) {
+    final att = IncidentAttachment.fromMap(entry);
+    if (att != null) out.add(att);
+  }
+  return out;
+}
+
+/// Anzahl der Dokumente — für Badges und den Kopier-Bericht.
+int incidentAttachmentCount(Map<String, dynamic> data) =>
+    incidentAttachmentsOf(data).length;
+
+Map<String, dynamic> _attachmentPatch(List<IncidentAttachment> list) =>
+    <String, dynamic>{
+      kIncidentAttachmentsField: <Map<String, dynamic>>[
+        for (final a in list) a.toMap(),
+      ],
+      kIncidentAttachmentCountField: list.length,
+    };
+
+/// Hängt hochgeladene Dokumente an das Vorfall-Dokument an.
+///
+/// Transaktion statt `arrayUnion`, weil zwei parallel laufende Uploads
+/// sonst über die gespiegelte Länge stolpern — und weil `arrayUnion` auf
+/// Map-Gleichheit besteht, die ein Timestamp-Feld leicht kippen lässt.
+/// `SetOptions(merge: true)` lässt alle anderen Felder unangetastet.
+Future<void> addIncidentAttachments(
+  DocumentReference<Map<String, dynamic>> ref,
+  List<IncidentAttachment> added,
+) async {
+  if (added.isEmpty) return;
+  await FirebaseFirestore.instance.runTransaction((tx) async {
+    final snap = await tx.get(ref);
+    final next = <IncidentAttachment>[
+      ...incidentAttachmentsOf(snap.data() ?? const <String, dynamic>{}),
+      ...added,
+    ];
+    tx.set(ref, _attachmentPatch(next), SetOptions(merge: true));
+  });
+}
+
+/// Entfernt genau einen Anhang aus dem Array (Storage-Datei separat über
+/// `deleteIncidentAttachmentFile`).
+Future<void> removeIncidentAttachment(
+  DocumentReference<Map<String, dynamic>> ref,
+  IncidentAttachment gone,
+) async {
+  await FirebaseFirestore.instance.runTransaction((tx) async {
+    final snap = await tx.get(ref);
+    final next = incidentAttachmentsOf(snap.data() ?? const <String, dynamic>{})
+        .where((a) => !a.sameAs(gone))
+        .toList();
+    tx.set(ref, _attachmentPatch(next), SetOptions(merge: true));
+  });
+}
 
 // ── Client-seitige Gruppierung (Statistik-Panel) ─────────────────────────
 
