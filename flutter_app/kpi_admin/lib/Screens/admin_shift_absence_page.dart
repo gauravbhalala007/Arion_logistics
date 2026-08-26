@@ -6903,8 +6903,8 @@ class _AbsenceDriversOverviewPageState
             'Contract period',
             'Counted until',
             'Sick leave\ndays',
-            'PTO\ntaken',
-            'PTO\nentitlement',
+            'Vacation\ntaken',
+            'Vacation\nentitlement',
             'Remaining',
             'thereof\nunpaid',
             'Overtime\nbalance',
@@ -8912,7 +8912,14 @@ Future<Uint8List> _buildDriverBalancePdf({
                         '${de ? 'Personalnr.' : 'Emp. no.'} ${profile.employeeNumber}',
                       'ID: ${profile.driverId}',
                       if (profile.contractPeriodText.isNotEmpty)
-                        profile.contractPeriodText,
+                        '${de ? 'Vertrag' : 'Contract'} '
+                            '${profile.contractPeriodText}',
+                      // Ausgeschiedene Fahrer: das Vertragsende noch
+                      // einmal ausgeschrieben, damit im Blatt nicht nur
+                      // eine Zahlenspanne steht.
+                      if (profile.contractEnd != null)
+                        '${de ? 'Vertragsende' : 'Contract ended'}: '
+                            '${fmt(profile.contractEnd!)}',
                     ].join('  ·  '),
                   ),
                   style: const pw.TextStyle(fontSize: 9, color: muted),
@@ -8981,11 +8988,13 @@ Future<Uint8List> _buildDriverBalancePdf({
           runSpacing: 8,
           children: [
             metric(
-              de ? 'Urlaub genommen' : 'PTO taken',
+              // „PTO" versteht nicht jeder Mitarbeiter — im PDF
+              // steht deshalb ueberall Urlaub bzw. Vacation.
+              de ? 'Urlaub genommen' : 'Vacation taken',
               '${days(taken)} / ${days(entitlement)}',
             ),
             metric(
-              de ? 'Urlaub verbleibend' : 'PTO remaining',
+              de ? 'Urlaub verbleibend' : 'Vacation remaining',
               '${days(remaining)} ${de ? 'Tage' : 'days'}',
               color: remaining < 0 ? red : green,
             ),
@@ -9078,7 +9087,102 @@ pw.Widget _overtimeMonthsTable({
   const ink = PdfColor.fromInt(0xFF111827);
   const muted = PdfColor.fromInt(0xFF6B7280);
   const line = PdfColor.fromInt(0xFFE5E7EB);
-  const zebra = PdfColor.fromInt(0xFFF7F8FA);
+  const zebra = PdfColor.fromInt(0xFFF3F4F6);
+  const white = PdfColor.fromInt(0xFFFFFFFF);
+  const headerBg = PdfColor.fromInt(0xFFE8EAED);
+  const green = PdfColor.fromInt(0xFF1D7F5A);
+  const red = PdfColor.fromInt(0xFFB91C1C);
+
+  /// Plusstunden gruen, Minusstunden rot, glatte Null neutral.
+  PdfColor signColor(int minutes) {
+    if (minutes > 0) return green;
+    if (minutes < 0) return red;
+    return ink;
+  }
+
+  pw.Widget headerCell(String text, {bool left = false}) => pw.Padding(
+        padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 5),
+        child: pw.Text(
+          _daPdfSafe(text),
+          textAlign: left ? pw.TextAlign.left : pw.TextAlign.right,
+          style: pw.TextStyle(
+            fontSize: 8,
+            color: muted,
+            fontWeight: pw.FontWeight.bold,
+          ),
+        ),
+      );
+
+  /// Von wann bis wann dieser Monat gezaehlt wurde.
+  ///
+  /// Normalerweise der ganze Monat; im ersten Monat ab Vertragsbeginn und
+  /// im letzten ab-/bis zum Vertragsende. Ohne diese Zeile ist im PDF
+  /// nicht erkennbar, warum ein Rumpfmonat weniger Sollstunden hat.
+  String? countedRange(String monthKey) {
+    final parts = monthKey.split('-');
+    if (parts.length < 2) return null;
+    final y = int.tryParse(parts[0]);
+    final m = int.tryParse(parts[1]);
+    if (y == null || m == null) return null;
+
+    final monthStart = DateTime(y, m, 1);
+    final monthEnd = DateTime(y, m + 1, 0);
+    var from = monthStart;
+    var to = monthEnd;
+
+    final start = profile.contractStart;
+    if (start != null && start.isAfter(from)) from = start;
+    final end = profile.contractEnd;
+    if (end != null && end.isBefore(to)) to = end;
+
+    if (to.isBefore(from)) return null;
+    // Voller Monat: keine Zusatzzeile, das waere nur Rauschen.
+    if (from == monthStart && to == monthEnd) return null;
+
+    String d(DateTime v) =>
+        '${v.day.toString().padLeft(2, '0')}.${v.month.toString().padLeft(2, '0')}.';
+    return '${d(from)} - ${d(to)}';
+  }
+
+  pw.Widget monthCell(String label, String? range) => pw.Padding(
+        padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          mainAxisSize: pw.MainAxisSize.min,
+          children: <pw.Widget>[
+            pw.Text(
+              _daPdfSafe(label),
+              style: const pw.TextStyle(fontSize: 8.5, color: ink),
+            ),
+            if (range != null)
+              pw.Text(
+                _daPdfSafe(
+                  de ? 'gezaehlt $range' : 'counted $range',
+                ),
+                style: const pw.TextStyle(fontSize: 7, color: muted),
+              ),
+          ],
+        ),
+      );
+
+  pw.Widget cell(
+    String text, {
+    bool left = false,
+    PdfColor? color,
+    bool bold = false,
+  }) =>
+      pw.Padding(
+        padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+        child: pw.Text(
+          _daPdfSafe(text),
+          textAlign: left ? pw.TextAlign.left : pw.TextAlign.right,
+          style: pw.TextStyle(
+            fontSize: 8.5,
+            color: color ?? ink,
+            fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+          ),
+        ),
+      );
 
   final months = profile.overtimeMonths.toList()
     // Neuester Monat zuerst — wie in der Bildschirmansicht.
@@ -9141,72 +9245,109 @@ pw.Widget _overtimeMonthsTable({
         ),
       ),
       pw.SizedBox(height: 6),
-      pw.TableHelper.fromTextArray(
-        headerHeight: 20,
-        cellHeight: 18,
-        headerDecoration: const pw.BoxDecoration(color: zebra),
-        headerStyle: pw.TextStyle(
-          fontSize: 8,
-          color: muted,
-          fontWeight: pw.FontWeight.bold,
-        ),
-        cellStyle: const pw.TextStyle(fontSize: 8.5, color: ink),
+      // Von Hand gebaut statt ueber `TableHelper.fromTextArray`: nur so
+      // laesst sich JEDE Zelle einzeln einfaerben — Plusstunden gruen,
+      // Minusstunden rot — und die Zeilen abwechselnd hellgrau/weiss
+      // hinterlegen. `fromTextArray` kennt nur einen Stil fuer alle Zellen.
+      pw.Table(
         border: pw.TableBorder.all(color: line, width: 0.4),
-        cellAlignments: {
-          0: pw.Alignment.centerLeft,
-          1: pw.Alignment.centerRight,
-          2: pw.Alignment.centerRight,
-          3: pw.Alignment.centerRight,
-          4: pw.Alignment.centerRight,
-          5: pw.Alignment.centerRight,
+        columnWidths: const <int, pw.TableColumnWidth>{
+          0: pw.FlexColumnWidth(2.4),
+          1: pw.FlexColumnWidth(1),
+          2: pw.FlexColumnWidth(1),
+          3: pw.FlexColumnWidth(1.1),
+          4: pw.FlexColumnWidth(1.1),
+          5: pw.FlexColumnWidth(1),
         },
-        headers: <String>[
-          de ? 'Monat' : 'Month',
-          de ? 'Soll' : 'Target',
-          de ? 'Ist' : 'Actual',
-          de ? 'Differenz' : 'Difference',
-          de ? 'ausgezahlt' : 'paid out',
-          de ? 'offen' : 'open',
-        ],
-        data: <List<String>>[
-          for (final m in months)
-            <String>[
-              _daPdfSafe(m.monthLabel(de)),
-              hhmm(m.targetMinutes),
-              hhmm(m.workedMinutes),
-              signed(m.overtimeMinutes),
-              hhmm(m.paidMinutes),
-              signed(m.remainingMinutes),
+        children: <pw.TableRow>[
+          pw.TableRow(
+            repeat: true,
+            decoration: const pw.BoxDecoration(color: headerBg),
+            children: <pw.Widget>[
+              headerCell(de ? 'Monat' : 'Month', left: true),
+              headerCell(de ? 'Soll' : 'Target'),
+              headerCell(de ? 'Ist' : 'Actual'),
+              headerCell(de ? 'Differenz' : 'Difference'),
+              headerCell(de ? 'ausgezahlt' : 'paid out'),
+              headerCell(de ? 'offen' : 'open'),
             ],
-          <String>[
-            de ? 'Summe' : 'Total',
-            hhmm(totalTarget),
-            hhmm(totalWorked),
-            signed(totalDiff),
-            hhmm(totalPaid),
-            signed(totalOpen),
-          ],
+          ),
+          for (var i = 0; i < months.length; i++)
+            pw.TableRow(
+              // Zebra: gerade Zeilen weiss, ungerade hellgrau.
+              decoration: pw.BoxDecoration(color: i.isOdd ? zebra : white),
+              children: <pw.Widget>[
+                monthCell(
+                  months[i].monthLabel(de),
+                  countedRange(months[i].month),
+                ),
+                cell(hhmm(months[i].targetMinutes)),
+                cell(hhmm(months[i].workedMinutes)),
+                cell(
+                  signed(months[i].overtimeMinutes),
+                  color: signColor(months[i].overtimeMinutes),
+                  bold: true,
+                ),
+                cell(hhmm(months[i].paidMinutes)),
+                cell(
+                  signed(months[i].remainingMinutes),
+                  color: signColor(months[i].remainingMinutes),
+                ),
+              ],
+            ),
+          pw.TableRow(
+            decoration: const pw.BoxDecoration(color: headerBg),
+            children: <pw.Widget>[
+              cell(de ? 'Summe' : 'Total', left: true, bold: true),
+              cell(hhmm(totalTarget), bold: true),
+              cell(hhmm(totalWorked), bold: true),
+              cell(
+                signed(totalDiff),
+                color: signColor(totalDiff),
+                bold: true,
+              ),
+              cell(hhmm(totalPaid), bold: true),
+              cell(
+                signed(totalOpen),
+                color: signColor(totalOpen),
+                bold: true,
+              ),
+            ],
+          ),
           // Unbezahlter Urlaub belastet das Konto (Ticket „TIME &
           // BALANCE"). Ohne diese Zeile ergaebe die Summenspalte nicht
           // den Saldo, der oben im Blatt steht.
           if (unpaidCharge > 0)
-            <String>[
-              de ? 'abzgl. unbezahlter Urlaub' : 'less unpaid leave',
-              '',
-              '',
-              '',
-              '',
-              signed(-unpaidCharge),
-            ],
+            pw.TableRow(
+              decoration: const pw.BoxDecoration(color: white),
+              children: <pw.Widget>[
+                cell(
+                  de ? 'abzgl. unbezahlter Urlaub' : 'less unpaid leave',
+                  left: true,
+                ),
+                cell(''),
+                cell(''),
+                cell(''),
+                cell(''),
+                cell(signed(-unpaidCharge), color: red),
+              ],
+            ),
           if (unpaidCharge > 0)
-            <String>[
-              de ? 'Saldo' : 'Balance',
-              '',
-              '',
-              '',
-              '',
-              signed(totalOpen - unpaidCharge),
-            ],
+            pw.TableRow(
+              decoration: const pw.BoxDecoration(color: headerBg),
+              children: <pw.Widget>[
+                cell(de ? 'Saldo' : 'Balance', left: true, bold: true),
+                cell(''),
+                cell(''),
+                cell(''),
+                cell(''),
+                cell(
+                  signed(totalOpen - unpaidCharge),
+                  color: signColor(totalOpen - unpaidCharge),
+                  bold: true,
+                ),
+              ],
+            ),
         ],
       ),
       pw.SizedBox(height: 4),
