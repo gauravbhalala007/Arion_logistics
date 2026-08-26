@@ -28,6 +28,7 @@ import '../services/driver_csv.dart';
 import '../services/driver_export_service.dart';
 import '../services/driver_identity_service.dart';
 import '../services/vacation_pools_repository.dart';
+import '../utils/driver_remark.dart';
 import '../utils/vacation_pools.dart';
 import '../widgets/vacation_pool_lines.dart';
 import '../widgets/app_side_menu.dart';
@@ -3100,6 +3101,116 @@ class _DriversHubPageState extends State<DriversHubPage> {
     );
   }
 
+  /// Freie Bemerkung zum Fahrer (Ticket „DRIVER'S HUB").
+  ///
+  /// Liegt als Feld `remark` auf dem Fahrerdokument und erscheint im
+  /// Monatsplan unter dem Namen. Leeres Feld = Bemerkung entfernen.
+  Future<void> _editDriverRemark(
+    DocumentSnapshot<Map<String, dynamic>> driverDoc,
+    String currentRemark,
+  ) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final ctrl = TextEditingController(text: currentRemark);
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Text(
+          de ? 'Bemerkung' : 'Remark',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+        ),
+        content: SizedBox(
+          width: 420,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                de
+                    ? 'Kurze Notiz zu diesem Fahrer — sie erscheint im '
+                        'Monatsplan direkt unter dem Namen.'
+                    : 'A short note about this driver — it appears in the '
+                        'monthly plan right below the name.',
+                style: const TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: ctrl,
+                autofocus: true,
+                minLines: 2,
+                maxLines: 4,
+                maxLength: kDriverRemarkMaxLength,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: InputDecoration(
+                  hintText: de
+                      ? 'z. B. nur Frühschicht, kein Kastenwagen'
+                      : 'e.g. early shift only, no box van',
+                  filled: true,
+                  fillColor: const Color(0xFFF9FAFB),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: Color(0xFF1D7F5A)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(de ? 'Abbrechen' : 'Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
+            child: Text(de ? 'Speichern' : 'Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == null) return; // abgebrochen
+    if (result == currentRemark.trim()) return; // unveraendert
+
+    try {
+      await driverDoc.reference.set(<String, dynamic>{
+        'remark': result,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result.isEmpty
+                ? (de ? 'Bemerkung entfernt.' : 'Remark removed.')
+                : (de ? 'Bemerkung gespeichert.' : 'Remark saved.'),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFFB42318),
+          content: Text(
+            de
+                ? 'Bemerkung konnte nicht gespeichert werden: $e'
+                : 'Could not save the remark: $e',
+          ),
+        ),
+      );
+    }
+  }
+
   Future<void> _editTransporterId(
     DocumentSnapshot<Map<String, dynamic>> driverDoc,
     String currentTid,
@@ -5017,6 +5128,7 @@ class _DriversHubPageState extends State<DriversHubPage> {
           ),
           editTransporterId: _editTransporterId,
           toggleActive: _onToggleActiveDriver,
+          editRemark: _editDriverRemark,
           settingsMenuBuilder: _driverSettingsMenu,
           profileImage: _profileImageFromOnboarding,
           workPermitTypeLabel: (raw, fallbackExpiry) => _workPermitTypeLabel(

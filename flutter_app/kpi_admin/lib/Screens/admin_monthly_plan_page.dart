@@ -22,6 +22,7 @@ import 'package:flutter/services.dart';
 
 import '../models/driver_contract_type.dart';
 import '../models/employment_period.dart';
+import '../utils/driver_remark.dart';
 import '../models/shift_plan.dart';
 import '../services/shift_plan_parser.dart';
 import '../utils/driver_activity.dart';
@@ -195,6 +196,48 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
   /// nach Wiedereinstellung), wird der für den angezeigten Monat
   /// relevante genommen. Ohne Daten bleibt die Zeile ganz weg, damit
   /// keine leere Lücke entsteht.
+  /// Bemerkung aus dem Fahrerprofil — direkt unter dem Namen.
+  ///
+  /// Ticket „DRIVER'S HUB": Die Disposition pflegt im Drivers Hub eine
+  /// Notiz zum Fahrer (z. B. „nur Frühschicht", „kein Kastenwagen") und
+  /// braucht sie genau hier bei der Monatsplanung vor Augen.
+  Widget _remarkLine(Map<String, dynamic> driverData) {
+    final remark = driverRemarkOf(driverData);
+    if (remark.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 1),
+            child: Icon(
+              Icons.sticky_note_2_outlined,
+              size: 11,
+              color: Color(0xFFB45309),
+            ),
+          ),
+          const SizedBox(width: 3),
+          Flexible(
+            child: Text(
+              remark,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 10,
+                height: 1.25,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFFB45309),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _employmentLine(Map<String, dynamic> driverData) {
     final periods = employmentPeriodsOf(driverData);
     final period = employmentPeriodForMonth(periods, _month);
@@ -3170,6 +3213,7 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
                             ),
                           ),
                         _employmentLine(data),
+                        _remarkLine(data),
                         const SizedBox(height: 8),
                         Wrap(
                           spacing: 6,
@@ -3281,6 +3325,7 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontSize: 11, color: _kMuted),
               ),
+              _remarkLine(data),
             ],
           ),
         ),
@@ -4005,6 +4050,7 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
                                 // Ticket: Beschäftigungszeitraum aus dem
                                 // Drivers Hub direkt unter dem Namen.
                                 _employmentLine(drivers[i].data()),
+                                _remarkLine(drivers[i].data()),
                               ],
                             ),
                           ),

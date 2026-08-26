@@ -22,6 +22,7 @@ import '../localization/app_localizations.dart';
 import '../models/employment_period.dart';
 import '../services/incident_reports.dart';
 import '../services/vacation_pools_repository.dart';
+import '../utils/driver_remark.dart';
 import '../utils/vacation_pools.dart';
 import '../widgets/vacation_pool_lines.dart';
 import '../widgets/driver_performance_sections.dart';
@@ -161,6 +162,7 @@ class DriverHubDetailActions {
     required this.editLicenseType,
     required this.editTransporterId,
     required this.toggleActive,
+    required this.editRemark,
     required this.settingsMenuBuilder,
     required this.profileImage,
     required this.workPermitTypeLabel,
@@ -230,6 +232,13 @@ class DriverHubDetailActions {
     DocumentSnapshot<Map<String, dynamic>> driverDoc,
     bool currentlyActive,
   ) toggleActive;
+
+  /// `_editDriverRemark` — freie Notiz zum Fahrer. Erscheint zusaetzlich
+  /// im Monatsplan direkt unter dem Namen.
+  final void Function(
+    DocumentSnapshot<Map<String, dynamic>> driverDoc,
+    String currentRemark,
+  ) editRemark;
 
   /// `_driverSettingsMenu` — das bestehende Zahnrad-Menü der Detailseite.
   final Widget Function(DocumentSnapshot<Map<String, dynamic>> driverDoc)
@@ -1810,6 +1819,8 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
       children: [
         _contractCard(data, onboarding),
         const SizedBox(height: 14),
+        _remarkCard(doc, data),
+        const SizedBox(height: 14),
         _personalCard(data, onboarding),
         const SizedBox(height: 14),
         _paymentCard(onboarding),
@@ -2090,6 +2101,87 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  /// Freie Bemerkung zum Fahrer (Ticket „DRIVER'S HUB").
+  ///
+  /// Bewusst eine eigene Karte und keine Zeile im Zweispalter: Die Notiz
+  /// ist mehrzeilig und soll auffallen — sie steuert die Monatsplanung.
+  Widget _remarkCard(
+    DocumentSnapshot<Map<String, dynamic>> doc,
+    Map<String, dynamic> data,
+  ) {
+    final remark = driverRemarkOf(data);
+    final empty = remark.isEmpty;
+
+    return _card(
+      title: _tr('Bemerkung', 'Remark'),
+      trailing: IconButton(
+        tooltip: empty
+            ? _tr('Bemerkung hinzufügen', 'Add remark')
+            : _tr('Bemerkung bearbeiten', 'Edit remark'),
+        onPressed: () => widget.actions.editRemark(doc, remark),
+        icon: Icon(
+          empty ? Icons.add_rounded : Icons.edit_outlined,
+          size: 18,
+          color: _C.text2,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+        child: empty
+            ? Text(
+                _tr(
+                  'Noch keine Bemerkung. Sie erscheint im Monatsplan direkt '
+                  'unter dem Namen.',
+                  'No remark yet. It appears in the monthly plan right '
+                  'below the name.',
+                ),
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  height: 1.4,
+                  color: _C.text3,
+                ),
+              )
+            : Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFFBEB),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFFDE68A)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(top: 1),
+                      child: Icon(
+                        Icons.sticky_note_2_outlined,
+                        size: 15,
+                        color: Color(0xFFB45309),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        remark,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          height: 1.4,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF92400E),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
       ),
     );
   }
