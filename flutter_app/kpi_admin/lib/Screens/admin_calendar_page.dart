@@ -352,33 +352,47 @@ class _AdminCalendarPageState extends State<AdminCalendarSection> {
             const SizedBox(height: AppSpacing.md),
             Expanded(
               child: isNarrow
-                  ? Column(
-                      children: [
-                        Expanded(
-                          flex: 3,
-                          child: _CalendarGrid(
-                            visibleMonth: _visibleMonth,
-                            selectedDay: _selectedDay,
-                            events: events,
-                            onSelectDay: _handleSelectDay,
-                            onEventTap: _showEventDetail,
-                            isMobile: isMobile,
+                  ? LayoutBuilder(
+                      builder: (context, constraints) {
+                        final gridHeight = _CalendarGrid.heightForWidth(
+                          constraints.maxWidth,
+                          isMobile: isMobile,
+                          weekCount: _buildWeeks(_visibleMonth).length,
+                        );
+                        // Gitter + Tagesliste koennen zusammen hoeher sein
+                        // als der Bildschirm — deshalb scrollbar statt
+                        // gestaucht.
+                        return SingleChildScrollView(
+                          child: Column(
+                            children: [
+                              SizedBox(
+                                height: gridHeight,
+                                child: _CalendarGrid(
+                                  visibleMonth: _visibleMonth,
+                                  selectedDay: _selectedDay,
+                                  events: events,
+                                  onSelectDay: _handleSelectDay,
+                                  onEventTap: _showEventDetail,
+                                  isMobile: isMobile,
+                                ),
+                              ),
+                              if (_showDayPanel) ...[
+                                const SizedBox(height: AppSpacing.md),
+                                SizedBox(
+                                  height: isMobile ? 360 : 280,
+                                  child: _DayEventsPanel(
+                                    selectedDay: _selectedDay,
+                                    events: events,
+                                    onEventTap: _showEventDetail,
+                                    onAddForSelected: () =>
+                                        _addEvent(prefillStart: _selectedDay),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
-                        ),
-                        if (_showDayPanel) ...[
-                          const SizedBox(height: AppSpacing.md),
-                          SizedBox(
-                            height: isMobile ? 360 : 280,
-                            child: _DayEventsPanel(
-                              selectedDay: _selectedDay,
-                              events: events,
-                              onEventTap: _showEventDetail,
-                              onAddForSelected: () =>
-                                  _addEvent(prefillStart: _selectedDay),
-                            ),
-                          ),
-                        ],
-                      ],
+                        );
+                      },
                     )
                   : Row(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -635,6 +649,31 @@ class _CalendarGrid extends StatelessWidget {
     required this.isMobile,
   });
 
+  /// Hoehe, bei der die Tageskacheln quadratisch werden.
+  ///
+  /// Das Gitter fuellt sonst nur den Rest, den die Tagesliste uebrig
+  /// laesst — auf dem Handy wurden die Tage dadurch flach und gedrungen.
+  /// Statt einer geratenen Fixhoehe rechnen wir aus der verfuegbaren
+  /// Breite zurueck: Zellbreite = (Breite − Rand − KW-Spalte) / 7, und
+  /// genau so hoch wird auch jede Zeile.
+  static double heightForWidth(
+    double width, {
+    required bool isMobile,
+    required int weekCount,
+  }) {
+    final outerPadding = isMobile ? AppSpacing.sm : AppSpacing.lg;
+    final kwWidth = isMobile ? 24.0 : 56.0;
+    // Wochentagszeile: caption2 (14 px Zeilenhoehe) + 6 px Polster oben
+    // und unten, danach der feste 4-px-Abstand zum Gitter.
+    const headerRow = 26.0;
+    const headerGap = 4.0;
+
+    final inner = width - outerPadding * 2 - kwWidth;
+    if (inner <= 0) return 0;
+    final cell = inner / 7;
+    return outerPadding * 2 + headerRow + headerGap + cell * weekCount;
+  }
+
   @override
   Widget build(BuildContext context) {
     final weeks = _buildWeeks(visibleMonth);
@@ -819,6 +858,10 @@ class _DayCell extends StatelessWidget {
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
+            // In der quadratischen Kachel sitzt der Inhalt mittig; am
+            // Desktop bleibt er oben, weil dort Termintitel folgen.
+            mainAxisAlignment:
+                isMobile ? MainAxisAlignment.center : MainAxisAlignment.start,
             children: [
               // Date pill — today gets the brand pill, otherwise plain.
               Align(
