@@ -1464,9 +1464,19 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
           );
         }
 
+        // Firestore liefert erst den lokalen Cache und danach den
+        // Serverstand. Auf schwacher Verbindung kann der Cache
+        // unvollstaendig sein — dann sind die Zaehler unten kurzzeitig zu
+        // niedrig. Statt das stumm zu zeigen, sagen wir es.
+        final fromCache = snapshot.data?.metadata.isFromCache ?? false;
+
         return CoStateSwitcher(
-          child: ListView.separated(
-          key: const ValueKey('tasks-list'),
+          child: Column(
+            key: const ValueKey('tasks-list'),
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (fromCache) _syncingBanner(),
+              Expanded(child: ListView.separated(
           itemCount: taskItems.length,
           separatorBuilder: (_, __) => const SizedBox(height: 10),
           itemBuilder: (_, i) {
@@ -1881,8 +1891,57 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
             );
           },
           ),
+              ),
+            ],
+          ),
         );
       },
+    );
+  }
+
+  /// Hinweis, solange nur der lokale Firestore-Cache beantwortet wird.
+  ///
+  /// Auf schwacher Verbindung kann der Cache aelter oder unvollstaendig
+  /// sein — die Zaehler in den Kacheln sind dann vorlaeufig zu niedrig.
+  /// Ohne diesen Streifen sieht eine halb geladene Liste genauso aus wie
+  /// eine vollstaendige.
+  Widget _syncingBanner() {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFBFDBFE)),
+      ),
+      child: Row(
+        children: [
+          const SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF1D4ED8)),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              de
+                  ? 'Offline-Stand wird angezeigt — die Zahlen können noch '
+                      'unvollständig sein, bis die Verbindung steht.'
+                  : 'Showing offline data — the counts may still be '
+                      'incomplete until the connection is back.',
+              style: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF1E40AF),
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1895,8 +1954,15 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: _driversCol().snapshots(),
       builder: (context, driversSnapshot) {
-        final activeTransporterIds = (driversSnapshot.data?.docs ?? const [])
-            .where((d) => isDriverWorking(d.data()))
+        // Fail-open statt fail-closed: ausgeblendet wird nur, wen wir
+        // POSITIV als inaktiv kennen. Vorher wurde gegen die Menge der
+        // aktiven Fahrer gefiltert — solange der Fahrer-Stream noch nicht
+        // (vollstaendig) da war, etwa weil Firestore erst den lokalen
+        // Cache liefert, verschwanden dadurch stillschweigend Zeilen und
+        // die Kachel zeigte eine viel zu kleine Zahl. Ein unbekannter
+        // Fahrer bleibt jetzt sichtbar.
+        final inactiveTransporterIds = (driversSnapshot.data?.docs ?? const [])
+            .where((d) => !isDriverWorking(d.data()))
             .map(
               (d) => (d.data()['transporterId'] ?? d.id)
                   .toString()
@@ -1907,7 +1973,7 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
             .toSet();
         final activeGroupedTasks = groupedTasks
             .where(
-              (t) => activeTransporterIds.contains(
+              (t) => !inactiveTransporterIds.contains(
                 t.assignedTransporterId.trim().toUpperCase(),
               ),
             )
@@ -2218,7 +2284,9 @@ class _TaskSheetPageState extends State<TaskSheetPage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '$focusLabel: ${sortedRows.length}',
+                  // Immer mit Bezugsgroesse: „30 von 91" macht sofort
+                  // sichtbar, ob die Liste vollstaendig ist.
+                  '$focusLabel: ${sortedRows.length} / ${summary.totalActive}',
                   style: const TextStyle(
                     fontSize: 13,
                     color: Color(0xFF4B5563),
