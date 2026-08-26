@@ -92,11 +92,73 @@ class _NotFound extends StatelessWidget {
   }
 }
 
-class _PlanView extends StatelessWidget {
+class _PlanView extends StatefulWidget {
   const _PlanView({required this.data});
   final Map<String, dynamic> data;
 
+  @override
+  State<_PlanView> createState() => _PlanViewState();
+}
+
+class _PlanViewState extends State<_PlanView> {
+  Map<String, dynamic> get data => widget.data;
+
+  /// Suchbegriff — Fahrer finden sich auf langen Plaenen sonst nur durch
+  /// Scrollen. Gefiltert wird ueber Name (primary), Details (secondary)
+  /// und die Pillen (z. B. Transporter-ID).
+  final TextEditingController _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
   String _s(dynamic v) => (v ?? '').toString();
+
+  bool _rowMatches(Map<String, dynamic> row, String needle) {
+    if (needle.isEmpty) return true;
+    final hay = StringBuffer()
+      ..write(_s(row['primary']))
+      ..write(' ')
+      ..write(_s(row['secondary']));
+    for (final key in const ['pills', 'badgeItems']) {
+      final list = row[key];
+      if (list is List) {
+        for (final item in list) {
+          hay
+            ..write(' ')
+            ..write(item.toString());
+        }
+      }
+    }
+    return hay.toString().toLowerCase().contains(needle);
+  }
+
+  /// Sektionen mit auf den Suchbegriff reduzierten Zeilen; leere
+  /// Sektionen fallen weg.
+  List<Map<String, dynamic>> _filteredSections(
+    List<Map<String, dynamic>> sections,
+    String needle,
+  ) {
+    if (needle.isEmpty) return sections;
+    final out = <Map<String, dynamic>>[];
+    for (final section in sections) {
+      final rows = (section['rows'] is List)
+          ? List<Map<String, dynamic>>.from(
+              (section['rows'] as List).whereType<Map>().map(
+                (m) => Map<String, dynamic>.from(m),
+              ),
+            )
+          : const <Map<String, dynamic>>[];
+      final kept =
+          rows.where((r) => _rowMatches(r, needle)).toList(growable: false);
+      if (kept.isEmpty) continue;
+      out.add(<String, dynamic>{...section, 'rows': kept});
+    }
+    return out;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -307,6 +369,65 @@ class _PlanView extends StatelessWidget {
             ),
           );
 
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final needle = _query.trim().toLowerCase();
+    final visibleSections = _filteredSections(sections, needle);
+
+    // Suche gehoert zum gepinnten Kopf: beim Tippen scrollt die Liste
+    // darunter, das Feld bleibt stehen.
+    final searchField = Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: TextField(
+        controller: _searchCtrl,
+        onChanged: (v) => setState(() => _query = v),
+        textInputAction: TextInputAction.search,
+        decoration: InputDecoration(
+          hintText: de
+              ? 'Namen suchen …'
+              : 'Search your name…',
+          prefixIcon: const Icon(
+            Icons.search_rounded,
+            size: 20,
+            color: Color(0xFF6B7280),
+          ),
+          suffixIcon: _query.isEmpty
+              ? null
+              : IconButton(
+                  tooltip: de ? 'Leeren' : 'Clear',
+                  onPressed: () {
+                    _searchCtrl.clear();
+                    setState(() => _query = '');
+                  },
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    size: 18,
+                    color: Color(0xFF6B7280),
+                  ),
+                ),
+          isDense: true,
+          filled: true,
+          fillColor: Colors.white,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide:
+                const BorderSide(color: AppColors.codriverGreen, width: 1.4),
+          ),
+        ),
+      ),
+    );
+
+    final noMatches = needle.isNotEmpty && visibleSections.isEmpty;
+
     return SafeArea(
       child: Center(
         child: ConstrainedBox(
@@ -315,14 +436,42 @@ class _PlanView extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               header,
+              searchField,
               Expanded(
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 40),
                   children: [
-                    dispatcherBox,
-                    stickyBox,
-                    notesBox,
-                    for (final section in sections) ...[
+                    // Beim Suchen verschwinden die Infokaesten — wer nach
+                    // seinem Namen sucht, will die Treffer oben sehen.
+                    if (needle.isEmpty) ...[
+                      dispatcherBox,
+                      stickyBox,
+                      notesBox,
+                    ],
+                    if (noMatches)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 32),
+                        child: Column(
+                          children: [
+                            const Icon(
+                              Icons.search_off_rounded,
+                              size: 36,
+                              color: Color(0xFF9CA3AF),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              de
+                                  ? 'Kein Eintrag zu "${_query.trim()}".'
+                                  : 'No entry matches "${_query.trim()}".',
+                              textAlign: TextAlign.center,
+                              style: AppTypography.footnote.copyWith(
+                                color: const Color(0xFF6B7280),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    for (final section in visibleSections) ...[
                       const SizedBox(height: 16),
                       _SectionCard(section: section),
                     ],
