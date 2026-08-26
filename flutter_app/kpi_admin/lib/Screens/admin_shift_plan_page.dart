@@ -8,6 +8,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '../models/shift_plan.dart';
+import '../services/driver_identity_service.dart';
 import '../services/shift_plan_parser.dart';
 import '../services/public_plan_service.dart';
 import '../services/shift_plan_repository.dart';
@@ -347,6 +348,192 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
     );
   }
 
+  /// Excel-Roster ↔ Fahrerliste (Ticket „alle Namen erkennen").
+  ///
+  /// Drei Faelle je Excel-Zeile:
+  ///  1. TID existiert als Fahrerdokument → alles gut, kein Ton.
+  ///  2. TID unbekannt, aber der NAME haengt an einem PENDING-Platzhalter
+  ///     (Fahrer wurde angelegt, bevor seine Amazon-ID bekannt war) →
+  ///     wir bieten an, die ID aus der Excel zu uebernehmen. Der Umzug
+  ///     laeuft ueber [migrateDriverToTid] — derselbe Weg wie im
+  ///     Drivers Hub, nimmt Subcollections und Login mit.
+  ///  3. TID und Name unbekannt → benennen, nicht raten. Der Admin legt
+  ///     den Fahrer im Drivers Hub an.
+  Future<void> _reconcileRosterWithDrivers(List<ShiftRoster> roster) async {
+    final uid = _adminUid;
+    if (uid == null || roster.isEmpty) return;
+    final de = Localizations.localeOf(context).languageCode == 'de';
+
+    String nameKey(String raw) =>
+        raw.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+
+    late final QuerySnapshot<Map<String, dynamic>> driversSnap;
+    try {
+      driversSnap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('drivers')
+          .get();
+    } catch (_) {
+      return; // Abgleich ist Komfort — der Upload selbst bleibt nutzbar.
+    }
+
+    final knownTids = <String>{};
+    final pendingByName = <String, DocumentSnapshot<Map<String, dynamic>>>{};
+    for (final doc in driversSnap.docs) {
+      final data = doc.data();
+      final tid = (data['transporterId'] ?? doc.id).toString().trim();
+      if (tid.isNotEmpty) knownTids.add(tid.toUpperCase());
+      final isPending = data['tidPending'] == true ||
+          doc.id.toUpperCase().startsWith('PENDING-');
+      if (isPending) {
+        final name = nameKey((data['driverName'] ?? '').toString());
+        if (name.isNotEmpty) pendingByName[name] = doc;
+      }
+    }
+
+    final adoptable =
+        <({ShiftRoster row, DocumentSnapshot<Map<String, dynamic>> doc})>[];
+    final unknown = <ShiftRoster>[];
+    for (final row in roster) {
+      final tid = row.transporterId.trim().toUpperCase();
+      if (tid.isEmpty || knownTids.contains(tid)) continue;
+      final pendingDoc = pendingByName[nameKey(row.driverName)];
+      if (pendingDoc != null) {
+        adoptable.add((row: row, doc: pendingDoc));
+      } else {
+        unknown.add(row);
+      }
+    }
+    if (adoptable.isEmpty && unknown.isEmpty) return;
+    if (!mounted) return;
+
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Text(
+          de ? 'Fahrer-Abgleich' : 'Driver reconciliation',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+        ),
+        content: SizedBox(
+          width: 460,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (adoptable.isNotEmpty) ...[
+                  Text(
+                    de
+                        ? '${adoptable.length} Fahrer stehen in CoDriver noch '
+                            'ohne Transporter-ID (Platzhalter). Die Excel '
+                            'liefert ihre IDs — jetzt uebernehmen?'
+                        : '${adoptable.length} drivers are still placeholders '
+                            'without a transporter ID in CoDriver. The Excel '
+                            'provides their IDs — adopt them now?',
+                    style: const TextStyle(fontSize: 13, height: 1.4),
+                  ),
+                  const SizedBox(height: 8),
+                  for (final a in adoptable)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 3),
+                      child: Text(
+                        '• ${a.row.driverName} → ${a.row.transporterId}',
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1D7F5A),
+                        ),
+                      ),
+                    ),
+                ],
+                if (unknown.isNotEmpty) ...[
+                  if (adoptable.isNotEmpty) const SizedBox(height: 12),
+                  Text(
+                    de
+                        ? '${unknown.length} Namen aus der Excel gibt es in '
+                            'CoDriver noch gar nicht — bitte im Drivers Hub '
+                            'anlegen, sonst sehen diese Fahrer ihren Plan '
+                            'nicht in der App:'
+                        : '${unknown.length} names from the Excel do not '
+                            'exist in CoDriver yet — add them in the Drivers '
+                            'Hub, otherwise they will not see their plan in '
+                            'the app:',
+                    style: const TextStyle(fontSize: 13, height: 1.4),
+                  ),
+                  const SizedBox(height: 8),
+                  for (final r in unknown)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 3),
+                      child: Text(
+                        '• ${r.driverName} (${r.transporterId})',
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFFB45309),
+                        ),
+                      ),
+                    ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(de ? 'Später' : 'Later'),
+          ),
+          if (adoptable.isNotEmpty)
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(
+                de
+                    ? 'IDs übernehmen (${adoptable.length})'
+                    : 'Adopt IDs (${adoptable.length})',
+              ),
+            ),
+        ],
+      ),
+    );
+    if (proceed != true || !mounted) return;
+
+    var moved = 0;
+    final failures = <String>[];
+    for (final a in adoptable) {
+      try {
+        await migrateDriverToTid(
+          dspUid: uid,
+          fromDocId: a.doc.id,
+          toTid: a.row.transporterId,
+        );
+        moved++;
+      } catch (e) {
+        failures.add('${a.row.driverName}: $e');
+      }
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor:
+            failures.isEmpty ? null : const Color(0xFFB45309),
+        duration: const Duration(seconds: 6),
+        content: Text(
+          failures.isEmpty
+              ? (de
+                  ? '$moved Fahrer mit ihrer Transporter-ID verknuepft.'
+                  : 'Linked $moved drivers to their transporter ID.')
+              : (de
+                  ? '$moved verknuepft, ${failures.length} fehlgeschlagen: '
+                      '${failures.first}'
+                  : 'Linked $moved, ${failures.length} failed: '
+                      '${failures.first}'),
+        ),
+      ),
+    );
+  }
+
   Future<void> _pickAndParseFile() async {
     if (_uploading) return;
     final de = Localizations.localeOf(context).languageCode == 'de';
@@ -485,6 +672,14 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
       );
       return;
     }
+
+    // Ticket „alle Namen erkennen": den Excel-Roster gegen die
+    // Fahrerliste halten. Fahrer, die in CoDriver noch als
+    // PENDING-Platzhalter laufen, bekommen hier ihre echte
+    // Transporter-ID angeboten; ganz unbekannte Namen werden benannt
+    // statt stillschweigend ignoriert.
+    await _reconcileRosterWithDrivers(parsed.roster);
+    if (!mounted) return;
 
     final now = DateTime.now();
     final todayKey = '${now.year.toString().padLeft(4, '0')}-'
