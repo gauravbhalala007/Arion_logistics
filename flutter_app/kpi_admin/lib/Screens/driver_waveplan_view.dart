@@ -152,8 +152,15 @@ class _DriverWaveplanViewState extends State<DriverWaveplanView>
               final routes = _routesFrom(data);
               final myRoute = _findMyRoute(routes);
               final myWave = myRoute?['dispatchTime']?.toString();
+              // Ticket „Waveplan nicht sichtbar": Wer selbst nicht im
+              // Plan steht (oder ohne Wave-Zeit eingetragen ist), sah
+              // frueher NICHTS. Jetzt zeigt der Alle-Fahrer-Tab dann den
+              // kompletten Plan, nach Wave-Zeit sortiert.
               final waveRoutes = myWave == null
-                  ? const <Map<String, dynamic>>[]
+                  ? (List<Map<String, dynamic>>.from(routes)
+                    ..sort((a, b) => (a['dispatchTime'] ?? '')
+                        .toString()
+                        .compareTo((b['dispatchTime'] ?? '').toString())))
                   : routes
                         .where((r) => r['dispatchTime'] == myWave)
                         .toList();
@@ -905,7 +912,7 @@ class _AllDriversTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    if (myWave == null || waveRoutes.isEmpty) {
+    if (waveRoutes.isEmpty) {
       return _EmptyState(
         icon: Icons.groups_rounded,
         title: t.t('driver_waveplan_all_empty_title'),
