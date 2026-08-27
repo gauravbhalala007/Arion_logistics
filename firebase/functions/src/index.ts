@@ -2986,7 +2986,9 @@ export const planPreview = onRequest(async (req, res) => {
       "Dein Waveplan mit Touren und Dispatchern.") +
     " Bereitgestellt über CoDriver.";
   const image = `https://dsp-codriver.de/og/${isShift ? "shiftplan" : "waveplan"}.png`;
-  const appUrl = `/p/${encodeURIComponent(shareId)}`;
+  // Die Flutter-App nutzt Hash-Routing — ohne '#' landet der Browser
+  // auf der Root-Route (Login/Admin) statt auf dem Plan.
+  const appUrl = `/#/p/${encodeURIComponent(shareId)}`;
 
   res.set("Cache-Control", "public, max-age=300, s-maxage=300");
   res.status(200).send(`<!DOCTYPE html>
