@@ -158,15 +158,24 @@
       var vv = window.visualViewport;
       if (!vv) return;
       var pending = false;
+      function fire() {
+        window.dispatchEvent(new Event('resize'));
+      }
       function nudge() {
         if (pending) return;
         pending = true;
         requestAnimationFrame(function () {
           pending = false;
-          window.dispatchEvent(new Event('resize'));
+          fire();
+          // Android-Tastaturen animieren: ein einzelner Frame trifft die
+          // Zwischenhoehe, der Canvas blieb dann klein (halbes Bild leer).
+          // Zwei Nachzuegler treffen die Endgeometrie zuverlaessig.
+          setTimeout(fire, 250);
+          setTimeout(fire, 600);
         });
       }
       vv.addEventListener('resize', nudge);
+      vv.addEventListener('scroll', nudge);
       vv.addEventListener('scroll', nudge);
     })();
   </script>

@@ -19,6 +19,7 @@ import '../services/fleet_vehicle_document_service.dart';
 import '../services/fleet_vehicle_repository.dart';
 import '../services/cortex_vehicle_importer.dart';
 import '../services/incident_reports.dart' show plateKeyOf;
+import '../services/vehicle_appointments.dart';
 import '../theme/app_colors.dart';
 import '../widgets/clearable_search_field.dart';
 import '../widgets/co_button.dart';
@@ -156,6 +157,7 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
   void dispose() {
     _scopeDocsSub?.cancel();
     _scopeExtrasSub?.cancel();
+    _scopeApptSub?.cancel();
     _searchCtrl.dispose();
     _referencesScrollCtrl.dispose();
     super.dispose();
@@ -1940,6 +1942,32 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
     );
   }
 
+  /// Offene (unaufgelöste) vergangene Kalender-Termine mit Fahrzeugbezug,
+  /// gruppiert nach `plateKey` — EINE Query je Scope (kein Zusatz-Read je
+  /// Zeile), gleiche Lebensdauer wie die Docs-/Extras-Abos.
+  StreamSubscription<List<VehicleAppointment>>? _scopeApptSub;
+  String? _scopeApptScope;
+  Map<String, List<VehicleAppointment>> _openApptByPlateKey =
+      const <String, List<VehicleAppointment>>{};
+
+  void _ensureScopeAppointmentsSubscription(String scope) {
+    if (_scopeApptScope == scope && _scopeApptSub != null) return;
+    _scopeApptSub?.cancel();
+    _scopeApptScope = scope;
+    _openApptByPlateKey = const <String, List<VehicleAppointment>>{};
+    _scopeApptSub = watchVehicleAppointments(dspUid: scope).listen(
+      (appointments) {
+        if (!mounted) return;
+        setState(
+          () => _openApptByPlateKey =
+              openPastAppointmentsByPlateKey(appointments),
+        );
+      },
+      // Kein Leserecht o. Ä.: schlicht keine Termin-Badges.
+      onError: (_) {},
+    );
+  }
+
   void _ensureScopeDocsSubscription(String scope) {
     if (_scopeDocsScope == scope && _scopeDocsSub != null) return;
     _scopeDocsSub?.cancel();
@@ -1968,6 +1996,7 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
     // Abos sicherstellen (einmal je Scope, ueberleben Rebuilds).
     _ensureScopeDocsSubscription(scope);
     _ensureScopeExtrasSubscription(scope);
+    _ensureScopeAppointmentsSubscription(scope);
     return LayoutBuilder(
       builder: (context, constraints) {
         final isNarrow = constraints.maxWidth < 1024;
@@ -3155,20 +3184,35 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                             0.0,
                             c.maxWidth,
                           );
+                          final apptBadge = _appointmentWarningBadge(
+                            context,
+                            vehicle,
+                          );
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              SizedBox(
-                                width: plateW,
-                                child: FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  alignment: Alignment.centerLeft,
-                                  child: LicensePlate.compact(
-                                    plate: vehicle.plateNumber,
-                                    height: 40,
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Flexible(
+                                    child: SizedBox(
+                                      width: plateW,
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        alignment: Alignment.centerLeft,
+                                        child: LicensePlate.compact(
+                                          plate: vehicle.plateNumber,
+                                          height: 40,
+                                        ),
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                  if (apptBadge != null) ...[
+                                    const SizedBox(width: 6),
+                                    apptBadge,
+                                  ],
+                                ],
                               ),
                               const SizedBox(height: 8),
                               SizedBox(
@@ -3569,6 +3613,44 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
     return FleetRemarkLines(remarks: remarks, fontSize: fontSize, iconSize: 13);
   }
 
+  /// Amber Badge am Fahrzeug-Kopf, wenn mindestens ein VERGANGENER
+  /// Kalender-Termin dieses Fahrzeugs noch nicht aufgelöst ist (Unterlagen
+  /// fehlen). Daten kommen aus dem EINEN Scope-Abo
+  /// [_ensureScopeAppointmentsSubscription] — kein Query je Zeile. Klick
+  /// auf die Zeile öffnet wie üblich die Detailseite, wo das Banner den
+  /// Auflösungs-Dialog trägt.
+  Widget? _appointmentWarningBadge(BuildContext context, FleetVehicle vehicle) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final open =
+        _openApptByPlateKey[plateKeyOf(vehicle.plateNumber)] ??
+        const <VehicleAppointment>[];
+    if (open.isEmpty) return null;
+    final d = open.first.start;
+    final dateLabel =
+        '${d.day.toString().padLeft(2, '0')}.'
+        '${d.month.toString().padLeft(2, '0')}.${d.year}';
+    final more = open.length - 1;
+    return Tooltip(
+      message: de
+          ? 'Unterlagen fehlen: Termin am $dateLabel'
+                '${more > 0 ? ' (+$more weitere)' : ''} — '
+                'Fahrzeug öffnen zum Auflösen'
+          : 'Documents missing: appointment on $dateLabel'
+                '${more > 0 ? ' (+$more more)' : ''} — '
+                'open the vehicle to resolve',
+      waitDuration: const Duration(milliseconds: 300),
+      child: Container(
+        width: 22,
+        height: 22,
+        decoration: const BoxDecoration(
+          color: _kAccentAmberTint,
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(Icons.event_busy, size: 13, color: _kAccentAmber),
+      ),
+    );
+  }
+
   /// Kennzeichen-Schild + Besitz-Badge + Leasingzeile (+ Rental-Firma bei
   /// SESO-/Rental-Fahrzeugen, Ticket 1c).
   Widget _rowPlateBlock(BuildContext context, FleetVehicle vehicle) {
@@ -3579,11 +3661,22 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
         _rentalCompanyByPlate[normalizePlateNumber(vehicle.plateNumber)] ?? '';
     final (badgeBg, badgeFg) = _ownerBadgeColors(vehicle.category);
 
+    final apptBadge = _appointmentWarningBadge(context, vehicle);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        LicensePlate.compact(plate: vehicle.plateNumber),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(child: LicensePlate.compact(plate: vehicle.plateNumber)),
+            if (apptBadge != null) ...[
+              const SizedBox(width: 6),
+              apptBadge,
+            ],
+          ],
+        ),
         const SizedBox(height: 6),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 2),

@@ -25,6 +25,7 @@ import '../widgets/co_pressable.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../services/incident_reports.dart' show plateKeyOf;
 import '../theme/app_colors.dart';
 import '../theme/app_elevation.dart';
 import '../theme/app_spacing.dart';
@@ -86,6 +87,9 @@ Future<void> showAddCalendarEventDialog(BuildContext context) async {
       'dispatcher': result.dispatcher,
       // Backward compatible: only write the field when it has content.
       if (result.description.isNotEmpty) 'description': result.description,
+      // Optional vehicle link — plateKey drives the fleet warning badge.
+      if (result.plate.isNotEmpty) 'plate': result.plate,
+      if (result.plate.isNotEmpty) 'plateKey': plateKeyOf(result.plate),
       'createdAt': FieldValue.serverTimestamp(),
     });
     if (!context.mounted) return;
@@ -220,6 +224,9 @@ class _AdminCalendarPageState extends State<AdminCalendarSection> {
             // Backward compatible: only write the field when it has content.
             if (result.description.isNotEmpty)
               'description': result.description,
+            // Optional vehicle link — plateKey drives the fleet warning badge.
+            if (result.plate.isNotEmpty) 'plate': result.plate,
+            if (result.plate.isNotEmpty) 'plateKey': plateKeyOf(result.plate),
             'createdAt': FieldValue.serverTimestamp(),
           });
       if (!mounted) return;
@@ -1286,6 +1293,44 @@ class _EventTile extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
+          // Verknüpftes Fahrzeug als kompakter Kennzeichen-Chip.
+          if (event.plate.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: AppColors.separatorLight,
+                  width: 0.8,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.directions_car_rounded,
+                    size: 12,
+                    color: AppColors.codriverDeep,
+                  ),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text(
+                      event.plate,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.caption2.copyWith(
+                        color: AppColors.codriverGraphite,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           if (event.description.isNotEmpty) ...[
             const SizedBox(height: 2),
             Text(
@@ -1402,6 +1447,18 @@ class _CompactEventTile extends StatelessWidget {
                   ),
                 ),
               ),
+              if (event.plate.isNotEmpty) ...[
+                const SizedBox(width: 6),
+                Tooltip(
+                  message: event.plate,
+                  waitDuration: const Duration(milliseconds: 300),
+                  child: const Icon(
+                    Icons.directions_car_rounded,
+                    size: 11,
+                    color: AppColors.codriverDeep,
+                  ),
+                ),
+              ],
               if (event.dispatcher.isNotEmpty) ...[
                 const SizedBox(width: 6),
                 const Icon(
@@ -1683,6 +1740,7 @@ Stream<List<_CalEvent>> _streamAllCalendarEvents() {
                   location: (d.data()['location'] ?? '').toString(),
                   dispatcher: (d.data()['dispatcher'] ?? '').toString(),
                   description: (d.data()['description'] ?? '').toString(),
+                  plate: (d.data()['plate'] ?? '').toString(),
                 ),
           ];
           emit();
@@ -1954,6 +2012,8 @@ Future<void> showCalendarEventDetail(
             detailRow(Icons.access_time_rounded, timeLabel),
             if (event.category.isNotEmpty)
               detailRow(Icons.label_rounded, event.category),
+            if (event.plate.isNotEmpty)
+              detailRow(Icons.directions_car_rounded, event.plate),
             if (event.location.isNotEmpty)
               detailRow(Icons.place_rounded, event.location),
             if (event.dispatcher.isNotEmpty)
@@ -2070,6 +2130,11 @@ Future<void> editCalendarEvent(
       'description': result.description.isEmpty
           ? FieldValue.delete()
           : result.description,
+      // Vehicle link: set when chosen, removed when cleared.
+      'plate': result.plate.isEmpty ? FieldValue.delete() : result.plate,
+      'plateKey': result.plate.isEmpty
+          ? FieldValue.delete()
+          : plateKeyOf(result.plate),
       'updatedAt': FieldValue.serverTimestamp(),
     });
     if (!context.mounted) return;
@@ -2108,6 +2173,7 @@ class _CalEvent {
   final String location;
   final String dispatcher; // pinned dispatcher name (optional)
   final String description; // optional free-text notes (may be empty)
+  final String plate; // optional linked vehicle (license plate, display form)
   const _CalEvent({
     required this.id,
     required this.start,
@@ -2117,6 +2183,7 @@ class _CalEvent {
     this.location = '',
     this.dispatcher = '',
     this.description = '',
+    this.plate = '',
   }) : end = end ?? start;
 
   bool get isMultiDay =>
@@ -2239,6 +2306,7 @@ class _NewEventResult {
   final String location;
   final String dispatcher;
   final String description;
+  final String plate; // optional linked vehicle (may be empty)
   final DateTime start;
   final DateTime end;
   const _NewEventResult({
@@ -2247,6 +2315,7 @@ class _NewEventResult {
     required this.location,
     required this.dispatcher,
     required this.description,
+    required this.plate,
     required this.start,
     required this.end,
   });
@@ -2274,6 +2343,39 @@ class _AddEventDialogState extends State<_AddEventDialog> {
   late DateTime _end;
   bool _multiDay = false;
   bool get _isEditing => widget.initial != null;
+
+  /// Kennzeichen der DSP-Flotte (`users/{scope}/vehicles`) für das
+  /// optionale Fahrzeug-Feld — einmalig geladen, Suche via Autocomplete.
+  List<String> _plates = const <String>[];
+  bool _platesRequested = false;
+
+  /// Interner Controller des Autocomplete-Felds (im fieldViewBuilder
+  /// eingefangen) — beim Submit wird daraus das Kennzeichen gelesen.
+  TextEditingController? _plateFieldCtrl;
+
+  void _loadPlates() {
+    if (_platesRequested) return;
+    _platesRequested = true;
+    final scope = AdminScope.adminUidOf(context);
+    if (scope == null) return;
+    FirebaseFirestore.instance
+        .collection('users')
+        .doc(scope)
+        .collection('vehicles')
+        .get()
+        .then((snap) {
+      if (!mounted) return;
+      final plates = <String>[
+        for (final d in snap.docs)
+          if (d.data()['isDeleted'] != true)
+            (d.data()['plateNumber'] ?? d.id).toString().trim(),
+      ]..removeWhere((p) => p.isEmpty);
+      plates.sort();
+      setState(() => _plates = plates);
+    }).catchError((_) {
+      // Kein Leserecht / offline — Feld bleibt Freitext ohne Vorschläge.
+    });
+  }
 
   Stream<List<String>> _dispatcherStream() {
     final user = FirebaseAuth.instance.currentUser;
@@ -2405,6 +2507,7 @@ class _AddEventDialogState extends State<_AddEventDialog> {
         location: _locationCtrl.text.trim(),
         dispatcher: _dispatcher,
         description: _descriptionCtrl.text.trim(),
+        plate: (_plateFieldCtrl?.text ?? widget.initial?.plate ?? '').trim(),
         start: _start,
         end: _multiDay ? _end : _start,
       ),
@@ -2416,6 +2519,7 @@ class _AddEventDialogState extends State<_AddEventDialog> {
     final de = Localizations.localeOf(context).languageCode == 'de';
     final df = DateFormat('EEE, d. MMMM y', _localeForFormat(context));
     final tfmt = DateFormat.Hm(_localeForFormat(context));
+    _loadPlates();
     return AlertDialog(
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.white,
@@ -2466,6 +2570,51 @@ class _AddEventDialogState extends State<_AddEventDialog> {
                 labelText: 'Ort (optional)',
                 hintText: 'z.B. Sixt Stuttgart Hbf',
               ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            // Optionales Fahrzeug (Kennzeichen-Suche über die DSP-Flotte).
+            // Vergangene Termine mit Fahrzeug erzeugen im Fleet Hub eine
+            // Unterlagen-Warnung, bis sie dort aufgelöst werden.
+            Autocomplete<String>(
+              initialValue:
+                  TextEditingValue(text: widget.initial?.plate ?? ''),
+              optionsBuilder: (value) {
+                if (_plates.isEmpty) return const Iterable<String>.empty();
+                final q = plateKeyOf(value.text);
+                if (q.isEmpty) return _plates;
+                return _plates.where((p) => plateKeyOf(p).contains(q));
+              },
+              onSelected: (_) => setState(() {}),
+              fieldViewBuilder: (ctx, ctrl, focus, onFieldSubmitted) {
+                _plateFieldCtrl = ctrl;
+                return TextField(
+                  controller: ctrl,
+                  focusNode: focus,
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(
+                    labelText: de
+                        ? 'Fahrzeug (optional)'
+                        : 'Vehicle (optional)',
+                    hintText: de
+                        ? 'Kennzeichen suchen …'
+                        : 'Search license plate …',
+                    prefixIcon: const Icon(
+                      Icons.directions_car_rounded,
+                      size: 18,
+                    ),
+                    suffixIcon: ctrl.text.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: de ? 'Entfernen' : 'Clear',
+                            icon: const Icon(Icons.close_rounded, size: 16),
+                            onPressed: () {
+                              ctrl.clear();
+                              setState(() {});
+                            },
+                          ),
+                  ),
+                );
+              },
             ),
             const SizedBox(height: AppSpacing.md),
             // Optional multi-line description / notes for the event.

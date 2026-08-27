@@ -982,7 +982,9 @@ class _FeedbackPageState extends State<FeedbackPage> {
               horizontalPadding,
               16,
               horizontalPadding,
-              24,
+              // Mobil schwebt die Bottom-Nav ueber dem Inhalt — ohne
+              // Extra-Puffer verdeckte sie die letzten Feedback-Karten.
+              MediaQuery.sizeOf(context).width < 700 ? 110 : 24,
             ),
             child: Center(
               child: ConstrainedBox(

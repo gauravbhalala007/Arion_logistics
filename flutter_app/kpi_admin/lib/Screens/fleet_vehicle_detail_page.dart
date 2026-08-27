@@ -33,6 +33,7 @@ import '../services/fleet_vehicle_document_repository.dart';
 import '../services/fleet_vehicle_document_service.dart';
 import '../services/fleet_vehicle_event_service.dart';
 import '../services/incident_reports.dart';
+import '../services/vehicle_appointments.dart';
 import '../services/vehicle_check_service.dart' show kVehicleCheckEventType;
 import '../widgets/admin_scope.dart';
 import '../widgets/license_plate.dart';
@@ -460,6 +461,17 @@ class _FleetVehicleDetailPageState extends State<FleetVehicleDetailPage> {
 
   String _tr(String de, String en) => _de ? de : en;
 
+  /// Kalender-Termine des DSP mit Fahrzeugbezug (`plateKey` gesetzt) —
+  /// treibt die Unterlagen-Warnbanner im Kopfbereich (Feedback-Ticket
+  /// "CALENDAR / HOMEPAGE EVENTS").
+  Stream<List<VehicleAppointment>>? _appointmentsStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _appointmentsStream = watchVehicleAppointments(dspUid: widget.dspUid);
+  }
+
   @override
   void dispose() {
     _copyTimer?.cancel();
@@ -822,6 +834,7 @@ class _FleetVehicleDetailPageState extends State<FleetVehicleDetailPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            _appointmentWarnings(),
             _profileCard(vehicle, extras, narrow: true),
             const SizedBox(height: 12),
             _mobileVehicleDataCard(vehicle, extras),
@@ -847,6 +860,7 @@ class _FleetVehicleDetailPageState extends State<FleetVehicleDetailPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  _appointmentWarnings(),
                   _profileCard(vehicle, extras, narrow: false),
                   const SizedBox(height: 14),
                   _documentsCard(vehicle, extras),
@@ -859,6 +873,116 @@ class _FleetVehicleDetailPageState extends State<FleetVehicleDetailPage> {
           const SizedBox(width: 16),
           Expanded(flex: 3, child: _eventsPanel(vehicle, scrollable: true)),
         ],
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // Unterlagen-Warnbanner (Kalender-Termine mit Fahrzeugbezug)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /// Amber Warnbanner für jeden VERGANGENEN, noch nicht aufgelösten
+  /// Kalender-Termin dieses Fahrzeugs. Klick öffnet den Auflösungs-Dialog
+  /// (Datei hochladen / Reparatur beschreiben / kein Bericht nötig).
+  Widget _appointmentWarnings() {
+    final stream = _appointmentsStream;
+    if (stream == null) return const SizedBox.shrink();
+    return StreamBuilder<List<VehicleAppointment>>(
+      stream: stream,
+      builder: (context, snap) {
+        final open = openPastAppointmentsByPlateKey(
+              snap.data ?? const <VehicleAppointment>[],
+            )[plateKeyOf(_plate)] ??
+            const <VehicleAppointment>[];
+        if (open.isEmpty) return const SizedBox.shrink();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final appt in open) ...[
+              _appointmentWarningBanner(appt),
+              const SizedBox(height: 12),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _appointmentWarningBanner(VehicleAppointment appt) {
+    final dateLabel = _fmtDate(appt.start);
+    final title = appt.title.trim();
+    final text = _tr(
+      'Zum Termin am $dateLabel${title.isEmpty ? '' : ' („$title“)'} fehlen '
+          'die Unterlagen — Datei hochladen oder Reparatur beschreiben.',
+      'The data for the appointment on $dateLabel'
+          '${title.isEmpty ? '' : ' (“$title”)'} is missing — please upload '
+          'a file or describe the repair.',
+    );
+    return Material(
+      color: _C.amberBg,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => showVehicleAppointmentResolveDialog(
+          context,
+          dspUid: widget.dspUid,
+          plate: _plate,
+          appointment: appt,
+        ),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            border: Border.all(color: _C.amberBorder),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.warning_amber_rounded,
+                size: 20,
+                color: _C.amberValue,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      text,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: _C.amberText,
+                        height: 1.45,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _tr(
+                        'Klicken zum Auflösen — oder „Kein Bericht nötig" '
+                            'wählen.',
+                        'Click to resolve — or choose "No report needed".',
+                      ),
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: _C.amberValue,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.chevron_right_rounded,
+                size: 20,
+                color: _C.amberValue,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
