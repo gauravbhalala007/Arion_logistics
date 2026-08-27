@@ -753,11 +753,14 @@ class _PaymentCheckBodyState extends State<_PaymentCheckBody> {
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
+                              // Gleichmaessige Drittelung (Ticket) — die
+                              // Ergebnis-Spalte bekam vorher doppelte
+                              // Breite und quetschte die Upload-Spalten.
                               Expanded(child: invoiceCol),
                               const SizedBox(width: 14),
                               Expanded(child: wstCol),
                               const SizedBox(width: 14),
-                              Expanded(flex: 2, child: resultCol),
+                              Expanded(child: resultCol),
                             ],
                           ),
                         ),
