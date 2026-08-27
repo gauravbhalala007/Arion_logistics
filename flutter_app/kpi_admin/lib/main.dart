@@ -70,30 +70,11 @@ class App extends StatelessWidget {
 
   Widget _wrapSelectable(Widget child) => SelectionArea(child: child);
 
-  @override
-  Widget build(BuildContext context) {
-    // 🔑 AnimatedBuilder listens to the global localeController.
-    // Whenever localeController.setLocale(...) is called,
-    // MaterialApp is rebuilt with the new locale → entire app language updates.
-    return AnimatedBuilder(
-      animation: localeController,
-      builder: (context, _) {
-        return MaterialApp(
-          title: 'DSP CODRIVER',
-          debugShowCheckedModeBanner: false,
-          // 🌍 Current app locale (null = use system locale)
-          locale: localeController.locale,
-          supportedLocales: AppLocalizations.supportedLocales,
-          localizationsDelegates: const [
-            AppLocalizationsDelegate(),
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-          theme: AppTheme.light(),
 
-          home: _wrapSelectable(const AuthGate()),
-          onGenerateRoute: (settings) {
+  /// Deep-Link-Routen (/jobs, /plan, /p, /inventory/item, Owner-Insights …).
+  /// Von onGenerateRoute UND onGenerateInitialRoutes gemeinsam genutzt.
+  Route<dynamic>? _deepLinkRoute(RouteSettings settings) {
+
             if (settings.name == '/inventory/item') {
               final id = (settings.arguments ?? '').toString();
               return MaterialPageRoute<void>(
@@ -205,8 +186,52 @@ class App extends StatelessWidget {
               );
             }
             return null;
+          
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // 🔑 AnimatedBuilder listens to the global localeController.
+    // Whenever localeController.setLocale(...) is called,
+    // MaterialApp is rebuilt with the new locale → entire app language updates.
+    return AnimatedBuilder(
+      animation: localeController,
+      builder: (context, _) {
+        return MaterialApp(
+          title: 'DSP CODRIVER',
+          debugShowCheckedModeBanner: false,
+          // 🌍 Current app locale (null = use system locale)
+          locale: localeController.locale,
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: const [
+            AppLocalizationsDelegate(),
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          theme: AppTheme.light(),
+
+          // Kein `home:` — WidgetsApp verbietet home zusammen mit
+          // onGenerateInitialRoutes; '/' liegt stattdessen in routes.
+          // Deep-Links (z. B. /jobs/<slug>, /plan/<id>) landen sonst
+          // segmentweise im Verlauf ('/', '/jobs', '/jobs/<slug>') — der
+          // Zurueck-Button traf dann den Zwischeneintrag OHNE Slug und
+          // zeigte "Invalid application link". Wir behalten nur den
+          // finalen Eintrag.
+          onGenerateInitialRoutes: (initialRoute) {
+            final settings = RouteSettings(name: initialRoute);
+            final deep = _deepLinkRoute(settings);
+            if (deep != null) return <Route<dynamic>>[deep];
+            return <Route<dynamic>>[
+              MaterialPageRoute<void>(
+                settings: settings,
+                builder: (_) => _wrapSelectable(const AuthGate()),
+              ),
+            ];
           },
+          onGenerateRoute: _deepLinkRoute,
           routes: {
+            '/': (_) => _wrapSelectable(const AuthGate()),
             '/login': (_) => _wrapSelectable(const LoginPage()),
             '/signup': (_) => _wrapSelectable(const SignupPage()),
             '/verify-email': (_) => _wrapSelectable(const VerifyEmailPage()),
