@@ -98,7 +98,51 @@ class _NewVersionGateState extends State<NewVersionGate> {
               color: Colors.transparent,
               child: InkWell(
                 borderRadius: BorderRadius.circular(999),
-                onTap: () => html.window.location.reload(),
+                // Erst bestaetigen: der Reload wirft ungespeicherte
+                // Eingaben weg — wer gerade mitten im Bearbeiten ist,
+                // speichert erst und tippt dann erneut.
+                onTap: () async {
+                  final ok = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      title: Text(
+                        de ? 'Jetzt aktualisieren?' : 'Refresh now?',
+                      ),
+                      content: Text(
+                        de
+                            ? 'Ungespeicherte Eingaben gehen beim Neuladen '
+                                'verloren. Wenn du gerade etwas bearbeitest, '
+                                'speichere zuerst und tippe dann erneut auf '
+                                'die Pille.'
+                            : 'Unsaved input is lost on reload. If you are '
+                                'editing something, save first and then tap '
+                                'the pill again.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(false),
+                          child: Text(
+                            de ? 'Später' : 'Later',
+                          ),
+                        ),
+                        FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF0D8A60),
+                          ),
+                          onPressed: () => Navigator.of(ctx).pop(true),
+                          icon: const Icon(Icons.refresh, size: 18),
+                          label: Text(
+                            de ? 'Jetzt neu laden' : 'Reload now',
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (ok == true) html.window.location.reload();
+                },
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
