@@ -14,6 +14,8 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -21,6 +23,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/recruiting_application.dart';
 import '../models/recruiting_form_config.dart';
+import '../services/image_compression.dart';
 import '../services/recruiting_agency_repository.dart';
 import '../services/recruiting_repository.dart';
 import '../services/recruiting_slug_service.dart';
@@ -886,6 +889,200 @@ class _RecruitingApplicationDetailPageState
   bool _onboardingBusy = false;
   late Map<String, dynamic>? _convertedToDriver = widget.app.convertedToDriver;
 
+  /// Lokale Kopie der Dokumente — Loeschen/Ersetzen wirkt sofort im
+  /// Blatt, ohne auf den naechsten Firestore-Snapshot zu warten.
+  late List<RecruitingDocument> _documents =
+      List<RecruitingDocument>.of(widget.app.documents);
+
+  DocumentReference<Map<String, dynamic>> get _appRef => FirebaseFirestore
+      .instance
+      .collection('users')
+      .doc(widget.adminUid)
+      .collection('recruiting_applications')
+      .doc(widget.app.id);
+
+  Future<void> _persistDocuments() async {
+    await _appRef.set(<String, dynamic>{
+      'documents': _documents.map((d) => d.toMap()).toList(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  /// Dokument loeschen (Ticket „unscharfe Fotos"): Eintrag aus dem
+  /// Array, Storage-Datei best effort hinterher.
+  Future<void> _deleteDocument(RecruitingDocument doc) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Text(
+          de ? 'Foto löschen?' : 'Delete photo?',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+        ),
+        content: Text(
+          de
+              ? '„${doc.filename}" wird aus der Bewerbung entfernt. Der '
+                  'Bewerber kann es über den Formular-Link nicht erneut '
+                  'hochladen — nutze Ersetzen, wenn ein besseres Foto '
+                  'vorliegt.'
+              : '"${doc.filename}" will be removed from the application. '
+                  'The applicant cannot re-upload via the form link — use '
+                  'Replace if you have a better photo.',
+          style: const TextStyle(fontSize: 13, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(de ? 'Abbrechen' : 'Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFB42318)),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(de ? 'Löschen' : 'Delete'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+
+    final previous = List<RecruitingDocument>.of(_documents);
+    setState(() => _documents.remove(doc));
+    try {
+      await _persistDocuments();
+      if (doc.storagePath.trim().isNotEmpty) {
+        // Best effort — ein verwaistes Storage-Objekt ist unkritisch.
+        try {
+          await FirebaseStorage.instance.ref(doc.storagePath).delete();
+        } catch (_) {}
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _documents
+        ..clear()
+        ..addAll(previous));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFFB42318),
+          content: Text(
+            de ? 'Löschen fehlgeschlagen: $e' : 'Delete failed: $e',
+          ),
+        ),
+      );
+    }
+  }
+
+  /// Dokument ersetzen: neue Datei waehlen, unter demselben Label
+  /// hochladen, Array-Eintrag tauschen, altes Storage-Objekt aufraeumen.
+  Future<void> _replaceDocument(RecruitingDocument doc) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+
+    FilePickerResult? picked;
+    try {
+      picked = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['jpg', 'jpeg', 'png', 'heic', 'pdf'],
+        withData: true,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('File picker: $e')),
+      );
+      return;
+    }
+    if (picked == null || picked.files.isEmpty || !mounted) return;
+    final file = picked.files.first;
+    var bytes = file.bytes;
+    if (bytes == null || bytes.isEmpty) return;
+
+    final lower = file.name.toLowerCase();
+    var mime = lower.endsWith('.pdf')
+        ? 'application/pdf'
+        : lower.endsWith('.png')
+            ? 'image/png'
+            : 'image/jpeg';
+    // Grosse Bilder wie beim Bewerber-Upload eindampfen — iOS-Fotos
+    // kommen sonst mit 8+ MB an.
+    if (mime != 'application/pdf' && bytes.lengthInBytes > 2 * 1024 * 1024) {
+      final squeezed = await compressImageToJpeg(bytes);
+      if (squeezed != null && squeezed.isNotEmpty) {
+        bytes = squeezed;
+        mime = 'image/jpeg';
+      }
+    }
+    if (bytes.lengthInBytes > 15 * 1024 * 1024) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            de ? 'Datei ist größer als 15 MB.' : 'File is larger than 15 MB.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _busy = true);
+    try {
+      final ext = mime == 'application/pdf'
+          ? 'pdf'
+          : mime == 'image/png'
+              ? 'png'
+              : 'jpg';
+      final path =
+          'recruiting/${widget.adminUid}/${widget.app.id}/${doc.label}.$ext';
+      final ref = FirebaseStorage.instance.ref(path);
+      await ref.putData(bytes, SettableMetadata(contentType: mime));
+      final url = await ref.getDownloadURL();
+
+      final replacement = RecruitingDocument(
+        label: doc.label,
+        filename: file.name,
+        mimeType: mime,
+        downloadUrl: url,
+        storagePath: path,
+        sizeBytes: bytes.lengthInBytes,
+      );
+      final index = _documents.indexOf(doc);
+      if (index < 0) return;
+      setState(() => _documents[index] = replacement);
+      await _persistDocuments();
+
+      // Alte Datei nur loeschen, wenn sie unter einem ANDEREN Pfad lag
+      // (z. B. andere Endung) — sonst haben wir sie gerade ueberschrieben.
+      final oldPath = doc.storagePath.trim();
+      if (oldPath.isNotEmpty && oldPath != path) {
+        try {
+          await FirebaseStorage.instance.ref(oldPath).delete();
+        } catch (_) {}
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.codriverDeep,
+          content: Text(
+            de ? 'Foto ersetzt.' : 'Photo replaced.',
+            style: const TextStyle(color: Colors.white),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFFB42318),
+          content: Text(
+            de ? 'Ersetzen fehlgeschlagen: $e' : 'Replace failed: $e',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _onboardAsDriver() async {
     final app = widget.app;
     final fullName = app.displayName;
@@ -1302,8 +1499,12 @@ class _RecruitingApplicationDetailPageState
                   ),
                 ),
                 const SizedBox(height: 8),
-                for (final d in app.documents)
-                  _DocumentPreview(doc: d),
+                for (final d in _documents)
+                  _DocumentPreview(
+                    doc: d,
+                    onReplace: _busy ? null : () => _replaceDocument(d),
+                    onDelete: _busy ? null : () => _deleteDocument(d),
+                  ),
               ],
             ),
           ),
@@ -2403,8 +2604,17 @@ class _StatusCounterBar extends StatelessWidget {
 }
 
 class _DocumentPreview extends StatelessWidget {
-  const _DocumentPreview({required this.doc});
+  const _DocumentPreview({
+    required this.doc,
+    this.onReplace,
+    this.onDelete,
+  });
   final RecruitingDocument doc;
+
+  /// Ticket „unscharfe Fotos": Admin kann ein Dokument ersetzen oder
+  /// loeschen. Null = Aktionen ausgeblendet (z. B. waehrend Upload).
+  final VoidCallback? onReplace;
+  final VoidCallback? onDelete;
 
   String _labelFor(String label, bool de) {
     switch (label) {
@@ -2530,6 +2740,32 @@ class _DocumentPreview extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (onReplace != null)
+                  IconButton(
+                    tooltip: Localizations.localeOf(context).languageCode ==
+                            'de'
+                        ? 'Foto ersetzen'
+                        : 'Replace photo',
+                    onPressed: onReplace,
+                    icon: const Icon(
+                      Icons.change_circle_outlined,
+                      size: 19,
+                      color: Color(0xFF1D7F5A),
+                    ),
+                  ),
+                if (onDelete != null)
+                  IconButton(
+                    tooltip: Localizations.localeOf(context).languageCode ==
+                            'de'
+                        ? 'Foto löschen'
+                        : 'Delete photo',
+                    onPressed: onDelete,
+                    icon: const Icon(
+                      Icons.delete_outline,
+                      size: 19,
+                      color: Color(0xFFB42318),
+                    ),
+                  ),
                 const Icon(
                   Icons.open_in_new_rounded,
                   size: 18,
