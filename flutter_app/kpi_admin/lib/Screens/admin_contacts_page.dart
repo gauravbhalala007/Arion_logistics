@@ -61,7 +61,11 @@ IconData _contactCategoryIcon(String category) {
 }
 
 class AdminContactsPage extends StatefulWidget {
-  const AdminContactsPage({super.key});
+  const AdminContactsPage({super.key, this.standalone = false});
+
+  /// True, wenn die Seite per Navigator gepusht wurde (z. B. aus dem
+  /// Fleet Hub) — dann zeigt der Kopf einen Zurueck-Pfeil.
+  final bool standalone;
 
   @override
   State<AdminContactsPage> createState() => _AdminContactsPageState();
@@ -328,6 +332,14 @@ class _AdminContactsPageState extends State<AdminContactsPage> {
             children: [
               Row(
                 children: [
+                  if (widget.standalone) ...[
+                    IconButton(
+                      tooltip: de ? 'Zurück' : 'Back',
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      icon: const Icon(Icons.arrow_back_rounded),
+                    ),
+                    const SizedBox(width: 4),
+                  ],
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,

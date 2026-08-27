@@ -25,6 +25,7 @@ import '../widgets/co_button.dart';
 import '../widgets/license_plate.dart';
 import '../widgets/mobile_filter_controls.dart';
 import '../widgets/co_pressable.dart';
+import 'admin_contacts_page.dart';
 import 'fleet_vehicle_detail_page.dart';
 
 class FleetStatusPage extends StatefulWidget {
@@ -2467,6 +2468,15 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                 active: _sortColumn != null,
                 onTap: _showMobileSortSheet,
               ),
+              const SizedBox(width: 8),
+              // Schnellzugriff auf die Kontakte-Seite (Werkstaetten,
+              // Leasing, Vermietung) — Ticket.
+              MobileIconButton(
+                icon: Icons.contacts_outlined,
+                tooltip: de ? 'Kontakte' : 'Contacts',
+                active: false,
+                onTap: _openContactsPage,
+              ),
 
             ],
           ),
@@ -2480,6 +2490,31 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
     final tuvFilter = _buildTuvFilterPill(context);
     final archiveToggle = _buildArchiveTogglePill(context);
     final sort = _buildSortPill(context);
+    // Schnellzugriff Kontakte (Werkstaetten, Leasing, Vermietung) — Ticket.
+    final contactsButton = Tooltip(
+      message: de ? 'Kontakte' : 'Contacts',
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: _openContactsPage,
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
+            ),
+            child: const Icon(
+              Icons.contacts_outlined,
+              size: 19,
+              color: Color(0xFF6B7280),
+            ),
+          ),
+        ),
+      ),
+    );
     final addButton = _canManageVehicles ? _buildAddMenu(context) : null;
 
     if (isNarrow) {
@@ -2497,6 +2532,8 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
               archiveToggle,
               const SizedBox(width: 8),
               sort,
+              const SizedBox(width: 8),
+              contactsButton,
               if (addButton != null) ...[const SizedBox(width: 8), addButton],
             ],
           ),
@@ -2515,6 +2552,8 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
         archiveToggle,
         const SizedBox(width: 8),
         sort,
+        const SizedBox(width: 8),
+        contactsButton,
         if (addButton != null) ...[const SizedBox(width: 8), addButton],
       ],
     );
@@ -2755,6 +2794,16 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
     );
   }
 
+
+  /// Oeffnet die Kontakte-Seite (Werkstaetten, Leasing, Vermietung) als
+  /// gepushte Seite mit Zurueck-Pfeil — Schnellzugriff aus dem Fleet Hub.
+  void _openContactsPage() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const AdminContactsPage(standalone: true),
+      ),
+    );
+  }
 
   Widget _buildTuvFilterPill(BuildContext context) {
     final t = AppLocalizations.of(context);

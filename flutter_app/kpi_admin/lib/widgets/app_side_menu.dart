@@ -168,6 +168,16 @@ class AppSideMenu extends StatelessWidget {
         active: active == AppNav.appUpdates,
         onTap: () => _handleNav(context, AppNav.appUpdates, '/app-updates'),
       ),
+      // Kontakte (Werkstaetten, Leasing, Vermietung) — bewusst oben in
+      // Overview (Ticket), zusaetzlich per Schnellzugriff im Fleet Hub.
+      _MenuItem(
+        icon: Icons.contacts_outlined,
+        label: Localizations.localeOf(context).languageCode == 'de'
+            ? 'Kontakte'
+            : 'Contacts',
+        active: active == AppNav.contacts,
+        onTap: () => _handleNav(context, AppNav.contacts, '/contacts'),
+      ),
 
       // ── Performance ──
       _SectionHeader(_groupTitle(context, 'performance')),
@@ -392,14 +402,6 @@ class AppSideMenu extends StatelessWidget {
           active: active == AppNav.vehicleCheck,
           onTap: () =>
               _handleNav(context, AppNav.vehicleCheck, '/vehicle-check'),
-        ),
-        _MenuItem(
-          icon: Icons.contacts_outlined,
-          label: Localizations.localeOf(context).languageCode == 'de'
-              ? 'Kontakte'
-              : 'Contacts',
-          active: active == AppNav.contacts,
-          onTap: () => _handleNav(context, AppNav.contacts, '/contacts'),
         ),
         _MenuItem(
           icon: Icons.inventory_2_outlined,
