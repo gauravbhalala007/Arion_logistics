@@ -1,10 +1,11 @@
 // lib/widgets/new_version_gate.dart
 //
-// Erzwingt nach einem Deployment einen Neustart der Web-App: Beim Start
+// Meldet nach einem Deployment eine neue Version der Web-App: Beim Start
 // wird /version.json (per Predeploy-Hook bei jedem Hosting-Deploy neu
 // gestempelt, ausgeliefert mit no-cache) gemerkt; alle 5 Minuten und bei
-// jedem Tab-Fokus wird neu geprüft. Weicht die Build-ID ab, erscheint ein
-// nicht wegklickbares Popup mit „Jetzt aktualisieren" → harter Reload.
+// jedem Tab-Fokus wird neu geprüft. Weicht die Build-ID ab, erscheint —
+// bewusst KEIN blockierendes Popup mehr (Kundenwunsch) — eine dezente
+// Pille oben mittig; erst ein Klick darauf laedt neu.
 //
 // Eingehängt in Admin-, Dispatcher- und Fahrer-Shell — bewusst NICHT in
 // den öffentlichen Seiten (Bewerbungsformular, Plan-Links): dort wäre ein
@@ -31,7 +32,7 @@ class _NewVersionGateState extends State<NewVersionGate> {
   String? _startBuildId;
   Timer? _timer;
   StreamSubscription<html.Event>? _focusSub;
-  bool _dialogShown = false;
+  bool _updateAvailable = false;
 
   @override
   void initState() {
@@ -65,59 +66,82 @@ class _NewVersionGateState extends State<NewVersionGate> {
   }
 
   Future<void> _check() async {
-    if (_dialogShown) return;
+    if (_updateAvailable) return;
     final current = await _fetchBuildId();
     if (current == null) return;
     // Ältere Deployments ohne version.json: ersten gelieferten Wert als
-    // Startwert übernehmen statt sofort ein Popup zu zeigen.
+    // Startwert übernehmen statt sofort eine Meldung zu zeigen.
     if (_startBuildId == null) {
       _startBuildId = current;
       return;
     }
     if (current == _startBuildId || !mounted) return;
-    _dialogShown = true;
-    final de = Localizations.localeOf(context).languageCode == 'de';
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => PopScope(
-        canPop: false,
-        child: AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: Row(
-            children: [
-              const Icon(Icons.system_update_alt, color: Color(0xFF0D8A60)),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(de ? 'Neue Version verfügbar' : 'Update available'),
-              ),
-            ],
-          ),
-          content: Text(
-            de
-                ? 'CoDriver wurde aktualisiert. Bitte lade die App neu, um '
-                      'die neueste Version zu verwenden — ungespeicherte '
-                      'Eingaben gehen dabei verloren.'
-                : 'CoDriver has been updated. Please reload the app to get '
-                      'the latest version — unsaved input will be lost.',
-          ),
-          actions: [
-            FilledButton.icon(
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF0D8A60),
-              ),
-              onPressed: () => html.window.location.reload(),
-              icon: const Icon(Icons.refresh),
-              label: Text(de ? 'Jetzt aktualisieren' : 'Reload now'),
-            ),
-          ],
-        ),
-      ),
-    );
+    setState(() => _updateAvailable = true);
   }
 
   @override
-  Widget build(BuildContext context) => widget.child;
+  Widget build(BuildContext context) {
+    if (!_updateAvailable) return widget.child;
+    final de = Localizations.localeOf(context).languageCode == 'de';
+
+    // Dezente Pille oben mittig statt blockierendem Popup: die Arbeit
+    // laeuft ungestoert weiter, aktualisiert wird erst beim Klick.
+    return Stack(
+      children: [
+        widget.child,
+        Positioned(
+          top: 8,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(999),
+                onTap: () => html.window.location.reload(),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0D8A60),
+                    borderRadius: BorderRadius.circular(999),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.25),
+                        blurRadius: 12,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.refresh_rounded,
+                        size: 16,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 7),
+                      Text(
+                        de
+                            ? 'Neue Version — zum Aktualisieren tippen'
+                            : 'New version — tap to refresh',
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
