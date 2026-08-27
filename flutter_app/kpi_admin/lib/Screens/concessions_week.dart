@@ -472,8 +472,39 @@ class _ConcessionsWeekPageState extends State<ConcessionsWeekPage> {
                           return pb.compareTo(pa);
                         });
 
+                        // Ticket „alle Betraege auflisten": Summe je
+                        // Woche ueber alle Fahrer — die Kacheln oben
+                        // zeigen nur die 4-Wochen-Summe, hier steht die
+                        // Aufschluesselung samt Betrag je Woche.
+                        final weekTotals = <String, int>{};
+                        for (final d in rows) {
+                          final cw =
+                              ((d.data()['concessions'] as Map?)?['dnrCountByWeek']
+                                      as Map?)
+                                  ?.cast<String, dynamic>() ??
+                              const <String, dynamic>{};
+                          cw.forEach((k, v) {
+                            final n = v is num
+                                ? v.toInt()
+                                : int.tryParse('$v') ?? 0;
+                            if (n > 0) {
+                              weekTotals[k] = (weekTotals[k] ?? 0) + n;
+                            }
+                          });
+                        }
+
                         return Column(
                           children: [
+                            if (weekTotals.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                    24, 4, 24, 4),
+                                child: _WeekAmountsPanel(
+                                  weekTotals: weekTotals,
+                                  reportYear: reportYear,
+                                  reportWeek: reportWeek,
+                                ),
+                              ),
                             Padding(
                               padding: const EdgeInsets.fromLTRB(
                                 24,
@@ -1064,7 +1095,9 @@ List<Widget> _dnrWeekChips(
           ),
           const SizedBox(width: 6),
           Text(
-            '· ${e.count}',
+            // Ticket „alle Betraege auflisten": je Woche Anzahl UND
+            // geschaetzter Betrag, nicht nur die 4-Wochen-Summe oben.
+            '· ${e.count} · ${_eurStr(e.count)}',
             style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w800,
@@ -1077,3 +1110,131 @@ List<Widget> _dnrWeekChips(
     );
   }).toList();
 }
+
+/// „Beträge je Woche" — Aufschlüsselung der DNRs und der geschätzten
+/// Beträge über alle Fahrer, je Kalenderwoche des Reports (W1–W4).
+///
+/// Ticket: die Kacheln oben zeigen nur die 4-Wochen-Summe; hier steht
+/// jede Woche einzeln mit Datumsspanne, Anzahl und Betrag.
+class _WeekAmountsPanel extends StatelessWidget {
+  const _WeekAmountsPanel({
+    required this.weekTotals,
+    required this.reportYear,
+    required this.reportWeek,
+  });
+
+  /// wKey ('w1'..'w4') → DNR-Summe über alle Fahrer.
+  final Map<String, int> weekTotals;
+  final int reportYear;
+  final int reportWeek;
+
+  @override
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    if (reportWeek <= 0) return const SizedBox.shrink();
+
+    const wToOffset = <String, int>{'w4': 0, 'w3': -1, 'w2': -2, 'w1': -3};
+    final entries = <({int year, int week, int count})>[];
+    weekTotals.forEach((k, n) {
+      final off = wToOffset[k];
+      if (off == null || n <= 0) return;
+      final shifted = _shiftIsoWeek(reportYear, reportWeek, off);
+      entries.add((year: shifted.year, week: shifted.week, count: n));
+    });
+    if (entries.isEmpty) return const SizedBox.shrink();
+    entries.sort((a, b) {
+      final yc = b.year.compareTo(a.year);
+      return yc != 0 ? yc : b.week.compareTo(a.week);
+    });
+    final total = entries.fold<int>(0, (acc, e) => acc + e.count);
+
+    final df = DateFormat('dd.MM.', 'de_DE');
+    final dfFull = DateFormat('dd.MM.yyyy', 'de_DE');
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            de ? 'BETRÄGE JE WOCHE' : 'AMOUNTS PER WEEK',
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.6,
+              color: Color(0xFF6B7280),
+            ),
+          ),
+          const SizedBox(height: 8),
+          for (final e in entries)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'KW ${e.week} · '
+                      '${df.format(_isoWeekMonday(e.year, e.week))} \u2013 '
+                      '${dfFull.format(_isoWeekMonday(e.year, e.week).add(const Duration(days: 6)))}',
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        color: Color(0xFF374151),
+                        fontFeatures: [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '${e.count} DNR · ${_eurStr(e.count)}',
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFFB42318),
+                      fontFeatures: [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          const Divider(height: 12, color: Color(0xFFE5E7EB)),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  de ? 'Gesamt (4 Wochen)' : 'Total (4 weeks)',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF111827),
+                  ),
+                ),
+              ),
+              Text(
+                '$total DNR · ${_eurStr(total)}',
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF111827),
+                  fontFeatures: [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            de
+                ? 'Betrag geschätzt: ${_eurFmt.format(kEurPerDnr)} je DNR.'
+                : 'Amount estimated: ${_eurFmt.format(kEurPerDnr)} per DNR.',
+            style: const TextStyle(fontSize: 10.5, color: Color(0xFF9CA3AF)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
