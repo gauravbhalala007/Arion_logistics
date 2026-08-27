@@ -634,15 +634,38 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
     ParsedShiftPlan? parsed;
     Object? parserError;
     StackTrace? parserStack;
+    // Phasen-Texte lokalisiert — der Parser liefert englische Keys.
+    String phaseLabel(String phase) {
+      if (!de) return phase;
+      switch (phase) {
+        case 'Decoding workbook…':
+          return 'Arbeitsmappe wird entpackt …';
+        case 'Reading header…':
+          return 'Kopfzeile wird gelesen …';
+        case 'Walking rows…':
+          return 'Zeilen werden verarbeitet …';
+        case 'Grouping by day…':
+          return 'Tage werden gruppiert …';
+        default:
+          return phase;
+      }
+    }
+    final parseStart = DateTime.now();
     try {
       parsed = await parseShiftPlanExcelAsync(
         bytes,
         onPhase: (phase) {
-          XlsxLoader.message(phase);
+          XlsxLoader.message(phaseLabel(phase));
           if (!mounted) return;
-          setState(() => _uploadPhase = phase);
+          setState(() => _uploadPhase = phaseLabel(phase));
         },
       );
+      // Tempo-Diagnose (Ticket "Upload dauert zu lange"): Dauer in die
+      // Konsole — beim naechsten Bericht sehen wir, WO die Zeit bleibt.
+      // ignore: avoid_print
+      print('[shift-plan] parse took '
+          '${DateTime.now().difference(parseStart).inMilliseconds} ms '
+          'for ${bytes.lengthInBytes} bytes');
       // ignore: avoid_print
       print(
         '[shift-plan] parsed OK · days=${parsed.availableDateKeys.length} '

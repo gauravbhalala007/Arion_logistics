@@ -42,11 +42,7 @@ Future<ParsedShiftPlan> parseShiftPlanExcelAsync(
 
   final header = _findNameHeader(rows);
   if (header == null) {
-    throw const FormatException(
-      'Header-Zeile mit der Namens-Spalte ("Name des Mitarbeiters") '
-      'wurde nicht gefunden. Bitte den Amazon-Export unverändert '
-      'hochladen.',
-    );
+    throw FormatException(_headerNotFoundMessage(excel, rows));
   }
   final headerRow = header.row;
   final nameCol = header.nameCol;
@@ -167,11 +163,7 @@ ParsedShiftPlan parseShiftPlanExcel(Uint8List bytes, {int? assumeYear}) {
   final rows = sheet.rows;
   final header = _findNameHeader(rows);
   if (header == null) {
-    throw const FormatException(
-      'Header-Zeile mit der Namens-Spalte ("Name des Mitarbeiters") '
-      'wurde nicht gefunden. Bitte den Amazon-Export unverändert '
-      'hochladen.',
-    );
+    throw FormatException(_headerNotFoundMessage(excel, rows));
   }
   final headerRow = header.row;
   final nameCol = header.nameCol;
@@ -249,6 +241,32 @@ ParsedShiftPlan parseShiftPlanExcel(Uint8List bytes, {int? assumeYear}) {
     station: station,
     company: company,
   );
+}
+
+/// Baut die Header-nicht-gefunden-Meldung MIT Diagnose: Blattnamen und
+/// die ersten Zellen der ersten Zeilen. So sagt schon der Screenshot des
+/// Fehlers, wie die fremde Datei aufgebaut ist (englischer Export,
+/// anderes Blatt, neu gespeichert, …) — ohne dass die Datei erst
+/// eingeschickt werden muss.
+String _headerNotFoundMessage(Excel excel, List<List<Data?>> rows) {
+  final sheets = excel.tables.keys.join(', ');
+  final preview = StringBuffer();
+  for (var r = 0; r < rows.length && r < 6; r++) {
+    final cells = <String>[];
+    final row = rows[r];
+    for (var c = 0; c < row.length && c < 6; c++) {
+      final v = _rowCell(row, c);
+      if (v.isNotEmpty) cells.add(v.length > 24 ? '${v.substring(0, 24)}…' : v);
+    }
+    if (cells.isNotEmpty) {
+      preview.writeln('Zeile ${r + 1}: ${cells.join(' | ')}');
+    }
+  }
+  return 'Header-Zeile mit der Namens-Spalte ("Name des Mitarbeiters" / '
+      '"Employee Name") wurde nicht gefunden. Bitte den Amazon-Export '
+      'unverändert hochladen.\n\n'
+      'Diagnose — Blätter: $sheets\n'
+      '${preview.toString().trim()}';
 }
 
 /// Decodes the workbook with a user-readable error instead of the

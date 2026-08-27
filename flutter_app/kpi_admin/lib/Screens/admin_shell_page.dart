@@ -4,6 +4,8 @@ import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html show window;
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../localization/app_localizations.dart';
@@ -67,7 +69,46 @@ class AdminShellPage extends StatefulWidget {
 }
 
 class _AdminShellPageState extends State<AdminShellPage> {
-  late AppNav _active = widget.initialNav;
+  late AppNav _active = _initialActive();
+
+  /// Ticket „nach Reload immer auf DA Requests": Der zuletzt aktive Tab
+  /// wird im Browser gemerkt und beim Neuladen wiederhergestellt. Eine
+  /// explizit angesteuerte Route (Deep-Link, Glocke) gewinnt weiterhin;
+  /// danach wird die URL neutralisiert, damit der Reload nicht ewig auf
+  /// derselben Route klebt.
+  static const String _kLastNavKey = 'codriver.lastAdminNav';
+
+  AppNav _initialActive() {
+    if (widget.initialNav != AppNav.home) {
+      _saveNav(widget.initialNav);
+      _neutralizeUrl();
+      return widget.initialNav;
+    }
+    try {
+      final saved = html.window.localStorage[_kLastNavKey];
+      if (saved != null && saved.isNotEmpty) {
+        final nav = AppNav.values
+            .where((n) => n.name == saved)
+            .toList(growable: false);
+        if (nav.isNotEmpty) return nav.first;
+      }
+    } catch (_) {}
+    return widget.initialNav;
+  }
+
+  static void _saveNav(AppNav nav) {
+    // Profil/Styleguide nicht merken — dort will nach Reload niemand landen.
+    if (nav == AppNav.styleguide) return;
+    try {
+      html.window.localStorage[_kLastNavKey] = nav.name;
+    } catch (_) {}
+  }
+
+  static void _neutralizeUrl() {
+    try {
+      html.window.history.replaceState(null, '', '/');
+    } catch (_) {}
+  }
   bool _redirectingToLogin = false;
   bool _redirectingToRoot = false;
   bool _updatePopupScheduled = false;
@@ -102,6 +143,7 @@ class _AdminShellPageState extends State<AdminShellPage> {
   /// Header-Actions (z. B. Glocke → DA Requests).
   void _openNav(AppNav nav) {
     if (_active == nav) return;
+    _saveNav(nav);
     setState(() {
       _active = nav;
       _materialized.add(nav);
@@ -286,6 +328,7 @@ class _AdminShellPageState extends State<AdminShellPage> {
               active: _active,
               onSelect: (nav) {
                 if (nav == _active) return;
+                _saveNav(nav);
                 setState(() {
                   _active = nav;
                   _materialized.add(nav);
@@ -488,6 +531,7 @@ class _AdminShellPageState extends State<AdminShellPage> {
                   active: _active,
                   onSelect: (nav) {
                     if (nav == _active) return;
+                    _saveNav(nav);
                     setState(() {
                       _active = nav;
                       _materialized.add(nav);
