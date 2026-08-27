@@ -387,7 +387,10 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
   ///     Drivers Hub, nimmt Subcollections und Login mit.
   ///  3. TID und Name unbekannt → benennen, nicht raten. Der Admin legt
   ///     den Fahrer im Drivers Hub an.
-  Future<void> _reconcileRosterWithDrivers(List<ShiftRoster> roster) async {
+  Future<void> _reconcileRosterWithDrivers(
+    List<ShiftRoster> roster, {
+    Set<String> assignedTids = const <String>{},
+  }) async {
     final uid = _adminUid;
     if (uid == null || roster.isEmpty) return;
     final de = Localizations.localeOf(context).languageCode == 'de';
@@ -429,7 +432,10 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
       final pendingDoc = pendingByName[nameKey(row.driverName)];
       if (pendingDoc != null) {
         adoptable.add((row: row, doc: pendingDoc));
-      } else {
+      } else if (assignedTids.contains(tid)) {
+        // Nur melden, wer wirklich eine Tour im Plan hat — der Roster
+        // listet ALLE Mitarbeiter, auch solche ohne Einsatz (Ticket:
+        // kein Dialog fuer Fahrer ohne geplante Tour).
         unknown.add(row);
       }
     }
@@ -623,7 +629,10 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
     });
     // CSS overlay keeps animating even while the synchronous workbook
     // decode blocks the Dart isolate (a Flutter spinner would freeze).
-    XlsxLoader.show(de ? 'Datei wird gelesen …' : 'Reading file…');
+    XlsxLoader.show(
+      de ? 'Datei wird gelesen …' : 'Reading file…',
+      title: de ? 'Shiftplan wird geladen' : 'Loading shift plan',
+    );
 
     // Wait two frames so the overlay AND its pulse animation have time
     // to paint before the parser runs. The async parser yields back to
@@ -729,7 +738,15 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
     // Abgleich haengen bleiben.
     Future<void> reconcileAfterLoad() async {
       try {
-        await _reconcileRosterWithDrivers(parsed!.roster);
+        final assignedTids = <String>{
+          for (final entries in parsed!.assignmentsByDate.values)
+            for (final e in entries)
+              e.transporterId.trim().toUpperCase(),
+        }..remove('');
+        await _reconcileRosterWithDrivers(
+          parsed.roster,
+          assignedTids: assignedTids,
+        );
       } catch (_) {
         // Abgleich ist Komfort — ein Fehler darf den geladenen Plan
         // nicht beeintraechtigen.

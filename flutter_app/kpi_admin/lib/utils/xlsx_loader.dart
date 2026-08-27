@@ -1,7 +1,7 @@
 import 'dart:js_interop';
 
 @JS('cdShowXlsxLoader')
-external void _cdShow(JSString msg);
+external void _cdShow(JSString msg, JSString title);
 
 @JS('cdSetXlsxLoaderMsg')
 external void _cdSetMsg(JSString msg);
@@ -16,9 +16,12 @@ external void _cdHide();
 /// synchronous `Excel.decodeBytes` call — unlike a Flutter spinner, which
 /// freezes for the duration of the decode. Defined in `web/index.html`.
 class XlsxLoader {
-  static void show([String msg = 'Datei wird verarbeitet …']) {
+  static void show(
+    String msg, {
+    String title = 'Shift plan loading',
+  }) {
     try {
-      _cdShow(msg.toJS);
+      _cdShow(msg.toJS, title.toJS);
     } catch (_) {}
   }
 
