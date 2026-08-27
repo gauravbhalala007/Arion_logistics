@@ -114,6 +114,18 @@ class AdminNotificationsService {
         target: AppNav.recruiting,
         count: watchNewRecruitingApplications(adminUid, visa: true),
       ),
+      // Ticket „Tourencheck-Erinnerung": Tage der letzten Woche, fuer
+      // die ein Schichtplan gespeichert/veroeffentlicht wurde, deren
+      // Tourencheck aber fehlt. Verschwindet, sobald der Check
+      // bestaetigt ist.
+      AdminNotificationSource(
+        id: 'tour_check_missing',
+        icon: Icons.fact_check_outlined,
+        labelDe: 'Tourencheck ausstehend',
+        labelEn: 'Tour check pending',
+        target: AppNav.shiftPlan,
+        count: watchMissingTourChecks(adminUid),
+      ),
       AdminNotificationSource(
         id: 'feedback_done',
         icon: Icons.feedback_outlined,
@@ -256,6 +268,103 @@ class AdminNotificationsService {
                 };
                 return !advanced.contains(status);
               }).length);
+    });
+  }
+
+  /// Tage mit Schichtplan, aber ohne bestaetigten Tourencheck.
+  ///
+  /// Fenster: die letzten 7 Tage bis GESTERN — der Check fuer einen Tag
+  /// passiert am Folgetag (erst dann sind Cuts/Drops bekannt), heute ist
+  /// also nie faellig. Geprueft werden `shift_plan_drafts` und
+  /// `shift_plans` (Doc-IDs sind Datums-Keys) gegen
+  /// `shift_plan_checks/{key}.confirmed`.
+  static Stream<int> watchMissingTourChecks(String? adminUid) {
+    return _guardedSelfStream(adminUid, (uid) {
+      final userDoc =
+          FirebaseFirestore.instance.collection('users').doc(uid);
+
+      String keyOf(DateTime d) =>
+          '${d.year.toString().padLeft(4, '0')}-'
+          '${d.month.toString().padLeft(2, '0')}-'
+          '${d.day.toString().padLeft(2, '0')}';
+      final now = DateTime.now();
+      final yesterday = DateTime(now.year, now.month, now.day)
+          .subtract(const Duration(days: 1));
+      final windowStart = yesterday.subtract(const Duration(days: 6));
+      final startKey = keyOf(windowStart);
+      final endKey = keyOf(yesterday);
+
+      Query<Map<String, dynamic>> ranged(String collection) => userDoc
+          .collection(collection)
+          .where(FieldPath.documentId, isGreaterThanOrEqualTo: startKey)
+          .where(FieldPath.documentId, isLessThanOrEqualTo: endKey);
+
+      final drafts = ranged('shift_plan_drafts').snapshots();
+      final published = ranged('shift_plans').snapshots();
+      final checks = ranged('shift_plan_checks').snapshots();
+
+      // Drei Live-Queries zu einem Zaehler kombinieren: Tage mit Plan
+      // (Entwurf ODER veroeffentlicht, mit Eintraegen) minus Tage mit
+      // bestaetigtem Check.
+      late final StreamController<int> controller;
+      final subs = <StreamSubscription>[];
+      var draftDays = <String>{};
+      var publishedDays = <String>{};
+      var checkedDays = <String>{};
+      var got = [false, false, false];
+
+      void emit() {
+        if (!got[0] || !got[1] || !got[2]) return;
+        final planned = {...draftDays, ...publishedDays};
+        final missing = planned.difference(checkedDays).length;
+        if (!controller.isClosed) controller.add(missing);
+      }
+
+      Set<String> daysWithEntries(QuerySnapshot<Map<String, dynamic>> snap) {
+        return snap.docs
+            .where((d) => (d.data()['entries'] as List?)?.isNotEmpty ?? false)
+            .map((d) => d.id)
+            .toSet();
+      }
+
+      controller = StreamController<int>(
+        onListen: () {
+          subs.add(drafts.listen((snap) {
+            draftDays = daysWithEntries(snap);
+            got[0] = true;
+            emit();
+          }, onError: (_) {
+            got[0] = true;
+            emit();
+          }));
+          subs.add(published.listen((snap) {
+            publishedDays = daysWithEntries(snap);
+            got[1] = true;
+            emit();
+          }, onError: (_) {
+            got[1] = true;
+            emit();
+          }));
+          subs.add(checks.listen((snap) {
+            checkedDays = snap.docs
+                .where((d) => d.data()['confirmed'] == true)
+                .map((d) => d.id)
+                .toSet();
+            got[2] = true;
+            emit();
+          }, onError: (_) {
+            got[2] = true;
+            emit();
+          }));
+        },
+        onCancel: () async {
+          for (final s in subs) {
+            await s.cancel();
+          }
+          subs.clear();
+        },
+      );
+      return controller.stream;
     });
   }
 

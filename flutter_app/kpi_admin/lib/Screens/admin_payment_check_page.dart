@@ -735,6 +735,9 @@ class _PaymentCheckBodyState extends State<_PaymentCheckBody> {
                   planMarks: _wstSource == _WstSource.shiftPlan
                       ? (_planData?.marks ?? const <ShiftPlanMark>[])
                       : const <ShiftPlanMark>[],
+                  planData: _wstSource == _WstSource.shiftPlan
+                      ? _planData
+                      : null,
                 );
 
                 final banner = Padding(
@@ -1489,9 +1492,39 @@ class _WstColumn extends StatelessWidget {
         '${p.rideAlongCount}',
       ),
       _SummaryRow(
+        de ? 'DA Trainings (Tourencheck)' : 'DA trainings (tour check)',
+        '${p.daTrainingsTotal}',
+      ),
+      _SummaryRow(
         de ? 'Geladene Tage' : 'Days loaded',
         w.filesUsed.isEmpty ? '—' : w.filesUsed.join('\n'),
       ),
+      if (p.uncheckedDays.isNotEmpty)
+        Container(
+          margin: const EdgeInsets.only(top: 6),
+          padding: const EdgeInsets.all(11),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFF7ED),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFFDBA74)),
+          ),
+          child: Text(
+            de
+                ? 'Tourencheck fehlt für: '
+                    '${p.uncheckedDays.map((d) => formatDay(d.date)).join(', ')} '
+                    '— Cuts/Drops/Trainings dieser Tage sind evtl. '
+                    'unvollständig.'
+                : 'Tour check missing for: '
+                    '${p.uncheckedDays.map((d) => formatDay(d.date, de: false)).join(', ')} '
+                    '— cuts/drops/trainings for these days may be '
+                    'incomplete.',
+            style: const TextStyle(
+              fontSize: 11.5,
+              color: Color(0xFF92400E),
+              height: 1.4,
+            ),
+          ),
+        ),
       if (p.missingDayKeys.isNotEmpty)
         Container(
           margin: const EdgeInsets.only(top: 10),
@@ -1841,12 +1874,14 @@ class _PlanConfirmDialog extends StatelessWidget {
                       '${data.plannedRoutes} geplante Touren · '
                       '${data.cutCount} Cuts · '
                       '${data.droppedCount} Dropped · '
-                      '${data.rideAlongCount} Ride-alongs'
+                      '${data.rideAlongCount} Ride-alongs · '
+                      '${data.daTrainingsTotal} DA Trainings'
                   : '${data.totalDrivers} drivers · '
                       '${data.plannedRoutes} planned tours · '
                       '${data.cutCount} cuts · '
                       '${data.droppedCount} dropped · '
-                      '${data.rideAlongCount} ride-alongs',
+                      '${data.rideAlongCount} ride-alongs · '
+                      '${data.daTrainingsTotal} DA trainings',
               style: const TextStyle(
                   fontSize: 13, fontWeight: FontWeight.w800, color: _kInk),
             ),
@@ -1926,12 +1961,17 @@ class _ResultColumn extends StatelessWidget {
   /// WST-upload source is active.
   final List<ShiftPlanMark> planMarks;
 
+  /// Volle Plan-Daten (fuer DA-Trainings-Gegenueberstellung); null bei
+  /// WST-Quelle.
+  final ShiftPlanPaymentData? planData;
+
   const _ResultColumn({
     required this.result,
     required this.hasInvoice,
     required this.hasWst,
     this.fromShiftPlan = false,
     this.planMarks = const <ShiftPlanMark>[],
+    this.planData,
   });
 
   @override
@@ -1988,7 +2028,8 @@ class _ResultColumn extends StatelessWidget {
             _SectionLabel(de
                 ? 'Markierungen aus dem Schichtplan'
                 : 'Markings from the shift plan'),
-            _PlanMarksSection(marks: planMarks, result: null, de: de),
+            _PlanMarksSection(
+                marks: planMarks, result: null, de: de, planData: planData),
           ],
         ),
       );
@@ -2048,7 +2089,8 @@ class _ResultColumn extends StatelessWidget {
               _SectionLabel(de
                   ? 'Markierungen aus dem Schichtplan'
                   : 'Markings from the shift plan'),
-              _PlanMarksSection(marks: planMarks, result: r, de: de),
+              _PlanMarksSection(
+                  marks: planMarks, result: r, de: de, planData: planData),
             ],
             // Bezahlt, aber nicht Teil des Routen-Abgleichs:
             // Late Cancels & Co. plus die Per-Shipment-Gebühren —
@@ -2085,10 +2127,15 @@ class _PlanMarksSection extends StatelessWidget {
   final List<ShiftPlanMark> marks;
   final ReconResult? result;
   final bool de;
+
+  /// Fuer die DA-Trainings-Gegenueberstellung (Tourencheck).
+  final ShiftPlanPaymentData? planData;
+
   const _PlanMarksSection({
     required this.marks,
     required this.result,
     required this.de,
+    this.planData,
   });
 
   @override
@@ -2198,6 +2245,67 @@ class _PlanMarksSection extends StatelessWidget {
                 ),
               ],
             ),
+          ],
+          if (planData != null && planData!.daTrainingsTotal > 0) ...[
+            const Divider(height: 14, color: Color(0xFFE5E7EB)),
+            Builder(builder: (context) {
+              final trainings = planData!.daTrainingsTotal;
+              double? invoiceTrainingQty;
+              final rr = result;
+              if (rr != null) {
+                invoiceTrainingQty = rr.paidExtras
+                    .where((e) => normKey(e.description).contains('training'))
+                    .fold<double>(0, (acc, e) => acc + e.quantity);
+              }
+              final match = invoiceTrainingQty != null &&
+                  invoiceTrainingQty.round() == trainings;
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    invoiceTrainingQty == null
+                        ? Icons.school_outlined
+                        : match
+                            ? Icons.check_circle_outline
+                            : Icons.warning_amber_rounded,
+                    size: 16,
+                    color: invoiceTrainingQty == null
+                        ? _kMuted
+                        : match
+                            ? const Color(0xFF067647)
+                            : const Color(0xFFB45309),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      invoiceTrainingQty == null
+                          ? (de
+                              ? 'DA Trainings laut Tourencheck: $trainings'
+                              : 'DA trainings per tour check: $trainings')
+                          : (de
+                              ? 'DA Trainings laut Tourencheck: $trainings · '
+                                  'Bezahlte Training-Positionen auf der '
+                                  'Rechnung: ${_qtyLabel(invoiceTrainingQty)} ×'
+                                  '${match ? '' : ' — bitte prüfen.'}'
+                              : 'DA trainings per tour check: $trainings · '
+                                  'Paid training positions on the invoice: '
+                                  '${_qtyLabel(invoiceTrainingQty)} ×'
+                                  '${match ? '' : ' — please check.'}'),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        height: 1.35,
+                        color: invoiceTrainingQty == null
+                            ? _kMuted
+                            : match
+                                ? const Color(0xFF067647)
+                                : const Color(0xFF92400E),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            }),
           ],
           if (marks.any((m) => m.isDropped)) ...[
             const SizedBox(height: 6),

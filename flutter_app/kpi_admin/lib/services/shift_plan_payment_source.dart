@@ -37,6 +37,13 @@ class ShiftPlanDayLoad {
   final String dateKey;
   final ShiftPlanDoc doc;
 
+  /// DA Trainings aus dem Tourencheck des Tages
+  /// (`shift_plan_checks/{dateKey}.daTrainings`), 0 wenn keiner erfasst.
+  final int daTrainings;
+
+  /// Ob der Tourencheck fuer den Tag bestaetigt wurde.
+  final bool tourCheckConfirmed;
+
   /// `true` when the doc came from `shift_plan_drafts` (internal save),
   /// `false` when it fell back to the published `shift_plans` doc.
   final bool fromDraft;
@@ -46,6 +53,8 @@ class ShiftPlanDayLoad {
     required this.dateKey,
     required this.doc,
     required this.fromDraft,
+    this.daTrainings = 0,
+    this.tourCheckConfirmed = false,
   });
 
   int get driverCount => doc.entries.length;
@@ -114,6 +123,14 @@ class ShiftPlanPaymentData {
 
   int get droppedCount => marks.where((m) => m.isDropped).length;
 
+  /// Summe der im Tourencheck erfassten DA Trainings ueber alle Tage.
+  int get daTrainingsTotal =>
+      days.fold<int>(0, (acc, d) => acc + d.daTrainings);
+
+  /// Tage, deren Tourencheck (noch) nicht bestaetigt wurde.
+  List<ShiftPlanDayLoad> get uncheckedDays =>
+      days.where((d) => !d.tourCheckConfirmed).toList(growable: false);
+
   int get rideAlongCount => marks.where((m) => m.isRideAlong).length;
 }
 
@@ -167,11 +184,28 @@ Future<ShiftPlanPaymentData> loadShiftPlanPaymentData({
     if (doc == null) {
       missing.add(key);
     } else {
+      // Tourencheck des Tages mitlesen — liefert DA Trainings und den
+      // Bestaetigungsstatus fuer den Abgleich.
+      var trainings = 0;
+      var checkConfirmed = false;
+      try {
+        final checkSnap =
+            await userDoc.collection('shift_plan_checks').doc(key).get();
+        final check = checkSnap.data();
+        if (check != null) {
+          trainings = (check['daTrainings'] as num?)?.toInt() ?? 0;
+          checkConfirmed = check['confirmed'] == true;
+        }
+      } catch (_) {
+        // Ohne Leserecht o. Ae. einfach ohne Trainings weiterrechnen.
+      }
       days.add(ShiftPlanDayLoad(
         date: cursor,
         dateKey: key,
         doc: doc,
         fromDraft: fromDraft,
+        daTrainings: trainings,
+        tourCheckConfirmed: checkConfirmed,
       ));
     }
     cursor = cursor.add(const Duration(days: 1));

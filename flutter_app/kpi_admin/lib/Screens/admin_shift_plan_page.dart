@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -117,7 +118,31 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
     super.dispose();
   }
 
+  /// Tourencheck-Status des angezeigten Tages
+  /// (`users/{uid}/shift_plan_checks/{dateKey}`).
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _tourCheckSub;
+  Map<String, dynamic>? _tourCheck;
+
+  void _bindTourCheckStream() {
+    _tourCheckSub?.cancel();
+    final adminUid = _adminUid;
+    if (adminUid == null) return;
+    final boundKey = _currentDateKey;
+    _tourCheck = null;
+    _tourCheckSub = FirebaseFirestore.instance
+        .collection('users')
+        .doc(adminUid)
+        .collection('shift_plan_checks')
+        .doc(boundKey)
+        .snapshots()
+        .listen((snap) {
+      if (!mounted || boundKey != _currentDateKey) return;
+      setState(() => _tourCheck = snap.data());
+    }, onError: (_) {});
+  }
+
   void _bindPublishedStream() {
+    _bindTourCheckStream();
     _publishedSub?.cancel();
     _draftSub?.cancel();
     final adminUid = _adminUid;
@@ -1342,6 +1367,161 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
     ];
   }
 
+  /// Tourencheck (Ticket): bestaetigt, dass alle Touren, Late Cancels
+  /// und Drops des Tages erfasst sind, und erfasst die Zahl der
+  /// DA Trainings. Gespeichert unter
+  /// `users/{uid}/shift_plan_checks/{dateKey}` — eine EIGENE Collection,
+  /// damit das normale Speichern/Publishen des Plans den Check nie
+  /// ueberschreibt. Der Payment Check liest sie mit.
+  Future<void> _openTourCheck() async {
+    final adminUid = _adminUid;
+    if (adminUid == null) return;
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final dateKey = _currentDateKey;
+    final tours = _entries.where((e) => !e.lateCancel && !e.dropped).length;
+    final cuts = _entries.where((e) => e.lateCancel).length;
+    final drops = _entries.where((e) => e.dropped).length;
+    final existing = _tourCheck;
+    final trainingsCtrl = TextEditingController(
+      text: existing == null
+          ? '0'
+          : '${(existing['daTrainings'] as num?)?.toInt() ?? 0}',
+    );
+
+    final d = _selectedDate;
+    final dayLabel = '${d.day.toString().padLeft(2, '0')}.'
+        '${d.month.toString().padLeft(2, '0')}.${d.year}';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Text(
+          de ? 'Tourencheck · $dayLabel' : 'Tour check · $dayLabel',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+        ),
+        content: SizedBox(
+          width: 400,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(11),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF9FAFB),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                ),
+                child: Text(
+                  de
+                      ? '$tours Touren · $cuts Cuts (Late Cancel) · '
+                          '$drops Dropped'
+                      : '$tours tours · $cuts cuts (late cancel) · '
+                          '$drops dropped',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                de
+                    ? 'Sind alle Touren, Late Cancels und Drops für diesen '
+                        'Tag erfasst?'
+                    : 'Are all tours, late cancels and drops recorded for '
+                        'this day?',
+                style: const TextStyle(fontSize: 13.5, height: 1.4),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: trainingsCtrl,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(3),
+                ],
+                decoration: InputDecoration(
+                  labelText: de
+                      ? 'DA Trainings an diesem Tag'
+                      : 'DA trainings on this day',
+                  helperText: de
+                      ? 'Anzahl der Trainings-Fahrer (0 = keine). '
+                          'Erscheint im Payment Check.'
+                      : 'Number of training drivers (0 = none). '
+                          'Shows up in the Payment Check.',
+                  helperMaxLines: 2,
+                  isDense: true,
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(de ? 'Abbrechen' : 'Cancel'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            icon: const Icon(Icons.check_rounded, size: 18),
+            label: Text(
+              de ? 'Ja, alles erfasst' : 'Yes, all recorded',
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final trainings = int.tryParse(trainingsCtrl.text.trim()) ?? 0;
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(adminUid)
+          .collection('shift_plan_checks')
+          .doc(dateKey)
+          .set(<String, dynamic>{
+        'confirmed': true,
+        'daTrainings': trainings,
+        'tourCount': tours,
+        'cutCount': cuts,
+        'droppedCount': drops,
+        'confirmedAt': FieldValue.serverTimestamp(),
+        'confirmedBy': FirebaseAuth.instance.currentUser?.uid ?? '',
+      }, SetOptions(merge: true));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.codriverDeep,
+          content: Text(
+            de
+                ? 'Tourencheck für $dayLabel gespeichert'
+                    '${trainings > 0 ? ' · $trainings DA Trainings' : ''}.'
+                : 'Tour check for $dayLabel saved'
+                    '${trainings > 0 ? ' · $trainings DA trainings' : ''}.',
+            style: const TextStyle(color: Colors.white),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFFB42318),
+          content: Text(
+            de
+                ? 'Tourencheck konnte nicht gespeichert werden: $e'
+                : 'Could not save the tour check: $e',
+          ),
+        ),
+      );
+    }
+  }
+
   Future<void> _publish() async {
     final adminUid = _adminUid;
     if (adminUid == null) return;
@@ -2056,6 +2236,8 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
                     canSaveInternal: _canSaveInternal,
                     saveLabel: _weekMode ? 'Save week' : 'Save day',
                     onPdf: _generatePdf,
+                    onTourCheck: _openTourCheck,
+                    tourCheckDone: _tourCheck?['confirmed'] == true,
                     onShare: _shareShiftPlan,
                     canClear: _entries.isNotEmpty && !_publishing,
                     onClear: _clearAllEntries,
@@ -2736,6 +2918,8 @@ class _Header extends StatelessWidget {
     this.publishLabel = 'Publish',
     this.onPublish,
     this.onSaveInternal,
+    this.onTourCheck,
+    this.tourCheckDone = false,
     this.canSaveInternal = false,
     this.saveLabel = 'Save',
     this.onPdf,
@@ -2759,6 +2943,8 @@ class _Header extends StatelessWidget {
   final String publishLabel;
   final VoidCallback? onPublish;
   final VoidCallback? onSaveInternal;
+  final VoidCallback? onTourCheck;
+  final bool tourCheckDone;
   final bool canSaveInternal;
   final String saveLabel;
   final VoidCallback? onPdf;
@@ -3061,6 +3247,21 @@ class _Header extends StatelessWidget {
               label: 'Link',
               icon: Icons.link_rounded,
               variant: CoButtonVariant.quiet,
+            ),
+          ],
+          // Tourencheck — bestaetigt Cuts/Drops-Vollstaendigkeit und
+          // erfasst DA Trainings; gruen sobald fuer den Tag erledigt.
+          if (onTourCheck != null) ...[
+            const SizedBox(width: 6),
+            CoButton(
+              onPressed: publishing ? null : onTourCheck,
+              label: tourCheckDone ? 'Tourencheck ✓' : 'Tourencheck',
+              icon: tourCheckDone
+                  ? Icons.check_circle_outline
+                  : Icons.fact_check_outlined,
+              variant: tourCheckDone
+                  ? CoButtonVariant.quiet
+                  : CoButtonVariant.secondaryTinted,
             ),
           ],
           // Internal save — persists to shift_plan_drafts without
