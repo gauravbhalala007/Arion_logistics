@@ -77,7 +77,10 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
   /// Per-dispatcher shift range, mirrors the Waveplan pattern.
   final Map<String, List<String>> _shiftByDispatcher =
       <String, List<String>>{};
-  static const int _maxDispatchers = 3;
+  // Ticket „mehr als 3": wie im Waveplan auf 10 angehoben. Die
+  // Stacked-Leiste rechts waechst zeilenweise und die Add-Chips stehen
+  // in einem Wrap — beides vertraegt beliebig viele Eintraege.
+  static const int _maxDispatchers = 10;
   final TextEditingController _meetCtrl = TextEditingController();
 
   /// Day notes shown to every driver. Admin can stack multiple
@@ -1016,6 +1019,11 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
             ),
             pw.Text(
               [
+                // Tag zusaetzlich zur Woche (Ticket) — bei mehreren Tagen
+                // die Spanne.
+                days.length > 1
+                    ? '${_pdfDate(DateTime.tryParse(days.first.key) ?? firstDate)} - ${_pdfDate(DateTime.tryParse(days.last.key) ?? firstDate)}'
+                    : _pdfDate(DateTime.tryParse(days.first.key) ?? firstDate),
                 'Week ${_pdfIsoWeek(firstDate)} · ${firstDate.year}',
                 if (company.isNotEmpty) company,
                 if (station.isNotEmpty) station,
@@ -1057,10 +1065,15 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
         },
       ),
     );
+    // Dateiname „Shiftplan" + Tagesdatum (Ticket) — im Wochenmodus die
+    // Kalenderwoche, weil ein einzelner Tag dort in die Irre fuehrte.
+    String dayStamp(DateTime d) =>
+        '${d.day.toString().padLeft(2, '0')}.'
+        '${d.month.toString().padLeft(2, '0')}.${d.year}';
     await Printing.layoutPdf(
       name: (_weekMode && days.length > 1)
-          ? 'Shift_Plan_Week${_pdfIsoWeek(firstDate)}_${firstDate.year}.pdf'
-          : 'Shift_Plan_${days.first.key}.pdf',
+          ? 'Shiftplan_KW${_pdfIsoWeek(firstDate)}_${firstDate.year}.pdf'
+          : 'Shiftplan_${dayStamp(DateTime.tryParse(days.first.key) ?? _selectedDate)}.pdf',
       onLayout: (format) async => doc.save(),
     );
   }
@@ -1151,12 +1164,20 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
         payload: {
           'type': 'shiftplan',
           'title': 'Shift Plan',
-          'subtitle': 'Week ${_pdfIsoWeek(firstDate)} · ${firstDate.year}',
-          'date': '',
+          'subtitle': 'Week ${_pdfIsoWeek(firstDate)} \u00b7 ${firstDate.year}',
+          // Tag in den Kopf (Ticket): im Tagesmodus das Datum, im
+          // Wochenmodus die Spanne erster-letzter Tag.
+          'date': days.length > 1
+              ? '${dayLabel(days.first.key)} \u2013 ${dayLabel(days.last.key)}'
+              : dayLabel(days.first.key),
           'company': company,
           'station': station,
           'notes':
               'P = Parking Time / Meeting Time · W = Waiting Area (Working Time)',
+          // Ticket: die P/W-Erklaerung zusaetzlich dezent unten im
+          // gruenen Kopfbereich der oeffentlichen Seite.
+          'legend':
+              'P = Parking Time / Meeting Time \u00b7 W = Waiting Area (Working Time)',
           'sections': sections,
         },
       );
@@ -1289,7 +1310,8 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
           for (var i = 0; i < rows.length; i++)
             pw.TableRow(
               decoration: pw.BoxDecoration(
-                color: i.isEven ? PdfColors.grey100 : PdfColors.white,
+                // Kraeftigeres Zebra (Ticket: mehr Kontrast grau/weiss).
+                color: i.isEven ? PdfColors.grey200 : PdfColors.white,
               ),
               children: [
                 pw.Padding(

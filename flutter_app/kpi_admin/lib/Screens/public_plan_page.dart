@@ -168,6 +168,7 @@ class _PlanViewState extends State<_PlanView> {
     final company = _s(data['company']);
     final station = _s(data['station']);
     final notes = _s(data['notes']).trim();
+    final legend = _s(data['legend']).trim();
     final stickyNote = _s(data['stickyNote']).trim();
     final dispatchers = (data['dispatchers'] is List)
         ? List<Map<String, dynamic>>.from(
@@ -243,6 +244,19 @@ class _PlanViewState extends State<_PlanView> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
+                // Legende (z. B. Parking/Waiting) — dezent ganz unten im
+                // gruenen Kopf, damit die Abkuerzungen in den Zeilen ohne
+                // Scrollen erklaert sind.
+                if (legend.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    legend,
+                    style: AppTypography.caption2.copyWith(
+                      color: Colors.white.withValues(alpha: 0.65),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -566,7 +580,9 @@ class _RowTile extends StatelessWidget {
         : const <String>[];
 
     return Container(
-      color: zebra ? const Color(0xFFFAFAFA) : Colors.white,
+      // Kraeftigeres Zebra (Ticket: mehr Kontrast grau/weiss) — das alte
+      // FAFAFA war neben Weiss praktisch unsichtbar.
+      color: zebra ? const Color(0xFFF0F2F4) : Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
