@@ -7,6 +7,8 @@
 //     badgeItems: []} ] } ] }
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:ui' show FontFeature;
+
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
@@ -596,19 +598,18 @@ class _RowTile extends StatelessWidget {
                   children: [
                     Text(
                       primary,
-                      style: AppTypography.subheadline.copyWith(
-                        color: const Color(0xFF111827),
-                        fontWeight: FontWeight.w700,
+                      // Ticket: Namen groesser — Fahrer lesen den Plan
+                      // auf dem Handy im Vorbeigehen.
+                      style: const TextStyle(
+                        fontSize: 16.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF111827),
+                        height: 1.25,
                       ),
                     ),
                     if (secondary.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        secondary,
-                        style: AppTypography.footnote.copyWith(
-                          color: const Color(0xFF6B7280),
-                        ),
-                      ),
+                      const SizedBox(height: 3),
+                      _ShiftTimesLine(text: secondary),
                     ],
                     if (pills.isNotEmpty) ...[
                       const SizedBox(height: 6),
@@ -722,3 +723,66 @@ class _RowTile extends StatelessWidget {
     );
   }
 }
+
+/// Schichtzeiten-Zeile „P 06:45 W 07:00 + P 17:45 W 18:00" — P und W
+/// farblich getrennt und fett (Ticket), Zeiten groesser. Faellt fuer
+/// Texte ohne P/W-Muster auf schlichten grauen Text zurueck.
+class _ShiftTimesLine extends StatelessWidget {
+  const _ShiftTimesLine({required this.text});
+
+  final String text;
+
+  static final RegExp _time = RegExp(r'^\d{1,2}:\d{2}$');
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = text.split(RegExp(r'\s+'));
+    final hasPw = tokens.contains('P') || tokens.contains('W');
+    if (!hasPw) {
+      return Text(
+        text,
+        style: AppTypography.footnote.copyWith(
+          color: const Color(0xFF6B7280),
+        ),
+      );
+    }
+
+    const pColor = Color(0xFFB45309); // Parking — amber
+    const wColor = Color(0xFF1D7F5A); // Working — gruen
+
+    final spans = <TextSpan>[];
+    for (var i = 0; i < tokens.length; i++) {
+      final tok = tokens[i];
+      TextStyle style;
+      if (tok == 'P' || tok == 'W') {
+        style = TextStyle(
+          fontSize: 14.5,
+          fontWeight: FontWeight.w900,
+          color: tok == 'P' ? pColor : wColor,
+        );
+      } else if (_time.hasMatch(tok)) {
+        style = const TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF111827),
+          fontFeatures: [FontFeature.tabularFigures()],
+        );
+      } else {
+        style = const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: Color(0xFF9CA3AF),
+        );
+      }
+      spans.add(TextSpan(text: tok, style: style));
+      if (i != tokens.length - 1) {
+        spans.add(const TextSpan(text: ' '));
+      }
+    }
+    return Text.rich(
+      TextSpan(children: spans),
+      style: const TextStyle(height: 1.35),
+    );
+  }
+}
+
