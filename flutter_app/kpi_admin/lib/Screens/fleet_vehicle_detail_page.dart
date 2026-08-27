@@ -28,6 +28,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/fleet_vehicle.dart';
 import '../models/fleet_vehicle_document.dart';
 import '../models/fleet_vehicle_event.dart';
+import '../models/fleet_vehicle_remark.dart';
 import '../services/fleet_vehicle_document_repository.dart';
 import '../services/fleet_vehicle_document_service.dart';
 import '../services/fleet_vehicle_event_service.dart';
@@ -146,6 +147,11 @@ enum FleetEventType {
   oil,
   tires,
   brakes,
+
+  /// Herstellerservice „Service A" / „Service B" (Ticket
+  /// iGVwWizlD5ncZRxEillJ) — kleine bzw. große Inspektion.
+  serviceA,
+  serviceB,
   tuv,
   accident,
   handover,
@@ -208,6 +214,8 @@ extension _FleetEventTypeX on FleetEventType {
     FleetEventType.oil => 'oil',
     FleetEventType.tires => 'tires',
     FleetEventType.brakes => 'brakes',
+    FleetEventType.serviceA => 'service_a',
+    FleetEventType.serviceB => 'service_b',
     FleetEventType.tuv => 'tuv',
     FleetEventType.accident => 'accident',
     FleetEventType.handover => 'handover',
@@ -222,6 +230,8 @@ extension _FleetEventTypeX on FleetEventType {
     FleetEventType.oil => Icons.oil_barrel_outlined,
     FleetEventType.tires => Icons.tire_repair,
     FleetEventType.brakes => Icons.album_outlined,
+    FleetEventType.serviceA => Icons.build_circle_outlined,
+    FleetEventType.serviceB => Icons.home_repair_service_outlined,
     FleetEventType.tuv => Icons.warning_amber_rounded,
     FleetEventType.accident => Icons.car_crash_outlined,
     FleetEventType.handover => Icons.swap_horiz,
@@ -243,6 +253,9 @@ extension _FleetEventTypeX on FleetEventType {
     FleetEventType.oil => de ? 'Ölwechsel' : 'Oil change',
     FleetEventType.tires => de ? 'Reifenwechsel' : 'Tire change',
     FleetEventType.brakes => de ? 'Bremsenwechsel' : 'Brake change',
+    // Herstellerbezeichnung — bewusst in beiden Sprachen identisch.
+    FleetEventType.serviceA => 'Service A',
+    FleetEventType.serviceB => 'Service B',
     FleetEventType.tuv => de ? 'TÜV / HU' : 'TÜV / inspection',
     FleetEventType.accident => de ? 'Unfall' : 'Accident',
     FleetEventType.handover => de ? 'Fahrzeugübergabe' : 'Handover',
@@ -262,6 +275,10 @@ extension _FleetEventTypeX on FleetEventType {
       case 'brakes':
       case 'brake':
         return FleetEventType.brakes;
+      case 'service_a':
+        return FleetEventType.serviceA;
+      case 'service_b':
+        return FleetEventType.serviceB;
       case 'tuv':
       case 'inspection':
         return FleetEventType.tuv;
@@ -890,6 +907,7 @@ class _FleetVehicleDetailPageState extends State<FleetVehicleDetailPage> {
 
   Widget _profileHeaderBand(FleetVehicle vehicle, Map<String, dynamic> extras) {
     final leasing = _str(extras['leasingProvider']);
+    final rentalCompany = _str(extras['rentalCompany']);
     final remarkLine = _headerRemarkLine(extras);
 
     final plateBlock = SizedBox(
@@ -903,7 +921,33 @@ class _FleetVehicleDetailPageState extends State<FleetVehicleDetailPage> {
           Wrap(
             spacing: 6,
             runSpacing: 6,
-            children: [_statusBadge(vehicle), _leasingBadge(vehicle, leasing)],
+            children: [
+              _statusBadge(vehicle),
+              _leasingBadge(vehicle, leasing),
+              // Rental-Firma (Ticket 1c) — gepflegt im Fahrzeug-Editor für
+              // SESO-/Rental-Fahrzeuge, hier nur sichtbar.
+              if (rentalCompany.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _C.blueTint,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: Text(
+                    'RENTAL: ${rentalCompany.toUpperCase()}',
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.4,
+                      color: _C.blue,
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+            ],
           ),
           if (remarkLine != null) ...[const SizedBox(height: 9), remarkLine],
         ],
@@ -992,40 +1036,12 @@ class _FleetVehicleDetailPageState extends State<FleetVehicleDetailPage> {
   /// editierbar, hier nur sichtbar. Ohne Bemerkung: `null`, das Kopfband
   /// bleibt dann unverändert.
   Widget? _headerRemarkLine(Map<String, dynamic> extras) {
-    final remark = _str(extras['remarks']).trim();
-    if (remark.isEmpty) return null;
-    return Tooltip(
-      message: remark,
-      waitDuration: const Duration(milliseconds: 400),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Padding(
-            padding: EdgeInsets.only(top: 1.5),
-            child: Icon(
-              Icons.sticky_note_2_outlined,
-              size: 14,
-              color: _C.amberValue,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              remark,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-                color: _C.amberValue,
-                height: 1.3,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+    // Mehrfach-Bemerkungen (remarkList, Fallback altes Einzelfeld
+    // `remarks`): je Bemerkung max. zwei Zeilen; Bemerkungen mit Fotos
+    // tragen ein Kamera-Icon, das das Foto-Popup öffnet.
+    final remarks = fleetVehicleRemarksFromExtras(extras);
+    if (remarks.isEmpty) return null;
+    return FleetRemarkLines(remarks: remarks, fontSize: 12.5, iconSize: 14);
   }
 
   /// Warum steht das Fahrzeug? Solange es stillgelegt ist, sitzt der Grund
@@ -1037,7 +1053,8 @@ class _FleetVehicleDetailPageState extends State<FleetVehicleDetailPage> {
   ) {
     if (!vehicle.status.isGrounded) return null;
     final reason = _str(extras['groundedReason']);
-    if (reason.isEmpty) return null;
+    final referenceName = _str(extras['groundedReferenceName']);
+    if (reason.isEmpty && referenceName.isEmpty) return null;
 
     final since = _asDateTime(extras['groundedAt']);
     final sinceLabel = since == null
@@ -1099,7 +1116,7 @@ class _FleetVehicleDetailPageState extends State<FleetVehicleDetailPage> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  reason,
+                  reason.isEmpty ? '—' : reason,
                   style: const TextStyle(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w700,
@@ -1107,6 +1124,34 @@ class _FleetVehicleDetailPageState extends State<FleetVehicleDetailPage> {
                     height: 1.35,
                   ),
                 ),
+                if (referenceName.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  // Beim Grounding gewählte Referenz (Ticket 1c) — z. B.
+                  // die Werkstatt aus den Fleet-Referenzen.
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.bookmarks_outlined,
+                        size: 12,
+                        color: _C.redText,
+                      ),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(
+                          '${_tr('Referenz', 'Reference')}: $referenceName',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: _C.redText,
+                            height: 1.35,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
@@ -2039,6 +2084,12 @@ class _FleetVehicleDetailPageState extends State<FleetVehicleDetailPage> {
                 label: 'Fahrzeugschein',
                 document: registration,
                 uploadType: 'FAHRZEUGSCHEIN',
+                // Ticket 2c: Ausstellungsdatum des Fahrzeugscheins — lebt
+                // in fleet_vehicle_extras (Dokument-Rules-Whitelist kennt
+                // kein issueDate-Feld); Ablaufdatum nutzt das bestehende
+                // expiryDate des Dokuments.
+                isRegistration: true,
+                issueDate: _str(extras['registrationIssueDate']),
               ),
               const SizedBox(height: 8),
               _documentRow(
@@ -2063,10 +2114,29 @@ class _FleetVehicleDetailPageState extends State<FleetVehicleDetailPage> {
     );
   }
 
+  /// Ablauf-Status eines Dokuments — analog zur TÜV-Logik: abgelaufen rot,
+  /// ≤ 30 Tage amber, sonst nichts. `null` = kein Warn-Badge.
+  (String, Color, Color)? _documentExpiryWarning(String expiryDate) {
+    final parsed = DateTime.tryParse(expiryDate.trim());
+    if (parsed == null) return null;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final expiry = DateTime(parsed.year, parsed.month, parsed.day);
+    if (expiry.isBefore(today)) {
+      return (_tr('abgelaufen', 'expired'), _C.redValue, _C.redBg);
+    }
+    if (!expiry.isAfter(today.add(const Duration(days: 30)))) {
+      return (_tr('läuft bald ab', 'expiring soon'), _C.amberValue, _C.amberBg);
+    }
+    return null;
+  }
+
   Widget _documentRow({
     required String label,
     required FleetVehicleDocument? document,
     required String uploadType,
+    bool isRegistration = false,
+    String issueDate = '',
   }) {
     final hasFile = (document?.fileUrl.trim() ?? '').isNotEmpty;
     if (!hasFile) {
@@ -2170,9 +2240,14 @@ class _FleetVehicleDetailPageState extends State<FleetVehicleDetailPage> {
       if (doc.fileName.trim().isNotEmpty) doc.fileName.trim(),
       if (uploaded != null)
         '${_tr('hochgeladen', 'uploaded')} ${_fmtDate(uploaded)}',
+      // Ticket 2c: Ausstellungsdatum (Fahrzeugschein).
+      if (issueDate.trim().isNotEmpty)
+        '${_tr('ausgestellt', 'issued')} ${_fmtIsoDate(issueDate)}',
       if (doc.expiryDate.trim().isNotEmpty)
         '${_tr('gültig bis', 'valid until')} ${_fmtIsoDate(doc.expiryDate)}',
     ].join(' · ');
+    // Ablauf-Warnung analog TÜV (rot = abgelaufen, amber = ≤ 30 Tage).
+    final expiryWarning = _documentExpiryWarning(doc.expiryDate);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
@@ -2224,6 +2299,25 @@ class _FleetVehicleDetailPageState extends State<FleetVehicleDetailPage> {
               ],
             ),
           ),
+          if (expiryWarning != null) ...[
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: expiryWarning.$3,
+                borderRadius: BorderRadius.circular(99),
+              ),
+              child: Text(
+                expiryWarning.$1,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                  color: expiryWarning.$2,
+                  height: 1.35,
+                ),
+              ),
+            ),
+          ],
           const SizedBox(width: 6),
           _IconAction(
             icon: Icons.visibility_outlined,
@@ -2252,7 +2346,11 @@ class _FleetVehicleDetailPageState extends State<FleetVehicleDetailPage> {
               size: 18,
               color: _C.text3,
               tooltip: _tr('Angaben bearbeiten', 'Edit details'),
-              onTap: () => _editDocumentMeta(doc),
+              onTap: () => _editDocumentMeta(
+                doc,
+                askIssueDate: isRegistration,
+                currentIssueDate: issueDate,
+              ),
             ),
             _IconAction(
               icon: Icons.delete_outline,
@@ -2270,10 +2368,19 @@ class _FleetVehicleDetailPageState extends State<FleetVehicleDetailPage> {
   /// Metadaten eines Dokuments bearbeiten (Dokumentnummer, Ablaufdatum,
   /// Notizen). Typ und Datei bleiben unverändert — der Dokumenttyp ist im
   /// Bestand bewusst unveränderlich (`ImmutableVehicleDocumentTypeException`).
-  Future<void> _editDocumentMeta(FleetVehicleDocument document) async {
+  ///
+  /// Fahrzeugschein (Ticket 2c): zusätzlich das Ausstellungsdatum — es lebt
+  /// in `fleet_vehicle_extras.registrationIssueDate`, weil die Rules-
+  /// Whitelist der Dokument-Records kein weiteres Datumsfeld erlaubt.
+  Future<void> _editDocumentMeta(
+    FleetVehicleDocument document, {
+    bool askIssueDate = false,
+    String currentIssueDate = '',
+  }) async {
     final numberCtrl = TextEditingController(text: document.documentNumber);
     final notesCtrl = TextEditingController(text: document.notes);
     var expiry = document.expiryDate.trim();
+    var issue = currentIssueDate.trim();
 
     final saved = await showDialog<bool>(
       context: context,
@@ -2301,6 +2408,53 @@ class _FleetVehicleDetailPageState extends State<FleetVehicleDetailPage> {
                       _tr('Dokumentnummer', 'Document number'),
                     ),
                   ),
+                  if (askIssueDate) ...[
+                    const SizedBox(height: 12),
+                    // Ausstellungsdatum (Fahrzeugschein, Ticket 2c).
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final parsed = DateTime.tryParse(issue);
+                        final now = DateTime.now();
+                        final picked = await showDatePicker(
+                          context: ctx,
+                          initialDate: parsed ?? now,
+                          firstDate: DateTime(now.year - 40),
+                          lastDate: DateTime(now.year + 20),
+                        );
+                        if (picked == null) return;
+                        setLocal(() {
+                          issue =
+                              '${picked.year.toString().padLeft(4, '0')}-'
+                              '${picked.month.toString().padLeft(2, '0')}-'
+                              '${picked.day.toString().padLeft(2, '0')}';
+                        });
+                      },
+                      icon: const Icon(Icons.event_available_outlined, size: 18),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _C.text,
+                        side: const BorderSide(color: _C.border),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      label: Text(
+                        '${_tr('Ausstellungsdatum', 'Issue date')}: '
+                        '${issue.isEmpty ? _tr('keines', 'none') : _fmtIsoDate(issue)}',
+                      ),
+                    ),
+                    if (issue.isNotEmpty)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: () => setLocal(() => issue = ''),
+                          child: Text(
+                            _tr('Datum entfernen', 'Clear date'),
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ),
+                      ),
+                  ],
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
                     onPressed: () async {
@@ -2393,6 +2547,13 @@ class _FleetVehicleDetailPageState extends State<FleetVehicleDetailPage> {
           notes: notes,
         ),
       );
+      // Ausstellungsdatum (nur Fahrzeugschein) — Extras-Merge-Write,
+      // leeres Datum räumt das Feld.
+      if (askIssueDate && issue != currentIssueDate.trim()) {
+        await widget.actions.saveExtras(_plate, <String, dynamic>{
+          'registrationIssueDate': issue.isEmpty ? FieldValue.delete() : issue,
+        });
+      }
       _snack(_tr('Dokument aktualisiert.', 'Document updated.'));
     } catch (e) {
       _snack(_documentErrorText(e), error: true);
@@ -2694,7 +2855,19 @@ class _FleetVehicleDetailPageState extends State<FleetVehicleDetailPage> {
   // ═══════════════════════════════════════════════════════════════════════
 
   Widget _notesCard(FleetVehicle vehicle, Map<String, dynamic> extras) {
-    final remarks = _str(extras['remarks']);
+    // Mehrfach-Bemerkungen: Anzeige aller Texte (zeilenweise) plus
+    // Foto-Anzahl; der Stift öffnet den Bemerkungs-Manager (Liste mit
+    // Hinzufügen/Bearbeiten/Löschen und Fotos je Bemerkung).
+    final remarkList = fleetVehicleRemarksFromExtras(extras);
+    final photoCount = remarkList.fold<int>(
+      0,
+      (total, remark) => total + remark.photos.length,
+    );
+    final remarksDisplay = <String>[
+      fleetVehicleRemarksLegacyText(remarkList),
+      if (photoCount > 0)
+        _tr('($photoCount Foto(s))', '($photoCount photo(s))'),
+    ].where((part) => part.trim().isNotEmpty).join('\n');
     final created = vehicle.createdAt;
     final updated = vehicle.updatedAt;
     return _card(
@@ -2712,9 +2885,12 @@ class _FleetVehicleDetailPageState extends State<FleetVehicleDetailPage> {
           ),
           _textRow(
             label: _tr('Bemerkungen', 'Remarks'),
-            value: remarks,
+            value: remarksDisplay,
             onEdit: widget.canManage
-                ? () => widget.actions.editRemarks(vehicle, remarks)
+                ? () => widget.actions.editRemarks(
+                    vehicle,
+                    _str(extras['remarks']),
+                  )
                 : null,
             divider: true,
           ),

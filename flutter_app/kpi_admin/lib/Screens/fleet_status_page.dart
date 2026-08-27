@@ -14,6 +14,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../localization/app_localizations.dart';
 import '../models/fleet_vehicle.dart';
 import '../models/fleet_vehicle_document.dart';
+import '../models/fleet_vehicle_remark.dart';
 import '../services/fleet_vehicle_document_service.dart';
 import '../services/fleet_vehicle_repository.dart';
 import '../services/cortex_vehicle_importer.dart';
@@ -93,6 +94,10 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
   // ALL | ARMADA | SESO | LMR | SELF_OWNED.
   String _categoryFilter = 'ALL';
   String _tuvFilter = _tuvAllValue;
+  // Archiv-Toggle (Ticket iGVwWizlD5ncZRxEillJ): ausgemusterte Fahrzeuge
+  // (Status INAKTIV) sind standardmäßig ausgeblendet und lassen sich hier
+  // wieder einblenden. Die Status-Pill „Inaktiv" zeigt sie unabhängig davon.
+  bool _showArchived = false;
   // Column sorting: null = default order (createdAt). Keys:
   // vehicle | model | status | serviceEnd | tuv.
   String? _sortColumn;
@@ -104,7 +109,19 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
   Map<String, String> _workshopByPlate = <String, String>{};
   // Free-text "Bemerkungen / Remarks" per vehicle — same admin subtree as
   // the workshop field (fleet_vehicle_extras), not the vehicle doc itself.
+  // Seit dem Mehrfach-Bemerkungs-Ticket: Text der ERSTEN Bemerkung (Seed
+  // für den Fahrzeug-Editor); die volle Liste liegt in [_remarkListByPlate].
   Map<String, String> _remarksByPlate = <String, String>{};
+  // Alle Bemerkungen je Fahrzeug (fleet_vehicle_extras.remarkList, Fallback
+  // altes Einzelfeld `remarks`) — für Kopfzeilen-Anzeige und Sortierung.
+  Map<String, List<FleetVehicleRemark>> _remarkListByPlate =
+      <String, List<FleetVehicleRemark>>{};
+  // Rental-Firma je Kennzeichen (fleet_vehicle_extras.rentalCompany) —
+  // SESO-/Rental-Fahrzeuge; gepflegt über den Fahrzeug-Editor.
+  Map<String, String> _rentalCompanyByPlate = <String, String>{};
+  // Beim Grounding gewählte Referenz (fleet_vehicle_extras.
+  // groundedReferenceName) — angezeigt im Tooltip/Banner.
+  Map<String, String> _groundedReferenceByPlate = <String, String>{};
   // Leasing provider per plate (fleet_vehicle_extras.leasingProvider) — shown
   // as the handshake line inside each fleet row.
   Map<String, String> _leasingByPlate = <String, String>{};
@@ -232,16 +249,50 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
   /// field (users/{dspUid}/fleet_vehicle_extras/{plate}) because the
   /// Firestore rules only allow a fixed field whitelist on the vehicle
   /// document itself.
+  ///
+  /// Mehrfach-Bemerkungen: [remarks] ist der Text der ERSTEN Bemerkung
+  /// (Fahrzeug-Editor-Feld). Bestehende weitere Bemerkungen und Fotos
+  /// bleiben unangetastet; ein gesetztes Alt-Feld `remarks` wird beim
+  /// ersten Speichern in `remarkList` migriert — Bestand geht nie verloren.
   Future<void> _saveVehicleRemarks(
     String scope,
     String plateNumber,
     String remarks,
   ) async {
-    await _extrasCollection(
-      scope,
-    ).doc(normalizePlateNumber(plateNumber)).set(<String, dynamic>{
-      'plateNumber': normalizePlateNumber(plateNumber),
-      'remarks': remarks.trim(),
+    final plate = normalizePlateNumber(plateNumber);
+    final ref = _extrasCollection(scope).doc(plate);
+    final snapshot = await ref.get();
+    final list = List<FleetVehicleRemark>.of(
+      fleetVehicleRemarksFromExtras(
+        snapshot.data() ?? const <String, dynamic>{},
+      ),
+    );
+    final text = remarks.trim();
+    if (list.isEmpty) {
+      if (text.isNotEmpty) {
+        list.add(FleetVehicleRemark(text: text, createdAt: Timestamp.now()));
+      }
+    } else if (text.isEmpty && list.first.photos.isEmpty) {
+      list.removeAt(0);
+    } else {
+      list[0] = list.first.copyWith(text: text);
+    }
+    await _writeVehicleRemarkList(scope, plate, list);
+  }
+
+  /// Schreibt die komplette Bemerkungsliste: `remarkList` führend plus das
+  /// Alt-Feld `remarks` als Spiegel (alle Texte, zeilenweise), damit ältere
+  /// Leser weiterhin etwas sehen.
+  Future<void> _writeVehicleRemarkList(
+    String scope,
+    String plateNumber,
+    List<FleetVehicleRemark> list,
+  ) async {
+    final plate = normalizePlateNumber(plateNumber);
+    await _extrasCollection(scope).doc(plate).set(<String, dynamic>{
+      'plateNumber': plate,
+      'remarkList': <Map<String, dynamic>>[for (final r in list) r.toMap()],
+      'remarks': fleetVehicleRemarksLegacyText(list),
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
   }
@@ -342,14 +393,28 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
     Map<String, _VehicleListComplianceSummary> complianceByPlate,
   ) {
     final query = _search.trim().toLowerCase();
+    final tuvFilterActive = _tuvFilter != _tuvAllValue;
     final filtered = vehicles.where((vehicle) {
       if (vehicle.isDeleted) return false;
+      // Ticket iGVwWizlD5ncZRxEillJ: Der TÜV-Filter blendet ausgemusterte
+      // (inaktive) Fahrzeuge immer aus — abgelaufene TÜV-Termine längst
+      // stillgelegter Fahrzeuge verstopften die Liste.
+      if (tuvFilterActive && vehicle.status == VehicleStatus.inactive) {
+        return false;
+      }
+      // Archiv-Toggle (Default aus): Inaktive erscheinen nur, wenn das
+      // Archiv eingeblendet ist ODER explizit die Status-Pill „Inaktiv"
+      // gewählt wurde.
+      if (!_showArchived &&
+          _statusPill != 'INAKTIV' &&
+          vehicle.status == VehicleStatus.inactive) {
+        return false;
+      }
       if (!_matchesStatusPill(vehicle.status)) return false;
       if (!_matchesCategoryFilter(vehicle)) return false;
       final compliance =
           complianceByPlate[vehicle.plateNumber] ?? _defaultComplianceSummary();
-      if (_tuvFilter != _tuvAllValue &&
-          compliance.tuvStatus.value != _tuvFilter) {
+      if (tuvFilterActive && compliance.tuvStatus.value != _tuvFilter) {
         return false;
       }
       if (query.isEmpty) return true;
@@ -373,7 +438,7 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
         if (byCreatedAt != 0) return byCreatedAt;
         return a.plateNumber.compareTo(b.plateNumber);
       });
-      return filtered;
+      return _remarksFirst(filtered);
     }
 
     int compare(FleetVehicle a, FleetVehicle b) {
@@ -409,7 +474,22 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
       if (result != 0) return result;
       return a.plateNumber.compareTo(b.plateNumber);
     });
-    return filtered;
+    return _remarksFirst(filtered);
+  }
+
+  /// Ticket FLEETHUB (JzvyBI6N06o5g5ftecyQ): Fahrzeuge MIT Bemerkung stehen
+  /// vor allen anderen — innerhalb beider Gruppen bleibt die bestehende
+  /// Sortierung unverändert (stabile Partition).
+  List<FleetVehicle> _remarksFirst(List<FleetVehicle> vehicles) {
+    bool hasRemark(FleetVehicle v) =>
+        (_remarkListByPlate[normalizePlateNumber(v.plateNumber)] ?? const [])
+            .isNotEmpty;
+    final withRemark = <FleetVehicle>[];
+    final withoutRemark = <FleetVehicle>[];
+    for (final vehicle in vehicles) {
+      (hasRemark(vehicle) ? withRemark : withoutRemark).add(vehicle);
+    }
+    return <FleetVehicle>[...withRemark, ...withoutRemark];
   }
 
   bool _matchesCategoryFilter(FleetVehicle vehicle) {
@@ -609,7 +689,8 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
     if (!vehicle.status.isGrounded) return child;
     final plate = normalizePlateNumber(vehicle.plateNumber);
     final reason = (_groundedReasonByPlate[plate] ?? '').trim();
-    if (reason.isEmpty) return child;
+    final reference = (_groundedReferenceByPlate[plate] ?? '').trim();
+    if (reason.isEmpty && reference.isEmpty) return child;
 
     final de = Localizations.localeOf(context).languageCode == 'de';
     final shortened = reason.length > 160
@@ -620,11 +701,14 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
         ? ''
         : '\n${de ? 'seit' : 'since'} '
               '${MaterialLocalizations.of(context).formatShortDate(since)}';
+    final referenceLine = reference.isEmpty
+        ? ''
+        : '\n${de ? 'Referenz' : 'Reference'}: $reference';
 
     return Tooltip(
       message:
           '${de ? 'Grund der Stilllegung' : 'Reason for grounding'}: '
-          '$shortened$sinceLine',
+          '${shortened.isEmpty ? '—' : shortened}$referenceLine$sinceLine',
       waitDuration: const Duration(milliseconds: 300),
       child: child,
     );
@@ -954,6 +1038,11 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
         initialWorkshop: _workshopByPlate[normalizedPlate] ?? '',
         initialTuvDate: _tuvDocByPlate[normalizedPlate]?.expiryDate ?? '',
         initialRemarks: _remarksByPlate[normalizedPlate] ?? '',
+        initialRentalCompany: _rentalCompanyByPlate[normalizedPlate] ?? '',
+        // Bereits bei anderen Fahrzeugen erfasste Rental-Firmen als
+        // Dropdown-Vorschläge (Ticket 1c).
+        knownRentalCompanies:
+            (_rentalCompanyByPlate.values.toSet().toList()..sort()),
       ),
     );
     if (result == null) return;
@@ -1012,6 +1101,16 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
         await _saveVehicleWorkshop(scope, draft.plateNumber, result.workshop);
         await _saveTuvDate(scope, draft.plateNumber, result.tuvDate);
         await _saveVehicleRemarks(scope, draft.plateNumber, result.remarks);
+        // Rental-Firma (Ticket 1c) — nur für SESO Rental gepflegt; eine
+        // leere Auswahl räumt das Feld.
+        if (draft.category == VehicleCategory.sesoRental) {
+          final rentalCompany = result.rentalCompany.trim();
+          await _saveVehicleExtras(scope, draft.plateNumber, <String, dynamic>{
+            'rentalCompany': rentalCompany.isEmpty
+                ? FieldValue.delete()
+                : rentalCompany,
+          });
+        }
       } catch (_) {
         // Non-fatal: the vehicle itself was saved successfully.
       }
@@ -1297,6 +1396,24 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
 
     _GroundingDialogResult? grounding;
     if (status.isGrounded) {
+      // Referenzen des DSP (Werkstätten, Vermieter, …) für die optionale
+      // Zuordnung im Grounding-Dialog — best-effort, ohne Referenzen zeigt
+      // der Dialog schlicht keine Auswahl.
+      var references = const <(String, String)>[];
+      final scope = _scopeUid;
+      if (scope != null) {
+        try {
+          final snap = await _referencesCollection(scope).orderBy('name').get();
+          references = <(String, String)>[
+            for (final doc in snap.docs)
+              if ((doc.data()['name'] ?? '').toString().trim().isNotEmpty)
+                (doc.id, (doc.data()['name'] ?? '').toString().trim()),
+          ];
+        } catch (_) {
+          // Kein Leserecht o. Ä. — Dialog ohne Referenz-Auswahl.
+        }
+      }
+      if (!mounted) return;
       grounding = await showDialog<_GroundingDialogResult>(
         context: context,
         builder: (_) => _ServiceEndDateDialog(
@@ -1310,6 +1427,10 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
           // Dialogs (Kundenticket „why is it grounded").
           askReason: true,
           initialReason: _groundedReasonByPlate[normalizedPlate] ?? '',
+          // Optionale Referenz (Ticket 1c) — z. B. die Werkstatt, zu der
+          // das Fahrzeug gebracht wurde.
+          references: references,
+          initialReferenceName: _groundedReferenceByPlate[normalizedPlate],
         ),
       );
       if (!mounted || grounding == null) return;
@@ -1340,7 +1461,13 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
     // Grounding: Grund am Fahrzeug ablegen (fleet_vehicle_extras) und als
     // Event in die Fahrzeug-Historie schreiben.
     if (updated && status.isGrounded && grounding != null && mounted) {
-      await _persistGroundingReason(vehicle, status, grounding.reason);
+      await _persistGroundingReason(
+        vehicle,
+        status,
+        grounding.reason,
+        referenceId: grounding.referenceId,
+        referenceName: grounding.referenceName,
+      );
     }
 
     // Wieder im Einsatz? Dann ist der alte Grund hinfällig — das Event in
@@ -1373,12 +1500,16 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
   Future<void> _persistGroundingReason(
     FleetVehicle vehicle,
     VehicleStatus status,
-    String reason,
-  ) async {
+    String reason, {
+    String referenceId = '',
+    String referenceName = '',
+  }) async {
     final scope = _scopeUid;
     if (scope == null) return;
     final de = Localizations.localeOf(context).languageCode == 'de';
     final trimmed = reason.trim();
+    final trimmedReferenceId = referenceId.trim();
+    final trimmedReferenceName = referenceName.trim();
     final statusLabel = _statusLabel(context, status);
 
     try {
@@ -1386,6 +1517,13 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
         'groundedReason': trimmed,
         'groundedAt': FieldValue.serverTimestamp(),
         'groundedBy': FirebaseAuth.instance.currentUser?.uid ?? '',
+        // Optionale Referenz (fleet_references) — leere Auswahl räumt sie.
+        'groundedReferenceId': trimmedReferenceId.isEmpty
+            ? FieldValue.delete()
+            : trimmedReferenceId,
+        'groundedReferenceName': trimmedReferenceName.isEmpty
+            ? FieldValue.delete()
+            : trimmedReferenceName,
       });
     } catch (_) {
       // Non-fatal: the status change itself already went through.
@@ -1402,7 +1540,11 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
             'plate': vehicle.plateNumber,
             'type': 'other',
             'title': de ? 'Stillgelegt' : 'Grounded',
-            'subtitle': trimmed.isEmpty ? statusLabel : trimmed,
+            'subtitle': <String>[
+              trimmed.isEmpty ? statusLabel : trimmed,
+              if (trimmedReferenceName.isNotEmpty)
+                '${de ? 'Referenz' : 'Reference'}: $trimmedReferenceName',
+            ].join(' · '),
             'date': Timestamp.fromDate(DateTime(now.year, now.month, now.day)),
             'km': null,
             'createdAt': FieldValue.serverTimestamp(),
@@ -1421,6 +1563,8 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
         'groundedReason': FieldValue.delete(),
         'groundedAt': FieldValue.delete(),
         'groundedBy': FieldValue.delete(),
+        'groundedReferenceId': FieldValue.delete(),
+        'groundedReferenceName': FieldValue.delete(),
       });
     } catch (_) {
       // Non-fatal: the status change itself already went through.
@@ -1655,19 +1799,40 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
     }
   }
 
+  /// Bemerkungs-Manager (Ticket 1b): Liste der Bemerkungen mit Hinzufügen /
+  /// Bearbeiten / Löschen und Fotos je Bemerkung. Liest immer frisch aus
+  /// Firestore (Fallback: Alt-Feld `remarks` als Ein-Element-Liste) und
+  /// schreibt `remarkList` plus den `remarks`-Spiegel zurück.
   Future<void> _editVehicleRemarks(
     String scope,
     FleetVehicle vehicle,
     String current,
   ) async {
     final de = Localizations.localeOf(context).languageCode == 'de';
-    final text = await _showMultilineEditor(
-      title: de ? 'Bemerkungen' : 'Remarks',
-      initialValue: current,
-    );
-    if (text == null) return;
+    final plate = normalizePlateNumber(vehicle.plateNumber);
+    List<FleetVehicleRemark> initial;
     try {
-      await _saveVehicleRemarks(scope, vehicle.plateNumber, text);
+      final snapshot = await _extrasCollection(scope).doc(plate).get();
+      initial = fleetVehicleRemarksFromExtras(
+        snapshot.data() ?? const <String, dynamic>{},
+      );
+    } catch (_) {
+      initial = current.trim().isEmpty
+          ? const <FleetVehicleRemark>[]
+          : <FleetVehicleRemark>[FleetVehicleRemark(text: current.trim())];
+    }
+    if (!mounted) return;
+    final result = await showDialog<List<FleetVehicleRemark>>(
+      context: context,
+      builder: (_) => _VehicleRemarksManagerDialog(
+        scope: scope,
+        plate: plate,
+        initial: initial,
+      ),
+    );
+    if (result == null || !mounted) return;
+    try {
+      await _writeVehicleRemarkList(scope, plate, result);
       if (!mounted) return;
       _showSnack(de ? 'Bemerkungen gespeichert.' : 'Remarks saved.');
     } catch (e) {
@@ -1846,8 +2011,12 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                       // "no workshop data" instead of breaking the page.
                       final workshopByPlate = <String, String>{};
                       final remarksByPlate = <String, String>{};
+                      final remarkListByPlate =
+                          <String, List<FleetVehicleRemark>>{};
                       final leasingByPlate = <String, String>{};
+                      final rentalCompanyByPlate = <String, String>{};
                       final groundedReasonByPlate = <String, String>{};
+                      final groundedReferenceByPlate = <String, String>{};
                       final groundedAtByPlate = <String, DateTime>{};
                       {
                         for (final doc in extrasDocs) {
@@ -1858,12 +2027,16 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                             workshopByPlate[normalizePlateNumber(doc.id)] =
                                 workshop;
                           }
-                          final remarks = (doc.data()['remarks'] ?? '')
-                              .toString()
-                              .trim();
-                          if (remarks.isNotEmpty) {
+                          // Mehrfach-Bemerkungen (remarkList, Fallback altes
+                          // Einzelfeld `remarks`).
+                          final remarkList = fleetVehicleRemarksFromExtras(
+                            doc.data(),
+                          );
+                          if (remarkList.isNotEmpty) {
+                            remarkListByPlate[normalizePlateNumber(doc.id)] =
+                                remarkList;
                             remarksByPlate[normalizePlateNumber(doc.id)] =
-                                remarks;
+                                remarkList.first.text;
                           }
                           final leasing = (doc.data()['leasingProvider'] ?? '')
                               .toString()
@@ -1871,6 +2044,16 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                           if (leasing.isNotEmpty) {
                             leasingByPlate[normalizePlateNumber(doc.id)] =
                                 leasing;
+                          }
+                          final rentalCompany =
+                              (doc.data()['rentalCompany'] ?? '')
+                                  .toString()
+                                  .trim();
+                          if (rentalCompany.isNotEmpty) {
+                            rentalCompanyByPlate[normalizePlateNumber(
+                                  doc.id,
+                                )] =
+                                rentalCompany;
                           }
                           final groundedReason =
                               (doc.data()['groundedReason'] ?? '')
@@ -1881,6 +2064,16 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                                   doc.id,
                                 )] =
                                 groundedReason;
+                          }
+                          final groundedReference =
+                              (doc.data()['groundedReferenceName'] ?? '')
+                                  .toString()
+                                  .trim();
+                          if (groundedReference.isNotEmpty) {
+                            groundedReferenceByPlate[normalizePlateNumber(
+                                  doc.id,
+                                )] =
+                                groundedReference;
                           }
                           final groundedAt = _asDateTime(
                             doc.data()['groundedAt'],
@@ -1893,8 +2086,11 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                       }
                       _workshopByPlate = workshopByPlate;
                       _remarksByPlate = remarksByPlate;
+                      _remarkListByPlate = remarkListByPlate;
                       _leasingByPlate = leasingByPlate;
+                      _rentalCompanyByPlate = rentalCompanyByPlate;
                       _groundedReasonByPlate = groundedReasonByPlate;
+                      _groundedReferenceByPlate = groundedReferenceByPlate;
                       _groundedAtByPlate = groundedAtByPlate;
 
                       final vehicles = _filteredVehicles(
@@ -3047,7 +3243,7 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
               MobileIconButton(
                 icon: Icons.tune,
                 tooltip: de ? 'Filter' : 'Filters',
-                active: _tuvFilter != _tuvAllValue,
+                active: _tuvFilter != _tuvAllValue || _showArchived,
                 onTap: _showMobileFilterSheet,
               ),
               const SizedBox(width: 8),
@@ -3072,8 +3268,9 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
       );
     }
 
-    // Desktop / Tablet: Pills, Suche, TÜV-Filter, Sortierung und „+ Neu".
+    // Desktop / Tablet: Pills, Suche, TÜV-Filter, Archiv, Sortierung, „+ Neu".
     final tuvFilter = _buildTuvFilterPill(context);
+    final archiveToggle = _buildArchiveTogglePill(context);
     final sort = _buildSortPill(context);
     final addButton = _canManageVehicles ? _buildAddMenu(context) : null;
 
@@ -3088,6 +3285,8 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
               Expanded(child: search),
               const SizedBox(width: 8),
               tuvFilter,
+              const SizedBox(width: 8),
+              archiveToggle,
               const SizedBox(width: 8),
               sort,
               if (addButton != null) ...[const SizedBox(width: 8), addButton],
@@ -3105,9 +3304,55 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
         const SizedBox(width: 8),
         tuvFilter,
         const SizedBox(width: 8),
+        archiveToggle,
+        const SizedBox(width: 8),
         sort,
         if (addButton != null) ...[const SizedBox(width: 8), addButton],
       ],
+    );
+  }
+
+  /// Archiv-Toggle (Ticket 2a): blendet ausgemusterte (inaktive) Fahrzeuge
+  /// ein/aus — Default aus. Optik wie die [_FilterPill]s daneben.
+  Widget _buildArchiveTogglePill(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final foreground = _showArchived ? _kAccentGreen : _kSubtle;
+    return Tooltip(
+      message: de
+          ? 'Ausgemusterte (inaktive) Fahrzeuge ein-/ausblenden'
+          : 'Show/hide retired (inactive) vehicles',
+      waitDuration: const Duration(milliseconds: 400),
+      child: Material(
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(999),
+          side: BorderSide(color: _showArchived ? _kAccentGreen : _kLine),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => setState(() => _showArchived = !_showArchived),
+          child: Container(
+            height: 38,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.inventory_2_outlined, size: 15, color: foreground),
+                const SizedBox(width: 6),
+                Text(
+                  de ? 'Archiv' : 'Archive',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: foreground,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -3212,6 +3457,30 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
                 Navigator.of(ctx).pop();
               },
             ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+            child: Text(
+              (de ? 'Archiv' : 'Archive').toUpperCase(),
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+                color: _kFaint,
+              ),
+            ),
+          ),
+          MobileSheetOption(
+            icon: Icons.inventory_2_outlined,
+            label: de
+                ? 'Ausgemusterte Fahrzeuge anzeigen'
+                : 'Show retired vehicles',
+            selected: _showArchived,
+            onTap: () {
+              setState(() => _showArchived = !_showArchived);
+              Navigator.of(ctx).pop();
+            },
+          ),
         ],
       ),
     );
@@ -4099,52 +4368,26 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
     FleetVehicle vehicle, {
     double fontSize = 11.5,
   }) {
-    final remark =
-        (_remarksByPlate[normalizePlateNumber(vehicle.plateNumber)] ?? '')
-            .trim();
-    if (remark.isEmpty) return null;
     // Amber statt Grau: die Bemerkung ist ein Hinweis, kein Stammdatum —
     // sie darf im Grau-Raster der Zeile auffallen, ohne wie ein Fehler
-    // (rot) zu wirken. Tooltip trägt den vollen Text, weil die Zeile nach
-    // zwei Zeilen abschneidet.
-    return Tooltip(
-      message: remark,
-      waitDuration: const Duration(milliseconds: 400),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Padding(
-            padding: EdgeInsets.only(top: 1.5),
-            child: Icon(
-              Icons.sticky_note_2_outlined,
-              size: 13,
-              color: _kAccentAmber,
-            ),
-          ),
-          const SizedBox(width: 5),
-          Expanded(
-            child: Text(
-              remark,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: fontSize,
-                fontWeight: FontWeight.w600,
-                color: _kAccentAmber,
-                height: 1.3,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+    // (rot) zu wirken. Je Bemerkung max. zwei Zeilen (Tooltip trägt den
+    // vollen Text); Bemerkungen mit Fotos zeigen ein Kamera-Icon, das das
+    // Foto-Popup öffnet (gleiche Optik wie das VIN-QR-Popup).
+    final remarks =
+        _remarkListByPlate[normalizePlateNumber(vehicle.plateNumber)] ??
+        const <FleetVehicleRemark>[];
+    if (remarks.isEmpty) return null;
+    return FleetRemarkLines(remarks: remarks, fontSize: fontSize, iconSize: 13);
   }
 
-  /// Kennzeichen-Schild + Besitz-Badge + Leasingzeile.
+  /// Kennzeichen-Schild + Besitz-Badge + Leasingzeile (+ Rental-Firma bei
+  /// SESO-/Rental-Fahrzeugen, Ticket 1c).
   Widget _rowPlateBlock(BuildContext context, FleetVehicle vehicle) {
     final de = Localizations.localeOf(context).languageCode == 'de';
     final leasing =
         _leasingByPlate[normalizePlateNumber(vehicle.plateNumber)] ?? '';
+    final rentalCompany =
+        _rentalCompanyByPlate[normalizePlateNumber(vehicle.plateNumber)] ?? '';
     final (badgeBg, badgeFg) = _ownerBadgeColors(vehicle.category);
 
     return Column(
@@ -4194,6 +4437,34 @@ class _FleetStatusPageState extends State<FleetStatusPage> {
             ),
           ],
         ),
+        if (rentalCompany.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Tooltip(
+            message: de
+                ? 'Rental-Firma: $rentalCompany'
+                : 'Rental company: $rentalCompany',
+            waitDuration: const Duration(milliseconds: 400),
+            child: Row(
+              children: [
+                const Icon(Icons.business_outlined, size: 13, color: _kFaint),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    rentalCompany,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: _kSubtle,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -4619,6 +4890,405 @@ class _HorizontalDragScrollBehavior extends MaterialScrollBehavior {
   };
 }
 
+/// Ein Eintrag im Bemerkungs-Manager: Text-Controller plus Fotoliste.
+class _RemarkDraft {
+  _RemarkDraft(FleetVehicleRemark remark)
+    : controller = TextEditingController(text: remark.text),
+      photos = List<FleetVehicleRemarkPhoto>.of(remark.photos),
+      createdAt = remark.createdAt;
+
+  _RemarkDraft.empty()
+    : controller = TextEditingController(),
+      photos = <FleetVehicleRemarkPhoto>[],
+      createdAt = null;
+
+  final TextEditingController controller;
+  final List<FleetVehicleRemarkPhoto> photos;
+  final Object? createdAt;
+  bool uploading = false;
+
+  FleetVehicleRemark toRemark() => FleetVehicleRemark(
+    text: controller.text.trim(),
+    photos: List<FleetVehicleRemarkPhoto>.of(photos),
+    createdAt: createdAt,
+  );
+}
+
+/// Bemerkungs-Manager (Ticket 1b): mehrere Bemerkungen je Fahrzeug, je
+/// Bemerkung Fotos. Fotos landen im bereits freigegebenen Storage-Pfad
+/// `vehicles/{dspUid}/{plate}/events/…` (Admin + Dispatcher, Bilder/PDF,
+/// max. 20 MB — keine Rules-Änderung nötig). Gibt beim Speichern die
+/// bereinigte Liste zurück; `null` = abgebrochen.
+class _VehicleRemarksManagerDialog extends StatefulWidget {
+  const _VehicleRemarksManagerDialog({
+    required this.scope,
+    required this.plate,
+    required this.initial,
+  });
+
+  final String scope;
+  final String plate;
+  final List<FleetVehicleRemark> initial;
+
+  @override
+  State<_VehicleRemarksManagerDialog> createState() =>
+      _VehicleRemarksManagerDialogState();
+}
+
+class _VehicleRemarksManagerDialogState
+    extends State<_VehicleRemarksManagerDialog> {
+  late final List<_RemarkDraft> _drafts;
+
+  /// Controller entfernter Einträge — erst beim Schließen des Dialogs
+  /// disposen, damit ein noch montiertes TextField nicht auf einen bereits
+  /// disposten Controller zugreift.
+  final List<TextEditingController> _removedControllers =
+      <TextEditingController>[];
+
+  @override
+  void initState() {
+    super.initState();
+    _drafts = <_RemarkDraft>[
+      for (final remark in widget.initial) _RemarkDraft(remark),
+    ];
+    if (_drafts.isEmpty) _drafts.add(_RemarkDraft.empty());
+  }
+
+  @override
+  void dispose() {
+    for (final draft in _drafts) {
+      draft.controller.dispose();
+    }
+    for (final controller in _removedControllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  bool get _anyUploading => _drafts.any((d) => d.uploading);
+
+  Future<void> _addPhoto(_RemarkDraft draft) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      withData: true,
+    );
+    if (picked == null || picked.files.isEmpty || !mounted) return;
+    final file = picked.files.first;
+    final bytes = file.bytes;
+    if (bytes == null) {
+      _snack(
+        de ? 'Datei konnte nicht gelesen werden.' : 'Could not read the file.',
+        error: true,
+      );
+      return;
+    }
+    if (bytes.lengthInBytes > 20 * 1024 * 1024) {
+      _snack(
+        de
+            ? 'Bild ist größer als 20 MB — bitte verkleinern.'
+            : 'Image is larger than 20 MB — please shrink it.',
+        error: true,
+      );
+      return;
+    }
+    setState(() => draft.uploading = true);
+    try {
+      final safeName = file.name.replaceAll(RegExp(r'[^\w.\-]+'), '_');
+      final ref = fb_storage.FirebaseStorage.instance.ref().child(
+        'vehicles/'
+        '${widget.scope}/'
+        '${widget.plate}/'
+        'events/'
+        'remark_${DateTime.now().millisecondsSinceEpoch}_$safeName',
+      );
+      await ref.putData(
+        bytes,
+        fb_storage.SettableMetadata(
+          contentType: _FleetStatusPageState._serviceUploadContentType(
+            file.name,
+          ),
+        ),
+      );
+      final url = await ref.getDownloadURL();
+      if (!mounted) return;
+      setState(() {
+        draft.photos.add(
+          FleetVehicleRemarkPhoto(url: url, path: ref.fullPath),
+        );
+      });
+    } catch (e) {
+      _snack(
+        de ? 'Upload fehlgeschlagen: $e' : 'Upload failed: $e',
+        error: true,
+      );
+    } finally {
+      if (mounted) setState(() => draft.uploading = false);
+    }
+  }
+
+  void _snack(String message, {bool error = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: error ? _FleetStatusPageState._kRed : null,
+        content: Text(message),
+      ),
+    );
+  }
+
+  void _submit() {
+    if (_anyUploading) return;
+    final remarks = <FleetVehicleRemark>[
+      for (final draft in _drafts)
+        if (!draft.toRemark().isEmpty) draft.toRemark(),
+    ];
+    Navigator.of(context).pop(remarks);
+  }
+
+  Widget _photoThumb(_RemarkDraft draft, FleetVehicleRemarkPhoto photo) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    return Stack(
+      children: [
+        InkWell(
+          onTap: () => showFleetRemarkPhotosPopup(
+            context,
+            FleetVehicleRemark(text: '', photos: <FleetVehicleRemarkPhoto>[photo]),
+          ),
+          borderRadius: BorderRadius.circular(8),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.network(
+              photo.url,
+              width: 56,
+              height: 56,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stack) => Container(
+                width: 56,
+                height: 56,
+                color: _FleetStatusPageState._kRowLine,
+                child: const Icon(
+                  Icons.broken_image_outlined,
+                  size: 20,
+                  color: _FleetStatusPageState._kFaint,
+                ),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          top: 0,
+          right: 0,
+          child: Tooltip(
+            message: de ? 'Foto entfernen' : 'Remove photo',
+            child: InkWell(
+              onTap: () => setState(() => draft.photos.remove(photo)),
+              borderRadius: BorderRadius.circular(99),
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Colors.black54,
+                  shape: BoxShape.circle,
+                ),
+                padding: const EdgeInsets.all(2),
+                child: const Icon(Icons.close, size: 12, color: Colors.white),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _draftCard(int index, _RemarkDraft draft, bool de) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9FAFB),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _FleetStatusPageState._kBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: draft.controller,
+            minLines: 1,
+            maxLines: 4,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: InputDecoration(
+              hintText: de
+                  ? 'Bemerkung ${index + 1} — z. B. Schiebetür klemmt'
+                  : 'Remark ${index + 1} — e.g. sliding door jams',
+              isDense: true,
+              border: InputBorder.none,
+            ),
+            style: const TextStyle(fontSize: 13.5, height: 1.35),
+          ),
+          if (draft.photos.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final photo in draft.photos) _photoThumb(draft, photo),
+              ],
+            ),
+          ],
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              TextButton.icon(
+                onPressed: draft.uploading ? null : () => _addPhoto(draft),
+                icon: draft.uploading
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.add_a_photo_outlined, size: 16),
+                style: TextButton.styleFrom(
+                  foregroundColor: _FleetStatusPageState._kAccentGreen,
+                  visualDensity: VisualDensity.compact,
+                ),
+                label: Text(
+                  draft.uploading
+                      ? (de ? 'Lädt hoch …' : 'Uploading …')
+                      : (de ? 'Foto hinzufügen' : 'Add photo'),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              IconButton(
+                tooltip: de ? 'Bemerkung löschen' : 'Delete remark',
+                onPressed: () => setState(() {
+                  _removedControllers.add(_drafts.removeAt(index).controller);
+                }),
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(
+                  Icons.delete_outline,
+                  size: 18,
+                  color: Color(0xFFC9A0A0),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    return Dialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: const BorderSide(color: _FleetStatusPageState._kBorder),
+      ),
+      insetPadding: const EdgeInsets.all(20),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520, maxHeight: 640),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      de ? 'Bemerkungen' : 'Remarks',
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: _FleetStatusPageState._kText,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: de ? 'Schließen' : 'Close',
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(
+                      Icons.close,
+                      color: _FleetStatusPageState._kMuted,
+                      size: 20,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                de
+                    ? 'Mehrere Bemerkungen je Fahrzeug, mit Fotos. Alle '
+                          'erscheinen im Fahrzeug-Kopf der Fleet-Liste.'
+                    : 'Multiple remarks per vehicle, with photos. All of '
+                          'them appear in the vehicle header of the fleet '
+                          'list.',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: _FleetStatusPageState._kMuted,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (var i = 0; i < _drafts.length; i++) ...[
+                        if (i > 0) const SizedBox(height: 10),
+                        _draftCard(i, _drafts[i], de),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () =>
+                      setState(() => _drafts.add(_RemarkDraft.empty())),
+                  icon: const Icon(Icons.add, size: 17),
+                  style: TextButton.styleFrom(
+                    foregroundColor: _FleetStatusPageState._kAccentGreen,
+                  ),
+                  label: Text(
+                    de ? 'Bemerkung hinzufügen' : 'Add remark',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  CoButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    label: de ? 'Abbrechen' : 'Cancel',
+                    variant: CoButtonVariant.quiet,
+                  ),
+                  const SizedBox(width: 10),
+                  CoButton(
+                    onPressed: _anyUploading ? null : _submit,
+                    label: de ? 'Speichern' : 'Save',
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Result of the vehicle editor: the vehicle draft itself plus the side
 /// data that is stored outside the vehicle document (workshop, TÜV date).
 class _VehicleEditorResult {
@@ -4627,12 +5297,17 @@ class _VehicleEditorResult {
     required this.workshop,
     required this.tuvDate,
     required this.remarks,
+    required this.rentalCompany,
   });
 
   final FleetVehicleDraft draft;
   final String workshop;
   final String tuvDate;
   final String remarks;
+
+  /// Rental-Firma (Ticket 1c) — nur für SESO-/Rental-Fahrzeuge relevant,
+  /// gespeichert in `fleet_vehicle_extras.rentalCompany`.
+  final String rentalCompany;
 }
 
 class _VehicleEditorDialog extends StatefulWidget {
@@ -4641,12 +5316,19 @@ class _VehicleEditorDialog extends StatefulWidget {
     this.initialWorkshop = '',
     this.initialTuvDate = '',
     this.initialRemarks = '',
+    this.initialRentalCompany = '',
+    this.knownRentalCompanies = const <String>[],
   });
 
   final FleetVehicle? vehicle;
   final String initialWorkshop;
   final String initialTuvDate;
   final String initialRemarks;
+
+  /// Rental-Firma des Fahrzeugs (SESO/Rental) plus die bereits bei anderen
+  /// Fahrzeugen erfassten Firmen für das Auswahl-Dropdown.
+  final String initialRentalCompany;
+  final List<String> knownRentalCompanies;
 
   @override
   State<_VehicleEditorDialog> createState() => _VehicleEditorDialogState();
@@ -4685,12 +5367,23 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
   late final TextEditingController _workshopCtrl;
   late final TextEditingController _tuvDateCtrl;
   late final TextEditingController _remarksCtrl;
+  late final TextEditingController _rentalCompanyCtrl;
+
+  /// Auswahl im Rental-Company-Dropdown: '' = keine, [_kRentalCustomValue]
+  /// = Freitext, sonst eine der bekannten Firmen.
+  static const String _kRentalCustomValue = '__custom__';
+  String _rentalCompanySelection = '';
 
   late VehicleCategory _category;
   late VehicleFuelType _fuelType;
   late VehicleStatus _status;
 
   bool get _isEditing => widget.vehicle != null;
+
+  /// Kategorien mit „Rental Company"-Sektion (Ticket 1c): SESO Rental hat
+  /// sonst keinerlei Vermieter-Feld — die anderen Rental-Kategorien führen
+  /// ihre Firma bereits in den Metadaten.
+  bool get _asksRentalCompany => _category == VehicleCategory.sesoRental;
 
   @override
   void initState() {
@@ -4772,6 +5465,16 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
     _workshopCtrl = TextEditingController(text: widget.initialWorkshop);
     _tuvDateCtrl = TextEditingController(text: widget.initialTuvDate);
     _remarksCtrl = TextEditingController(text: widget.initialRemarks);
+
+    final initialRental = widget.initialRentalCompany.trim();
+    _rentalCompanyCtrl = TextEditingController(text: initialRental);
+    if (initialRental.isEmpty) {
+      _rentalCompanySelection = '';
+    } else if (widget.knownRentalCompanies.contains(initialRental)) {
+      _rentalCompanySelection = initialRental;
+    } else {
+      _rentalCompanySelection = _kRentalCustomValue;
+    }
   }
 
   @override
@@ -4802,6 +5505,7 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
       _workshopCtrl,
       _tuvDateCtrl,
       _remarksCtrl,
+      _rentalCompanyCtrl,
     ]) {
       controller.dispose();
     }
@@ -4852,6 +5556,11 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
             : widget.initialWorkshop.trim(),
         tuvDate: _tuvDateCtrl.text.trim(),
         remarks: _remarksCtrl.text.trim(),
+        rentalCompany: !_asksRentalCompany
+            ? widget.initialRentalCompany.trim()
+            : _rentalCompanySelection == _kRentalCustomValue
+            ? _rentalCompanyCtrl.text.trim()
+            : _rentalCompanySelection,
       ),
     );
   }
@@ -5222,6 +5931,81 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
                 ),
                 const SizedBox(height: 12),
                 _buildMetadataFields(context),
+                if (_asksRentalCompany) ...[
+                  const SizedBox(height: 18),
+                  // Ticket 1c: Rental Company für SESO-/Rental-Fahrzeuge —
+                  // Auswahl aus bereits erfassten Firmen plus Freitext.
+                  const _SectionTitle(text: 'Rental Company'),
+                  const SizedBox(height: 12),
+                  Builder(
+                    builder: (context) {
+                      final de =
+                          Localizations.localeOf(context).languageCode == 'de';
+                      final known = <String>{
+                        ...widget.knownRentalCompanies,
+                        if (_rentalCompanySelection.isNotEmpty &&
+                            _rentalCompanySelection != _kRentalCustomValue)
+                          _rentalCompanySelection,
+                      }.toList()..sort();
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          DropdownButtonFormField<String>(
+                            initialValue: _rentalCompanySelection,
+                            decoration: _inputDecoration(
+                              label: de
+                                  ? 'Rental-Firma (Vermieter)'
+                                  : 'Rental company',
+                            ),
+                            dropdownColor: Colors.white,
+                            elevation: 8,
+                            borderRadius: BorderRadius.circular(14),
+                            items: [
+                              DropdownMenuItem<String>(
+                                value: '',
+                                child: Text(
+                                  de ? 'Keine' : 'None',
+                                  style: const TextStyle(
+                                    color: _FleetStatusPageState._kFaint,
+                                  ),
+                                ),
+                              ),
+                              for (final company in known)
+                                DropdownMenuItem<String>(
+                                  value: company,
+                                  child: Text(
+                                    company,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              DropdownMenuItem<String>(
+                                value: _kRentalCustomValue,
+                                child: Text(
+                                  de ? 'Andere / neu …' : 'Other / new …',
+                                ),
+                              ),
+                            ],
+                            onChanged: (value) => setState(
+                              () => _rentalCompanySelection = value ?? '',
+                            ),
+                          ),
+                          if (_rentalCompanySelection ==
+                              _kRentalCustomValue) ...[
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: _rentalCompanyCtrl,
+                              decoration: _inputDecoration(
+                                label: de
+                                    ? 'Name der Rental-Firma'
+                                    : 'Rental company name',
+                              ),
+                            ),
+                          ],
+                        ],
+                      );
+                    },
+                  ),
+                ],
                 const SizedBox(height: 18),
                 _SectionTitle(text: t.t('fleet_status_section_notes')),
                 const SizedBox(height: 12),
@@ -5252,6 +6036,12 @@ class _VehicleEditorDialogState extends State<_VehicleEditorDialog> {
                       maxLines: 5,
                       decoration: _inputDecoration(
                         label: de ? 'Bemerkungen / Remarks' : 'Remarks',
+                        helperText: de
+                            ? 'Erste Bemerkung des Fahrzeugs — weitere '
+                                  'Bemerkungen und Fotos über die '
+                                  'Detailseite.'
+                            : 'First remark of the vehicle — manage more '
+                                  'remarks and photos on the detail page.',
                       ),
                     );
                   },
@@ -5720,6 +6510,8 @@ class _GroundingDialogResult {
     required this.serviceEndDate,
     this.workshop = '',
     this.reason = '',
+    this.referenceId = '',
+    this.referenceName = '',
   });
 
   final String serviceEndDate;
@@ -5728,6 +6520,11 @@ class _GroundingDialogResult {
   /// Freitext „Grund der Stilllegung". Leer, wenn der Admin „Ohne Grund"
   /// gewählt hat — der Statuswechsel läuft dann trotzdem durch.
   final String reason;
+
+  /// Optionale Referenz aus `fleet_references` (Ticket 1c) — leer, wenn
+  /// keine gewählt wurde.
+  final String referenceId;
+  final String referenceName;
 }
 
 /// Schnellauswahl für den Stilllegungsgrund — tippen setzt den Freitext,
@@ -5749,6 +6546,8 @@ class _ServiceEndDateDialog extends StatefulWidget {
     this.initialWorkshop = '',
     this.askReason = false,
     this.initialReason = '',
+    this.references = const <(String, String)>[],
+    this.initialReferenceName,
   });
 
   final String initialValue;
@@ -5762,6 +6561,11 @@ class _ServiceEndDateDialog extends StatefulWidget {
   final bool askReason;
   final String initialReason;
 
+  /// Referenzen des DSP `(id, name)` — bei nicht-leerer Liste bietet der
+  /// Dialog eine optionale Zuordnung an (Ticket 1c).
+  final List<(String, String)> references;
+  final String? initialReferenceName;
+
   @override
   State<_ServiceEndDateDialog> createState() => _ServiceEndDateDialogState();
 }
@@ -5772,12 +6576,26 @@ class _ServiceEndDateDialogState extends State<_ServiceEndDateDialog> {
   late final TextEditingController _workshopController;
   late final TextEditingController _reasonController;
 
+  /// Aktuell gewählte Referenz-ID (`''` = keine).
+  String _referenceId = '';
+
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.initialValue);
     _workshopController = TextEditingController(text: widget.initialWorkshop);
     _reasonController = TextEditingController(text: widget.initialReason);
+    // Vorbelegung über den gespeicherten Namen (die ID lag im Bestand
+    // nicht immer vor) — erste Referenz mit passendem Namen gewinnt.
+    final initialName = (widget.initialReferenceName ?? '').trim();
+    if (initialName.isNotEmpty) {
+      for (final ref in widget.references) {
+        if (ref.$2 == initialName) {
+          _referenceId = ref.$1;
+          break;
+        }
+      }
+    }
   }
 
   @override
@@ -5802,11 +6620,20 @@ class _ServiceEndDateDialogState extends State<_ServiceEndDateDialog> {
 
   void _submit({required bool withReason}) {
     if (!(_formKey.currentState?.validate() ?? false)) return;
+    var referenceName = '';
+    for (final ref in widget.references) {
+      if (ref.$1 == _referenceId) {
+        referenceName = ref.$2;
+        break;
+      }
+    }
     Navigator.of(context).pop(
       _GroundingDialogResult(
         serviceEndDate: _controller.text.trim(),
         workshop: _workshopController.text.trim(),
         reason: withReason ? _reasonController.text.trim() : '',
+        referenceId: _referenceId,
+        referenceName: _referenceId.isEmpty ? '' : referenceName,
       ),
     );
   }
@@ -5922,6 +6749,63 @@ class _ServiceEndDateDialogState extends State<_ServiceEndDateDialog> {
                   ),
                   const SizedBox(height: 14),
                   _reasonSection(de),
+                  if (widget.references.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    // Optionale Referenz-Zuordnung (Ticket 1c): z. B. die
+                    // Werkstatt oder der Vermieter aus den Fleet-Referenzen.
+                    DropdownButtonFormField<String>(
+                      initialValue: _referenceId,
+                      decoration: InputDecoration(
+                        labelText: de
+                            ? 'Referenz (optional)'
+                            : 'Reference (optional)',
+                        filled: true,
+                        fillColor: const Color(0xFFF9FAFB),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: const BorderSide(
+                            color: _FleetStatusPageState._kBorder,
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: const BorderSide(
+                            color: _FleetStatusPageState._kBorder,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: const BorderSide(
+                            color: _FleetStatusPageState._kGreen,
+                          ),
+                        ),
+                      ),
+                      dropdownColor: Colors.white,
+                      elevation: 8,
+                      borderRadius: BorderRadius.circular(14),
+                      items: [
+                        DropdownMenuItem<String>(
+                          value: '',
+                          child: Text(
+                            de ? 'Keine Referenz' : 'No reference',
+                            style: const TextStyle(
+                              color: _FleetStatusPageState._kFaint,
+                            ),
+                          ),
+                        ),
+                        for (final ref in widget.references)
+                          DropdownMenuItem<String>(
+                            value: ref.$1,
+                            child: Text(
+                              ref.$2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
+                      onChanged: (value) =>
+                          setState(() => _referenceId = value ?? ''),
+                    ),
+                  ],
                   const SizedBox(height: 14),
                 ],
                 _DateInputField(
