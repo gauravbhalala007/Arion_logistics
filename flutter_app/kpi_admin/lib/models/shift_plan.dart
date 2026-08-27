@@ -105,6 +105,8 @@ class ShiftPlanEntry {
     this.menteeName = '',
     this.lateCancel = false,
     this.lateCancelReason = '',
+    this.dropped = false,
+    this.droppedReason = '',
     this.auditTrail = const <AuditEvent>[],
   });
 
@@ -142,8 +144,16 @@ class ShiftPlanEntry {
   /// the billed amount.
   final bool lateCancel;
 
+  /// Von DSP-Seite zurueckgegebene Tour („Dropped") — im Gegensatz zum
+  /// [lateCancel] (Amazon-seitiger Cut) hat der DSP die Tour selbst
+  /// abgegeben. Wird im Payment Check gesondert ausgewiesen.
+  final bool dropped;
+
   /// Optional reason note for the late cancel, e.g. "Krankmeldung 06:30".
   final String lateCancelReason;
+
+  /// Freitext-Grund zum [dropped]-Flag.
+  final String droppedReason;
 
   /// Append-only audit trail — every meaningful change appends one
   /// entry, written after a confirm dialog.
@@ -161,6 +171,8 @@ class ShiftPlanEntry {
     bool clearMentee = false,
     bool? lateCancel,
     String? lateCancelReason,
+    bool? dropped,
+    String? droppedReason,
     List<AuditEvent>? auditTrail,
     AuditEvent? appendAudit,
   }) =>
@@ -178,6 +190,8 @@ class ShiftPlanEntry {
             clearMentee ? '' : (menteeName ?? this.menteeName),
         lateCancel: lateCancel ?? this.lateCancel,
         lateCancelReason: lateCancelReason ?? this.lateCancelReason,
+        dropped: dropped ?? this.dropped,
+        droppedReason: droppedReason ?? this.droppedReason,
         auditTrail: appendAudit != null
             ? <AuditEvent>[...this.auditTrail, appendAudit]
             : (auditTrail ?? this.auditTrail),
@@ -196,6 +210,8 @@ class ShiftPlanEntry {
         'blocks': blocks.map((b) => b.toMap()).toList(),
         'lateCancel': lateCancel,
         'lateCancelReason': lateCancelReason.trim(),
+        'dropped': dropped,
+        'droppedReason': droppedReason.trim(),
         'auditTrail': auditTrail.map((a) => a.toMap()).toList(),
       };
 
@@ -217,6 +233,8 @@ class ShiftPlanEntry {
             : <ShiftBlock>[],
         lateCancel: m['lateCancel'] == true,
         lateCancelReason: (m['lateCancelReason'] ?? '').toString(),
+        dropped: m['dropped'] == true,
+        droppedReason: (m['droppedReason'] ?? '').toString(),
         auditTrail: (m['auditTrail'] is List)
             ? (m['auditTrail'] as List)
                 .whereType<Map>()

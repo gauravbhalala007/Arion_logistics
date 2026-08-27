@@ -1295,6 +1295,28 @@ class _WstColumn extends StatelessWidget {
                             'published plan. Loads only after confirmation.',
                     onPick: onPickPlan,
                   ),
+                  // Ablauf kurz erklaert (Ticket): Vortag hochladen,
+                  // am Tag danach Cuts/Drops markieren.
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      de
+                          ? 'So läuft es: Schichtplan am Vortag hochladen '
+                              'und speichern. Am nächsten Tag im '
+                              'Schichtplan markieren, welche Touren als '
+                              '„Cut · Late Cancel" storniert oder von '
+                              'DSP-Seite „Dropped" wurden — beides '
+                              'erscheint hier im Abgleich.'
+                          : 'How it works: upload and save the shift plan '
+                              'the day before. The next day, mark in the '
+                              'shift plan which tours were cancelled as '
+                              '"Cut · late cancel" or "Dropped" by the '
+                              'DSP — both show up here in the '
+                              'reconciliation.',
+                      style: const TextStyle(
+                          fontSize: 11.5, color: _kMuted, height: 1.4),
+                    ),
+                  ),
                   if (planError != null) _ErrorNote(planError!),
                   if (p != null) ..._planSummary(de, p),
                 ],
@@ -1319,6 +1341,25 @@ class _WstColumn extends StatelessWidget {
                         ? 'ZIP aus dem WST — oder Weekly Report & Package Report als CSV'
                         : 'ZIP from WST — or Weekly Report & Package Report as CSV',
                     onPick: onPick,
+                  ),
+                  // Kurz erklaert, wo der Export herkommt (Ticket).
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      de
+                          ? 'WST = Work Summary-Tool: in Cortex '
+                              '(logistics.amazon.de) in der Navigations'
+                              'leiste. Bei vollendeter Woche dort den '
+                              'Button „Wöchentlicher Export" nutzen und '
+                              'die Datei hier hochladen.'
+                          : 'WST = Work Summary Tool: in Cortex '
+                              '(logistics.amazon.de) in the navigation '
+                              'bar. Once the week is complete, use the '
+                              '"Weekly export" button there and upload '
+                              'the file here.',
+                      style: const TextStyle(
+                          fontSize: 11.5, color: _kMuted, height: 1.4),
+                    ),
                   ),
                   if (error != null) _ErrorNote(error!),
                   if (w != null) ..._summary(de, w),
@@ -1438,6 +1479,10 @@ class _WstColumn extends StatelessWidget {
       _SummaryRow(
         de ? 'Cuts (Late Cancel)' : 'Cuts (late cancel)',
         '${p.cutCount}',
+      ),
+      _SummaryRow(
+        de ? 'Dropped (DSP)' : 'Dropped (DSP)',
+        '${p.droppedCount}',
       ),
       _SummaryRow(
         de ? 'Ride-alongs' : 'Ride-alongs',
@@ -1795,10 +1840,12 @@ class _PlanConfirmDialog extends StatelessWidget {
                   ? '${data.totalDrivers} Fahrer · '
                       '${data.plannedRoutes} geplante Touren · '
                       '${data.cutCount} Cuts · '
+                      '${data.droppedCount} Dropped · '
                       '${data.rideAlongCount} Ride-alongs'
                   : '${data.totalDrivers} drivers · '
                       '${data.plannedRoutes} planned tours · '
                       '${data.cutCount} cuts · '
+                      '${data.droppedCount} dropped · '
                       '${data.rideAlongCount} ride-alongs',
               style: const TextStyle(
                   fontSize: 13, fontWeight: FontWeight.w800, color: _kInk),
@@ -2089,6 +2136,18 @@ class _PlanMarksSection extends StatelessWidget {
                 badgeColor: const Color(0xFFB42318),
                 detail: m.serviceSummary,
               ),
+            if (m.isDropped)
+              _markRow(
+                icon: Icons.remove_circle_outline,
+                iconColor: const Color(0xFFB45309),
+                date: m.date,
+                driver: m.driverName,
+                badge: m.droppedReason.trim().isEmpty
+                    ? (de ? 'Dropped (DSP)' : 'Dropped (DSP)')
+                    : 'Dropped (DSP) — ${m.droppedReason.trim()}',
+                badgeColor: const Color(0xFFB45309),
+                detail: m.serviceSummary,
+              ),
             if (m.isRideAlong)
               _markRow(
                 icon: Icons.group_outlined,
@@ -2138,6 +2197,18 @@ class _PlanMarksSection extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ],
+          if (marks.any((m) => m.isDropped)) ...[
+            const SizedBox(height: 6),
+            Text(
+              de
+                  ? 'Dropped-Touren wurden von DSP-Seite zurückgegeben — sie '
+                      'zählen weder als Tour noch als Late-Cancel-Position.'
+                  : 'Dropped tours were given back by the DSP — they count '
+                      'neither as a tour nor as a late-cancel position.',
+              style: const TextStyle(
+                  fontSize: 11, color: _kMuted, height: 1.35),
             ),
           ],
           if (marks.any((m) => m.isRideAlong)) ...[

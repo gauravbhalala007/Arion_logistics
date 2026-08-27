@@ -59,6 +59,11 @@ class ShiftPlanMark {
   final String transporterId;
   final bool isLateCancel;
   final String lateCancelReason;
+
+  /// Vom DSP zurueckgegebene Tour („Dropped") — nicht gefahren, nicht
+  /// abrechenbar, aber sichtbar im Abgleich.
+  final bool isDropped;
+  final String droppedReason;
   final bool isRideAlong;
   final String menteeName;
 
@@ -71,6 +76,8 @@ class ShiftPlanMark {
     required this.transporterId,
     required this.isLateCancel,
     required this.lateCancelReason,
+    this.isDropped = false,
+    this.droppedReason = '',
     required this.isRideAlong,
     required this.menteeName,
     required this.serviceSummary,
@@ -104,6 +111,8 @@ class ShiftPlanPaymentData {
   int get plannedRoutes => wst.totalRoutes;
 
   int get cutCount => marks.where((m) => m.isLateCancel).length;
+
+  int get droppedCount => marks.where((m) => m.isDropped).length;
 
   int get rideAlongCount => marks.where((m) => m.isRideAlong).length;
 }
@@ -204,13 +213,15 @@ ShiftPlanPaymentData buildShiftPlanPaymentData({
       // wants these visible next to the reconciliation result.
       final isRideAlong =
           entry.hasMentee || entry.menteeName.trim().isNotEmpty;
-      if (entry.lateCancel || isRideAlong) {
+      if (entry.lateCancel || entry.dropped || isRideAlong) {
         marks.add(ShiftPlanMark(
           date: day.date,
           driverName: entry.driverName,
           transporterId: entry.transporterId,
           isLateCancel: entry.lateCancel,
           lateCancelReason: entry.lateCancelReason,
+          isDropped: entry.dropped,
+          droppedReason: entry.droppedReason,
           isRideAlong: isRideAlong,
           menteeName: entry.menteeName,
           serviceSummary: entry.blocks
@@ -227,7 +238,9 @@ ShiftPlanPaymentData buildShiftPlanPaymentData({
       // Cut tours are not driven — Amazon pays them as "Late Cancel"
       // extras, never as route blocks. Excluding them keeps the route
       // comparison honest (a cut tour must NOT demand a paid block).
-      if (entry.lateCancel) continue;
+      // Dropped tours (given back by the DSP) are not driven either and
+      // are never billable — excluded the same way.
+      if (entry.lateCancel || entry.dropped) continue;
 
       for (final block in entry.blocks) {
         final hours = parseDurationHours(block.duration);

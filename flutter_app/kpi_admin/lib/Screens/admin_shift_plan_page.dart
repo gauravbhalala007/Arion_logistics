@@ -1800,6 +1800,14 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
           ? 'removed personal note'
           : 'updated personal note');
     }
+    if (a.dropped != b.dropped) {
+      out.add(b.dropped
+          ? 'marked as Dropped (DSP)'
+          : 'cleared Dropped mark');
+    } else if (b.dropped &&
+        a.droppedReason.trim() != b.droppedReason.trim()) {
+      out.add('changed drop reason');
+    }
     if (a.lateCancel != b.lateCancel) {
       out.add(b.lateCancel
           ? 'marked as Cut · Late Cancel'
@@ -2037,6 +2045,8 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
                     isPastOrToday: _isPastOrToday,
                     lateCancelCount:
                         _entries.where((e) => e.lateCancel).length,
+                    droppedCount:
+                        _entries.where((e) => e.dropped).length,
                     canPublish: _canPublish,
                     publishing: _publishing,
                     publishLabel:
@@ -2720,6 +2730,7 @@ class _Header extends StatelessWidget {
     this.publishedAt,
     this.isPastOrToday = false,
     this.lateCancelCount = 0,
+    this.droppedCount = 0,
     this.canPublish = false,
     this.publishing = false,
     this.publishLabel = 'Publish',
@@ -2742,6 +2753,7 @@ class _Header extends StatelessWidget {
   final DateTime? publishedAt;
   final bool isPastOrToday;
   final int lateCancelCount;
+  final int droppedCount;
   final bool canPublish;
   final bool publishing;
   final String publishLabel;
@@ -2967,6 +2979,39 @@ class _Header extends StatelessWidget {
                     '$lateCancelCount Cuts',
                     style: AppTypography.caption2.copyWith(
                       color: const Color(0xFFB91C1C),
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (droppedCount > 0) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 6,
+              ),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF3C7),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.remove_circle_outline,
+                    size: 14,
+                    color: Color(0xFFB45309),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '$droppedCount Dropped',
+                    style: AppTypography.caption2.copyWith(
+                      color: const Color(0xFFB45309),
                       fontWeight: FontWeight.w800,
                       letterSpacing: 0.4,
                     ),
@@ -3735,6 +3780,33 @@ class _AssignmentRow extends StatelessWidget {
                       ),
                     ),
                   const SizedBox(width: 6),
+                  if (entry.dropped) ...[
+                    const SizedBox(width: 6),
+                    Tooltip(
+                      message: entry.droppedReason.trim().isEmpty
+                          ? 'Dropped (DSP)'
+                          : 'Dropped (DSP): ${entry.droppedReason}',
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF3C7),
+                          borderRadius: BorderRadius.circular(999),
+                          border:
+                              Border.all(color: const Color(0xFFFDE68A)),
+                        ),
+                        child: const Text(
+                          'DROP',
+                          style: TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFFB45309),
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                   if (entry.lateCancel) ...[
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -3931,10 +4003,12 @@ class _EntryEditorDialogState extends State<_EntryEditorDialog> {
   late final TextEditingController _notes;
   late final TextEditingController _meet;
   late final TextEditingController _lcReason;
+  late final TextEditingController _dropReason;
   late ShiftKind _kind;
   String _menteeTid = '';
   String _menteeName = '';
   late bool _lateCancel;
+  late bool _dropped;
 
   @override
   void initState() {
@@ -3943,10 +4017,13 @@ class _EntryEditorDialogState extends State<_EntryEditorDialog> {
     _meet = TextEditingController(text: widget.entry.meetingTime);
     _lcReason =
         TextEditingController(text: widget.entry.lateCancelReason);
+    _dropReason =
+        TextEditingController(text: widget.entry.droppedReason);
     _kind = widget.entry.kind;
     _menteeTid = widget.entry.menteeTransporterId;
     _menteeName = widget.entry.menteeName;
     _lateCancel = widget.entry.lateCancel;
+    _dropped = widget.entry.dropped;
   }
 
   @override
@@ -3954,6 +4031,7 @@ class _EntryEditorDialogState extends State<_EntryEditorDialog> {
     _notes.dispose();
     _meet.dispose();
     _lcReason.dispose();
+    _dropReason.dispose();
     super.dispose();
   }
 
@@ -4220,9 +4298,30 @@ class _EntryEditorDialogState extends State<_EntryEditorDialog> {
                         _LateCancelSection(
                           active: _lateCancel,
                           reasonCtrl: _lcReason,
-                          onToggle: () => setState(
-                            () => _lateCancel = !_lateCancel,
-                          ),
+                          onToggle: () => setState(() {
+                            _lateCancel = !_lateCancel;
+                            // Cut und Dropped schliessen sich aus — eine
+                            // Tour ist entweder Amazon-seitig storniert
+                            // oder vom DSP abgegeben.
+                            if (_lateCancel) _dropped = false;
+                          }),
+                        ),
+                        const SizedBox(height: 10),
+                        _LateCancelSection(
+                          active: _dropped,
+                          reasonCtrl: _dropReason,
+                          title: 'Mark as Dropped (DSP)',
+                          subtitle:
+                              'Tour was given back by the DSP — not driven, '
+                              'not billable.',
+                          icon: Icons.remove_circle_outline,
+                          activeColor: const Color(0xFFB45309),
+                          activeBg: const Color(0xFFFEF3C7),
+                          activeBorder: const Color(0xFFFDE68A),
+                          onToggle: () => setState(() {
+                            _dropped = !_dropped;
+                            if (_dropped) _lateCancel = false;
+                          }),
                         ),
                       ],
                       if (widget.entry.auditTrail.isNotEmpty) ...[
@@ -4275,6 +4374,10 @@ class _EntryEditorDialogState extends State<_EntryEditorDialog> {
                                 (isRegular && _lateCancel)
                                     ? _lcReason.text.trim()
                                     : '',
+                            dropped: isRegular && _dropped,
+                            droppedReason: (isRegular && _dropped)
+                                ? _dropReason.text.trim()
+                                : '',
                           ),
                         ),
                       );
@@ -4316,11 +4419,24 @@ class _LateCancelSection extends StatelessWidget {
     required this.active,
     required this.reasonCtrl,
     required this.onToggle,
+    this.title = 'Mark as Cut · Late Cancel',
+    this.subtitle =
+        'Tour was confirmed in last night\'s plan but cancelled today.',
+    this.icon = Icons.cancel_outlined,
+    this.activeColor = const Color(0xFFB91C1C),
+    this.activeBg = const Color(0xFFFEE2E2),
+    this.activeBorder = const Color(0xFFFCA5A5),
   });
 
   final bool active;
   final TextEditingController reasonCtrl;
   final VoidCallback onToggle;
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color activeColor;
+  final Color activeBg;
+  final Color activeBorder;
 
   @override
   Widget build(BuildContext context) {
@@ -4328,12 +4444,12 @@ class _LateCancelSection extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: active
-            ? const Color(0xFFFEE2E2)
+            ? activeBg
             : _AdminShiftPlanPageState._kSoft,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: active
-              ? const Color(0xFFFCA5A5)
+              ? activeBorder
               : _AdminShiftPlanPageState._kBorder,
           width: active ? 1.5 : 1,
         ),
@@ -4344,10 +4460,10 @@ class _LateCancelSection extends StatelessWidget {
           Row(
             children: [
               Icon(
-                Icons.cancel_outlined,
+                icon,
                 size: 18,
                 color: active
-                    ? const Color(0xFFB91C1C)
+                    ? activeColor
                     : _AdminShiftPlanPageState._kMuted,
               ),
               const SizedBox(width: 8),
@@ -4357,16 +4473,16 @@ class _LateCancelSection extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'Mark as Cut · Late Cancel',
+                      title,
                       style: AppTypography.subheadline.copyWith(
                         color: active
-                            ? const Color(0xFFB91C1C)
+                            ? activeColor
                             : _AdminShiftPlanPageState._kText,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
                     Text(
-                      'Tour was confirmed in last night\'s plan but cancelled today.',
+                      subtitle,
                       style: AppTypography.caption2.copyWith(
                         color: _AdminShiftPlanPageState._kMuted,
                         height: 1.4,
@@ -4377,7 +4493,7 @@ class _LateCancelSection extends StatelessWidget {
               ),
               Switch.adaptive(
                 value: active,
-                activeThumbColor: const Color(0xFFB91C1C),
+                activeThumbColor: activeColor,
                 onChanged: (_) => onToggle(),
               ),
             ],
