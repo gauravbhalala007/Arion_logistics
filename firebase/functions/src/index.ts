@@ -519,6 +519,24 @@ export const createDriverLogin = onCall(async (request) => {
       );
     }
 
+    // SICHERHEITS-CHECK (Rollen): gehoert die Email bereits einem
+    // Admin-, Dispatcher- oder Staff-Konto, darf daraus NIE ein
+    // Fahrer-Login werden — sonst werden Rolle und Auth-Claims des
+    // Kontos ueberschrieben und der Admin sperrt sich selbst aus.
+    // (Vorfall 27.08.2026: Admin legte sich selbst als Fahrer an.)
+    const existingRole =
+      (existingProfile.role ?? "").toString().trim().toLowerCase();
+    if (["admin", "dispatcher", "user", "developer"]
+      .includes(existingRole)) {
+      throw new HttpsError(
+        "failed-precondition",
+        `Diese Email gehoert bereits einem ${existingRole}-Konto. ` +
+        "Ein Admin-/Dispatcher-Konto kann nicht in einen Fahrer-Login " +
+        "umgewandelt werden — bitte eine andere Email fuer den Fahrer " +
+        "nutzen.",
+      );
+    }
+
     userRecord = await auth.updateUser(existingUser.uid, {
       password,
       displayName: driverName || undefined,
