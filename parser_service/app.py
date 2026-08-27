@@ -955,7 +955,9 @@ def extract_driver_rows(
 # ===============================
 # SUMMARY EXTRACTION
 # ===============================
-def extract_summary(pdf: pdfplumber.PDF) -> Dict[str, Any]:
+def extract_summary(
+    pdf: pdfplumber.PDF, filename: str = ""
+) -> Dict[str, Any]:
     text = "\n".join(filter(None, (p.extract_text() for p in pdf.pages))) or ""
     res: Dict[str, Any] = {}
 
@@ -1002,6 +1004,32 @@ def extract_summary(pdf: pdfplumber.PDF) -> Dict[str, Any]:
         res["stationCount"] = int(m.group(2))
 
     res.update(_parse_scorecard_summary_sections(pdf))
+
+    # Scorecard 3.0 (ab ~KW34/2026): der Kopftext nennt Station und Rank
+    # anders formuliert — bis die neuen Muster bekannt sind, rettet der
+    # Dateiname die Station ("DE-AION-DBY5-Week34-DSP-Scorecard-3.0.pdf").
+    if not res.get("stationCode") and filename:
+        if m := re.search(
+            r"^([A-Z]{2})-([A-Z0-9]+)-([A-Z0-9]{3,6})-Week(\d{1,2})",
+            filename,
+            re.IGNORECASE,
+        ):
+            res["stationCode"] = m.group(3).upper()
+            res.setdefault("weekNumber", int(m.group(4)))
+    if not res.get("weekText") and res.get("weekNumber") and res.get("year"):
+        res["weekText"] = f"Week {res['weekNumber']} - {res['year']}"
+    # Rank: neben "Rank at DBY5: 2 (+0 WoW" und "Rank in Station 2 of 5"
+    # auch die 3.0-Varianten "Station Rank: 2" bzw. "Rank: 2 (+0 WoW".
+    # Bewusst NUR Seite 1 (Summary) — im Volltext wuerde die "Rank"-
+    # Spalte der Fahrertabelle falsche Treffer liefern.
+    if res.get("rankAtStation") is None:
+        first_page = (pdf.pages[0].extract_text() or "") if pdf.pages else ""
+        if m := re.search(
+            r"(?:Station\s+Rank\s*[:#]?|Rank\s*:)\s*(\d{1,3})\b",
+            first_page,
+            re.IGNORECASE,
+        ):
+            res["rankAtStation"] = int(m.group(1))
 
     return res
 
@@ -2573,7 +2601,7 @@ async def parse_pdf(file: UploadFile = File(...)):
             summary = _extract_pod_quality_summary(pdf, filename)
             drivers = _extract_pod_quality_drivers(pdf)
         else:
-            summary = extract_summary(pdf)
+            summary = extract_summary(pdf, filename)
             week_number = summary.get("weekNumber") if summary else None
             year = summary.get("year") if summary else None  # <-- ADDED
 
