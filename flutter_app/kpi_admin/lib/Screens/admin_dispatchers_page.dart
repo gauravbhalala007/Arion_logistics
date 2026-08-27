@@ -24,15 +24,29 @@ import '../theme/app_typography.dart';
 /// Stable order of permission keys used by both the toggle list and the
 /// default-permissions in the Cloud Function. Keep these in sync.
 const List<_PermissionDef> kDispatcherPermissions = [
+  _PermissionDef('dashboard', 'Score Card Dashboard'),
+  _PermissionDef('pod_quality', 'POD Quality'),
+  _PermissionDef('concessions', 'Concessions'),
+  _PermissionDef('cdf', 'Customer Feedback'),
+  _PermissionDef('dwc', 'DWC / IADC'),
+  _PermissionDef('contact_compliance', 'Contact Compliance'),
   _PermissionDef('waveplan', 'Waveplan'),
+  _PermissionDef('shift_plan', 'Shift Plan'),
+  _PermissionDef('monthly_plan', 'Monthly Plan'),
   _PermissionDef('calendar', 'Kalender', 'Calendar'),
   _PermissionDef('drivers_hub', 'Drivers Hub'),
+  _PermissionDef('recruiting', 'Recruiting'),
   _PermissionDef('tasks', 'Tasks'),
   _PermissionDef('shift_absence', 'Shift & Absence'),
   _PermissionDef('fleet_status', 'Fleet Hub'),
+  _PermissionDef('vehicle_check', 'Fahrzeug-Check', 'Vehicle Check'),
   _PermissionDef('incident_reports', 'Incident Reports'),
+  _PermissionDef('inventory', 'Inventar', 'Inventory'),
+  _PermissionDef('cotimer', 'CoTimer'),
+  _PermissionDef('payment_check', 'Payment Check'),
   _PermissionDef('academy', 'Academy'),
   _PermissionDef('dispatcher_pill', 'Dispatcher Pill'),
+  _PermissionDef('notifications', 'Company Rules'),
   _PermissionDef('feedback', 'Feedback'),
   _PermissionDef('faqs', 'FAQs'),
   _PermissionDef('approvals', 'Driver Approvals'),
@@ -401,7 +415,10 @@ Future<void> _showEditSheet(
   final de = Localizations.localeOf(context).languageCode == 'de';
   bool localActive = active;
   final localPerms = <String, bool>{
-    for (final p in kDispatcherPermissions) p.key: permissions[p.key] ?? false,
+    // Fehlender Schalter = ERLAUBT — muss zum Fallback der Dispatcher-
+    // Shell passen. Stuende hier false, wuerde blosses Oeffnen+Speichern
+    // des Sheets dem Sub-Account alle neuen Module wegnehmen.
+    for (final p in kDispatcherPermissions) p.key: permissions[p.key] ?? true,
   };
   bool saving = false;
   bool deleting = false;
@@ -423,12 +440,29 @@ Future<void> _showEditSheet(
               error = null;
             });
             try {
+              // Rechte DIREKT nach Firestore schreiben statt ueber die
+              // Cloud Function: deren sanitizePermissions kennt nur die
+              // alten 15 Schluessel und wuerde die neuen Module-Schalter
+              // (Recruiting, Monthly Plan, Payment Check, ...) beim
+              // Speichern stillschweigend verwerfen. Das Sub-Account-Doc
+              // liegt unter dem eigenen Admin-Konto — der Write ist per
+              // Rules erlaubt.
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(adminUid)
+                  .collection('sub_accounts')
+                  .doc(dispatcherUid)
+                  .set({
+                'permissions': localPerms,
+                'updatedAt': FieldValue.serverTimestamp(),
+              }, SetOptions(merge: true));
+              // Aktiv/Inaktiv weiterhin ueber die Function — sie sperrt
+              // zusaetzlich den Auth-User (sofortiger Logout).
               await FirebaseFunctions.instanceFor(region: 'us-central1')
                   .httpsCallable('updateDispatcherAccount')
                   .call({
                 'dispatcherUid': dispatcherUid,
                 'active': localActive,
-                'permissions': localPerms,
               });
               if (sheetCtx.mounted) Navigator.of(sheetCtx).pop();
             } on FirebaseFunctionsException catch (e) {

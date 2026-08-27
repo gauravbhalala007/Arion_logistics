@@ -38,6 +38,16 @@ import 'feedback_page.dart';
 import 'fleet_status_page.dart';
 import 'task_sheet_page.dart';
 import '../widgets/new_version_gate.dart';
+import 'admin_cotimer_page.dart';
+import 'admin_inventory_page.dart';
+import 'admin_monthly_plan_page.dart';
+import 'admin_payment_check_page.dart';
+import 'admin_recruiting_page.dart';
+import 'admin_vehicle_check_page.dart';
+import 'cdf_overview.dart';
+import 'concessions_overview.dart';
+import 'contact_compliance_overview.dart';
+import 'dwc_overview.dart';
 import 'scorecard_overview.dart';
 import 'pod_quality_overview.dart';
 import 'notifications_page.dart';
@@ -99,6 +109,70 @@ const List<_ModuleEntry> _kAllModules = [
     icon: Icons.task_alt_rounded,
     label: 'Tasks',
     page: TaskSheetPage(),
+  ),
+  // Ticket „Sub accounts sollen alles sehen, was der Admin erlaubt":
+  // fehlende Admin-Module fuer Sub-Accounts freigeschaltet. Sichtbar
+  // ist, was die Dispatcher-Center-Schalter erlauben (fehlender
+  // Schalter = erlaubt).
+  _ModuleEntry(
+    key: 'concessions',
+    icon: Icons.report_gmailerrorred_outlined,
+    label: 'Concessions',
+    page: ConcessionsOverviewPage(),
+  ),
+  _ModuleEntry(
+    key: 'cdf',
+    icon: Icons.feedback_outlined,
+    label: 'Customer Feedback',
+    page: CdfOverviewPage(),
+  ),
+  _ModuleEntry(
+    key: 'dwc',
+    icon: Icons.verified_user_outlined,
+    label: 'DWC / IADC',
+    page: DwcOverviewPage(),
+  ),
+  _ModuleEntry(
+    key: 'contact_compliance',
+    icon: Icons.phone_in_talk_outlined,
+    label: 'Contact Compliance',
+    page: ContactComplianceOverviewPage(),
+  ),
+  _ModuleEntry(
+    key: 'recruiting',
+    icon: Icons.badge_outlined,
+    label: 'Recruiting',
+    page: AdminRecruitingPage(),
+  ),
+  _ModuleEntry(
+    key: 'monthly_plan',
+    icon: Icons.calendar_view_month_rounded,
+    label: 'Monthly Plan',
+    page: AdminMonthlyPlanPage(),
+  ),
+  _ModuleEntry(
+    key: 'vehicle_check',
+    icon: Icons.checklist_rounded,
+    label: 'Vehicle Check',
+    page: AdminVehicleCheckPage(),
+  ),
+  _ModuleEntry(
+    key: 'inventory',
+    icon: Icons.inventory_2_outlined,
+    label: 'Inventar',
+    page: AdminInventoryPage(),
+  ),
+  _ModuleEntry(
+    key: 'cotimer',
+    icon: Icons.timer_outlined,
+    label: 'CoTimer',
+    page: AdminCotimerPage(),
+  ),
+  _ModuleEntry(
+    key: 'payment_check',
+    icon: Icons.request_quote_outlined,
+    label: 'Payment Check',
+    page: AdminPaymentCheckPage(),
   ),
   _ModuleEntry(
     key: 'shift_plan',
@@ -203,11 +277,26 @@ class _DispatcherShellPageState extends State<DispatcherShellPage> {
             return const _DispatcherDisabled();
           }
 
-          // Volle Parität mit dem Admin: Dispatcher sieht alle Module —
-          // alte `permissions: { … : false }`-Flags aus früheren Accounts
-          // werden bewusst ignoriert. Granulares Module-Gating kann
-          // später wieder eingeführt werden, wenn der Admin es braucht.
-          final allowed = List<_ModuleEntry>.from(_kAllModules);
+          // Ticket „Sub accounts sollen alles sehen, was der Admin
+          // erlaubt": Sichtbar ist jedes Modul, dessen Schalter im
+          // Dispatcher Center NICHT auf aus steht. Fehlt ein Schalter
+          // (neue Module, Alt-Konten ohne Eintrag), gilt ERLAUBT —
+          // so verliert kein bestehendes Konto durch dieses Update
+          // etwas, und der Admin kann gezielt einzelne Module abdrehen.
+          final perms = (data['permissions'] as Map?)
+                  ?.map((k, v) => MapEntry(k.toString(), v == true)) ??
+              const <String, bool>{};
+          // Sicherheitsnetz fuer Alt-Konten: aus der Vollparitaets-Aera
+          // liegen teils Maps mit AUSSCHLIESSLICH false-Werten — die
+          // waren nie eine bewusste Admin-Entscheidung. Erst wenn
+          // mindestens ein Schalter an ist (= der Admin hat die Rechte
+          // wirklich gepflegt), greift das Gating.
+          final managed = perms.values.any((v) => v);
+          final allowed = !managed
+              ? List<_ModuleEntry>.from(_kAllModules)
+              : _kAllModules
+                  .where((m) => !perms.containsKey(m.key) || perms[m.key]!)
+                  .toList(growable: false);
 
           // If the previously-active module got revoked, fall back to home.
           if (_active != 'home' &&

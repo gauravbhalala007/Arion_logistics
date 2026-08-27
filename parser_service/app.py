@@ -537,6 +537,11 @@ def compute_scores(
         dsc_penalty = avg_base * dsc_penalty_rate(dnr_val)
         lor_penalty = avg_base * lor_penalty_rate(lor_val)
         FinalScore = avg_base - ce_penalty - dsc_penalty - lor_penalty
+        # Kundenvorgabe: die Abzuege (insb. die CE-Escalation-Strafe von
+        # 90 Punkten) bleiben unveraendert, aber der Gesamtscore darf nie
+        # unter 2 % landen. Vorher konnte eine einzige Escalation den
+        # Score weit ins Negative druecken.
+        FinalScore = max(FinalScore, 2.0)
 
     return {
         "POD_Score": POD_Score, "CC_Score": CC_Score, "DCR_Score": DCR_Score,
