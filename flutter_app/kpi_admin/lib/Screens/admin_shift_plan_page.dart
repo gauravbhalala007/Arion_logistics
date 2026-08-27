@@ -1067,9 +1067,60 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
           ];
           if (_selectedDispatchers.isNotEmpty) {
             w.add(pw.SizedBox(height: 2));
-            w.add(pw.Text('Dispatchers: ${_selectedDispatchers.join(', ')}',
+            // Mit Schichtzeit je Dispatcher — nur der Name sagte dem
+            // Fahrer nicht, wen er wann erreicht.
+            w.add(pw.Text(
+                'Dispatchers: ${_selectedDispatchers.map((name) {
+                  final range = (_shiftByDispatcher[name] ??
+                          const <String>[])
+                      .where((t) => t.trim().isNotEmpty)
+                      .join('-');
+                  return range.isEmpty ? name : '$name ($range)';
+                }).join(', ')}',
                 style: const pw.TextStyle(
                     fontSize: 9, color: PdfColors.grey700)));
+          }
+          // Ticket „Notizen tauchen nicht auf": Tages-Notizen als
+          // eigener Block im PDF — gleicher Orange-Ton wie der
+          // Hinweiskasten im geteilten Link.
+          if (_planNotes.isNotEmpty) {
+            w.add(pw.SizedBox(height: 8));
+            w.add(pw.Container(
+              width: double.infinity,
+              padding: const pw.EdgeInsets.symmetric(
+                  horizontal: 8, vertical: 6),
+              decoration: pw.BoxDecoration(
+                color: const PdfColor.fromInt(0xFFFFF7ED),
+                borderRadius: pw.BorderRadius.circular(4),
+                border: pw.Border.all(
+                    color: const PdfColor.fromInt(0xFFFDBA74), width: 0.6),
+              ),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  for (final note in _planNotes) ...[
+                    if (note.title.trim().isNotEmpty)
+                      pw.Text(
+                        note.title.trim(),
+                        style: pw.TextStyle(
+                          fontSize: 8.5,
+                          fontWeight: pw.FontWeight.bold,
+                          color: const PdfColor.fromInt(0xFF92400E),
+                        ),
+                      ),
+                    if (note.body.trim().isNotEmpty)
+                      pw.Text(
+                        note.body.trim(),
+                        style: const pw.TextStyle(
+                          fontSize: 8.5,
+                          color: PdfColor.fromInt(0xFF92400E),
+                        ),
+                      ),
+                    if (note != _planNotes.last) pw.SizedBox(height: 4),
+                  ],
+                ],
+              ),
+            ));
           }
           // Legend at the top.
           w.add(pw.SizedBox(height: 8));
@@ -1205,10 +1256,26 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
               : dayLabel(days.first.key),
           'company': company,
           'station': station,
-          'notes':
-              'P = Parking Time / Meeting Time · W = Waiting Area (Working Time)',
-          // Ticket: die P/W-Erklaerung zusaetzlich dezent unten im
-          // gruenen Kopfbereich der oeffentlichen Seite.
+          // Ticket „Notizen tauchen nicht auf": die echten Tages-Notizen
+          // in den orangen Hinweiskasten der oeffentlichen Seite — die
+          // P/W-Legende hat ihr eigenes Feld unten im gruenen Kopf.
+          'notes': _planNotes
+              .map((n) => n.title.trim().isEmpty
+                  ? n.body.trim()
+                  : '${n.title.trim()}\n${n.body.trim()}')
+              .where((t) => t.isNotEmpty)
+              .join('\n\n'),
+          // Ticket „Dispatcher tauchen nicht auf": Namen + Schichtzeiten
+          // in die Dispatcher-Pillen der oeffentlichen Seite.
+          'dispatchers': [
+            for (final name in _selectedDispatchers)
+              {
+                'name': name,
+                'time': (_shiftByDispatcher[name] ?? const <String>[])
+                    .where((t) => t.trim().isNotEmpty)
+                    .join(' \u2013 '),
+              },
+          ],
           'legend':
               'P = Parking Time / Meeting Time \u00b7 W = Waiting Area (Working Time)',
           'sections': sections,
