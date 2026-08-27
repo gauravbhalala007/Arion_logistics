@@ -36,6 +36,7 @@ import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart' as sf;
 
 import '../services/payment_check_parser.dart';
+import '../services/shift_plan_payment_source.dart';
 import '../widgets/admin_scope.dart';
 
 const _kAccent = Color(0xFF00B287);
@@ -394,27 +395,42 @@ class _PaymentCheckBody extends StatefulWidget {
   State<_PaymentCheckBody> createState() => _PaymentCheckBodyState();
 }
 
+/// Which data feeds column 2: the classic WST upload or a saved shift plan
+/// loaded from Firestore (drafts first, published fallback).
+enum _WstSource { upload, shiftPlan }
+
 class _PaymentCheckBodyState extends State<_PaymentCheckBody> {
   // ── in-memory only ──────────────────────────────────────────────────────
   // Nothing below is ever persisted. No Firestore write, no Storage upload,
   // no parser_service call. A page reload wipes all of it, by design.
+  // (The shift-plan source only READS the admin's own, already-stored
+  // shift_plan_drafts / shift_plans docs — it never writes anything.)
   InvoiceData? _invoice;
   String? _invoiceFileName;
   bool _invoiceLoading = false;
   String? _invoiceError;
 
-  WstData? _wst;
+  WstData? _wstUpload;
   List<String> _wstFileNames = const <String>[];
   bool _wstLoading = false;
   String? _wstError;
+
+  _WstSource _wstSource = _WstSource.upload;
+  ShiftPlanPaymentData? _planData;
+  bool _planLoading = false;
+  String? _planError;
 
   ReconResult? _result;
 
   bool get _de => Localizations.localeOf(context).languageCode == 'de';
 
+  /// The WST-shaped data of the ACTIVE source tab.
+  WstData? get _activeWst =>
+      _wstSource == _WstSource.upload ? _wstUpload : _planData?.wst;
+
   void _recompute() {
     final inv = _invoice;
-    final wst = _wst;
+    final wst = _activeWst;
     _result = (inv != null && wst != null) ? reconcile(inv, wst) : null;
   }
 
@@ -528,8 +544,8 @@ class _PaymentCheckBodyState extends State<_PaymentCheckBody> {
         // Uploads ergänzen sich: Weekly Report (Routen) und Package
         // Report (Pakete) dürfen nacheinander hochgeladen werden —
         // gleiche Komponente wird ersetzt, nie doppelt gezählt.
-        _wst = mergeWstData(_wst, parsed);
-        _wstFileNames = _wst!.filesUsed;
+        _wstUpload = mergeWstData(_wstUpload, parsed);
+        _wstFileNames = _wstUpload!.filesUsed;
         _wstLoading = false;
         _recompute();
       });
@@ -548,17 +564,133 @@ class _PaymentCheckBodyState extends State<_PaymentCheckBody> {
       _invoice = null;
       _invoiceFileName = null;
       _invoiceError = null;
-      _wst = null;
+      _wstUpload = null;
       _wstFileNames = const <String>[];
       _wstError = null;
+      _planData = null;
+      _planError = null;
       _result = null;
+    });
+  }
+
+  void _setWstSource(_WstSource source) {
+    if (source == _wstSource) return;
+    setState(() {
+      _wstSource = source;
+      _recompute();
+    });
+  }
+
+  // ── Shiftplan source ────────────────────────────────────────────────────
+
+  /// Default range for the shift-plan pick: the period the reconciliation
+  /// concerns anyway (the invoice period), otherwise the Amazon week
+  /// (Sunday–Saturday) that contains yesterday.
+  DateTimeRange _defaultPlanRange() {
+    final invStart = _invoice?.periodStart ?? _invoice?.minDate;
+    final invEnd = _invoice?.periodEnd ?? _invoice?.maxDate;
+    if (invStart != null && invEnd != null && !invEnd.isBefore(invStart)) {
+      return DateTimeRange(start: invStart, end: invEnd);
+    }
+    final now = DateTime.now();
+    final yesterday = DateTime(now.year, now.month, now.day)
+        .subtract(const Duration(days: 1));
+    // Amazon weeks run Sunday–Saturday (see the invoice header).
+    final start = yesterday.subtract(Duration(days: yesterday.weekday % 7));
+    return DateTimeRange(
+        start: start, end: start.add(const Duration(days: 6)));
+  }
+
+  Future<void> _pickShiftPlan() async {
+    final de = _de;
+    final adminUid = AdminScope.adminUidOf(context);
+    if (adminUid == null) return;
+
+    final now = DateTime.now();
+    final range = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(now.year - 2, 1, 1),
+      lastDate: DateTime(now.year, now.month, now.day)
+          .add(const Duration(days: 7)),
+      initialDateRange: _defaultPlanRange(),
+      helpText: de
+          ? 'Zeitraum des Schichtplans wählen'
+          : 'Select the shift plan period',
+      saveText: de ? 'Übernehmen' : 'Apply',
+    );
+    if (range == null || !mounted) return;
+    if (range.duration.inDays > 31) {
+      setState(() => _planError = de
+          ? 'Bitte höchstens 31 Tage auswählen.'
+          : 'Please select at most 31 days.');
+      return;
+    }
+
+    setState(() {
+      _planLoading = true;
+      _planError = null;
+    });
+    ShiftPlanPaymentData data;
+    try {
+      data = await loadShiftPlanPaymentData(
+        adminUid: adminUid,
+        start: range.start,
+        end: range.end,
+        de: de,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _planLoading = false;
+        _planError = de
+            ? 'Schichtplan konnte nicht geladen werden: $e'
+            : 'Could not load the shift plan: $e';
+      });
+      return;
+    }
+    if (!mounted) return;
+
+    if (data.days.isEmpty) {
+      setState(() {
+        _planLoading = false;
+        _planError = range.start == range.end
+            ? (de
+                ? 'Kein gespeicherter Schichtplan für diesen Tag.'
+                : 'No saved shift plan for this day.')
+            : (de
+                ? 'Kein gespeicherter Schichtplan für diesen Zeitraum.'
+                : 'No saved shift plan for this period.');
+      });
+      return;
+    }
+
+    // Bestätigung — mit Fahrerzahl, die nach dem Lesen bekannt ist.
+    // Bis zur Bestätigung wird nichts in den Vergleich übernommen.
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) =>
+          _PlanConfirmDialog(data: data, range: range, de: de),
+    );
+    if (!mounted) return;
+    if (confirmed != true) {
+      setState(() => _planLoading = false);
+      return;
+    }
+
+    setState(() {
+      _planData = data;
+      _planLoading = false;
+      _planError = null;
+      _wstSource = _WstSource.shiftPlan;
+      _recompute();
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final de = _de;
-    final hasAnything = _invoice != null || _wst != null;
+    final hasAnything =
+        _invoice != null || _wstUpload != null || _planData != null;
 
     return SafeArea(
       child: Column(
@@ -568,7 +700,7 @@ class _PaymentCheckBodyState extends State<_PaymentCheckBody> {
             hasData: hasAnything,
             onClear: _clearAll,
             invoice: _invoice,
-            wst: _wst,
+            wst: _activeWst,
           ),
           Expanded(
             child: LayoutBuilder(
@@ -583,16 +715,26 @@ class _PaymentCheckBodyState extends State<_PaymentCheckBody> {
                   onPick: _pickInvoice,
                 );
                 final wstCol = _WstColumn(
-                  wst: _wst,
+                  wst: _wstUpload,
                   fileNames: _wstFileNames,
                   loading: _wstLoading,
                   error: _wstError,
                   onPick: _pickWst,
+                  source: _wstSource,
+                  onSourceChanged: _setWstSource,
+                  planData: _planData,
+                  planLoading: _planLoading,
+                  planError: _planError,
+                  onPickPlan: _pickShiftPlan,
                 );
                 final resultCol = _ResultColumn(
                   result: _result,
                   hasInvoice: _invoice != null,
-                  hasWst: _wst != null,
+                  hasWst: _activeWst != null,
+                  fromShiftPlan: _wstSource == _WstSource.shiftPlan,
+                  planMarks: _wstSource == _WstSource.shiftPlan
+                      ? (_planData?.marks ?? const <ShiftPlanMark>[])
+                      : const <ShiftPlanMark>[],
                 );
 
                 final banner = Padding(
@@ -1086,7 +1228,7 @@ class _InvoiceColumn extends StatelessWidget {
   }
 }
 
-// ── Column 2: Work Summary Tool export ──
+// ── Column 2: Work Summary Tool export / saved shift plan ──
 
 class _WstColumn extends StatelessWidget {
   final WstData? wst;
@@ -1095,30 +1237,68 @@ class _WstColumn extends StatelessWidget {
   final String? error;
   final VoidCallback onPick;
 
+  final _WstSource source;
+  final ValueChanged<_WstSource> onSourceChanged;
+  final ShiftPlanPaymentData? planData;
+  final bool planLoading;
+  final String? planError;
+  final VoidCallback onPickPlan;
+
   const _WstColumn({
     required this.wst,
     required this.fileNames,
     required this.loading,
     required this.error,
     required this.onPick,
+    required this.source,
+    required this.onSourceChanged,
+    required this.planData,
+    required this.planLoading,
+    required this.planError,
+    required this.onPickPlan,
   });
 
   @override
   Widget build(BuildContext context) {
     final de = Localizations.localeOf(context).languageCode == 'de';
+    final isPlan = source == _WstSource.shiftPlan;
     final w = wst;
+    final p = planData;
 
-    return _ColumnCard(
-      icon: Icons.summarize_outlined,
-      title: '2 · Work Summary Tool',
-      trailing: w == null
-          ? null
-          : IconButton(
-              tooltip: de ? 'Anderen Export' : 'Different export',
-              onPressed: onPick,
-              icon: const Icon(Icons.autorenew, size: 18, color: _kMuted),
-            ),
-      child: loading
+    final Widget body;
+    if (isPlan) {
+      body = planLoading
+          ? const Center(child: CircularProgressIndicator(color: _kAccent))
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _UploadZone(
+                    hasFile: p != null,
+                    primary: p != null
+                        ? (de
+                            ? 'Schichtplan geladen — ${p.days.length} '
+                                '${p.days.length == 1 ? 'Tag' : 'Tage'}'
+                            : 'Shift plan loaded — ${p.days.length} '
+                                '${p.days.length == 1 ? 'day' : 'days'}')
+                        : (de
+                            ? 'Gespeicherten Schichtplan laden'
+                            : 'Load saved shift plan'),
+                    secondary: de
+                        ? 'Aus „Speichern"/„Save week" — Entwurf zuerst, sonst '
+                            'veröffentlichter Plan. Laden nur nach Bestätigung.'
+                        : 'From "Save"/"Save week" — draft first, else the '
+                            'published plan. Loads only after confirmation.',
+                    onPick: onPickPlan,
+                  ),
+                  if (planError != null) _ErrorNote(planError!),
+                  if (p != null) ..._planSummary(de, p),
+                ],
+              ),
+            );
+    } else {
+      body = loading
           ? const Center(child: CircularProgressIndicator(color: _kAccent))
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16),
@@ -1141,8 +1321,183 @@ class _WstColumn extends StatelessWidget {
                   if (w != null) ..._summary(de, w),
                 ],
               ),
+            );
+    }
+
+    return _ColumnCard(
+      icon: isPlan ? Icons.event_note_outlined : Icons.summarize_outlined,
+      title: isPlan
+          ? (de ? '2 · Schichtplan' : '2 · Shift plan')
+          : '2 · Work Summary Tool',
+      trailing: isPlan
+          ? (p == null
+              ? null
+              : IconButton(
+                  tooltip:
+                      de ? 'Anderen Zeitraum laden' : 'Load different period',
+                  onPressed: onPickPlan,
+                  icon:
+                      const Icon(Icons.autorenew, size: 18, color: _kMuted),
+                ))
+          : (w == null
+              ? null
+              : IconButton(
+                  tooltip: de ? 'Anderen Export' : 'Different export',
+                  onPressed: onPick,
+                  icon:
+                      const Icon(Icons.autorenew, size: 18, color: _kMuted),
+                )),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: _SourceToggle(
+              source: source,
+              onChanged: onSourceChanged,
+              de: de,
             ),
+          ),
+          Expanded(child: body),
+        ],
+      ),
     );
+  }
+
+  /// Summary for the shift-plan source — mirrors the WST summary, but with
+  /// plan-specific facts (drivers, cuts, ride-alongs) and clear notes about
+  /// what the plan CANNOT provide (parcels, actually-driven counts).
+  List<Widget> _planSummary(bool de, ShiftPlanPaymentData p) {
+    final w = p.wst;
+    final start = w.minDate;
+    final end = w.maxDate;
+
+    final routesByDay = <String, int>{};
+    final dayOf = <String, DateTime>{};
+    for (final r in w.routes) {
+      routesByDay[dayKey(r.date)] =
+          (routesByDay[dayKey(r.date)] ?? 0) + r.completed;
+      dayOf[dayKey(r.date)] = r.date;
+    }
+    final days = dayOf.keys.toList()..sort();
+
+    return [
+      _SectionLabel(de ? 'Erkannt' : 'Recognised'),
+      // Defaults sichtbar machen: der Plan kennt nur geplante Touren und
+      // keine Pakete — beides klar sagen statt still anzunehmen.
+      Container(
+        margin: const EdgeInsets.only(top: 6, bottom: 4),
+        padding: const EdgeInsets.all(11),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEFF6FF),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFF93C5FD)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.info_outline_rounded,
+                size: 17, color: Color(0xFF1D4ED8)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                de
+                    ? 'Vergleichsbasis sind GEPLANTE Touren aus dem Schichtplan '
+                        '(je Block 1 Tour, Cuts ausgenommen). Paketzahlen '
+                        'enthält der Plan nicht — der Paketabgleich entfällt.'
+                    : 'The comparison uses PLANNED tours from the shift plan '
+                        '(1 tour per block, cuts excluded). The plan has no '
+                        'parcel counts — the parcel comparison is skipped.',
+                style: const TextStyle(
+                    fontSize: 11.5, color: Color(0xFF1E40AF), height: 1.35),
+              ),
+            ),
+          ],
+        ),
+      ),
+      _SummaryRow(
+        de ? 'Zeitraum' : 'Period',
+        (start == null || end == null)
+            ? '—'
+            : '${formatDay(start, de: de)} – ${formatDay(end, de: de)}',
+      ),
+      if (w.stations.isNotEmpty)
+        _SummaryRow(de ? 'Station' : 'Station', w.stations.join('\n')),
+      _SummaryRow(
+        de ? 'Fahrer gesamt' : 'Total drivers',
+        '${p.totalDrivers}',
+      ),
+      _SummaryRow(
+        de ? 'Geplante Touren' : 'Planned tours',
+        '${p.plannedRoutes}',
+        strong: true,
+      ),
+      _SummaryRow(
+        de ? 'Cuts (Late Cancel)' : 'Cuts (late cancel)',
+        '${p.cutCount}',
+      ),
+      _SummaryRow(
+        de ? 'Ride-alongs' : 'Ride-alongs',
+        '${p.rideAlongCount}',
+      ),
+      _SummaryRow(
+        de ? 'Geladene Tage' : 'Days loaded',
+        w.filesUsed.isEmpty ? '—' : w.filesUsed.join('\n'),
+      ),
+      if (p.missingDayKeys.isNotEmpty)
+        Container(
+          margin: const EdgeInsets.only(top: 10),
+          padding: const EdgeInsets.all(11),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFFBEB),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFFCD34D)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.warning_amber_rounded,
+                  size: 17, color: Color(0xFFB45309)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  de
+                      ? 'Ohne gespeicherten Plan: '
+                          '${p.missingDayKeys.join(', ')}. Diese Tage fehlen '
+                          'im Vergleich.'
+                      : 'No saved plan for: '
+                          '${p.missingDayKeys.join(', ')}. These days are '
+                          'missing from the comparison.',
+                  style: const TextStyle(
+                      fontSize: 11.5, color: Color(0xFF92400E), height: 1.35),
+                ),
+              ),
+            ],
+          ),
+        ),
+      _SectionLabel(de ? 'Pro Tag' : 'Per day'),
+      for (final k in days)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 3),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  formatDay(dayOf[k]!, de: de),
+                  style: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w700, color: _kInk),
+                ),
+              ),
+              Text(
+                de
+                    ? '${routesByDay[k] ?? 0} geplante Touren'
+                    : '${routesByDay[k] ?? 0} planned tours',
+                style: const TextStyle(fontSize: 12, color: _kMuted),
+              ),
+            ],
+          ),
+        ),
+    ];
   }
 
   List<Widget> _summary(bool de, WstData w) {
@@ -1303,6 +1658,209 @@ class _WstColumn extends StatelessWidget {
   }
 }
 
+/// Two-way segmented toggle: WST upload vs. saved shift plan.
+class _SourceToggle extends StatelessWidget {
+  final _WstSource source;
+  final ValueChanged<_WstSource> onChanged;
+  final bool de;
+  const _SourceToggle({
+    required this.source,
+    required this.onChanged,
+    required this.de,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Widget seg({
+      required _WstSource value,
+      required IconData icon,
+      required String label,
+    }) {
+      final selected = source == value;
+      return Expanded(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(9),
+          onTap: () => onChanged(value),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(
+              color: selected ? Colors.white : Colors.transparent,
+              borderRadius: BorderRadius.circular(9),
+              border: selected
+                  ? Border.all(color: const Color(0xFFE2E8F0))
+                  : null,
+              boxShadow: selected
+                  ? const [
+                      BoxShadow(
+                        color: Color(0x0F000000),
+                        blurRadius: 4,
+                        offset: Offset(0, 1),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon,
+                    size: 15, color: selected ? _kAccent : _kMuted),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: selected ? _kInk : _kMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(11),
+      ),
+      child: Row(
+        children: [
+          seg(
+            value: _WstSource.upload,
+            icon: Icons.upload_file_outlined,
+            label: de ? 'WTS-Upload' : 'WTS upload',
+          ),
+          const SizedBox(width: 3),
+          seg(
+            value: _WstSource.shiftPlan,
+            icon: Icons.event_note_outlined,
+            label: de ? 'Schichtplan' : 'Shift plan',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Confirmation dialog before a loaded shift plan is taken into the
+/// comparison. Shows the range, the per-day sources and the driver count —
+/// the range is read BEFORE this dialog, so the numbers are already known.
+class _PlanConfirmDialog extends StatelessWidget {
+  final ShiftPlanPaymentData data;
+  final DateTimeRange range;
+  final bool de;
+  const _PlanConfirmDialog({
+    required this.data,
+    required this.range,
+    required this.de,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final singleDay = dayKey(range.start) == dayKey(range.end);
+    final title = singleDay
+        ? (de
+            ? 'Gespeicherten Schichtplan vom '
+                '${formatDay(range.start)} laden?'
+            : 'Load the saved shift plan of '
+                '${formatDay(range.start, de: false)}?')
+        : (de
+            ? 'Gespeicherte Schichtpläne '
+                '${formatDay(range.start)} – ${formatDay(range.end)} laden?'
+            : 'Load the saved shift plans '
+                '${formatDay(range.start, de: false)} – '
+                '${formatDay(range.end, de: false)}?');
+
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Text(
+        title,
+        style: const TextStyle(
+            fontSize: 16, fontWeight: FontWeight.w900, color: _kInk),
+      ),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              de
+                  ? '${data.totalDrivers} Fahrer · '
+                      '${data.plannedRoutes} geplante Touren · '
+                      '${data.cutCount} Cuts · '
+                      '${data.rideAlongCount} Ride-alongs'
+                  : '${data.totalDrivers} drivers · '
+                      '${data.plannedRoutes} planned tours · '
+                      '${data.cutCount} cuts · '
+                      '${data.rideAlongCount} ride-alongs',
+              style: const TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w800, color: _kInk),
+            ),
+            const SizedBox(height: 10),
+            for (final d in data.days)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  children: [
+                    Icon(
+                      d.fromDraft
+                          ? Icons.edit_note_outlined
+                          : Icons.public_outlined,
+                      size: 15,
+                      color: _kMuted,
+                    ),
+                    const SizedBox(width: 7),
+                    Expanded(
+                      child: Text(
+                        '${formatDay(d.date, de: de)} · '
+                        '${d.fromDraft ? (de ? 'Entwurf' : 'draft') : (de ? 'Veröffentlicht' : 'published')}',
+                        style:
+                            const TextStyle(fontSize: 12.5, color: _kInk),
+                      ),
+                    ),
+                    Text(
+                      de
+                          ? '${d.driverCount} Fahrer'
+                          : '${d.driverCount} drivers',
+                      style: const TextStyle(fontSize: 12.5, color: _kMuted),
+                    ),
+                  ],
+                ),
+              ),
+            if (data.missingDayKeys.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                de
+                    ? 'Kein gespeicherter Schichtplan für: '
+                        '${data.missingDayKeys.join(', ')}'
+                    : 'No saved shift plan for: '
+                        '${data.missingDayKeys.join(', ')}',
+                style: const TextStyle(
+                    fontSize: 12, color: Color(0xFFB45309), height: 1.35),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: Text(de ? 'Abbrechen' : 'Cancel'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: _kAccent),
+          onPressed: () => Navigator.of(context).pop(true),
+          child: Text(de ? 'Laden' : 'Load'),
+        ),
+      ],
+    );
+  }
+}
+
 // ── Column 3: Result — ONLY what is missing on the invoice ──
 
 class _ResultColumn extends StatelessWidget {
@@ -1310,10 +1868,20 @@ class _ResultColumn extends StatelessWidget {
   final bool hasInvoice;
   final bool hasWst;
 
+  /// `true` while the shift-plan source tab is active — switches a few
+  /// labels and enables the marks section below.
+  final bool fromShiftPlan;
+
+  /// Cut / ride-along markings from the loaded shift plan; empty when the
+  /// WST-upload source is active.
+  final List<ShiftPlanMark> planMarks;
+
   const _ResultColumn({
     required this.result,
     required this.hasInvoice,
     required this.hasWst,
+    this.fromShiftPlan = false,
+    this.planMarks = const <ShiftPlanMark>[],
   });
 
   @override
@@ -1321,88 +1889,327 @@ class _ResultColumn extends StatelessWidget {
     final de = Localizations.localeOf(context).languageCode == 'de';
     final r = result;
 
+    final Widget child;
+    if (r == null && planMarks.isEmpty) {
+      child = _Centered(
+        icon: Icons.upload_file_outlined,
+        title: de ? 'Noch nichts zu vergleichen' : 'Nothing to compare yet',
+        subtitle: !hasInvoice && !hasWst
+            ? (fromShiftPlan
+                ? (de
+                    ? 'Lade links die Amazon-Rechnung hoch und den '
+                        'gespeicherten Schichtplan.'
+                    : 'Upload the Amazon invoice and load the saved '
+                        'shift plan on the left.')
+                : (de
+                    ? 'Lade links die Amazon-Rechnung und den WST-Export hoch.'
+                    : 'Upload the Amazon invoice and the WST export on the left.'))
+            : !hasInvoice
+                ? (de
+                    ? 'Es fehlt noch die Amazon-Rechnung.'
+                    : 'The Amazon invoice is still missing.')
+                : (fromShiftPlan
+                    ? (de
+                        ? 'Es fehlt noch der gespeicherte Schichtplan.'
+                        : 'The saved shift plan is still missing.')
+                    : (de
+                        ? 'Es fehlt noch der WST-Export.'
+                        : 'The WST export is still missing.')),
+      );
+    } else if (r == null) {
+      // Plan geladen, Rechnung fehlt noch: die Markierungen (Cuts /
+      // Ride-alongs) sind trotzdem schon sichtbar.
+      child = SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _Centered(
+              icon: Icons.upload_file_outlined,
+              title:
+                  de ? 'Noch nichts zu vergleichen' : 'Nothing to compare yet',
+              subtitle: de
+                  ? 'Es fehlt noch die Amazon-Rechnung — die Markierungen '
+                      'aus dem Schichtplan stehen schon unten.'
+                  : 'The Amazon invoice is still missing — the shift-plan '
+                      'markings are already listed below.',
+            ),
+            const SizedBox(height: 8),
+            _SectionLabel(de
+                ? 'Markierungen aus dem Schichtplan'
+                : 'Markings from the shift plan'),
+            _PlanMarksSection(marks: planMarks, result: null, de: de),
+          ],
+        ),
+      );
+    } else {
+      child = SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (!r.periodsOverlap)
+              _OverlapWarning(
+                result: r,
+                de: de,
+                unknown: !r.periodsKnown,
+              ),
+            // Tagesdetails: vollständige Übersicht je Tag (alle
+            // Touren beider Seiten + Pakete), nicht nur Fehlendes.
+            Align(
+              alignment: Alignment.centerRight,
+              child: OutlinedButton.icon(
+                onPressed: () => showDialog<void>(
+                  context: context,
+                  builder: (_) => _DailyDetailsDialog(result: r, de: de),
+                ),
+                icon: const Icon(Icons.calendar_view_day_outlined, size: 17),
+                label: Text(
+                  de ? 'Tagesdetails' : 'Daily details',
+                  style: const TextStyle(
+                      fontSize: 12.5, fontWeight: FontWeight.w800),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF067647),
+                  side: const BorderSide(color: Color(0xFFD1D5DB)),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 10),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            if (r.isComplete)
+              _AllCompleteCard(de: de)
+            else ...[
+              _MissingSummary(result: r, de: de),
+              if (r.missingRoutes.isNotEmpty) ...[
+                _SectionLabel(de ? 'Fehlende Routen' : 'Missing routes'),
+                _MissingRoutesTable(rows: r.missingRoutes, de: de),
+              ],
+              if (r.missingPackages.isNotEmpty) ...[
+                _SectionLabel(de ? 'Fehlende Pakete' : 'Missing parcels'),
+                _MissingPackagesTable(rows: r.missingPackages, de: de),
+              ],
+            ],
+            // Markierungen aus dem Schichtplan (nur Schichtplan-Quelle):
+            // Cuts (Late Cancel) und Ride-alongs — inkl. Gegenüberstellung
+            // mit den Late-Cancel-Positionen der Rechnung.
+            if (fromShiftPlan && planMarks.isNotEmpty) ...[
+              _SectionLabel(de
+                  ? 'Markierungen aus dem Schichtplan'
+                  : 'Markings from the shift plan'),
+              _PlanMarksSection(marks: planMarks, result: r, de: de),
+            ],
+            // Bezahlt, aber nicht Teil des Routen-Abgleichs:
+            // Late Cancels & Co. plus die Per-Shipment-Gebühren —
+            // mit Anzahl und Betrag, damit die Rechnung vollständig
+            // nachvollziehbar ist.
+            if (r.paidExtras.isNotEmpty) ...[
+              _SectionLabel(fromShiftPlan
+                  ? (de
+                      ? 'Weitere bezahlte Positionen (ohne Tourenbezug)'
+                      : 'Other paid items (no tour counterpart)')
+                  : (de
+                      ? 'Weitere bezahlte Positionen (ohne WST-Routenbezug)'
+                      : 'Other paid items (no WST route counterpart)')),
+              _PaidExtrasTable(items: r.paidExtras, de: de),
+            ],
+          ],
+        ),
+      );
+    }
+
     return _ColumnCard(
       icon: Icons.rule_folder_outlined,
       title: de ? '3 · Fehlt auf der Rechnung' : '3 · Missing on the invoice',
-      child: r == null
-          ? _Centered(
-              icon: Icons.upload_file_outlined,
-              title: de ? 'Noch nichts zu vergleichen' : 'Nothing to compare yet',
-              subtitle: !hasInvoice && !hasWst
-                  ? (de
-                      ? 'Lade links die Amazon-Rechnung und den WST-Export hoch.'
-                      : 'Upload the Amazon invoice and the WST export on the left.')
-                  : !hasInvoice
-                      ? (de
-                          ? 'Es fehlt noch die Amazon-Rechnung.'
-                          : 'The Amazon invoice is still missing.')
-                      : (de
-                          ? 'Es fehlt noch der WST-Export.'
-                          : 'The WST export is still missing.'),
-            )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (!r.periodsOverlap)
-                    _OverlapWarning(
-                      result: r,
-                      de: de,
-                      unknown: !r.periodsKnown,
-                    ),
-                  // Tagesdetails: vollständige Übersicht je Tag (alle
-                  // Touren beider Seiten + Pakete), nicht nur Fehlendes.
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: OutlinedButton.icon(
-                      onPressed: () => showDialog<void>(
-                        context: context,
-                        builder: (_) =>
-                            _DailyDetailsDialog(result: r, de: de),
-                      ),
-                      icon: const Icon(Icons.calendar_view_day_outlined,
-                          size: 17),
-                      label: Text(
-                        de ? 'Tagesdetails' : 'Daily details',
-                        style: const TextStyle(
-                            fontSize: 12.5, fontWeight: FontWeight.w800),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF067647),
-                        side: const BorderSide(color: Color(0xFFD1D5DB)),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 10),
-                      ),
+      child: child,
+    );
+  }
+}
+
+/// "Markierungen aus dem Schichtplan": one row per Cut (Late Cancel, mit
+/// Grund) und Ride-along (mit Mentee-Name), plus — wenn eine Rechnung
+/// geladen ist — die Gegenüberstellung Cuts im Plan vs. bezahlte
+/// Late-Cancel-Positionen auf der Rechnung.
+class _PlanMarksSection extends StatelessWidget {
+  final List<ShiftPlanMark> marks;
+  final ReconResult? result;
+  final bool de;
+  const _PlanMarksSection({
+    required this.marks,
+    required this.result,
+    required this.de,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cuts = marks.where((m) => m.isLateCancel).length;
+
+    // Bezahlte Late-Cancel-Positionen der Rechnung (paidExtras) aufsummieren
+    // — Beschreibungen wie "AMZL Late Cancel".
+    double? invoiceLateCancelQty;
+    final r = result;
+    if (r != null) {
+      invoiceLateCancelQty = r.paidExtras
+          .where((e) => normKey(e.description).contains('late cancel'))
+          .fold<double>(0, (acc, e) => acc + e.quantity);
+    }
+    final qtyLabel = invoiceLateCancelQty == null
+        ? null
+        : _qtyLabel(invoiceLateCancelQty);
+    final cutsMatch = invoiceLateCancelQty != null &&
+        invoiceLateCancelQty.round() == cuts;
+
+    return Container(
+      margin: const EdgeInsets.only(top: 6),
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9FAFB),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final m in marks) ...[
+            if (m.isLateCancel)
+              _markRow(
+                icon: Icons.content_cut,
+                iconColor: const Color(0xFFB42318),
+                date: m.date,
+                driver: m.driverName,
+                badge: m.lateCancelReason.trim().isEmpty
+                    ? (de ? 'Cut · Late Cancel' : 'Cut · late cancel')
+                    : (de
+                        ? 'Cut · Late Cancel — ${m.lateCancelReason.trim()}'
+                        : 'Cut · late cancel — ${m.lateCancelReason.trim()}'),
+                badgeColor: const Color(0xFFB42318),
+                detail: m.serviceSummary,
+              ),
+            if (m.isRideAlong)
+              _markRow(
+                icon: Icons.group_outlined,
+                iconColor: const Color(0xFF1D4ED8),
+                date: m.date,
+                driver: m.driverName,
+                badge: m.menteeName.trim().isEmpty
+                    ? 'Ride along'
+                    : 'Ride along · ${m.menteeName.trim()}',
+                badgeColor: const Color(0xFF1D4ED8),
+                detail: m.serviceSummary,
+              ),
+          ],
+          if (qtyLabel != null && (cuts > 0 || invoiceLateCancelQty! > 0)) ...[
+            const Divider(height: 14, color: Color(0xFFE5E7EB)),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  cutsMatch
+                      ? Icons.check_circle_outline
+                      : Icons.warning_amber_rounded,
+                  size: 16,
+                  color: cutsMatch
+                      ? const Color(0xFF067647)
+                      : const Color(0xFFB45309),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    de
+                        ? 'Cuts im Schichtplan: $cuts · Bezahlte '
+                            'Late-Cancel-Positionen auf der Rechnung: '
+                            '$qtyLabel ×'
+                            '${cutsMatch ? '' : ' — bitte prüfen.'}'
+                        : 'Cuts in the shift plan: $cuts · Paid late-cancel '
+                            'positions on the invoice: $qtyLabel ×'
+                            '${cutsMatch ? '' : ' — please check.'}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      height: 1.35,
+                      color: cutsMatch
+                          ? const Color(0xFF067647)
+                          : const Color(0xFF92400E),
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  if (r.isComplete)
-                    _AllCompleteCard(de: de)
-                  else ...[
-                    _MissingSummary(result: r, de: de),
-                    if (r.missingRoutes.isNotEmpty) ...[
-                      _SectionLabel(de ? 'Fehlende Routen' : 'Missing routes'),
-                      _MissingRoutesTable(rows: r.missingRoutes, de: de),
-                    ],
-                    if (r.missingPackages.isNotEmpty) ...[
-                      _SectionLabel(de ? 'Fehlende Pakete' : 'Missing parcels'),
-                      _MissingPackagesTable(rows: r.missingPackages, de: de),
-                    ],
-                  ],
-                  // Bezahlt, aber nicht Teil des Routen-Abgleichs:
-                  // Late Cancels & Co. plus die Per-Shipment-Gebühren —
-                  // mit Anzahl und Betrag, damit die Rechnung vollständig
-                  // nachvollziehbar ist.
-                  if (r.paidExtras.isNotEmpty) ...[
-                    _SectionLabel(de
-                        ? 'Weitere bezahlte Positionen (ohne WST-Routenbezug)'
-                        : 'Other paid items (no WST route counterpart)'),
-                    _PaidExtrasTable(items: r.paidExtras, de: de),
-                  ],
-                ],
-              ),
+                ),
+              ],
             ),
+          ],
+          if (marks.any((m) => m.isRideAlong)) ...[
+            const SizedBox(height: 6),
+            Text(
+              de
+                  ? 'Ride-alongs zählen nicht als eigene Tour — der Mentee '
+                      'fährt im Fahrzeug des Mentors mit.'
+                  : 'Ride-alongs do not count as their own tour — the mentee '
+                      'rides in the mentor\'s van.',
+              style: const TextStyle(
+                  fontSize: 11, color: _kMuted, height: 1.35),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _markRow({
+    required IconData icon,
+    required Color iconColor,
+    required DateTime date,
+    required String driver,
+    required String badge,
+    required Color badgeColor,
+    required String detail,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 15, color: iconColor),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 76,
+            child: Text(
+              formatDay(date, de: de),
+              style: const TextStyle(
+                  fontSize: 12, fontWeight: FontWeight.w700, color: _kInk),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  driver.trim().isEmpty ? '—' : driver.trim(),
+                  style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w800,
+                      color: _kInk),
+                ),
+                Text(
+                  badge,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: badgeColor,
+                    height: 1.3,
+                  ),
+                ),
+                if (detail.trim().isNotEmpty)
+                  Text(
+                    detail,
+                    style: const TextStyle(
+                        fontSize: 11, color: _kMuted, height: 1.3),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

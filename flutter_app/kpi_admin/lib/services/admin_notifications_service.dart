@@ -93,6 +93,27 @@ class AdminNotificationsService {
         target: AppNav.drivers,
         count: _watchExpiringDocuments(selfUid),
       ),
+      // Ticket „Recruiting-Meldung": neue Bewerber, solange sie auf
+      // Status „Neu" stehen — getrennt nach Local/EU und Non-EU/Visa.
+      // Verschwindet automatisch, sobald der Status weitergeschaltet
+      // wird. Ueber _guardedSelfStream nur fuer das Admin-Konto selbst
+      // (Ticket: „nur fuer admin bereich").
+      AdminNotificationSource(
+        id: 'recruiting_new_local',
+        icon: Icons.person_add_alt_1_outlined,
+        labelDe: 'Neue Bewerber (Local/EU)',
+        labelEn: 'New applicants (Local/EU)',
+        target: AppNav.recruiting,
+        count: watchNewRecruitingApplications(adminUid, visa: false),
+      ),
+      AdminNotificationSource(
+        id: 'recruiting_new_visa',
+        icon: Icons.flight_takeoff_rounded,
+        labelDe: 'Neue Bewerber (Non-EU/Visa)',
+        labelEn: 'New applicants (Non-EU/Visa)',
+        target: AppNav.recruiting,
+        count: watchNewRecruitingApplications(adminUid, visa: true),
+      ),
       AdminNotificationSource(
         id: 'feedback_done',
         icon: Icons.feedback_outlined,
@@ -183,6 +204,59 @@ class AdminNotificationsService {
               );
         })
         .handleError((_) {});
+  }
+
+  /// Bewerber mit Status „Neu" in
+  /// `users/{adminUid}/recruiting_applications`, getrennt nach Kanal.
+  ///
+  /// „Neu" ist exakt die Definition der Recruiting-Seite:
+  /// `RecruitingStatus.fromValue` faellt fuer fehlende/unbekannte Werte
+  /// auf `newApp` zurueck — deshalb wird lokal gefiltert statt per
+  /// `where('status', ...)`, sonst wuerden Dokumente ohne Status-Feld
+  /// verschluckt. Kanal: `channel == 'visa'` ist Non-EU, alles andere
+  /// (auch fehlend) ist Local/EU — gleiche Logik wie
+  /// `RecruitingChannel.fromValue`.
+  static Stream<int> watchNewRecruitingApplications(
+    String? adminUid, {
+    required bool visa,
+  }) {
+    return _guardedSelfStream(adminUid, (uid) {
+      return FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('recruiting_applications')
+          .snapshots()
+          .map((snap) => snap.docs.where((d) {
+                final data = d.data();
+                final isVisa =
+                    (data['channel'] ?? '').toString().trim().toLowerCase() ==
+                        'visa';
+                if (isVisa != visa) return false;
+                final status =
+                    (data['status'] ?? '').toString().trim().toLowerCase();
+                // Bekannte Weiter-Stati zaehlen nicht; alles Unbekannte
+                // behandelt die Seite als „Neu".
+                const advanced = {
+                  'onboarded',
+                  'scheduled_training',
+                  'scheduledtraining',
+                  'ready',
+                  'contacted',
+                  'scheduled',
+                  'zav_request',
+                  'zavrequest',
+                  'pre_approval',
+                  'preapproval',
+                  'contract_ezb',
+                  'contractezb',
+                  'hired',
+                  'rejected',
+                  'declined',
+                  'archived',
+                };
+                return !advanced.contains(status);
+              }).length);
+    });
   }
 
   // ── Helfer ─────────────────────────────────────────────────────────

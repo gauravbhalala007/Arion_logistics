@@ -2,16 +2,28 @@
 //
 // Monthly Plan ("Spesen Fast Check") — one grid per month:
 //   rows = working drivers, columns = days of the month.
-// Each cell holds a day code (A, AC, AB, C, U, X, OSM, …). Days coded with
-// one of [_kSpesenCodes] (A / AC / Ra / AB) count towards the monthly
-// Spesen; the rate per day is configurable (default 14 €). The two
-// right-hand columns show the qualifying-day count and the resulting €.
+// Each cell holds a day code (A, AC, AB, C, U, X, OSM, …). Die Codes sind
+// je Admin/DSP frei konfigurierbar (Kürzel, Beschriftung, Spesen ja/nein,
+// eigener €-Satz, Farbe) — siehe lib/models/monthly_plan_codes.dart.
+// Tage mit einem Spesen-Code zählen zur Monats-Spesensumme; der Satz pro
+// Tag ist global konfigurierbar (Default 14 €) und pro Code
+// überschreibbar. The two right-hand columns show the qualifying-day
+// count and the resulting €.
 //
 // Storage: users/{uid}/monthly_plans/{YYYY-MM}
 //   { entries: { <transporterId>: { "1": "A", "2": "AC", ... } } }
 // Settings: users/{uid}/settings/monthly_plan
 //   { spesenContracts: [...], spesenBuckets: [...], autoFill: bool,
-//     spesenRate: number, codeLabels: { "<code>": "<Beschriftung>" } }
+//     spesenRate: number, codeLabels: { "<code>": "<Beschriftung>" },
+//     dayCodes: [{ code, label, spesen, spesenRate, color }, ...] }
+//
+// `codeLabels` wird beim Speichern weiter mitgepflegt (Abwärts-
+// kompatibilität); fehlt `dayCodes` (Bestandskunden), wird exakt der
+// historische Zustand abgeleitet. Zellen mit Codes, die es in der
+// konfigurierten Liste nicht (mehr) gibt, bleiben lesbar (Farb-Fallback,
+// unbekannte Codes neutral grau), zählen aber nicht als Spesen-/
+// Arbeitstag. Bestandsdaten werden bei Umbenennen/Löschen NIE
+// umgeschrieben.
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
@@ -22,6 +34,7 @@ import 'package:flutter/services.dart';
 
 import '../models/driver_contract_type.dart';
 import '../models/employment_period.dart';
+import '../models/monthly_plan_codes.dart';
 import '../utils/driver_remark.dart';
 import '../models/shift_plan.dart';
 import '../services/shift_plan_parser.dart';
@@ -35,19 +48,10 @@ import '../widgets/clearable_search_field.dart';
 /// konfigurierbar — dieser Wert dient nur als Vorbelegung/Fallback.
 const double kSpesenPerDay = 14.0;
 
-/// Day codes with display colours. Only [_kSpesenCodes] count towards €.
-/// „AB" und „OSM" sind additiv ergänzt: bestehende Pläne mit den alten
-/// Codes bleiben unverändert lesbar.
-const List<String> kDayCodes = [
-  'A', 'AC', 'AB', 'C', 'U', 'K', 'X', 'F', 'S', 'SA', 'Ra', 'OSM', 'P', 'N',
-];
-
-/// Codes, die einen Spesen-Tag auslösen. „AB" zählt (Ticket), „OSM" nicht.
-const Set<String> _kSpesenCodes = {'A', 'AC', 'Ra', 'AB'};
-
-/// Codes counted as a worked day in the compact mobile summary
-/// (shift codes; U/K/F/X are days off and are counted separately).
-const Set<String> _kWorkCodes = {'A', 'AC', 'C', 'Ra', 'AB', 'OSM'};
+// Die Standard-Codeliste, die Spesen- und die Arbeitstag-Codes leben jetzt
+// in lib/models/monthly_plan_codes.dart ([kDefaultDayCodes],
+// [kDefaultSpesenCodes], [kDefaultWorkCodes]) und dienen nur noch als
+// Fallback, solange keine eigene `dayCodes`-Konfiguration gespeichert ist.
 
 /// Compact contract-type tag shown in front of the employee name.
 /// Minijob drivers never receive Spesen.
@@ -88,6 +92,10 @@ int _contractGroupRank(DriverContractType? c) => switch (c) {
       null => 5,
     };
 
+/// Eingebaute Farben der 14 historischen Standard-Codes — bleibt als
+/// Fallback bestehen, damit Bestandsdaten (auch gelöschte/umbenannte
+/// Codes) exakt wie bisher aussehen. Für konfigurierte Codes mit eigener
+/// Farbe greift [_AdminMonthlyPlanPageState._colorFor].
 Color _codeColor(String code) {
   switch (code) {
     case 'A':
@@ -322,9 +330,60 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
   // € pro Spesen-Tag — im Einstellungs-Dialog frei wählbar.
   double _spesenRate = kSpesenPerDay;
   // Eigene Beschriftung je Zellen-Code (Code → Klartext). Leere/fehlende
-  // Einträge fallen auf [_defaultCodeLabel] zurück.
+  // Einträge fallen auf [_defaultCodeLabel] zurück. Wird für
+  // Abwärtskompatibilität weiter gepflegt und dient als Label-Quelle,
+  // solange keine `dayCodes`-Konfiguration existiert.
   Map<String, String> _codeLabels = {};
+
+  /// Konfigurierte Tagescodes aus `settings/monthly_plan.dayCodes`.
+  /// `null` = Bestandskunde ohne Konfiguration → [_dayCodes] leitet den
+  /// EXAKT historischen Zustand ab (Standardcodes + `codeLabels`).
+  List<MonthlyPlanCode>? _dayCodesCfg;
+
+  /// Cache für [_codeCfgMap] — wird bei jeder Settings-Änderung geleert.
+  Map<String, MonthlyPlanCode>? _codeCfgCache;
+
   bool _settingsLoaded = false;
+
+  /// Effektive Codeliste (konfiguriert oder historischer Default).
+  List<MonthlyPlanCode> get _dayCodes =>
+      _dayCodesCfg ?? defaultMonthlyPlanCodes(_codeLabels);
+
+  Map<String, MonthlyPlanCode> get _codeCfgMap =>
+      _codeCfgCache ??= {for (final c in _dayCodes) c.code: c};
+
+  /// Konfigurations-Eintrag eines Codes — `null` für "verwaiste" Codes,
+  /// die nur noch in Bestandsdaten vorkommen.
+  MonthlyPlanCode? _cfgOf(String code) => _codeCfgMap[code];
+
+  /// Zählt dieser Code als Spesen-Tag? Verwaiste Codes: nein.
+  bool _isSpesenCode(String code) => _cfgOf(code)?.spesen ?? false;
+
+  /// €-Satz für einen Spesen-Tag mit diesem Code — eigener Satz des
+  /// Codes oder der globale [_spesenRate].
+  double _rateFor(String code) => _cfgOf(code)?.spesenRate ?? _spesenRate;
+
+  /// Zählt dieser Code als Arbeitstag (kompakte Handy-Zusammenfassung)?
+  /// Konfigurierte Codes: historische Arbeitscodes ODER "Spesen an"
+  /// (neue Codes mit Spesen zählen damit automatisch als Arbeitstag).
+  /// Verwaiste Codes: nein.
+  bool _isWorkCode(String code) {
+    final cfg = _cfgOf(code);
+    if (cfg == null) return false;
+    return cfg.spesen || kDefaultWorkCodes.contains(cfg.code);
+  }
+
+  /// Zellfarbe eines Codes: gespeicherte eigene Farbe → eingebaute
+  /// Standardfarbe ([_codeColor]) → neutral grau für unbekannte Codes
+  /// (verwaiste Bestandsdaten bleiben so sichtbar und lesbar).
+  Color _colorFor(String code) {
+    if (code.isEmpty) return Colors.transparent;
+    final custom = parseMonthlyPlanCodeColor(_cfgOf(code)?.colorHex);
+    if (custom != null) return custom;
+    final legacy = _codeColor(code);
+    if (legacy != Colors.transparent) return legacy;
+    return const Color(0xFFE2E8F0); // neutral grau (unbekannter Code)
+  }
 
   // ── Ticket „Auto-Vorbelegung" ──────────────────────────────────────
   // Genehmigter Urlaub aus „Zeiten & Abwesenheiten" erscheint als „U"
@@ -385,6 +444,21 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
                 e.key.toString(): e.value.toString().trim(),
           };
         }
+        // Konfigurierte Codeliste — fehlt sie (Bestandskunden), bleibt
+        // `_dayCodesCfg` null und der historische Default greift.
+        final rawCodes = data['dayCodes'];
+        if (rawCodes is List) {
+          final parsed = <MonthlyPlanCode>[];
+          final seen = <String>{};
+          for (final e in rawCodes) {
+            if (e is! Map) continue;
+            final c = MonthlyPlanCode.fromMap(e);
+            if (c == null || !seen.add(c.code)) continue;
+            parsed.add(c);
+          }
+          if (parsed.isNotEmpty) _dayCodesCfg = parsed;
+        }
+        _codeCfgCache = null;
       });
     } catch (_) {}
   }
@@ -397,11 +471,15 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
       'spesenBuckets': _spesenBuckets.toList(),
       'autoFill': _autoFill,
       'spesenRate': _spesenRate,
-      // Immer alle Codes schreiben (leerer String = Standardbeschriftung).
-      // `merge: true` führt Map-Felder zusammen — eine gelöschte
-      // Beschriftung verschwände sonst nicht.
+      // Vollständige Code-Konfiguration (Kürzel, Beschriftung, Spesen,
+      // eigener Satz, Farbe) — die Liste ersetzt sich bei jedem Speichern
+      // komplett.
+      'dayCodes': [for (final c in _dayCodes) c.toMap()],
+      // Abwärtskompatibilität: `codeLabels` weiter mitpflegen (leerer
+      // String = Standardbeschriftung). `merge: true` führt Map-Felder
+      // zusammen — eine gelöschte Beschriftung verschwände sonst nicht.
       'codeLabels': {
-        for (final c in kDayCodes) c: _codeLabels[c] ?? '',
+        for (final c in _dayCodes) c.code: c.label,
       },
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
@@ -449,14 +527,138 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
       ('POOR', 'Poor'),
     ];
     final rateCtrl = TextEditingController(text: _rateInput(_spesenRate));
-    final labelCtrls = {
-      for (final c in kDayCodes)
-        c: TextEditingController(text: _codeLabels[c] ?? ''),
-    };
+
+    // ── Editierbare Code-Zeilen (Ticket: Codes je Team konfigurierbar) ──
+    // `allRows` sammelt JEDE je erzeugte Zeile (auch gelöschte), damit am
+    // Ende alle Controller sauber disposed werden.
+    final allRows = <_CodeRow>[];
+    _CodeRow rowFor(MonthlyPlanCode c) {
+      final r = _CodeRow(
+        code: TextEditingController(text: c.code),
+        label: TextEditingController(text: c.label),
+        rate: TextEditingController(
+            text: c.spesenRate == null ? '' : _rateInput(c.spesenRate!)),
+        spesen: c.spesen,
+        colorHex: c.colorHex,
+      );
+      allRows.add(r);
+      return r;
+    }
+
+    var rows = [for (final c in _dayCodes) rowFor(c)];
+    String? errorText;
+    List<MonthlyPlanCode>? newCodes;
+
+    // Anzeige-Farbe einer Zeile: gespeicherte eigene Farbe, sonst die
+    // eingebaute Standardfarbe des (aktuell eingetippten) Kürzels,
+    // sonst neutral grau.
+    Color rowColor(_CodeRow r) {
+      final custom = parseMonthlyPlanCodeColor(r.colorHex);
+      if (custom != null) return custom;
+      final legacy = _codeColor(r.code.text.trim());
+      return legacy == Colors.transparent
+          ? const Color(0xFFE2E8F0)
+          : legacy;
+    }
+
     final saved = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setLocal) => AlertDialog(
+        builder: (ctx, setLocal) {
+          Future<void> confirmDeleteRow(_CodeRow r) async {
+            final code = r.code.text.trim();
+            final ok = await showDialog<bool>(
+              context: ctx,
+              builder: (dctx) => AlertDialog(
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
+                title: Text(
+                  code.isEmpty
+                      ? _tr('Zeile löschen?', 'Delete row?')
+                      : _tr('Code „$code" löschen?',
+                          'Delete code "$code"?'),
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w800),
+                ),
+                content: Text(
+                  _tr(
+                      'Bestehende Einträge mit diesem Code bleiben im '
+                          'Plan sichtbar, zählen aber nicht mehr als '
+                          'Spesen- oder Arbeitstag.',
+                      'Existing entries with this code stay visible in '
+                          'the plan but no longer count as a Spesen or '
+                          'work day.'),
+                  style: const TextStyle(fontSize: 13, height: 1.4),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dctx, false),
+                    child: Text(_tr('Abbrechen', 'Cancel')),
+                  ),
+                  FilledButton(
+                    style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFFDC2626)),
+                    onPressed: () => Navigator.pop(dctx, true),
+                    child: Text(_tr('Löschen', 'Delete')),
+                  ),
+                ],
+              ),
+            );
+            if (ok == true) {
+              setLocal(() {
+                rows = [...rows]..remove(r);
+                errorText = null;
+              });
+            }
+          }
+
+          Future<void> confirmRestoreDefaults() async {
+            final ok = await showDialog<bool>(
+              context: ctx,
+              builder: (dctx) => AlertDialog(
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
+                title: Text(
+                  _tr('Standard wiederherstellen?', 'Restore defaults?'),
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w800),
+                ),
+                content: Text(
+                  _tr(
+                      'Setzt die Liste auf die 14 Standard-Codes zurück '
+                          '(eigene Codes, Beschriftungen und Sätze in '
+                          'dieser Liste werden verworfen). Einträge im '
+                          'Plan selbst bleiben unverändert.',
+                      'Resets the list to the 14 default codes (custom '
+                          'codes, labels and rates in this list are '
+                          'discarded). Entries in the plan itself remain '
+                          'unchanged.'),
+                  style: const TextStyle(fontSize: 13, height: 1.4),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dctx, false),
+                    child: Text(_tr('Abbrechen', 'Cancel')),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(dctx, true),
+                    child: Text(
+                        _tr('Zurücksetzen', 'Reset')),
+                  ),
+                ],
+              ),
+            );
+            if (ok == true) {
+              setLocal(() {
+                rows = [
+                  for (final c in defaultMonthlyPlanCodes()) rowFor(c)
+                ];
+                errorText = null;
+              });
+            }
+          }
+
+          return AlertDialog(
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16)),
           title: Text(
@@ -465,7 +667,7 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
                 const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
           ),
           content: SizedBox(
-            width: 380,
+            width: 460,
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -502,10 +704,11 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
                   const SizedBox(height: 6),
                   Text(
                     _tr(
-                        'Gilt für alle Codes mit Spesen '
-                            '(${kDayCodes.where(_kSpesenCodes.contains).join(' / ')}).',
-                        'Applies to all codes with Spesen '
-                            '(${kDayCodes.where(_kSpesenCodes.contains).join(' / ')}).'),
+                        'Standardsatz für alle Codes mit Spesen. Unten '
+                            'kann je Code ein eigener Satz hinterlegt '
+                            'werden.',
+                        'Default rate for all codes with Spesen. A '
+                            'per-code rate can be set below.'),
                     style: const TextStyle(fontSize: 11, color: _kMuted),
                   ),
                   const SizedBox(height: 14),
@@ -563,10 +766,9 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
                   const SizedBox(height: 14),
                   const Divider(height: 1, color: _kBorder),
                   const SizedBox(height: 12),
-                  // ── Beschriftung der Codes ──
+                  // ── Tagescodes (frei konfigurierbar) ──
                   Text(
-                    _tr('Beschriftung der Codes',
-                        'Labels for the day codes'),
+                    _tr('Tagescodes', 'Day codes'),
                     style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
@@ -575,54 +777,76 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
                   const SizedBox(height: 4),
                   Text(
                     _tr(
-                        'Eigene Bedeutung je Kürzel — erscheint in Legende, '
-                            'Tooltips und im Code-Menü. Leer = Standard.',
-                        'Custom meaning per code — shown in the legend, '
-                            'tooltips and the code menu. Empty = default.'),
+                        'Kürzel (1–4 Zeichen), Bezeichnung, Spesen ja/nein '
+                            'und optional ein eigener €-Satz (leer = '
+                            'Standardsatz). Gelöschte Codes bleiben in '
+                            'bestehenden Plänen sichtbar, zählen aber '
+                            'nicht mehr.',
+                        'Code (1–4 characters), label, Spesen on/off and '
+                            'optionally a per-code € rate (empty = '
+                            'default rate). Deleted codes stay visible '
+                            'in existing plans but no longer count.'),
                     style: const TextStyle(fontSize: 11, color: _kMuted),
                   ),
                   const SizedBox(height: 8),
-                  for (final code in kDayCodes)
+                  for (final r in rows)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          Container(
-                            width: 34,
-                            height: 30,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: _codeColor(code),
-                              borderRadius: BorderRadius.circular(7),
-                            ),
-                            child: Text(
-                              code,
+                          // Kürzel — Hintergrund = Zellfarbe des Codes.
+                          SizedBox(
+                            width: 54,
+                            child: TextField(
+                              controller: r.code,
+                              textAlign: TextAlign.center,
+                              textCapitalization:
+                                  TextCapitalization.characters,
+                              inputFormatters: [
+                                LengthLimitingTextInputFormatter(4),
+                                FilteringTextInputFormatter.allow(
+                                    RegExp(r'[A-Za-z0-9]')),
+                                _UpperCaseTextFormatter(),
+                              ],
+                              onChanged: (_) => setLocal(() {}),
                               style: const TextStyle(
-                                fontSize: 10.5,
+                                fontSize: 12,
                                 fontWeight: FontWeight.w800,
                                 color: Color(0xFF1F2937),
                               ),
+                              decoration: InputDecoration(
+                                isDense: true,
+                                filled: true,
+                                fillColor: rowColor(r),
+                                hintText: _tr('Kürzel', 'Code'),
+                                hintStyle: const TextStyle(
+                                    fontSize: 10,
+                                    color: Color(0xFF6B7280)),
+                                contentPadding:
+                                    const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 9),
+                                border: OutlineInputBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(8),
+                                  borderSide: BorderSide.none,
+                                ),
+                              ),
                             ),
                           ),
-                          if (_kSpesenCodes.contains(code)) ...[
-                            const SizedBox(width: 4),
-                            const Icon(Icons.euro_rounded,
-                                size: 13, color: Color(0xFF1D7F5A)),
-                          ],
                           const SizedBox(width: 8),
                           Expanded(
                             child: TextField(
-                              controller: labelCtrls[code],
+                              controller: r.label,
                               style: const TextStyle(fontSize: 13),
                               decoration: InputDecoration(
                                 isDense: true,
                                 contentPadding:
                                     const EdgeInsets.symmetric(
                                         horizontal: 10, vertical: 9),
-                                hintText: _defaultCodeLabel(code) ??
-                                    _tr('Bedeutung eingeben',
-                                        'Enter meaning'),
+                                hintText: _defaultCodeLabel(
+                                        r.code.text.trim()) ??
+                                    _tr('Bezeichnung', 'Label'),
                                 hintStyle: const TextStyle(
                                     fontSize: 12, color: Color(0xFF9CA3AF)),
                                 border: OutlineInputBorder(
@@ -631,9 +855,111 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
                               ),
                             ),
                           ),
+                          const SizedBox(width: 4),
+                          // Spesen an/aus.
+                          Tooltip(
+                            message: r.spesen
+                                ? _tr('Spesen: an', 'Spesen: on')
+                                : _tr('Spesen: aus', 'Spesen: off'),
+                            child: Switch(
+                              value: r.spesen,
+                              activeThumbColor: const Color(0xFF00B287),
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                              onChanged: (v) =>
+                                  setLocal(() => r.spesen = v),
+                            ),
+                          ),
+                          // Eigener €-Satz — nur sichtbar bei Spesen an.
+                          if (r.spesen) ...[
+                            const SizedBox(width: 4),
+                            SizedBox(
+                              width: 64,
+                              child: TextField(
+                                controller: r.rate,
+                                textAlign: TextAlign.right,
+                                keyboardType: const TextInputType
+                                    .numberWithOptions(decimal: true),
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.allow(
+                                      RegExp(r'[0-9.,]')),
+                                ],
+                                style: const TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w700),
+                                decoration: InputDecoration(
+                                  isDense: true,
+                                  suffixText: '€',
+                                  hintText: _rateInput(_spesenRate),
+                                  hintStyle: const TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF9CA3AF)),
+                                  contentPadding:
+                                      const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 9),
+                                  border: OutlineInputBorder(
+                                      borderRadius:
+                                          BorderRadius.circular(10)),
+                                ),
+                              ),
+                            ),
+                          ],
+                          const SizedBox(width: 2),
+                          IconButton(
+                            tooltip: _tr('Code löschen', 'Delete code'),
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                                minWidth: 32, minHeight: 32),
+                            icon: const Icon(Icons.delete_outline_rounded,
+                                size: 18, color: Color(0xFF9CA3AF)),
+                            onPressed: () => confirmDeleteRow(r),
+                          ),
                         ],
                       ),
                     ),
+                  Row(
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () => setLocal(() {
+                          rows = [
+                            ...rows,
+                            rowFor(MonthlyPlanCode(
+                              code: '',
+                              colorHex: nextMonthlyPlanCodeColor(
+                                  [for (final r in rows) r.colorHex]),
+                            )),
+                          ];
+                          errorText = null;
+                        }),
+                        icon: const Icon(Icons.add_rounded, size: 18),
+                        label: Text(
+                            _tr('Code hinzufügen', 'Add code'),
+                            style: const TextStyle(fontSize: 12.5)),
+                      ),
+                      const Spacer(),
+                      TextButton.icon(
+                        onPressed: confirmRestoreDefaults,
+                        icon: const Icon(Icons.restart_alt_rounded,
+                            size: 17),
+                        label: Text(
+                            _tr('Standard wiederherstellen',
+                                'Restore defaults'),
+                            style: const TextStyle(fontSize: 12.5)),
+                      ),
+                    ],
+                  ),
+                  if (errorText != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      errorText!,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFDC2626),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -644,21 +970,61 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
               child: Text(_tr('Abbrechen', 'Cancel')),
             ),
             FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
+              onPressed: () {
+                // Validierung: leere Codes verwerfen, Duplikate und
+                // ungültige Beträge blockieren das Speichern.
+                final parsedCodes = <MonthlyPlanCode>[];
+                final seen = <String>{};
+                for (final r in rows) {
+                  final code = r.code.text.trim();
+                  if (code.isEmpty) continue;
+                  if (!seen.add(code)) {
+                    setLocal(() => errorText = _tr(
+                        'Doppelter Code: „$code" — jedes Kürzel darf nur '
+                            'einmal vorkommen.',
+                        'Duplicate code: "$code" — each code may only '
+                            'appear once.'));
+                    return;
+                  }
+                  double? rate;
+                  final t = r.rate.text.trim().replaceAll(',', '.');
+                  if (r.spesen && t.isNotEmpty) {
+                    rate = double.tryParse(t);
+                    if (rate == null || rate < 0) {
+                      setLocal(() => errorText = _tr(
+                          'Ungültiger €-Betrag bei „$code".',
+                          'Invalid € amount for "$code".'));
+                      return;
+                    }
+                  }
+                  parsedCodes.add(MonthlyPlanCode(
+                    code: code,
+                    label: r.label.text.trim(),
+                    spesen: r.spesen,
+                    spesenRate: r.spesen ? rate : null,
+                    colorHex: r.colorHex,
+                  ));
+                }
+                if (parsedCodes.isEmpty) {
+                  setLocal(() => errorText = _tr(
+                      'Mindestens ein Code wird benötigt.',
+                      'At least one code is required.'));
+                  return;
+                }
+                newCodes = parsedCodes;
+                Navigator.pop(ctx, true);
+              },
               child: Text(_tr('Speichern', 'Save')),
             ),
           ],
-        ),
+          );
+        },
       ),
     );
     final rateText = rateCtrl.text.trim().replaceAll(',', '.');
-    final labels = {
-      for (final e in labelCtrls.entries)
-        if (e.value.text.trim().isNotEmpty) e.key: e.value.text.trim(),
-    };
     rateCtrl.dispose();
-    for (final c in labelCtrls.values) {
-      c.dispose();
+    for (final r in allRows) {
+      r.dispose();
     }
     if (saved != true || !mounted) return;
     final parsedRate = double.tryParse(rateText);
@@ -673,7 +1039,17 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
       _spesenContracts = contracts;
       _spesenBuckets = buckets;
       if (parsedRate != null && parsedRate >= 0) _spesenRate = parsedRate;
-      _codeLabels = labels;
+      final codes = newCodes;
+      if (codes != null) {
+        _dayCodesCfg = codes;
+        // `codeLabels` spiegeln (Abwärtskompatibilität + Label-Quelle,
+        // falls die Konfiguration je zurückgesetzt wird).
+        _codeLabels = {
+          for (final c in codes)
+            if (c.label.isNotEmpty) c.code: c.label,
+        };
+      }
+      _codeCfgCache = null;
     });
     await _saveSettings();
   }
@@ -1408,40 +1784,41 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
           ),
           const PopupMenuDivider(height: 6),
         ],
-        for (final code in kDayCodes)
+        for (final cfg in _dayCodes)
           PopupMenuItem<String>(
-            value: code,
+            value: cfg.code,
             height: 34,
             child: Row(
               children: [
                 Container(
-                  width: 22,
+                  width: 26,
                   height: 22,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: _codeColor(code),
+                    color: _colorFor(cfg.code),
                     borderRadius: BorderRadius.circular(5),
                   ),
-                  child: Text(code,
+                  child: Text(cfg.code,
                       style: const TextStyle(
                           fontSize: 10, fontWeight: FontWeight.w800)),
                 ),
                 const SizedBox(width: 8),
-                if (_kSpesenCodes.contains(code))
+                if (cfg.spesen)
                   Flexible(
                     child: Text(
-                      _codeLabels[code] != null
-                          ? '${_codeLabel(code)} · +${_money(_spesenRate)}'
-                          : '+${_money(_spesenRate)}',
+                      _codeLabel(cfg.code) != null
+                          ? '${_codeLabel(cfg.code)} · '
+                              '+${_money(_rateFor(cfg.code))}'
+                          : '+${_money(_rateFor(cfg.code))}',
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                           fontSize: 11, color: Color(0xFF1D7F5A)),
                     ),
                   )
-                else if (_codeLabel(code) != null)
+                else if (_codeLabel(cfg.code) != null)
                   Flexible(
                     child: Text(
-                      _codeLabel(code)!,
+                      _codeLabel(cfg.code)!,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                           fontSize: 11, color: Color(0xFF64748B)),
@@ -2396,31 +2773,43 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
                           var n = 0;
                           for (var d = 1; d <= daysInMonth; d++) {
                             if (weekBlocked(tid, _weekOfDay(d))) continue;
-                            if (_kSpesenCodes.contains(codeOf(tid, d))) n++;
+                            if (_isSpesenCode(codeOf(tid, d))) n++;
                           }
                           return n;
                         }
 
+                        // €-Summe eines Mitarbeiters: Summe der
+                        // Tagessätze (je Code eigener Satz oder der
+                        // globale) — nicht mehr pauschal Tage × Satz.
+                        double spesenEur(String tid) {
+                          var sum = 0.0;
+                          for (var d = 1; d <= daysInMonth; d++) {
+                            if (weekBlocked(tid, _weekOfDay(d))) continue;
+                            final c = codeOf(tid, d);
+                            if (_isSpesenCode(c)) sum += _rateFor(c);
+                          }
+                          return sum;
+                        }
+
                         // Monats-Gesamtsumme: Spesen-Tage aller
                         // berechtigten Mitarbeiter und der daraus
-                        // resultierende Betrag.
-                        final totalDays = drivers.fold<int>(
-                          0,
-                          (total, d) {
-                            // Contract types deselected in the
-                            // settings never receive Spesen.
-                            if (!_contractEligible(
-                                DriverContractType.fromValue(
-                                    d.data()['contractType']))) {
-                              return total;
-                            }
-                            return total +
-                                spesenDays((d.data()['transporterId'] ?? d.id)
-                                    .toString()
-                                    .trim());
-                          },
-                        );
-                        final totalEur = totalDays * _spesenRate;
+                        // resultierende Betrag (Summe der Tagessätze).
+                        var totalDays = 0;
+                        var totalEur = 0.0;
+                        for (final d in drivers) {
+                          // Contract types deselected in the
+                          // settings never receive Spesen.
+                          if (!_contractEligible(
+                              DriverContractType.fromValue(
+                                  d.data()['contractType']))) {
+                            continue;
+                          }
+                          final tid = (d.data()['transporterId'] ?? d.id)
+                              .toString()
+                              .trim();
+                          totalDays += spesenDays(tid);
+                          totalEur += spesenEur(tid);
+                        }
 
                         // Ticket: in der schmalen Ansicht ist ggf. die
                         // Tagesliste eines Fahrers geöffnet.
@@ -2460,7 +2849,8 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
                                 padding:
                                     const EdgeInsets.fromLTRB(14, 10, 14, 10),
                                 child: detail != null
-                                    ? _narrowDetailBar(detail, spesenDays)
+                                    ? _narrowDetailBar(
+                                        detail, spesenDays, spesenEur)
                                     : Row(
                                   children: [
                                     Text(
@@ -2512,10 +2902,11 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
                                                 monthBlocked)
                                             : _narrowDriverList(
                                                 drivers, daysInMonth,
-                                                codeOf, spesenDays))
+                                                codeOf, spesenDays,
+                                                spesenEur))
                                         : _grid(
                                             drivers, daysInMonth, codeOf,
-                                            isAuto, spesenDays,
+                                            isAuto, spesenDays, spesenEur,
                                             weekBlocked, monthBlocked),
                               ),
                             ],
@@ -3082,6 +3473,7 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
     int daysInMonth,
     String Function(String tid, int day) codeOf,
     int Function(String tid) spesenDays,
+    double Function(String tid) spesenEur,
   ) {
     // Gleiche Gruppierung wie in der Matrix: Minijob → Teilzeit →
     // Dispatch → Vollzeit, innerhalb der Gruppe nach Vertragsbeginn.
@@ -3124,7 +3516,7 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
             if (DateTime(_month.year, _month.month, d).weekday != 7) open++;
             continue;
           }
-          if (_kWorkCodes.contains(code)) {
+          if (_isWorkCode(code)) {
             work++;
           } else if (code == 'U') {
             vacation++;
@@ -3135,7 +3527,7 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
           }
         }
         final days = eligible ? spesenDays(tid) : 0;
-        final eur = days * _spesenRate;
+        final eur = eligible ? spesenEur(tid) : 0.0;
 
         final empNo = (data['employeeNumber'] ?? '').toString().trim();
         final sub = [
@@ -3284,13 +3676,14 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
   Widget _narrowDetailBar(
     QueryDocumentSnapshot<Map<String, dynamic>> driver,
     int Function(String tid) spesenDays,
+    double Function(String tid) spesenEur,
   ) {
     final data = driver.data();
     final tid = (data['transporterId'] ?? driver.id).toString().trim();
     final eligible = _contractEligible(
         DriverContractType.fromValue(data['contractType']));
     final days = eligible ? spesenDays(tid) : 0;
-    final eur = days * _spesenRate;
+    final eur = eligible ? spesenEur(tid) : 0.0;
     return Row(
       children: [
         SizedBox(
@@ -3357,9 +3750,12 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
         _ => null,
       };
 
-  /// Beschriftung eines Codes: eigene Bezeichnung aus den Einstellungen,
-  /// sonst der Standardtext. `null`, wenn beides fehlt.
+  /// Beschriftung eines Codes: eigene Bezeichnung aus der konfigurierten
+  /// Codeliste, sonst aus dem Legacy-Feld `codeLabels`, sonst der
+  /// Standardtext. `null`, wenn alles fehlt.
   String? _codeLabel(String code) {
+    final cfgLabel = _cfgOf(code)?.label.trim();
+    if (cfgLabel != null && cfgLabel.isNotEmpty) return cfgLabel;
     final custom = _codeLabels[code]?.trim();
     if (custom != null && custom.isNotEmpty) return custom;
     return _defaultCodeLabel(code);
@@ -3373,21 +3769,38 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
     return '${_de ? s.replaceAll('.', ',') : s} €';
   }
 
-  /// Legende des Kopfbereichs — nutzt den konfigurierten Spesensatz und
-  /// die (ggf. eigenen) Beschriftungen aller Codes.
+  /// Legende des Kopfbereichs — baut auf der KONFIGURIERTEN Codeliste
+  /// auf: Spesen-Codes mit globalem Satz gesammelt, Codes mit eigenem
+  /// Satz einzeln, dazu die (ggf. eigenen) Beschriftungen.
   String _legendText() {
-    final spesenCodes =
-        kDayCodes.where(_kSpesenCodes.contains).join(' / ');
+    final codes = _dayCodes;
+    final defaultRateCodes = [
+      for (final c in codes)
+        if (c.spesen && c.spesenRate == null) c.code,
+    ];
+    // Klassische "keine Spesen"-Kurzinfo — nur für die Codes, die es in
+    // der Konfiguration (noch) gibt und die keine Spesen auslösen.
+    final noSpesen = [
+      for (final k in const ['U', 'X', 'K'])
+        if (codes.any((c) => c.code == k && !c.spesen)) k,
+    ];
     final parts = <String>[
-      '$spesenCodes = ${_money(_spesenRate)} '
-          '${_tr('pro Tag', 'per day')}',
-      for (final c in kDayCodes)
-        if (!_kSpesenCodes.contains(c) && _codeLabel(c) != null)
-          '$c = ${_codeLabel(c)}',
-      for (final c in kDayCodes)
-        if (_kSpesenCodes.contains(c) && _codeLabels[c] != null)
-          '$c = ${_codeLabel(c)}',
-      _tr('U / X / K = keine Spesen', 'U / X / K = no Spesen'),
+      if (defaultRateCodes.isNotEmpty)
+        '${defaultRateCodes.join(' / ')} = ${_money(_spesenRate)} '
+            '${_tr('pro Tag', 'per day')}',
+      for (final c in codes)
+        if (c.spesen && c.spesenRate != null)
+          '${c.code} = ${_money(c.spesenRate!)} '
+              '${_tr('pro Tag', 'per day')}',
+      for (final c in codes)
+        if (!c.spesen && _codeLabel(c.code) != null)
+          '${c.code} = ${_codeLabel(c.code)}',
+      for (final c in codes)
+        if (c.spesen && c.label.trim().isNotEmpty)
+          '${c.code} = ${c.label.trim()}',
+      if (noSpesen.isNotEmpty)
+        _tr('${noSpesen.join(' / ')} = keine Spesen',
+            '${noSpesen.join(' / ')} = no Spesen'),
       _tr('Poor/Fair-Woche = automatisch gestrichen',
           'poor/fair week = auto-cancelled'),
     ];
@@ -3469,11 +3882,11 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
       final note = <String>[
         if (_codeLabel(code) != null) _codeLabel(code)!,
         if (auto) _tr('automatisch', 'automatic'),
-        if (_kSpesenCodes.contains(code))
+        if (_isSpesenCode(code))
           blocked
-              ? _tr('${_money(_spesenRate)} gestrichen',
-                  '${_money(_spesenRate)} cancelled')
-              : '+${_money(_spesenRate)}',
+              ? _tr('${_money(_rateFor(code))} gestrichen',
+                  '${_money(_rateFor(code))} cancelled')
+              : '+${_money(_rateFor(code))}',
         if (code.isEmpty) _tr('kein Eintrag', 'no entry'),
       ].join(' · ');
 
@@ -3499,7 +3912,7 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
               child: Row(
                 children: [
                   // Farbakzent des Codes — dieselbe Palette wie die Zellen.
-                  Container(width: 5, color: _codeColor(code)),
+                  Container(width: 5, color: _colorFor(code)),
                   const SizedBox(width: 9),
                   SizedBox(
                     width: 64,
@@ -3540,9 +3953,9 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
                               // Vorbelegung blasser als eine echte
                               // Eintragung.
                               ? Color.alphaBlend(
-                                  _codeColor(code).withValues(alpha: 0.38),
+                                  _colorFor(code).withValues(alpha: 0.38),
                                   Colors.white)
-                              : _codeColor(code)),
+                              : _colorFor(code)),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
                           color: code.isEmpty || auto
@@ -3602,6 +4015,7 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
     String Function(String tid, int day) codeOf,
     bool Function(String tid, int day) isAuto,
     int Function(String tid) spesenDays,
+    double Function(String tid) spesenEur,
     bool Function(String tid, int week) weekBlocked,
     bool Function(String tid) monthBlocked,
   ) {
@@ -4136,7 +4550,7 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
                         DriverContractType.fromValue(
                             drivers[i].data()['contractType']));
                     final days = isMinijob ? 0 : spesenDays(tid);
-                    final eur = days * _spesenRate;
+                    final eur = isMinijob ? 0.0 : spesenEur(tid);
                     return Container(
                       height: _rowH,
                       color: i.isOdd
@@ -4244,8 +4658,8 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
         ? emptyBg
         : (auto
             ? Color.alphaBlend(
-                _codeColor(code).withValues(alpha: 0.38), emptyBg)
-            : _codeColor(code));
+                _colorFor(code).withValues(alpha: 0.38), emptyBg)
+            : _colorFor(code));
     // Blocked calendar week: code label stays, day gets an orange frame
     // and its A/AC days no longer count towards the Spesen total.
     final border = blocked
@@ -4268,11 +4682,11 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
         : [
             [code, if (_codeLabel(code) != null) _codeLabel(code)!]
                 .join(' — '),
-            if (_kSpesenCodes.contains(code))
+            if (_isSpesenCode(code))
               blocked
-                  ? _tr('${_money(_spesenRate)} gestrichen',
-                      '${_money(_spesenRate)} cancelled')
-                  : '+${_money(_spesenRate)}',
+                  ? _tr('${_money(_rateFor(code))} gestrichen',
+                      '${_money(_rateFor(code))} cancelled')
+                  : '+${_money(_rateFor(code))}',
             if (auto) _tr('automatisch vorbelegt', 'pre-filled automatically'),
           ].join(' · ');
     return Builder(
@@ -4309,6 +4723,46 @@ class _AdminMonthlyPlanPageState extends State<AdminMonthlyPlanPage> {
           child: cell,
         );
       },
+    );
+  }
+}
+
+/// Eine editierbare Code-Zeile im Einstellungs-Dialog: Kürzel,
+/// Bezeichnung, Spesen-Schalter, optionaler eigener €-Satz und die
+/// (beim Anlegen fest vergebene) Farbe.
+class _CodeRow {
+  _CodeRow({
+    required this.code,
+    required this.label,
+    required this.rate,
+    required this.spesen,
+    this.colorHex,
+  });
+
+  final TextEditingController code;
+  final TextEditingController label;
+  final TextEditingController rate;
+  bool spesen;
+  final String? colorHex;
+
+  void dispose() {
+    code.dispose();
+    label.dispose();
+    rate.dispose();
+  }
+}
+
+/// Uppercased die Code-Eingabe beim Tippen. Der Initialwert bleibt bis
+/// zur ersten Änderung unangetastet — der historische Code „Ra" behält
+/// so seine Schreibweise, solange er nicht bewusst editiert wird.
+class _UpperCaseTextFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) {
+    return TextEditingValue(
+      text: newValue.text.toUpperCase(),
+      selection: newValue.selection,
+      composing: TextRange.empty,
     );
   }
 }
