@@ -18,6 +18,7 @@ import 'scorecard_week.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../localization/app_localizations.dart';
 import '../utils/driver_activity.dart';
+import '../utils/driver_stations.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_elevation.dart';
 import '../theme/app_typography.dart';
@@ -174,6 +175,17 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage>
   int? _selectedYear;
   String? _selectedStationCode;
 
+  /// Fahrer-Stations-Filter (Session-State, nicht persistiert):
+  /// null = Alle · Stationscode = nur Fahrer dieser Station ·
+  /// [kNoStationFilter] = nur Fahrer ohne Stations-Zuweisung.
+  /// Basis ist das Feld `station` auf users/{dsp}/drivers/{TID}.
+  String? _driverStationFilter;
+
+  /// TID -> Station aus der drivers-Collection — einmal pro Admin-Scope
+  /// geladen. Leer, solange keine Stationen vergeben sind (der Filter
+  /// erscheint dann gar nicht).
+  Map<String, String> _tidStationMap = const <String, String>{};
+
   /// Top segmented control: 0 = Company Score view, 1 = Best Driver view.
   /// Replaces the previous Best-Drivers popup dialog — Best-Drivers is now
   /// just the second tab on this page.
@@ -214,7 +226,20 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage>
       _currentAdminUid = next;
       _globalNamesStreamCached = _driversNameMapGlobal();
       _activeTidsStreamCached = _activeTidsStream();
+      _loadDriverStations();
     }
+  }
+
+  /// Laedt die TID->Station-Map einmalig fuer den aktuellen Admin-Scope.
+  void _loadDriverStations() {
+    _driverStationFilter = null;
+    _tidStationMap = const <String, String>{};
+    final uid =
+        _currentAdminUid ?? FirebaseAuth.instance.currentUser?.uid ?? '';
+    loadDriverStations(uid).then((m) {
+      if (!mounted) return;
+      setState(() => _tidStationMap = m);
+    });
   }
 
   /// Streams the set of transporter-IDs of drivers that are currently
@@ -535,6 +560,15 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage>
             onChanged: () => setDialogState(() {}),
           ),
         ),
+        ...() {
+          final chips = _buildDriverStationChips(
+            context: context,
+            setDialogState: setDialogState,
+          );
+          return chips == null
+              ? const <Widget>[]
+              : <Widget>[const SizedBox(height: 12), chips];
+        }(),
         const SizedBox(height: 16),
         if (subtitle != null && subtitle.isNotEmpty)
           Padding(
@@ -654,6 +688,16 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage>
                   if (tid.isEmpty) continue;
                   // Skip inactive DAs (feedback ticket).
                   if (filterActive && !activeTids.contains(tid)) continue;
+                  // Fahrer-Stations-Filter (Zuordnung aus Drivers Hub):
+                  // wirkt auf Ranking UND die Durchschnitts-Aggregation,
+                  // da gefilterte Fahrer gar nicht erst aggregiert werden.
+                  if (!tidMatchesStationFilter(
+                    filter: _driverStationFilter,
+                    tidToStation: _tidStationMap,
+                    normalizedTid: tid,
+                  )) {
+                    continue;
+                  }
 
                   String station = '';
                   final reportPath = _s(data['reportPath']);
@@ -682,6 +726,30 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage>
                   final agg = aggMap.putIfAbsent(tid, () => _DriverAgg());
                   agg.sumScore += score;
                   agg.count++;
+                }
+
+                // Stations-Filter kann alle Fahrer wegfiltern — dann
+                // einen klaren Leer-Zustand statt leerer Flaeche zeigen.
+                if (stationAgg.isEmpty) {
+                  final de =
+                      Localizations.localeOf(context).languageCode == 'de';
+                  return CoStateSwitcher(
+                    child: Padding(
+                      key: const ValueKey('best-empty-station'),
+                      padding: const EdgeInsets.symmetric(vertical: 32),
+                      child: Center(
+                        child: Text(
+                          de
+                              ? 'Keine Fahrer für diese Auswahl im Zeitraum.'
+                              : 'No drivers for this selection in this period.',
+                          style: AppTypography.subheadline.copyWith(
+                            color: AppColors.labelSecondaryLight,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
                 }
 
                 final stationsSorted = stationAgg.keys.toList()..sort();
@@ -752,6 +820,73 @@ class _ScorecardOverviewPageState extends State<ScorecardOverviewPage>
           },
         ),
       ],
+    );
+  }
+
+  /// Fahrer-Stations-Filter als Chip-Reihe ("Alle" + je vergebene Station
+  /// + optional "Ohne Station"). Gibt null zurueck, wenn keine einzige
+  /// Station vergeben ist — die Seite sieht dann exakt aus wie bisher.
+  Widget? _buildDriverStationChips({
+    required BuildContext context,
+    required void Function(VoidCallback) setDialogState,
+  }) {
+    final stations = distinctStations(_tidStationMap);
+    if (stations.isEmpty) return null;
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final showNone = hasUnassignedDrivers(_tidStationMap);
+
+    Widget chip({required String label, required String? value}) {
+      final selected = _driverStationFilter == value;
+      return Padding(
+        padding: const EdgeInsets.only(right: 6),
+        child: ChoiceChip(
+          label: Text(
+            label,
+            style: AppTypography.caption1.copyWith(
+              fontWeight: FontWeight.w700,
+              color: selected ? Colors.white : AppColors.codriverDeep,
+            ),
+          ),
+          selected: selected,
+          showCheckmark: false,
+          selectedColor: AppColors.codriverGreen,
+          backgroundColor: AppColors.surfaceElevatedLight,
+          side: BorderSide(
+            color: selected
+                ? AppColors.codriverGreen
+                : const Color(0xFFE5E5EA),
+            width: 0.8,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(999),
+          ),
+          onSelected: (_) =>
+              setDialogState(() => _driverStationFilter = value),
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(right: 8),
+            child: Icon(
+              Icons.place_outlined,
+              size: 16,
+              color: AppColors.labelSecondaryLight,
+            ),
+          ),
+          chip(label: de ? 'Alle' : 'All', value: null),
+          for (final s in stations) chip(label: s, value: s),
+          if (showNone)
+            chip(
+              label: de ? 'Ohne Station' : 'No station',
+              value: kNoStationFilter,
+            ),
+        ],
+      ),
     );
   }
 

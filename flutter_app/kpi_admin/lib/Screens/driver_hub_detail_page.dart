@@ -159,6 +159,7 @@ class DriverHubDetailActions {
     required this.editDriverLanguage,
     required this.editRemainingVacation,
     required this.editEmployeeNumber,
+    required this.editStation,
     required this.editLicenseType,
     required this.editTransporterId,
     required this.toggleActive,
@@ -214,6 +215,11 @@ class DriverHubDetailActions {
 
   /// `_editEmployeeNumber`.
   final void Function(String current) editEmployeeNumber;
+
+  /// `_editDriverStation` — Stationszuweisung (z. B. „DBY5"), Top-Level-Feld
+  /// `station` auf dem Fahrerdokument. Vorbereitung für die
+  /// Stations-Trennung der Scorecard.
+  final void Function(String current) editStation;
 
   /// `_adminEditLicenseType` — EU vs. Nicht-EU-Führerschein.
   final void Function(String current) editLicenseType;
@@ -1896,6 +1902,7 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
       onboarding['workPermitType'],
       onboarding['residencePermitExpiry'],
     );
+    final station = (data['station'] ?? '').toString().trim();
 
     final current = currentEmploymentPeriod(employmentPeriodsOf(data));
     final active = (data['active'] as bool?) ?? true;
@@ -1962,6 +1969,15 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
               onboarding['workPermitType'],
               onboarding['residencePermitExpiry'],
             ),
+          ),
+          // Stationszuweisung (z. B. „DBY5") — Top-Level-Feld `station`,
+          // Grundlage für die Stations-Trennung der Scorecard.
+          _FieldSpec(
+            label: _tr('Station', 'Station'),
+            value: station,
+            placeholder: _tr('Keine Station', 'No station'),
+            mono: true,
+            onEdit: () => widget.actions.editStation(station),
           ),
           _FieldSpec(
             label: _tr('Beschäftigung', 'Employment'),

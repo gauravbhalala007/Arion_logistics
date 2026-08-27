@@ -4098,6 +4098,146 @@ class _DriversHubPageState extends State<DriversHubPage> {
     }, SetOptions(merge: true));
   }
 
+  /// Stations-Editor — schreibt das Top-Level-Feld `station`
+  /// (Großbuchstaben, max. 10 Zeichen) auf dem Fahrerdokument.
+  /// Vorbereitung für die Stations-Trennung der Scorecard.
+  ///
+  /// Zeigt als Vorschläge alle Stationen, die bei anderen Fahrern des DSP
+  /// bereits gesetzt sind (einmaliger Read der drivers-Collection),
+  /// plus ein Freitextfeld. Leeres Feld = Station entfernen.
+  Future<void> _editDriverStation({
+    required DocumentReference<Map<String, dynamic>> driverRef,
+    required String current,
+  }) async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+
+    // Distinct-Stationswerte aller Fahrer des DSP als Vorschlags-Chips.
+    final existing = <String>{};
+    try {
+      final snap = await driverRef.parent.get();
+      for (final doc in snap.docs) {
+        final s = (doc.data()['station'] ?? '').toString().trim();
+        if (s.isNotEmpty) existing.add(s.toUpperCase());
+      }
+    } catch (_) {
+      // Vorschläge sind optional — Freitext funktioniert trotzdem.
+    }
+    if (!mounted) return;
+    final suggestions = existing.toList()..sort();
+
+    final ctrl = TextEditingController(text: current);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          de ? 'Station zuweisen' : 'Assign station',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+        ),
+        content: SizedBox(
+          width: 320,
+          child: StatefulBuilder(
+            builder: (ctx2, setStateDialog) => Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  de
+                      ? 'Station des Fahrers (z. B. DBY5) — Grundlage für '
+                          'die Stations-Trennung der Scorecard. Leer '
+                          'lassen, um die Station zu entfernen.'
+                      : 'The driver\'s station (e.g. DBY5) — used to '
+                          'split the scorecard by station. Leave empty '
+                          'to remove the station.',
+                  style: const TextStyle(
+                      fontSize: 12.5, color: Color(0xFF6B7280)),
+                ),
+                if (suggestions.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final s in suggestions)
+                        InkWell(
+                          onTap: () => setStateDialog(() {
+                            ctrl.text = s;
+                            ctrl.selection = TextSelection.collapsed(
+                                offset: s.length);
+                          }),
+                          borderRadius: BorderRadius.circular(999),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: ctrl.text.trim().toUpperCase() == s
+                                  ? const Color(0xFFE6F7F2)
+                                  : const Color(0xFFF3F4F6),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: ctrl.text.trim().toUpperCase() == s
+                                    ? const Color(0xFF00B287)
+                                    : const Color(0xFFE5E7EB),
+                              ),
+                            ),
+                            child: Text(
+                              s,
+                              style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: ctrl.text.trim().toUpperCase() == s
+                                    ? const Color(0xFF00B287)
+                                    : const Color(0xFF374151),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 12),
+                TextField(
+                  controller: ctrl,
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.characters,
+                  inputFormatters: [
+                    LengthLimitingTextInputFormatter(10),
+                  ],
+                  onChanged: (_) => setStateDialog(() {}),
+                  onSubmitted: (_) => Navigator.pop(ctx, true),
+                  decoration: _pillInputDecoration(
+                      de ? 'z. B. DBY5' : 'e.g. DBY5'),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(de ? 'Abbrechen' : 'Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF00B287)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(de ? 'Speichern' : 'Save'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final cleaned = ctrl.text.trim().toUpperCase();
+    final station =
+        cleaned.length > 10 ? cleaned.substring(0, 10) : cleaned;
+    await driverRef.set({
+      'station': station.isEmpty ? FieldValue.delete() : station,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
   /// Contract-type picker — writes the top-level `contractType` field.
   Future<void> _adminEditContractType({
     required DocumentReference<Map<String, dynamic>> driverRef,
@@ -5119,6 +5259,10 @@ class _DriversHubPageState extends State<DriversHubPage> {
             computed: computed,
           ),
           editEmployeeNumber: (current) => _editEmployeeNumber(
+            driverRef: driverRef,
+            current: current,
+          ),
+          editStation: (current) => _editDriverStation(
             driverRef: driverRef,
             current: current,
           ),
@@ -8699,6 +8843,45 @@ class _DriverHubRow extends StatelessWidget {
     final licenseType =
         _driverLicenseType(onboarding['licenseType'], onboarding);
 
+    // Stationszuweisung (z. B. „DBY5") — dezentes graues Badge in der
+    // Chip-Zeile, nur wenn gesetzt (Optik wie „TID ausstehend").
+    final station = (driverDoc.data()['station'] ?? '').toString().trim();
+    final Widget? stationBadge = station.isEmpty
+        ? null
+        : Tooltip(
+            message: 'Station',
+            waitDuration: const Duration(milliseconds: 500),
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3F4F6),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.location_on_outlined,
+                    size: 11,
+                    color: Color(0xFF6B7280),
+                  ),
+                  const SizedBox(width: 3),
+                  Text(
+                    station,
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF6B7280),
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+
     final scoreBlock = score == null
         ? Column(
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -8984,6 +9167,7 @@ class _DriverHubRow extends StatelessWidget {
                           contractPill,
                           licencePill,
                           permitPill,
+                          if (stationBadge != null) stationBadge,
                           if (tidPending)
                             Container(
                               padding: const EdgeInsets.symmetric(
@@ -9196,6 +9380,7 @@ class _DriverHubRow extends StatelessWidget {
                             },
                           ),
                         ),
+                        if (stationBadge != null) stationBadge,
                         if (tidPending)
                           Container(
                             padding: const EdgeInsets.symmetric(

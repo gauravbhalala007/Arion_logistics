@@ -23,6 +23,7 @@ import '../localization/app_localizations.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_elevation.dart';
 import '../theme/app_typography.dart';
+import '../utils/driver_stations.dart';
 import '../widgets/admin_scope.dart';
 import '../widgets/clearable_search_field.dart';
 import '../widgets/co_button.dart';
@@ -123,7 +124,35 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
 
   String _bucket = 'ALL';
 
+  /// Stations-Filter (Session-State, wird nicht persistiert):
+  /// null = Alle · Stationscode = nur diese Station ·
+  /// [kNoStationFilter] = nur Fahrer ohne Stations-Zuweisung.
+  String? _stationFilter;
+
+  /// TID -> Station aus users/{dsp}/drivers — einmal pro Admin-Scope
+  /// geladen. Leer solange keine Stationen vergeben sind (Filter
+  /// erscheint dann gar nicht).
+  Map<String, String> _tidStation = const <String, String>{};
+  String? _stationsLoadedForUid;
+
   bool get _de => Localizations.localeOf(context).languageCode == 'de';
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final uid = AdminScope.adminUidOf(context) ??
+        FirebaseAuth.instance.currentUser?.uid ??
+        '';
+    if (uid == _stationsLoadedForUid) return;
+    _stationsLoadedForUid = uid;
+    loadDriverStations(uid).then((m) {
+      if (!mounted) return;
+      setState(() {
+        _tidStation = m;
+        _stationFilter = null;
+      });
+    });
+  }
 
   static const _bucketItems = <String>[
     'ALL',
@@ -1080,6 +1109,8 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
       busy: _busyPdf,
     );
 
+    final stationChips = _buildStationChips();
+
     if (isMobile) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1095,11 +1126,15 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
               uploadBtn,
             ],
           ),
+          if (stationChips != null) ...[
+            const SizedBox(height: 10),
+            stationChips,
+          ],
         ],
       );
     }
 
-    return Row(
+    final row = Row(
       children: [
         Expanded(flex: 3, child: search),
         const SizedBox(width: 10),
@@ -1109,6 +1144,79 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
         const SizedBox(width: 10),
         uploadBtn,
       ],
+    );
+
+    if (stationChips == null) return row;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        row,
+        const SizedBox(height: 10),
+        stationChips,
+      ],
+    );
+  }
+
+  /// Stations-Filter als Chip-Reihe ("Alle" + je vorhandene Station +
+  /// optional "Ohne Station"). null, wenn keine einzige Station vergeben
+  /// ist — die Seite sieht dann exakt aus wie ohne das Feature.
+  Widget? _buildStationChips() {
+    final stations = distinctStations(_tidStation);
+    if (stations.isEmpty) return null;
+    final de = _de;
+    final showNone = hasUnassignedDrivers(_tidStation);
+
+    Widget chip({required String label, required String? value}) {
+      final selected = _stationFilter == value;
+      return Padding(
+        padding: const EdgeInsets.only(right: 6),
+        child: ChoiceChip(
+          label: Text(
+            label,
+            style: AppTypography.caption1.copyWith(
+              fontWeight: FontWeight.w700,
+              color: selected ? Colors.white : AppColors.codriverDeep,
+            ),
+          ),
+          selected: selected,
+          showCheckmark: false,
+          selectedColor: AppColors.codriverGreen,
+          backgroundColor: AppColors.surfaceElevatedLight,
+          side: BorderSide(
+            color: selected
+                ? AppColors.codriverGreen
+                : const Color(0xFFE5E5EA),
+            width: 0.8,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(999),
+          ),
+          onSelected: (_) => setState(() => _stationFilter = value),
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(right: 8),
+            child: Icon(
+              Icons.place_outlined,
+              size: 16,
+              color: AppColors.labelSecondaryLight,
+            ),
+          ),
+          chip(label: de ? 'Alle' : 'All', value: null),
+          for (final s in stations) chip(label: s, value: s),
+          if (showNone)
+            chip(
+              label: de ? 'Ohne Station' : 'No station',
+              value: kNoStationFilter,
+            ),
+        ],
+      ),
     );
   }
 
@@ -1176,6 +1284,19 @@ class _ScorecardWeekPageState extends State<ScorecardWeekPage> {
                   );
                   return delivered > 0;
                 }).toList();
+
+                // Stations-Filter: Zuordnung TID -> Station aus den
+                // Fahrerdocs (Drivers Hub). Wirkt auf Liste, Ranking
+                // und den Zaehler-Badge.
+                if (_stationFilter != null) {
+                  docs = docs.where((d) {
+                    return tidMatchesStationFilter(
+                      filter: _stationFilter,
+                      tidToStation: _tidStation,
+                      normalizedTid: _normTid(d.data()['transporterId']),
+                    );
+                  }).toList();
+                }
 
                 if (_bucket != 'ALL') {
                   docs = docs.where((d) {
