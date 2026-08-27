@@ -676,13 +676,17 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
       return;
     }
 
-    // Ticket „alle Namen erkennen": den Excel-Roster gegen die
-    // Fahrerliste halten. Fahrer, die in CoDriver noch als
-    // PENDING-Platzhalter laufen, bekommen hier ihre echte
-    // Transporter-ID angeboten; ganz unbekannte Namen werden benannt
-    // statt stillschweigend ignoriert.
-    await _reconcileRosterWithDrivers(parsed.roster);
-    if (!mounted) return;
+    // Ticket „alle Namen erkennen": der Roster-Abgleich laeuft NACH dem
+    // Laden des Plans (siehe reconcileAfterLoad) — der Plan darf nie am
+    // Abgleich haengen bleiben.
+    Future<void> reconcileAfterLoad() async {
+      try {
+        await _reconcileRosterWithDrivers(parsed!.roster);
+      } catch (_) {
+        // Abgleich ist Komfort — ein Fehler darf den geladenen Plan
+        // nicht beeintraechtigen.
+      }
+    }
 
     final now = DateTime.now();
     final todayKey = '${now.year.toString().padLeft(4, '0')}-'
@@ -739,6 +743,8 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
             duration: const Duration(seconds: 5),
           ),
         );
+        // Plan ist geladen — jetzt erst der Fahrer-Abgleich.
+        await reconcileAfterLoad();
         return;
       }
       // scope == 'day' → fall through to the single-day picker.
@@ -806,6 +812,8 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
         duration: const Duration(seconds: 3),
       ),
     );
+    // Plan ist geladen — jetzt erst der Fahrer-Abgleich.
+    await reconcileAfterLoad();
   }
 
   bool get _isTomorrowSelected {
