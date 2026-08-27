@@ -227,6 +227,20 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
   // driver app can show an alert.
   final Map<String, List<String>> _atlasByRoute = {};
 
+  // ─── Zeitvorlagen (time templates) ────────────────────────────────
+  // Saved one-click times ("10:40", "11:00", …) shown as chips next to
+  // every time input of the waveplan. Persisted per DSP under
+  // `users/{adminUid}/settings/waveplan_time_templates` so dispatchers
+  // and admin share the same list. Falls back to sensible defaults
+  // until the admin saves an own list.
+  static const List<String> _kDefaultTimeTemplates = [
+    '06:30', '10:30', '11:00', '11:20', '12:30',
+    '12:50', '13:00', '17:30', '22:00',
+  ];
+  List<String> _timeTemplates = List.of(_kDefaultTimeTemplates);
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+      _timeTemplatesSub;
+
   // Manually added drivers that are NOT in the Amazon waveplan (e.g.
   // "infinities after sequence"). We give each a synthetic transporter-ID
   // (`MANUAL-<micros>`) and store the typed name here so the existing
@@ -337,7 +351,227 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
     _dispatcherNamesStream = _streamDispatcherNames();
     _loadProgram(_activeProgram);
     _watchPublished();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _watchShiftPlan());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _watchShiftPlan();
+      _watchTimeTemplates();
+    });
+  }
+
+  // ─── Zeitvorlagen (time templates) ────────────────────────────────
+
+  DocumentReference<Map<String, dynamic>>? _timeTemplatesDocRef() {
+    // Same scope resolution as the rest of the page: dispatchers work
+    // in their parent admin's namespace via AdminScope.
+    final uid = AdminScope.adminUidOf(context) ??
+        FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return null;
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('settings')
+        .doc('waveplan_time_templates');
+  }
+
+  void _watchTimeTemplates() {
+    _timeTemplatesSub?.cancel();
+    final ref = _timeTemplatesDocRef();
+    if (ref == null) return;
+    _timeTemplatesSub = ref.snapshots().listen((doc) {
+      if (!mounted) return;
+      final raw = (doc.data() ?? const {})['times'];
+      // No doc / no array yet → keep the defaults untouched.
+      if (raw is! List) return;
+      final parsed = <String>{};
+      for (final e in raw) {
+        final m = RegExp(r'^(\d{1,2}):(\d{2})$').firstMatch(e.toString().trim());
+        if (m == null) continue;
+        final h = int.parse(m.group(1)!);
+        final min = int.parse(m.group(2)!);
+        if (h > 23 || min > 59) continue;
+        parsed.add('${h.toString().padLeft(2, '0')}:'
+            '${min.toString().padLeft(2, '0')}');
+      }
+      final sorted = parsed.toList()..sort();
+      setState(() => _timeTemplates = sorted);
+    });
+  }
+
+  Future<void> _saveTimeTemplates(List<String> times) async {
+    final sorted = times.toSet().toList()..sort();
+    setState(() => _timeTemplates = sorted);
+    final ref = _timeTemplatesDocRef();
+    if (ref == null) return;
+    try {
+      await ref.set({'times': sorted}, SetOptions(merge: true));
+    } catch (_) {
+      // Best effort — chips keep working from local state.
+    }
+  }
+
+  /// Small manage dialog for the time templates: list with per-entry
+  /// delete plus an "add via time field" action. Every change persists
+  /// immediately (merge write).
+  Future<void> _showTimeTemplatesDialog() async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    await showDialog<void>(
+      context: context,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setLocal) {
+            Future<void> addTime() async {
+              final picked = await showTimePicker(
+                context: ctx,
+                initialTime: const TimeOfDay(hour: 11, minute: 0),
+              );
+              if (picked == null) return;
+              final hhmm = '${picked.hour.toString().padLeft(2, '0')}:'
+                  '${picked.minute.toString().padLeft(2, '0')}';
+              await _saveTimeTemplates([..._timeTemplates, hhmm]);
+              setLocal(() {});
+            }
+
+            Future<void> removeTime(String hhmm) async {
+              await _saveTimeTemplates(
+                _timeTemplates.where((e) => e != hhmm).toList(),
+              );
+              setLocal(() {});
+            }
+
+            return Dialog(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 400),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.more_time_rounded,
+                              size: 20, color: AppColors.codriverDeep),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              de
+                                  ? 'Zeitvorlagen verwalten'
+                                  : 'Manage time templates',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF111827),
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.of(dialogCtx).pop(),
+                            icon: const Icon(Icons.close_rounded, size: 20),
+                            splashRadius: 18,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        de
+                            ? 'Gespeicherte Uhrzeiten erscheinen als '
+                                'Ein-Klick-Chips an allen Zeitfeldern '
+                                'des Waveplans.'
+                            : 'Saved times appear as one-click chips on '
+                                'all waveplan time fields.',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF6B7280),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      if (_timeTemplates.isEmpty)
+                        Text(
+                          de
+                              ? 'Noch keine Vorlagen gespeichert.'
+                              : 'No templates saved yet.',
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            fontStyle: FontStyle.italic,
+                            color: Color(0xFF9CA3AF),
+                          ),
+                        )
+                      else
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            for (final tpl in _timeTemplates)
+                              Container(
+                                padding: const EdgeInsets.only(left: 10),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF3F4F6),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: const Color(0xFFE5E7EB),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      tpl,
+                                      style: const TextStyle(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w700,
+                                        fontFeatures: [
+                                          FontFeature.tabularFigures()
+                                        ],
+                                        color: Color(0xFF374151),
+                                      ),
+                                    ),
+                                    InkWell(
+                                      onTap: () => removeTime(tpl),
+                                      borderRadius:
+                                          BorderRadius.circular(8),
+                                      child: const Padding(
+                                        padding: EdgeInsets.all(6),
+                                        child: Icon(
+                                          Icons.close_rounded,
+                                          size: 14,
+                                          color: Color(0xFF9CA3AF),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          CoButton(
+                            onPressed: () => Navigator.of(dialogCtx).pop(),
+                            label: de ? 'Fertig' : 'Done',
+                            variant: CoButtonVariant.secondaryOutlined,
+                          ),
+                          const SizedBox(width: 10),
+                          CoButton(
+                            onPressed: addTime,
+                            icon: Icons.add_rounded,
+                            label: de ? 'Zeit hinzufügen' : 'Add time',
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   /// Opens a dialog listing every driver in the published shift plan
@@ -591,6 +825,7 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
     _driverSearchFocus.dispose();
     _publishedSub?.cancel();
     _shiftPlanSub?.cancel();
+    _timeTemplatesSub?.cancel();
     // Flush a pending debounced draft save so the last edit isn't lost.
     if (_draftSaveTimer?.isActive ?? false) {
       _draftSaveTimer?.cancel();
@@ -1335,8 +1570,22 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
                           compact: true,
                         ),
                       ],
-                    )
-                  else
+                    ),
+                  // Why is Publish greyed out? Mobile shows the reason
+                  // (and the one-click "No Atlas today" fix) right under
+                  // the top row; desktop shows it inside the header next
+                  // to the publish toggle.
+                  if (isMobile && !_isPublished && !canPublish) ...[
+                    const SizedBox(height: AppSpacing.xs),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: _PublishBlockerHint(
+                        missingAtlas: _hasAnyEntries && !_atlasConfirmed,
+                        onNoAtlasToday: _confirmNoAtlasToday,
+                      ),
+                    ),
+                  ],
+                  if (!isMobile)
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
@@ -1382,6 +1631,8 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
                       atlasTotal: _atlasTotal,
                       atlasConfirmed: _atlasConfirmed,
                       notesLength: _generalNotes.trim().length,
+                      hasEntries: _hasAnyEntries,
+                      onNoAtlasToday: _confirmNoAtlasToday,
                     ),
                   if (!isMobile) const SizedBox(height: AppSpacing.md),
                   // Driver search — filters the route list by assigned
@@ -1520,6 +1771,26 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
 
   // ─── Import / paste ───────────────────────────────────────────────────
 
+  /// One-click "no Atlas packages today" confirmation. Does exactly what
+  /// the sentinel button inside the Atlas dialog does: clears the Atlas
+  /// list, opens the publish gate and persists the draft. Reachable both
+  /// from the Atlas dialog and from the hint chip next to the (disabled)
+  /// publish toggle.
+  void _confirmNoAtlasToday() {
+    if (!mounted) return;
+    final t = AppLocalizations.of(context);
+    setState(() {
+      _atlasByRoute.clear();
+      _atlasConfirmed = true;
+    });
+    _scheduleDraftSave();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(t.t('waveplan_snack_atlas_none_confirmed')),
+      ),
+    );
+  }
+
   Future<void> _showAtlasPasteDialog() async {
     final t = AppLocalizations.of(context);
     final controller = TextEditingController();
@@ -1594,17 +1865,7 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
 
     // Sentinel: dispatcher confirmed there are no Atlas packages today.
     if (result == _kAtlasNoneToday) {
-      setState(() {
-        _atlasByRoute.clear();
-        _atlasConfirmed = true;
-      });
-      _scheduleDraftSave();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(t.t('waveplan_snack_atlas_none_confirmed')),
-        ),
-      );
+      _confirmNoAtlasToday();
       return;
     }
 
@@ -2151,6 +2412,95 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
               );
             }
 
+            // One-click chip applying a saved time template to the
+            // start or end field. Templates are shared page-wide
+            // (`_timeTemplates`) and persisted per DSP.
+            Widget tplChip(String tpl, bool isStart) {
+              final current = isStart ? startTime : endTime;
+              final selected = current != null && fmt(current) == tpl;
+              return InkWell(
+                onTap: () {
+                  final parts = tpl.split(':');
+                  final v = TimeOfDay(
+                    hour: int.parse(parts[0]),
+                    minute: int.parse(parts[1]),
+                  );
+                  setLocal(() {
+                    if (isStart) {
+                      startTime = v;
+                    } else {
+                      endTime = v;
+                    }
+                  });
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? AppColors.codriverGreen.withValues(alpha: 0.14)
+                        : const Color(0xFFF3F4F6),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: selected
+                          ? AppColors.codriverGreen
+                          : const Color(0xFFE5E7EB),
+                    ),
+                  ),
+                  child: Text(
+                    tpl,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                      color: selected
+                          ? AppColors.codriverDeep
+                          : const Color(0xFF4B5563),
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            // Section label with a small "manage templates" icon that
+            // opens the template dialog and refreshes the chips after.
+            Widget tplLabelRow(String label) {
+              return Row(
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF6B7280),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Tooltip(
+                    message: de
+                        ? 'Zeitvorlagen verwalten'
+                        : 'Manage time templates',
+                    child: InkWell(
+                      onTap: () async {
+                        await _showTimeTemplatesDialog();
+                        setLocal(() {});
+                      },
+                      borderRadius: BorderRadius.circular(6),
+                      child: const Padding(
+                        padding: EdgeInsets.all(3),
+                        child: Icon(
+                          Icons.tune_rounded,
+                          size: 15,
+                          color: Color(0xFF9CA3AF),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            }
+
             Widget sideChip(String value, String label) {
               final selected = parkSide == value;
               return Expanded(
@@ -2285,69 +2635,32 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
                           ),
                         ),
                         const SizedBox(height: 14),
-                        Text(
+                        tplLabelRow(
                           de
                               ? 'Zeit-Vorlagen (Startzeit)'
                               : 'Time templates (start)',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF6B7280),
-                          ),
                         ),
                         const SizedBox(height: 6),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: [
-                            for (final tpl in const [
-                              '06:30', '10:30', '11:00', '11:20', '12:30',
-                              '12:50', '13:00', '17:30', '22:00',
-                            ])
-                              InkWell(
-                                onTap: () {
-                                  final parts = tpl.split(':');
-                                  setLocal(() => startTime = TimeOfDay(
-                                        hour: int.parse(parts[0]),
-                                        minute: int.parse(parts[1]),
-                                      ));
-                                },
-                                borderRadius: BorderRadius.circular(8),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: startTime != null &&
-                                            fmt(startTime) == tpl
-                                        ? AppColors.codriverGreen
-                                            .withValues(alpha: 0.14)
-                                        : const Color(0xFFF3F4F6),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: startTime != null &&
-                                              fmt(startTime) == tpl
-                                          ? AppColors.codriverGreen
-                                          : const Color(0xFFE5E7EB),
-                                    ),
-                                  ),
-                                  child: Text(
-                                    tpl,
-                                    style: TextStyle(
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w700,
-                                      fontFeatures: const [
-                                        FontFeature.tabularFigures()
-                                      ],
-                                      color: startTime != null &&
-                                              fmt(startTime) == tpl
-                                          ? AppColors.codriverDeep
-                                          : const Color(0xFF4B5563),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
+                        if (_timeTemplates.isEmpty)
+                          Text(
+                            de
+                                ? 'Keine Vorlagen — über das Symbol anlegen.'
+                                : 'No templates — add via the icon.',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic,
+                              color: Color(0xFF9CA3AF),
+                            ),
+                          )
+                        else
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              for (final tpl in _timeTemplates)
+                                tplChip(tpl, true),
+                            ],
+                          ),
                         const SizedBox(height: 10),
                         Row(
                           children: [
@@ -2368,6 +2681,23 @@ class _AdminWaveplanPageState extends State<AdminWaveplanPage> {
                             ),
                           ],
                         ),
+                        if (_timeTemplates.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          tplLabelRow(
+                            de
+                                ? 'Zeit-Vorlagen (Endzeit)'
+                                : 'Time templates (end)',
+                          ),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              for (final tpl in _timeTemplates)
+                                tplChip(tpl, false),
+                            ],
+                          ),
+                        ],
                         const SizedBox(height: 14),
                         Text(
                           de ? 'Park-Seite' : 'Park-side',
@@ -4481,6 +4811,8 @@ class _Header extends StatelessWidget {
   final int atlasTotal;
   final bool atlasConfirmed;
   final int notesLength;
+  final bool hasEntries;
+  final VoidCallback onNoAtlasToday;
 
   const _Header({
     required this.programLabel,
@@ -4500,6 +4832,8 @@ class _Header extends StatelessWidget {
     required this.atlasTotal,
     required this.atlasConfirmed,
     required this.notesLength,
+    required this.hasEntries,
+    required this.onNoAtlasToday,
   });
 
   @override
@@ -4629,13 +4963,150 @@ class _Header extends StatelessWidget {
       ],
     );
 
-    return Row(
+    final headerRow = Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Expanded(child: left),
         const SizedBox(width: AppSpacing.sm),
         right,
       ],
+    );
+
+    // Publish is greyed out? Say why — right under the toggle, flush
+    // right. Missing Atlas confirmation additionally gets a one-click
+    // "No Atlas today" fix so SD_A & Co. are publishable without
+    // hunting for the Atlas dialog. (Own line instead of inside the
+    // right Wrap: the Wrap sits in an unbounded Row slot and could
+    // overflow on narrow desktop widths.)
+    final publishBlocked = !isPublished && !(hasEntries && atlasConfirmed);
+    if (!publishBlocked) return headerRow;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        headerRow,
+        const SizedBox(height: AppSpacing.xs),
+        Align(
+          alignment: Alignment.centerRight,
+          child: _PublishBlockerHint(
+            missingAtlas: hasEntries && !atlasConfirmed,
+            onNoAtlasToday: onNoAtlasToday,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Inline explanation why the publish toggle is greyed out, shown right
+/// next to it. Two cases:
+///  * [missingAtlas] — entries exist but the Atlas gate is still open.
+///    Shows the hint plus a one-click "No Atlas today" action that
+///    mirrors the sentinel button inside the Atlas dialog.
+///  * otherwise — there is simply nothing to publish yet.
+class _PublishBlockerHint extends StatelessWidget {
+  final bool missingAtlas;
+  final VoidCallback onNoAtlasToday;
+
+  const _PublishBlockerHint({
+    required this.missingAtlas,
+    required this.onNoAtlasToday,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+
+    if (!missingAtlas) {
+      // No entries at all — publishing has nothing to send.
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF3F4F6),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: const Color(0xFFE5E7EB)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.info_outline_rounded,
+              size: 15,
+              color: Color(0xFF6B7280),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              de
+                  ? 'Keine Einträge zum Veröffentlichen'
+                  : 'No entries to publish',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF6B7280),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Atlas confirmation is the only blocker → explain it and offer the
+    // one-click fix.
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 5, 5, 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF7E6),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: AppColors.warning.withValues(alpha: 0.45),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.inventory_2_rounded,
+            size: 15,
+            color: AppColors.warning,
+          ),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              de
+                  ? 'Zuerst Atlas bestätigen (Import oder „Kein Atlas heute“)'
+                  : 'Confirm Atlas first (import or “No Atlas today”)',
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF92400E),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          InkWell(
+            onTap: onNoAtlasToday,
+            borderRadius: BorderRadius.circular(999),
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 6,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.codriverDeep,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                de ? 'Kein Atlas heute' : 'No Atlas today',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
