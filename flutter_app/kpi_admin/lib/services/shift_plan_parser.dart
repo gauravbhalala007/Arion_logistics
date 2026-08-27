@@ -95,7 +95,9 @@ Future<ParsedShiftPlan> parseShiftPlanExcelAsync(
     final lower = name.toLowerCase();
     if (lower.startsWith('eingeplant') ||
         lower.startsWith('gesamt') ||
-        lower.startsWith('summe')) {
+        lower.startsWith('summe') ||
+        // Englischer Export: "Total rostered".
+        lower.startsWith('total')) {
       continue;
     }
     final tid = _rowCell(row, tidCol);
@@ -196,7 +198,9 @@ ParsedShiftPlan parseShiftPlanExcel(Uint8List bytes, {int? assumeYear}) {
     final lower = name.toLowerCase();
     if (lower.startsWith('eingeplant') ||
         lower.startsWith('gesamt') ||
-        lower.startsWith('summe')) {
+        lower.startsWith('summe') ||
+        // Englischer Export: "Total rostered".
+        lower.startsWith('total')) {
       continue;
     }
     final tid = _cellString(sheet, col: tidCol, row: r);
@@ -290,7 +294,12 @@ Sheet _pickShiftSheet(Excel excel) {
   if (keys.isEmpty) {
     throw const FormatException('Die Excel-Datei enthält keine Tabellen.');
   }
-  final byName = keys.where((k) => k.toLowerCase().contains('arbeitsbl'));
+  // DE: "Arbeitsblöcke nach Dienstplan" · EN: "Rostered work blocks" —
+  // je nach Sprache der Amazon-Oberflaeche beim Download.
+  final byName = keys.where((k) {
+    final l = k.toLowerCase();
+    return l.contains('arbeitsbl') || l.contains('rostered work');
+  });
   if (byName.isNotEmpty) return excel.tables[byName.first]!;
   // Fallback: first sheet that actually has rows (skips empty cover sheets).
   for (final k in keys) {
@@ -350,6 +359,11 @@ _HeaderLocation? _findNameHeader(List<List<Data?>> rows) {
         l == 'mitarbeiter' ||
         l.startsWith('mitarbeiter') ||
         l.contains('employee name') ||
+        // Englischer Amazon-Export: "Associate name" (und Verwandte wie
+        // "Driver name"). Meta-Spalten wie "Company name" filtert
+        // looksLikeMeta oben schon weg.
+        l.contains('associate name') ||
+        l.endsWith(' name') ||
         (l.contains('name') && l.contains('mitarbeiter'));
   }
 
