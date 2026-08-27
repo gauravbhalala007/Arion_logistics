@@ -38,6 +38,7 @@ enum AppNav {
   driverReviews,
   incidentReports,
   vehicleCheck,
+  contacts,
   academy,
   dispatcherPill,
   notifications,
@@ -391,6 +392,14 @@ class AppSideMenu extends StatelessWidget {
           active: active == AppNav.vehicleCheck,
           onTap: () =>
               _handleNav(context, AppNav.vehicleCheck, '/vehicle-check'),
+        ),
+        _MenuItem(
+          icon: Icons.contacts_outlined,
+          label: Localizations.localeOf(context).languageCode == 'de'
+              ? 'Kontakte'
+              : 'Contacts',
+          active: active == AppNav.contacts,
+          onTap: () => _handleNav(context, AppNav.contacts, '/contacts'),
         ),
         _MenuItem(
           icon: Icons.inventory_2_outlined,

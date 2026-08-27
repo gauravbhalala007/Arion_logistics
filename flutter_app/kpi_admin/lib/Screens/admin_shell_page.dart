@@ -29,6 +29,7 @@ import 'drivers_hub_page.dart';
 import 'admin_recruiting_page.dart';
 import 'admin_waveplan_page.dart';
 import 'admin_calendar_page.dart';
+import 'admin_contacts_page.dart';
 import 'task_sheet_page.dart';
 import 'admin_zeiten_abwesenheiten_page.dart';
 import 'admin_da_requests_page.dart';
@@ -426,6 +427,10 @@ class _AdminShellPageState extends State<AdminShellPage> {
                           () => const ContactComplianceOverviewPage(),
                         ),
                         _lazy(
+                          AppNav.contacts,
+                          () => const AdminContactsPage(),
+                        ),
+                        _lazy(
                           AppNav.vehicleCheck,
                           () => const AdminVehicleCheckPage(),
                         ),
@@ -582,8 +587,10 @@ class _AdminShellPageState extends State<AdminShellPage> {
         return 32;
       case AppNav.contactCompliance:
         return 33;
-      case AppNav.vehicleCheck:
+      case AppNav.contacts:
         return 34;
+      case AppNav.vehicleCheck:
+        return 35;
       default:
         return 0;
     }

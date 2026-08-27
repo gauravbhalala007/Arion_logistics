@@ -38,6 +38,7 @@ import 'feedback_page.dart';
 import 'fleet_status_page.dart';
 import 'task_sheet_page.dart';
 import '../widgets/new_version_gate.dart';
+import 'admin_contacts_page.dart';
 import 'admin_cotimer_page.dart';
 import 'admin_inventory_page.dart';
 import 'admin_monthly_plan_page.dart';
@@ -149,6 +150,12 @@ const List<_ModuleEntry> _kAllModules = [
     icon: Icons.calendar_view_month_rounded,
     label: 'Monthly Plan',
     page: AdminMonthlyPlanPage(),
+  ),
+  _ModuleEntry(
+    key: 'contacts',
+    icon: Icons.contacts_outlined,
+    label: 'Kontakte',
+    page: AdminContactsPage(),
   ),
   _ModuleEntry(
     key: 'vehicle_check',
