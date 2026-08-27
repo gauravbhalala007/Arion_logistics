@@ -284,12 +284,21 @@ class _DispatcherShellPageState extends State<DispatcherShellPage> {
             return const _DispatcherDisabled();
           }
 
-          // Kundenentscheidung 27.08.2026: Sub-Accounts sind schlicht ein
-          // ZWEITER ZUGANG zum selben Admin-Bereich — identische Sicht,
-          // kein Modul-Gating. Die permissions-Map wird bewusst
-          // ignoriert; alle Module (inklusive der elf 2026-08 ergaenzten)
-          // sind immer sichtbar.
-          final allowed = List<_ModuleEntry>.from(_kAllModules);
+          // Sichtbar ist, was die Schalter im Dispatcher Center
+          // erlauben (Anlegen-Dialog: Standard alles an). Fehlender
+          // Schluessel = erlaubt (neue Module). Alt-Konten aus der
+          // Vollparitaets-Aera tragen Maps mit AUSSCHLIESSLICH false —
+          // die waren nie eine Admin-Entscheidung: ohne ein einziges
+          // true bleibt die volle Sicht, bis der Admin einmal speichert.
+          final perms = (data['permissions'] as Map?)
+                  ?.map((k, v) => MapEntry(k.toString(), v == true)) ??
+              const <String, bool>{};
+          final managed = perms.values.any((v) => v);
+          final allowed = !managed
+              ? List<_ModuleEntry>.from(_kAllModules)
+              : _kAllModules
+                  .where((m) => !perms.containsKey(m.key) || perms[m.key]!)
+                  .toList(growable: false);
 
           // If the previously-active module got revoked, fall back to home.
           if (_active != 'home' &&

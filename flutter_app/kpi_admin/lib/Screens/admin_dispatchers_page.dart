@@ -296,6 +296,41 @@ Future<void> _showCreateDialog(BuildContext context, String adminUid) async {
   final pwCtrl = TextEditingController();
   bool submitting = false;
   String? error;
+  // Modul-Sichtbarkeit direkt beim Anlegen (Ticket) — Standard: ALLES an.
+  final perms = <String, bool>{
+    for (final p in kDispatcherPermissions) p.key: true,
+  };
+
+  /// Ticket: Dispatcher haben oft auch ein Fahrer-Konto — dieselbe
+  /// E-Mail wuerde dessen Login ueberschreiben. Deshalb wird die
+  /// E-Mail gegen die eigenen Fahrer geprueft (Felder email /
+  /// loginEmail / onboarding.email).
+  Future<String?> driverNameForEmail(String email) async {
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(adminUid)
+          .collection('drivers')
+          .get();
+      final needle = email.trim().toLowerCase();
+      for (final d in snap.docs) {
+        final x = d.data();
+        final candidates = <String>[
+          (x['email'] ?? '').toString(),
+          (x['loginEmail'] ?? '').toString(),
+          ((x['onboarding'] is Map)
+                  ? ((x['onboarding'] as Map)['email'] ?? '')
+                  : '')
+              .toString(),
+        ];
+        if (candidates
+            .any((c) => c.trim().toLowerCase() == needle && needle.isNotEmpty)) {
+          return (x['driverName'] ?? d.id).toString();
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
 
   await showDialog<void>(
     context: context,
@@ -317,14 +352,54 @@ Future<void> _showCreateDialog(BuildContext context, String adminUid) async {
               submitting = true;
               error = null;
             });
+            // Fahrer-Email-Sperre (Ticket): gehoert die E-Mail einem
+            // Fahrer dieses DSP, klar ablehnen statt kryptischem
+            // "already exists".
+            final driverName = await driverNameForEmail(email);
+            if (driverName != null) {
+              setStateDialog(() {
+                submitting = false;
+                error = de
+                    ? 'Diese E-Mail gehört bereits zum Fahrer-Konto von '
+                        '"$driverName". Dispatcher brauchen eine EIGENE '
+                        'E-Mail — sonst würde der Fahrer-Login '
+                        'überschrieben.'
+                    : 'This email already belongs to the driver account '
+                        'of "$driverName". Dispatchers need their OWN '
+                        'email — otherwise the driver login would be '
+                        'overwritten.';
+              });
+              return;
+            }
             try {
-              await FirebaseFunctions.instanceFor(region: 'us-central1')
-                  .httpsCallable('createDispatcherAccount')
-                  .call({
+              final result =
+                  await FirebaseFunctions.instanceFor(region: 'us-central1')
+                      .httpsCallable('createDispatcherAccount')
+                      .call({
                 'email': email,
                 'password': pw,
                 'displayName': nameCtrl.text.trim(),
               });
+              // Modul-Auswahl DIREKT nach Firestore schreiben — die
+              // Function kennt nur die alten 15 Schluessel und wuerde
+              // neue Module verwerfen.
+              final newUid = (result.data is Map)
+                  ? ((result.data as Map)['uid'] ??
+                          (result.data as Map)['dispatcherUid'] ??
+                          '')
+                      .toString()
+                  : '';
+              if (newUid.isNotEmpty) {
+                await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(adminUid)
+                    .collection('sub_accounts')
+                    .doc(newUid)
+                    .set({
+                  'permissions': perms,
+                  'updatedAt': FieldValue.serverTimestamp(),
+                }, SetOptions(merge: true));
+              }
               if (ctx.mounted) Navigator.of(ctx).pop();
             } on FirebaseFunctionsException catch (e) {
               setStateDialog(() {
@@ -374,6 +449,45 @@ Future<void> _showCreateDialog(BuildContext context, String adminUid) async {
                           : 'Initial password (min. 6 characters)',
                     ),
                   ),
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    de ? 'Sichtbare Module' : 'Visible modules',
+                    style: AppTypography.subheadline.copyWith(
+                      color: AppColors.codriverGraphite,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  Text(
+                    de
+                        ? 'Standard: alle Seiten. Später jederzeit über das '
+                            'Stift-Symbol änderbar.'
+                        : 'Default: all pages. Editable any time via the '
+                            'edit icon.',
+                    style: AppTypography.caption2.copyWith(
+                      color: AppColors.labelSecondaryLight,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 260),
+                    child: ListView(
+                      shrinkWrap: true,
+                      children: [
+                        for (final p in kDispatcherPermissions)
+                          SwitchListTile.adaptive(
+                            contentPadding: EdgeInsets.zero,
+                            dense: true,
+                            title: Text(p.labelFor(de)),
+                            value: perms[p.key] ?? true,
+                            onChanged: submitting
+                                ? null
+                                : (v) => setStateDialog(
+                                      () => perms[p.key] = v,
+                                    ),
+                          ),
+                      ],
+                    ),
+                  ),
                   if (error != null) ...[
                     const SizedBox(height: AppSpacing.sm),
                     Text(
@@ -414,6 +528,11 @@ Future<void> _showEditSheet(
 }) async {
   final de = Localizations.localeOf(context).languageCode == 'de';
   bool localActive = active;
+  // Fehlender Schalter = ERLAUBT — muss zum Fallback der Dispatcher-
+  // Shell passen (neue Module erscheinen sonst faelschlich als aus).
+  final localPerms = <String, bool>{
+    for (final p in kDispatcherPermissions) p.key: permissions[p.key] ?? true,
+  };
 
   bool saving = false;
   bool deleting = false;
@@ -435,9 +554,18 @@ Future<void> _showEditSheet(
               error = null;
             });
             try {
-              // Sub-Accounts sehen immer alles (Kundenentscheidung) —
-              // gespeichert wird nur Aktiv/Inaktiv, ueber die Function,
-              // weil sie zusaetzlich den Auth-User sperrt.
+              // Rechte DIREKT nach Firestore (die Function kennt nur die
+              // alten 15 Schluessel und wuerde neue Module verwerfen);
+              // Aktiv/Inaktiv ueber die Function (sperrt den Auth-User).
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(adminUid)
+                  .collection('sub_accounts')
+                  .doc(dispatcherUid)
+                  .set({
+                'permissions': localPerms,
+                'updatedAt': FieldValue.serverTimestamp(),
+              }, SetOptions(merge: true));
               await FirebaseFunctions.instanceFor(region: 'us-central1')
                   .httpsCallable('updateDispatcherAccount')
                   .call({
@@ -554,28 +682,30 @@ Future<void> _showEditSheet(
                         : (v) => setSheetState(() => localActive = v),
                   ),
                   const SizedBox(height: AppSpacing.sm),
-                  // Kundenentscheidung 27.08.2026: Sub-Accounts sind ein
-                  // zweiter Zugang mit identischer Sicht — die frueheren
-                  // Modul-Schalter sind entfernt, damit niemand glaubt,
-                  // sie wuerden etwas bewirken.
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(11),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF0FDF4),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFBBF7D0)),
+                  Text(
+                    de ? 'Sichtbare Module' : 'Visible modules',
+                    style: AppTypography.subheadline.copyWith(
+                      color: AppColors.codriverGraphite,
+                      fontWeight: FontWeight.w800,
                     ),
-                    child: Text(
-                      de
-                          ? 'Dieser Zugang sieht denselben Admin-Bereich '
-                              'wie du — alle Module, gleiche Daten.'
-                          : 'This account sees the same admin area as you '
-                              '— all modules, same data.',
-                      style: AppTypography.footnote.copyWith(
-                        color: const Color(0xFF166534),
-                        height: 1.4,
-                      ),
+                  ),
+                  Flexible(
+                    child: ListView(
+                      shrinkWrap: true,
+                      children: [
+                        for (final p in kDispatcherPermissions)
+                          SwitchListTile.adaptive(
+                            contentPadding: EdgeInsets.zero,
+                            dense: true,
+                            title: Text(p.labelFor(de)),
+                            value: localPerms[p.key] ?? true,
+                            onChanged: saving || deleting || !localActive
+                                ? null
+                                : (v) => setSheetState(
+                                      () => localPerms[p.key] = v,
+                                    ),
+                          ),
+                      ],
                     ),
                   ),
                   if (error != null) ...[

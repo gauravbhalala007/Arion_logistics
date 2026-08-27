@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -821,9 +822,27 @@ Future<void> showOperativeTaskDialog(
 // Card (dashboard + tasksheet)
 // ---------------------------------------------------------------------------
 
-class OperativeTasksCard extends StatelessWidget {
+class OperativeTasksCard extends StatefulWidget {
   final String adminUid;
   const OperativeTasksCard({super.key, required this.adminUid});
+
+  @override
+  State<OperativeTasksCard> createState() => _OperativeTasksCardState();
+}
+
+class _OperativeTasksCardState extends State<OperativeTasksCard> {
+  String get adminUid => widget.adminUid;
+
+  /// Ticket „Tasks dem Sub-Account zuordnen": Ein eingeloggter
+  /// Dispatcher kann die Liste auf die ihm zugewiesenen Aufgaben
+  /// filtern. Fuer den Admin selbst ist der Filter ausgeblendet.
+  bool _onlyMine = false;
+
+  String? get _selfUid => FirebaseAuth.instance.currentUser?.uid;
+  bool get _isSubAccount {
+    final self = _selfUid;
+    return self != null && self.isNotEmpty && self != adminUid;
+  }
 
   static const _kBorder = Color(0xFFE5E7EB);
   static const _kText = Color(0xFF111827);
@@ -894,6 +913,30 @@ class OperativeTasksCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           const Divider(height: 1, thickness: 1, color: _kBorder),
+          if (_isSubAccount)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: FilterChip(
+                  label: Text(
+                    de ? 'Nur meine Aufgaben' : 'My tasks only',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  selected: _onlyMine,
+                  onSelected: (v) => setState(() => _onlyMine = v),
+                  avatar: Icon(
+                    Icons.person_outline_rounded,
+                    size: 15,
+                    color: _onlyMine ? _kGreen : _kMuted,
+                  ),
+                  showCheckmark: false,
+                ),
+              ),
+            ),
           const SizedBox(height: 4),
           Expanded(
             child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -912,11 +955,18 @@ class OperativeTasksCard extends StatelessWidget {
                   );
                 }
                 final isSunday = DateTime.now().weekday == DateTime.sunday;
+                final selfUid = _selfUid ?? '';
                 final tasks = (snap.data?.docs ?? const [])
                     .map(OperativeTask.fromDoc)
                     .where((t) => t.title.isNotEmpty)
                     // Daily means Mon–Sat — keep Sundays free of them.
                     .where((t) => !(isSunday && t.recurrence == 'daily'))
+                    // „Nur meine": auf die dem Sub-Account zugewiesenen
+                    // Aufgaben eingrenzen (uid im dispatchers-Array).
+                    .where((t) =>
+                        !_onlyMine ||
+                        t.dispatchers
+                            .any((d) => (d['uid'] ?? '') == selfUid))
                     .toList();
                 if (tasks.isEmpty) {
                   return Center(
@@ -995,7 +1045,7 @@ class _GroupedTaskList extends StatelessWidget {
               Icon(
                 shiftIcons[shift],
                 size: 15,
-                color: OperativeTasksCard._kSubText,
+                color: _OperativeTasksCardState._kSubText,
               ),
               const SizedBox(width: 6),
               Text(
@@ -1003,7 +1053,7 @@ class _GroupedTaskList extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
-                  color: OperativeTasksCard._kSubText,
+                  color: _OperativeTasksCardState._kSubText,
                   letterSpacing: 0.3,
                 ),
               ),
@@ -1013,7 +1063,7 @@ class _GroupedTaskList extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 11.5,
                   fontWeight: FontWeight.w700,
-                  color: OperativeTasksCard._kMuted,
+                  color: _OperativeTasksCardState._kMuted,
                 ),
               ),
             ],
@@ -1095,7 +1145,7 @@ class _TaskRow extends StatelessWidget {
     final done = task.isDoneNow;
 
     Widget badge(String text, {IconData? icon, Color? bg, Color? fg}) {
-      final fgColor = fg ?? OperativeTasksCard._kSubText;
+      final fgColor = fg ?? _OperativeTasksCardState._kSubText;
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
         decoration: BoxDecoration(
@@ -1149,7 +1199,7 @@ class _TaskRow extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
-                          color: OperativeTasksCard._kText,
+                          color: _OperativeTasksCardState._kText,
                         ),
                       ),
                     ),
@@ -1207,7 +1257,7 @@ class _TaskRow extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 13,
                         height: 1.45,
-                        color: OperativeTasksCard._kSubText,
+                        color: _OperativeTasksCardState._kSubText,
                       ),
                     ),
                   ),
@@ -1344,8 +1394,8 @@ class _TaskRow extends StatelessWidget {
                           fontSize: 13.5,
                           fontWeight: FontWeight.w600,
                           color: done
-                              ? OperativeTasksCard._kMuted
-                              : OperativeTasksCard._kText,
+                              ? _OperativeTasksCardState._kMuted
+                              : _OperativeTasksCardState._kText,
                           decoration: done
                               ? TextDecoration.lineThrough
                               : TextDecoration.none,
@@ -1359,7 +1409,7 @@ class _TaskRow extends StatelessWidget {
                           style: const TextStyle(
                             fontSize: 11.5,
                             fontWeight: FontWeight.w500,
-                            color: OperativeTasksCard._kMuted,
+                            color: _OperativeTasksCardState._kMuted,
                           ),
                         ),
                     ],
@@ -1450,7 +1500,7 @@ class _TaskRow extends StatelessWidget {
                         const Icon(
                           Icons.repeat_rounded,
                           size: 11,
-                          color: OperativeTasksCard._kSubText,
+                          color: _OperativeTasksCardState._kSubText,
                         ),
                         const SizedBox(width: 3),
                       ],
@@ -1459,7 +1509,7 @@ class _TaskRow extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w700,
-                          color: OperativeTasksCard._kSubText,
+                          color: _OperativeTasksCardState._kSubText,
                         ),
                       ),
                     ],
