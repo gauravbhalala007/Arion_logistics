@@ -158,7 +158,11 @@ class App extends StatelessWidget {
             // resolves deep initial routes segment by segment ('/', '/plan',
             // '/plan/<id>'); if any segment fails the WHOLE deep link falls
             // back to '/' (login).
-            if (namePath == '/plan' || namePath.startsWith('/plan/')) {
+            if (namePath == '/plan' || namePath.startsWith('/plan/') ||
+                namePath == '/p' || namePath.startsWith('/p/')) {
+              // '/p/<id>' ist der SPA-Alias: /plan/** beantwortet seit den
+              // Link-Vorschauen die Cloud Function planPreview (OG-Tags
+              // fuer WhatsApp & Co.) und leitet Browser hierher weiter.
               final segs = Uri.parse(name).pathSegments;
               final shareId = segs.length >= 2 ? segs[1] : '';
               return MaterialPageRoute<void>(

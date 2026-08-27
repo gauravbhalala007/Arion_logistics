@@ -4,7 +4,7 @@
 
 // Minimal Firebase Functions file just for driver sub-accounts + notifications
 
-import {onCall, HttpsError} from "firebase-functions/v2/https";
+import {onCall, HttpsError, onRequest} from "firebase-functions/v2/https";
 import {defineSecret} from "firebase-functions/params";
 import * as logger from "firebase-functions/logger";
 import * as https from "node:https";
@@ -2939,4 +2939,79 @@ export const getOwnerUsageStats = onCall(async (request) => {
     roleCounts,
     companies: companiesOut,
   };
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// Link-Vorschau fuer geteilte Plaene (WhatsApp/Telegram/Slack).
+//
+// Hosting leitet /plan/** hierher. Crawler bekommen OG-Tags (Titel
+// "Shiftplan <Datum>" bzw. "Waveplan <Datum>", kurze Beschreibung,
+// Vorschaubild /og/shiftplan.png bzw. /og/waveplan.png); echte Browser
+// werden per Script auf die SPA-Route /p/<id> weitergeleitet, die das
+// Hosting normal als App ausliefert.
+// ─────────────────────────────────────────────────────────────────────
+export const planPreview = onRequest(async (req, res) => {
+  const segs = (req.path || "").split("/").filter(Boolean);
+  const shareId = (segs[0] === "plan" ? segs[1] : segs[0]) || "";
+  const esc = (v: unknown) =>
+    String(v ?? "")
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+  let type = "";
+  let dateText = "";
+  let company = "";
+  let station = "";
+  if (shareId) {
+    try {
+      const snap = await db.collection("public_plans").doc(shareId).get();
+      const p = snap.data() ?? {};
+      type = String(p.type ?? "");
+      dateText = String(p.date ?? "").trim() ||
+        String(p.subtitle ?? "").trim();
+      company = String(p.company ?? "").trim();
+      station = String(p.station ?? "").trim();
+    } catch (err) {
+      logger.warn(`planPreview: read failed for ${shareId}`, err);
+    }
+  }
+
+  const isShift = type === "shiftplan";
+  const planWord = isShift ? "Shiftplan" : "Waveplan";
+  const title = dateText ? `${planWord} ${dateText}` : planWord;
+  const descParts = [company, station].filter((v) => v);
+  const description = `${descParts.length ? descParts.join(" · ") + " — " : ""}` +
+    (isShift ?
+      "Dein Schichtplan mit Parking- und Working-Zeiten." :
+      "Dein Waveplan mit Touren und Dispatchern.") +
+    " Bereitgestellt über CoDriver.";
+  const image = `https://dsp-codriver.de/og/${isShift ? "shiftplan" : "waveplan"}.png`;
+  const appUrl = `/p/${encodeURIComponent(shareId)}`;
+
+  res.set("Cache-Control", "public, max-age=300, s-maxage=300");
+  res.status(200).send(`<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>${esc(title)}</title>
+<meta name="description" content="${esc(description)}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="CoDriver">
+<meta property="og:title" content="${esc(title)}">
+<meta property="og:description" content="${esc(description)}">
+<meta property="og:image" content="${esc(image)}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${esc(title)}">
+<meta name="twitter:description" content="${esc(description)}">
+<meta name="twitter:image" content="${esc(image)}">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body style="font-family:sans-serif;background:#F3F6F7;margin:0;display:flex;align-items:center;justify-content:center;height:100vh;">
+<p>${esc(title)} wird geladen …</p>
+<script>window.location.replace(${JSON.stringify(appUrl)});</script>
+<noscript><a href="${esc(appUrl)}">${esc(title)} öffnen</a></noscript>
+</body>
+</html>`);
 });
