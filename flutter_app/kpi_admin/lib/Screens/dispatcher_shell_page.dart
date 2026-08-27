@@ -277,26 +277,12 @@ class _DispatcherShellPageState extends State<DispatcherShellPage> {
             return const _DispatcherDisabled();
           }
 
-          // Ticket „Sub accounts sollen alles sehen, was der Admin
-          // erlaubt": Sichtbar ist jedes Modul, dessen Schalter im
-          // Dispatcher Center NICHT auf aus steht. Fehlt ein Schalter
-          // (neue Module, Alt-Konten ohne Eintrag), gilt ERLAUBT —
-          // so verliert kein bestehendes Konto durch dieses Update
-          // etwas, und der Admin kann gezielt einzelne Module abdrehen.
-          final perms = (data['permissions'] as Map?)
-                  ?.map((k, v) => MapEntry(k.toString(), v == true)) ??
-              const <String, bool>{};
-          // Sicherheitsnetz fuer Alt-Konten: aus der Vollparitaets-Aera
-          // liegen teils Maps mit AUSSCHLIESSLICH false-Werten — die
-          // waren nie eine bewusste Admin-Entscheidung. Erst wenn
-          // mindestens ein Schalter an ist (= der Admin hat die Rechte
-          // wirklich gepflegt), greift das Gating.
-          final managed = perms.values.any((v) => v);
-          final allowed = !managed
-              ? List<_ModuleEntry>.from(_kAllModules)
-              : _kAllModules
-                  .where((m) => !perms.containsKey(m.key) || perms[m.key]!)
-                  .toList(growable: false);
+          // Kundenentscheidung 27.08.2026: Sub-Accounts sind schlicht ein
+          // ZWEITER ZUGANG zum selben Admin-Bereich — identische Sicht,
+          // kein Modul-Gating. Die permissions-Map wird bewusst
+          // ignoriert; alle Module (inklusive der elf 2026-08 ergaenzten)
+          // sind immer sichtbar.
+          final allowed = List<_ModuleEntry>.from(_kAllModules);
 
           // If the previously-active module got revoked, fall back to home.
           if (_active != 'home' &&

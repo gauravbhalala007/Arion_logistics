@@ -414,12 +414,7 @@ Future<void> _showEditSheet(
 }) async {
   final de = Localizations.localeOf(context).languageCode == 'de';
   bool localActive = active;
-  final localPerms = <String, bool>{
-    // Fehlender Schalter = ERLAUBT — muss zum Fallback der Dispatcher-
-    // Shell passen. Stuende hier false, wuerde blosses Oeffnen+Speichern
-    // des Sheets dem Sub-Account alle neuen Module wegnehmen.
-    for (final p in kDispatcherPermissions) p.key: permissions[p.key] ?? true,
-  };
+
   bool saving = false;
   bool deleting = false;
   String? error;
@@ -440,24 +435,9 @@ Future<void> _showEditSheet(
               error = null;
             });
             try {
-              // Rechte DIREKT nach Firestore schreiben statt ueber die
-              // Cloud Function: deren sanitizePermissions kennt nur die
-              // alten 15 Schluessel und wuerde die neuen Module-Schalter
-              // (Recruiting, Monthly Plan, Payment Check, ...) beim
-              // Speichern stillschweigend verwerfen. Das Sub-Account-Doc
-              // liegt unter dem eigenen Admin-Konto — der Write ist per
-              // Rules erlaubt.
-              await FirebaseFirestore.instance
-                  .collection('users')
-                  .doc(adminUid)
-                  .collection('sub_accounts')
-                  .doc(dispatcherUid)
-                  .set({
-                'permissions': localPerms,
-                'updatedAt': FieldValue.serverTimestamp(),
-              }, SetOptions(merge: true));
-              // Aktiv/Inaktiv weiterhin ueber die Function — sie sperrt
-              // zusaetzlich den Auth-User (sofortiger Logout).
+              // Sub-Accounts sehen immer alles (Kundenentscheidung) —
+              // gespeichert wird nur Aktiv/Inaktiv, ueber die Function,
+              // weil sie zusaetzlich den Auth-User sperrt.
               await FirebaseFunctions.instanceFor(region: 'us-central1')
                   .httpsCallable('updateDispatcherAccount')
                   .call({
@@ -574,30 +554,28 @@ Future<void> _showEditSheet(
                         : (v) => setSheetState(() => localActive = v),
                   ),
                   const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    de ? 'Modul-Zugriff' : 'Module access',
-                    style: AppTypography.subheadline.copyWith(
-                      color: AppColors.codriverGraphite,
-                      fontWeight: FontWeight.w800,
+                  // Kundenentscheidung 27.08.2026: Sub-Accounts sind ein
+                  // zweiter Zugang mit identischer Sicht — die frueheren
+                  // Modul-Schalter sind entfernt, damit niemand glaubt,
+                  // sie wuerden etwas bewirken.
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(11),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0FDF4),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFBBF7D0)),
                     ),
-                  ),
-                  Flexible(
-                    child: ListView(
-                      shrinkWrap: true,
-                      children: [
-                        for (final p in kDispatcherPermissions)
-                          SwitchListTile.adaptive(
-                            contentPadding: EdgeInsets.zero,
-                            dense: true,
-                            title: Text(p.labelFor(de)),
-                            value: localPerms[p.key] ?? false,
-                            onChanged: saving || deleting || !localActive
-                                ? null
-                                : (v) => setSheetState(
-                                      () => localPerms[p.key] = v,
-                                    ),
-                          ),
-                      ],
+                    child: Text(
+                      de
+                          ? 'Dieser Zugang sieht denselben Admin-Bereich '
+                              'wie du — alle Module, gleiche Daten.'
+                          : 'This account sees the same admin area as you '
+                              '— all modules, same data.',
+                      style: AppTypography.footnote.copyWith(
+                        color: const Color(0xFF166534),
+                        height: 1.4,
+                      ),
                     ),
                   ),
                   if (error != null) ...[
