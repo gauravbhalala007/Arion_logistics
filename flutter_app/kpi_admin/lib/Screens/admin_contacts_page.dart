@@ -8,16 +8,21 @@
 // bleiben alle bestehenden Einträge erhalten und der Grounding-Dialog
 // im Fleet Hub kann sie unverändert zur Zuordnung anbieten.
 // Schema je Doc: {name, url (Maps-Link), website, email, phone,
-// address, category, note,
-// createdAt, updatedAt} — nur `name` ist Pflicht. Die Adresse ist
+// address, category, note, attachments: [{url, path, name, size,
+// contentType}], createdAt, updatedAt} — nur `name` ist Pflicht. Die Adresse ist
 // klickbar: gespeicherter Maps-Link gewinnt, sonst Google-Maps-Suche
 // nach der Adresse.
 
+import 'dart:typed_data';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../services/image_compression.dart';
 import '../theme/app_colors.dart';
 import '../widgets/admin_scope.dart';
 import '../widgets/clearable_search_field.dart';
@@ -284,6 +289,203 @@ class _AdminContactsPageState extends State<AdminContactsPage> {
         ),
       );
     }
+  }
+
+  /// Anhaenge (Dokumente/Bilder) eines Kontakts.
+  ///
+  /// Storage-Pfad: vehicles/{dsp}/contact-{contactId}/events/… — dieser
+  /// Pfad erlaubt laut storage.rules Admin UND Dispatcher (Bilder/PDF,
+  /// 20 MB) und kollidiert nicht mit echten Kennzeichen-Ordnern, weil
+  /// normalisierte Kennzeichen nie ein '-' enthalten (gleiches Muster
+  /// wie die Incident-Dokumente).
+  Future<void> _openAttachments(
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) async {
+    final uid = _uid;
+    if (uid == null) return;
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    var items = List<Map<String, dynamic>>.from(
+      ((doc.data()?['attachments'] as List?) ?? const [])
+          .whereType<Map>()
+          .map((m) => Map<String, dynamic>.from(m)),
+    );
+
+    Future<void> persist() => doc.reference.set({
+          'attachments': items,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          var busy = false;
+
+          Future<void> upload(StateSetter setSt) async {
+            FilePickerResult? picked;
+            try {
+              picked = await FilePicker.platform.pickFiles(
+                type: FileType.custom,
+                allowedExtensions: const [
+                  'pdf', 'jpg', 'jpeg', 'png', 'webp', 'heic',
+                ],
+                allowMultiple: true,
+                withData: true,
+              );
+            } catch (_) {
+              return;
+            }
+            if (picked == null || picked.files.isEmpty) return;
+            setSt(() => busy = true);
+            for (final f in picked.files) {
+              Uint8List? bytes = f.bytes;
+              if (bytes == null || bytes.isEmpty) continue;
+              final lower = f.name.toLowerCase();
+              var mime = lower.endsWith('.pdf')
+                  ? 'application/pdf'
+                  : lower.endsWith('.png')
+                      ? 'image/png'
+                      : 'image/jpeg';
+              if (mime != 'application/pdf' &&
+                  bytes.lengthInBytes > 2 * 1024 * 1024) {
+                final squeezed = await compressImageToJpeg(bytes);
+                if (squeezed != null && squeezed.isNotEmpty) {
+                  bytes = squeezed;
+                  mime = 'image/jpeg';
+                }
+              }
+              if (bytes.lengthInBytes > 15 * 1024 * 1024) continue;
+              try {
+                final safeName = f.name.replaceAll(
+                    RegExp(r'[^A-Za-z0-9._-]'), '_');
+                final path =
+                    'vehicles/$uid/contact-${doc.id}/events/'
+                    '${DateTime.now().millisecondsSinceEpoch}_$safeName';
+                final ref = FirebaseStorage.instance.ref(path);
+                await ref.putData(
+                    bytes, SettableMetadata(contentType: mime));
+                final url = await ref.getDownloadURL();
+                items.add({
+                  'url': url,
+                  'path': path,
+                  'name': f.name,
+                  'size': bytes.lengthInBytes,
+                  'contentType': mime,
+                });
+              } catch (_) {}
+            }
+            await persist();
+            setSt(() => busy = false);
+          }
+
+          Future<void> remove(int i, StateSetter setSt) async {
+            final item = items[i];
+            setSt(() => items.removeAt(i));
+            await persist();
+            final path = (item['path'] ?? '').toString();
+            if (path.isNotEmpty) {
+              try {
+                await FirebaseStorage.instance.ref(path).delete();
+              } catch (_) {}
+            }
+          }
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18)),
+            title: Text(
+              de ? 'Anhänge' : 'Attachments',
+              style: const TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.w800),
+            ),
+            content: SizedBox(
+              width: 420,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (items.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Text(
+                        de
+                            ? 'Noch keine Dateien — z. B. Vertrag, '
+                                'Preisliste oder Visitenkarte.'
+                            : 'No files yet — e.g. contract, price '
+                                'list or business card.',
+                        style: const TextStyle(
+                            fontSize: 13, color: Color(0xFF6B7280)),
+                      ),
+                    ),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 300),
+                    child: ListView(
+                      shrinkWrap: true,
+                      children: [
+                        for (var i = 0; i < items.length; i++)
+                          ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: Icon(
+                              ((items[i]['contentType'] ?? '')
+                                          .toString())
+                                      .startsWith('image/')
+                                  ? Icons.image_outlined
+                                  : Icons.picture_as_pdf_outlined,
+                              color: const Color(0xFF6B7280),
+                            ),
+                            title: Text(
+                              (items[i]['name'] ?? '').toString(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                            onTap: () => _openLink(
+                                (items[i]['url'] ?? '').toString()),
+                            trailing: IconButton(
+                              tooltip: de ? 'Löschen' : 'Delete',
+                              icon: const Icon(Icons.delete_outline,
+                                  size: 18, color: Color(0xFFB42318)),
+                              onPressed: busy
+                                  ? null
+                                  : () => remove(i, setDialogState),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  FilledButton.icon(
+                    onPressed:
+                        busy ? null : () => upload(setDialogState),
+                    icon: busy
+                        ? const SizedBox(
+                            width: 15,
+                            height: 15,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.upload_file_rounded,
+                            size: 18),
+                    label: Text(
+                      de
+                          ? 'Datei hochladen (PDF/Bild)'
+                          : 'Upload file (PDF/image)',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text(de ? 'Fertig' : 'Done'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   Future<void> _deleteContact(
@@ -653,6 +855,20 @@ class _AdminContactsPageState extends State<AdminContactsPage> {
                                       ),
                                     ],
                                   ],
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: de ? 'Anhänge' : 'Attachments',
+                                onPressed: () => _openAttachments(doc),
+                                icon: Badge(
+                                  isLabelVisible:
+                                      ((x['attachments'] as List?) ?? const [])
+                                          .isNotEmpty,
+                                  label: Text(
+                                    '${((x['attachments'] as List?) ?? const []).length}',
+                                  ),
+                                  child: const Icon(Icons.attach_file_rounded,
+                                      size: 18, color: Color(0xFF6B7280)),
                                 ),
                               ),
                               IconButton(
