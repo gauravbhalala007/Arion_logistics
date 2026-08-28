@@ -1757,12 +1757,14 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
           color: _kPageBg,
           padding: EdgeInsets.all(horizontalPadding),
           child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: absencesCol
-                .orderBy('submittedAt', descending: true)
-                .limit(300)
-                .snapshots(),
+            // Fokus-Bug: der Stream darf NICHT je build() neu entstehen —
+            // sonst faellt der StreamBuilder bei jedem Such-Tastendruck
+            // auf `waiting` zurueck, die Seite (samt Suchfeld) wird
+            // zerstoert und der Fokus ist weg. Gecacht je Collection.
+            stream: _absencesStreamFor(absencesCol),
             builder: (context, snap) {
-              if (snap.connectionState == ConnectionState.waiting) {
+              if (snap.connectionState == ConnectionState.waiting &&
+                  !snap.hasData) {
                 return const Center(child: CircularProgressIndicator());
               }
               if (snap.hasError) {
@@ -2415,6 +2417,22 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
         ],
       ),
     );
+  }
+
+  /// Fokus-Bug-Schutz: Live-Stream je Collection genau EINMAL erzeugen.
+  Stream<QuerySnapshot<Map<String, dynamic>>>? _absencesStreamCache;
+  String? _absencesStreamPath;
+  Stream<QuerySnapshot<Map<String, dynamic>>> _absencesStreamFor(
+    CollectionReference<Map<String, dynamic>> col,
+  ) {
+    if (_absencesStreamCache == null || _absencesStreamPath != col.path) {
+      _absencesStreamPath = col.path;
+      _absencesStreamCache = col
+          .orderBy('submittedAt', descending: true)
+          .limit(300)
+          .snapshots();
+    }
+    return _absencesStreamCache!;
   }
 
   Widget _buildSearchBar() {
@@ -4145,6 +4163,13 @@ class _AbsenceAllRequestsView extends StatefulWidget {
 }
 
 class _AbsenceAllRequestsViewState extends State<_AbsenceAllRequestsView> {
+  /// Fokus-Bug-Schutz: Stream einmal erzeugen, nicht je build().
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> _stream = widget
+      .collection
+      .orderBy('submittedAt', descending: true)
+      .limit(_kAllRequestsLimit)
+      .snapshots();
+
   late final TextEditingController _ctrl =
       TextEditingController(text: widget.initialSearch);
   final FocusNode _focus = FocusNode();
@@ -4250,12 +4275,10 @@ class _AbsenceAllRequestsViewState extends State<_AbsenceAllRequestsView> {
               // weiter aufgemacht. Ein hartes Limit bleibt als Schutz vor
               // einem unbegrenzten Live-Stream stehen; wird es erreicht,
               // sagt eine Hinweiszeile das offen.
-              stream: widget.collection
-                  .orderBy('submittedAt', descending: true)
-                  .limit(_kAllRequestsLimit)
-                  .snapshots(),
+              stream: _stream,
               builder: (context, snap) {
-                if (snap.connectionState == ConnectionState.waiting) {
+                if (snap.connectionState == ConnectionState.waiting &&
+                    !snap.hasData) {
                   return const Center(child: CircularProgressIndicator());
                 }
                 final docs = snap.data?.docs ?? const [];
