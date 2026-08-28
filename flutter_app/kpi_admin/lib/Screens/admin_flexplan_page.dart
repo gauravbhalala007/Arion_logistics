@@ -847,14 +847,19 @@ class _AdminFlexplanPageState extends State<AdminFlexplanPage> {
                         ),
                       ),
                     ),
+                    if (b.doubleLimitUnlocked)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: _chip('2×', _kOrange, _kOrangeBg),
+                      ),
                     Text(
                       '${formatMinutes(b.totalMinutes)} · '
                       '${earningsForMinutes(b.totalMinutes, month.hourlyWage).toStringAsFixed(2)} € '
-                      '/ ${formatMinutes(month.maxMinutes)}',
+                      '/ ${formatMinutes(b.maxMinutesFor(month))}',
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w700,
-                        color: b.totalMinutes >= month.maxMinutes
+                        color: b.totalMinutes >= b.maxMinutesFor(month)
                             ? _kOrange
                             : _kMuted,
                       ),

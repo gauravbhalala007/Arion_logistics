@@ -1825,6 +1825,12 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
       children: [
         _contractCard(data, onboarding),
         const SizedBox(height: 14),
+        // Nur für Flexplan-(Minijob-)Fahrer: Zähler der bereits genutzten
+        // 2×-Limit-Monate im laufenden Kalenderjahr.
+        if ((data['planType'] ?? '').toString() == 'flex') ...[
+          _flexplanCard(data),
+          const SizedBox(height: 14),
+        ],
         _remarkCard(doc, data),
         const SizedBox(height: 14),
         _personalCard(data, onboarding),
@@ -1835,6 +1841,94 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
         const SizedBox(height: 14),
         _emergencyCard(onboarding),
       ],
+    );
+  }
+
+  /// Flexplan-Karte (nur Minijob-/Flex-Fahrer): Wie oft wurde das
+  /// doppelte Minijob-Limit (max. 2 Kalendermonate/Jahr, Überschreitung
+  /// der Verdienstgrenze bis zum Doppelten) in diesem Jahr bereits
+  /// genutzt — z. B. durch Überschreitungen VOR der App-Nutzung.
+  /// Steht der Zähler auf 2, kann der Fahrer nicht mehr freischalten;
+  /// in der App selbst freigeschaltete Monate zählen zusätzlich.
+  Widget _flexplanCard(Map<String, dynamic> data) {
+    final year = DateTime.now().year.toString();
+    final raw = data['flexplanDoubleUsed'];
+    var used = 0;
+    if (raw is Map && raw[year] is num) {
+      used = (raw[year] as num).toInt().clamp(0, 2);
+    }
+    return _card(
+      title: 'Flexplan',
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _tr(
+                      '2×-Limit bereits genutzt ($year)',
+                      'Double limit already used ($year)',
+                    ),
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: _C.text,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    _tr(
+                      'Max. 2 Monate pro Jahr darf die Minijob-Grenze bis '
+                      'zum Doppelten überschritten werden. Bei 2 ist die '
+                      'Freischaltung für den Fahrer gesperrt.',
+                      'The minijob limit may be exceeded up to twice per '
+                      'year (max. double). At 2 the driver can no longer '
+                      'unlock it.',
+                    ),
+                    style: const TextStyle(fontSize: 12, color: _C.text2),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                color: _C.surface,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: _C.border),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<int>(
+                  value: used,
+                  isDense: true,
+                  borderRadius: BorderRadius.circular(10),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: _C.text,
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 0, child: Text('0')),
+                    DropdownMenuItem(value: 1, child: Text('1')),
+                    DropdownMenuItem(value: 2, child: Text('2')),
+                  ],
+                  onChanged: (v) {
+                    if (v == null) return;
+                    widget.driverRef.update(<String, dynamic>{
+                      'flexplanDoubleUsed.$year': v,
+                      'updatedAt': FieldValue.serverTimestamp(),
+                    });
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

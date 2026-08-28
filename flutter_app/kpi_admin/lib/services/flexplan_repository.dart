@@ -213,14 +213,24 @@ class FlexBooking {
     required this.driverTransporterId,
     required this.driverName,
     required this.entries,
+    this.doubleLimitUnlocked = false,
   });
 
   final String driverTransporterId;
   final String driverName;
   final List<FlexBookingEntry> entries;
 
+  /// Minijob-Sonderfall: In max. 2 Kalendermonaten pro Jahr darf die
+  /// Verdienstgrenze unvorhersehbar überschritten werden — bis maximal
+  /// zum Doppelten. Freigeschaltet gilt für DIESEN Monat das 2×-Limit.
+  final bool doubleLimitUnlocked;
+
   int get totalMinutes =>
       entries.fold(0, (acc, e) => acc + e.minutes);
+
+  /// Effektives Monatslimit in Minuten (ggf. verdoppelt).
+  int maxMinutesFor(FlexMonth month) =>
+      month.maxMinutes * (doubleLimitUnlocked ? 2 : 1);
 
   static FlexBooking fromDoc(String tid, Map<String, dynamic>? data) {
     final d = data ?? const <String, dynamic>{};
@@ -239,6 +249,7 @@ class FlexBooking {
       driverTransporterId: tid,
       driverName: (d['driverName'] ?? '').toString(),
       entries: entries,
+      doubleLimitUnlocked: d['doubleLimitUnlocked'] == true,
     );
   }
 }
@@ -347,7 +358,9 @@ class FlexplanRepository {
       if (exists) throw StateError('already_booked');
 
       final newTotal = booking.totalMinutes + shift.minutes;
-      if (newTotal > month.maxMinutes) throw StateError('limit_exceeded');
+      if (newTotal > booking.maxMinutesFor(month)) {
+        throw StateError('limit_exceeded');
+      }
 
       final entries = [
         ...booking.entries.map((e) => e.toMap()),
@@ -369,6 +382,69 @@ class FlexplanRepository {
         'updatedAt': FieldValue.serverTimestamp(),
       });
     });
+  }
+
+  /// Wie oft der Fahrer im Kalenderjahr von [monthKey] das doppelte
+  /// Limit bereits genutzt hat (inkl. des Monats selbst). Zählt die
+  /// in-App-Freischaltungen PLUS den vom Admin im Driver Hub gesetzten
+  /// Offset `drivers/{tid}.flexplanDoubleUsed.{jahr}` (0–2) — für
+  /// Überschreitungen, die außerhalb der App passiert sind.
+  Future<({int usedThisYear, bool currentMonthUnlocked})> doubleLimitUsage({
+    required String monthKey,
+    required String tid,
+  }) async {
+    final year = monthKey.split('-').first;
+    final driverRef = _db
+        .collection('users')
+        .doc(dspUid)
+        .collection('drivers')
+        .doc(tid.trim().toUpperCase());
+    final results = await Future.wait<dynamic>([
+      driverRef.get(),
+      for (var m = 1; m <= 12; m++)
+        bookingRef('$year-${m.toString().padLeft(2, '0')}', tid).get(),
+    ]);
+
+    var used = 0;
+    final driverSnap = results.first as DocumentSnapshot<Map<String, dynamic>>;
+    final overrideRaw = driverSnap.data()?['flexplanDoubleUsed'];
+    if (overrideRaw is Map) {
+      final v = overrideRaw[year];
+      if (v is num) used += v.toInt().clamp(0, 2);
+    }
+
+    var current = false;
+    for (final snap
+        in results.skip(1).cast<DocumentSnapshot<Map<String, dynamic>>>()) {
+      if (snap.data()?['doubleLimitUnlocked'] == true) {
+        used++;
+        if (snap.reference.parent.parent?.id == monthKey) current = true;
+      }
+    }
+    return (usedThisYear: used, currentMonthUnlocked: current);
+  }
+
+  /// Schaltet für [monthKey] das doppelte Minijob-Limit frei.
+  /// Erlaubt in maximal 2 Kalendermonaten pro Jahr — danach
+  /// StateError('unlock_exhausted'). Bereits freigeschaltet →
+  /// StateError('already_unlocked'). Freischaltung ist nicht umkehrbar
+  /// (sie zählt als einer der beiden Monate).
+  Future<void> unlockDoubleLimit({
+    required String monthKey,
+    required String tid,
+    required String driverName,
+  }) async {
+    final usage = await doubleLimitUsage(monthKey: monthKey, tid: tid);
+    if (usage.currentMonthUnlocked) throw StateError('already_unlocked');
+    if (usage.usedThisYear >= 2) throw StateError('unlock_exhausted');
+    await bookingRef(monthKey, tid).set({
+      'driverTransporterId': tid.trim().toUpperCase(),
+      'monthKey': monthKey,
+      'driverName': driverName,
+      'doubleLimitUnlocked': true,
+      'doubleLimitUnlockedAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
   }
 
   /// Fahrer stellt eine Storno-Anfrage (selbst löschen ist nicht erlaubt).
