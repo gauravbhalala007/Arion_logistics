@@ -7,7 +7,8 @@
 // (gleiche Collection wie die bisherigen Fleet-Hub-„Referenzen") — so
 // bleiben alle bestehenden Einträge erhalten und der Grounding-Dialog
 // im Fleet Hub kann sie unverändert zur Zuordnung anbieten.
-// Schema je Doc: {name, url, email, phone, address, category, note,
+// Schema je Doc: {name, url (Maps-Link), website, email, phone,
+// address, category, note,
 // createdAt, updatedAt} — nur `name` ist Pflicht. Die Adresse ist
 // klickbar: gespeicherter Maps-Link gewinnt, sonst Google-Maps-Suche
 // nach der Adresse.
@@ -113,6 +114,8 @@ class _AdminContactsPageState extends State<AdminContactsPage> {
     final nameCtrl =
         TextEditingController(text: (data['name'] ?? '').toString());
     final urlCtrl = TextEditingController(text: (data['url'] ?? '').toString());
+    final websiteCtrl =
+        TextEditingController(text: (data['website'] ?? '').toString());
     final emailCtrl =
         TextEditingController(text: (data['email'] ?? '').toString());
     final phoneCtrl =
@@ -205,7 +208,16 @@ class _AdminContactsPageState extends State<AdminContactsPage> {
                     controller: urlCtrl,
                     keyboardType: TextInputType.url,
                     decoration: deco(
-                      de ? 'Link (Maps, Website …)' : 'Link (Maps, website …)',
+                      de ? 'Google-Maps-Link' : 'Google Maps link',
+                      hint: 'https://maps.app.goo.gl/…',
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: websiteCtrl,
+                    keyboardType: TextInputType.url,
+                    decoration: deco(
+                      de ? 'Website' : 'Website',
                       hint: 'https://…',
                     ),
                   ),
@@ -246,6 +258,7 @@ class _AdminContactsPageState extends State<AdminContactsPage> {
     final payload = <String, dynamic>{
       'name': nameCtrl.text.trim(),
       'url': urlCtrl.text.trim(),
+      'website': websiteCtrl.text.trim(),
       'email': emailCtrl.text.trim(),
       'phone': phoneCtrl.text.trim(),
       'address': addressCtrl.text.trim(),
@@ -496,6 +509,8 @@ class _AdminContactsPageState extends State<AdminContactsPage> {
                         final phone = (x['phone'] ?? '').toString().trim();
                         final email = (x['email'] ?? '').toString().trim();
                         final url = (x['url'] ?? '').toString().trim();
+                        final website =
+                            (x['website'] ?? '').toString().trim();
                         final address =
                             (x['address'] ?? '').toString().trim();
                         final note = (x['note'] ?? '').toString().trim();
@@ -583,6 +598,7 @@ class _AdminContactsPageState extends State<AdminContactsPage> {
                                     if (phone.isNotEmpty ||
                                         email.isNotEmpty ||
                                         address.isNotEmpty ||
+                                        website.isNotEmpty ||
                                         url.isNotEmpty) ...[
                                       const SizedBox(height: 8),
                                       Wrap(
@@ -623,6 +639,15 @@ class _AdminContactsPageState extends State<AdminContactsPage> {
                                               icon: Icons.map_outlined,
                                               label: 'Google Maps',
                                               onTap: () => _openLink(url),
+                                            ),
+                                          if (website.isNotEmpty)
+                                            _ContactActionChip(
+                                              icon: Icons.language_rounded,
+                                              label: de
+                                                  ? 'Website'
+                                                  : 'Website',
+                                              onTap: () =>
+                                                  _openLink(website),
                                             ),
                                         ],
                                       ),
