@@ -736,6 +736,7 @@ class _ApplicationRow extends StatelessWidget {
                               ? '—'
                               : app.phoneWhatsApp,
                         ),
+                        _WhatsAppChip(phone: app.phoneWhatsApp),
                         _MetaChip(
                           icon: Icons.email_outlined,
                           text: app.email.isEmpty ? '—' : app.email,
@@ -816,6 +817,71 @@ class _ContractTypePill extends StatelessWidget {
           color: Colors.white,
           fontWeight: FontWeight.w800,
           letterSpacing: 0.4,
+        ),
+      ),
+    );
+  }
+}
+
+/// Baut aus einer frei eingetippten Telefonnummer einen wa.me-Deep-Link.
+/// Normalisierung: Sonderzeichen raus, `+`/`00` abschneiden, führende `0`
+/// als deutsche Nummer interpretieren (`0176…` → `49176…`). Nummern mit
+/// weniger als 8 Ziffern gelten als unvollständig → kein Link.
+Uri? whatsAppUriFor(String raw) {
+  var s = raw.trim().replaceAll(RegExp(r'[^0-9+]'), '');
+  if (s.startsWith('+')) {
+    s = s.substring(1);
+  } else if (s.startsWith('00')) {
+    s = s.substring(2);
+  } else if (s.startsWith('0')) {
+    s = '49${s.substring(1)}';
+  }
+  s = s.replaceAll(RegExp(r'[^0-9]'), '');
+  if (s.length < 8) return null;
+  return Uri.parse('https://wa.me/$s');
+}
+
+/// Grüner Chip neben der Telefonnummer: öffnet den WhatsApp-Chat mit dem
+/// Bewerber in einem neuen Tab (wa.me-Link, ohne die Nummer erst im
+/// Telefon speichern zu müssen).
+class _WhatsAppChip extends StatelessWidget {
+  const _WhatsAppChip({required this.phone});
+  final String phone;
+
+  @override
+  Widget build(BuildContext context) {
+    final uri = whatsAppUriFor(phone);
+    if (uri == null) return const SizedBox.shrink();
+    return Tooltip(
+      message: 'WhatsApp: $phone',
+      child: Material(
+        color: const Color(0xFFDCFCE7),
+        borderRadius: BorderRadius.circular(999),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(999),
+          onTap: () =>
+              launchUrl(uri, mode: LaunchMode.externalApplication),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.chat_rounded,
+                  size: 12,
+                  color: Color(0xFF16A34A),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'WhatsApp',
+                  style: AppTypography.caption2.copyWith(
+                    color: const Color(0xFF15803D),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -1462,7 +1528,11 @@ class _RecruitingApplicationDetailPageState
                   title: 'Contact & sizing',
                   rows: [
                     _DetailRow('Email', app.email),
-                    _DetailRow('Phone (WhatsApp)', app.phoneWhatsApp),
+                    _DetailRow(
+                      'Phone (WhatsApp)',
+                      app.phoneWhatsApp,
+                      trailing: _WhatsAppChip(phone: app.phoneWhatsApp),
+                    ),
                     _DetailRow('T-shirt size', app.shirtSize),
                     _DetailRow('Shoe size', app.shoeSize),
                   ],
@@ -1758,9 +1828,12 @@ class _DetailGroup extends StatelessWidget {
 }
 
 class _DetailRow extends StatelessWidget {
-  const _DetailRow(this.label, this.value);
+  const _DetailRow(this.label, this.value, {this.trailing});
   final String label;
   final String value;
+
+  /// Optionale Aktion am Zeilenende (z.B. WhatsApp-Link beim Telefon).
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -1819,6 +1892,10 @@ class _DetailRow extends StatelessWidget {
               ],
             ),
           ),
+          if (trailing != null) ...[
+            const SizedBox(width: 8),
+            trailing!,
+          ],
         ],
       ),
     );
