@@ -327,33 +327,42 @@ class _DriverFlexPlanPageState extends State<DriverFlexPlanPage> {
                   DateTime(month.year, month.month, d),
             ];
 
-            return ListView(
+            // Stunden-Übersicht bleibt fix oben stehen — nur die
+            // Tagesliste scrollt darunter.
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _totalsCard(month, booking, remaining),
                 const SizedBox(height: AppSpacing.sm),
-                if (workDays.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.all(AppSpacing.lg),
-                    child: Text(
-                      de
-                          ? 'Für ${_monthLabel(month.monthKey)} sind noch '
-                              'keine Schichten angelegt.'
-                          : 'No shifts created yet for '
-                              '${_monthLabel(month.monthKey)}.',
-                      style: AppTypography.body.copyWith(
-                        color: AppColors.labelSecondaryLight,
-                      ),
-                    ),
+                Expanded(
+                  child: ListView(
+                    children: [
+                      if (workDays.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.all(AppSpacing.lg),
+                          child: Text(
+                            de
+                                ? 'Für ${_monthLabel(month.monthKey)} sind '
+                                    'noch keine Schichten angelegt.'
+                                : 'No shifts created yet for '
+                                    '${_monthLabel(month.monthKey)}.',
+                            style: AppTypography.body.copyWith(
+                              color: AppColors.labelSecondaryLight,
+                            ),
+                          ),
+                        ),
+                      for (final day in workDays)
+                        _dayCard(
+                          month,
+                          day,
+                          booking,
+                          pendingCancellations,
+                          remaining,
+                        ),
+                      const SizedBox(height: AppSpacing.xl),
+                    ],
                   ),
-                for (final day in workDays)
-                  _dayCard(
-                    month,
-                    day,
-                    booking,
-                    pendingCancellations,
-                    remaining,
-                  ),
-                const SizedBox(height: AppSpacing.xl),
+                ),
               ],
             );
           },
