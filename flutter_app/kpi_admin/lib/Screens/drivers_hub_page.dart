@@ -8843,6 +8843,28 @@ class _DriverHubRow extends StatelessWidget {
     final licenseType =
         _driverLicenseType(onboarding['licenseType'], onboarding);
 
+    // Flexplan: Fix-Plan-Fahrer (Standard) folgen dem Roster; Flex-Plan-
+    // Fahrer (Minijobber) wählen ihre Schichten selbst über den Flexplan.
+    final planType =
+        (driverDoc.data()['planType'] ?? 'fix').toString() == 'flex'
+            ? 'flex'
+            : 'fix';
+    final planPill = _InlineChoicePill(
+      icon: Icons.event_repeat_rounded,
+      tooltip: de ? 'Planart (Fix / Flex)' : 'Plan type (fix / flex)',
+      value: planType,
+      options: [
+        _PillOption('fix', de ? 'Fix Plan' : 'Fix plan',
+            const Color(0xFF64748B)),
+        _PillOption('flex', de ? 'Flex Plan' : 'Flex plan',
+            const Color(0xFF7C3AED)),
+      ],
+      onChanged: (v) => driverDoc.reference.update(<String, dynamic>{
+        'planType': v,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }),
+    );
+
     // Stationszuweisung (z. B. „DBY5") — dezentes graues Badge in der
     // Chip-Zeile, nur wenn gesetzt (Optik wie „TID ausstehend").
     final station = (driverDoc.data()['station'] ?? '').toString().trim();
@@ -9165,6 +9187,7 @@ class _DriverHubRow extends StatelessWidget {
                         runSpacing: 4,
                         children: [
                           contractPill,
+                          planPill,
                           licencePill,
                           permitPill,
                           if (stationBadge != null) stationBadge,
@@ -9339,6 +9362,7 @@ class _DriverHubRow extends StatelessWidget {
                             );
                           },
                         ),
+                        planPill,
                         _InlineChoicePill(
                           icon: Icons.badge_outlined,
                           tooltip: de

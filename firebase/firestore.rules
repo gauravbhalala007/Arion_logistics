@@ -774,6 +774,46 @@ service cloud.firestore {
         allow read: if isDriverForUser(userId) && isApproved(userId);
       }
 
+      // ---------- Flexplan (Minijobber wählen Schichten) ----------
+      // Monatskonfiguration: Admin schreibt, Fahrer lesen (auch die
+      // Query where status == 'open'). Buchungen: je Fahrer genau ein
+      // Doc pro Monat, Doc-ID == eigene Transporter-ID — derselbe
+      // Schutz wie bei academy_test_results/{...}/drivers/{driverId}.
+      match /flexplan_months/{monthId} {
+        allow read, write: if isSelf(userId) && isApproved(userId);
+        allow read: if isDriverForUser(userId) && isApproved(userId);
+
+        match /bookings/{driverId} {
+          allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
+
+          allow read: if isDriverForUser(userId)
+            && isApproved(userId)
+            && driverTransporterId() == driverId;
+
+          allow create, update: if isDriverForUser(userId)
+            && isApproved(userId)
+            && driverTransporterId() == driverId
+            && request.resource.data.driverTransporterId == driverId
+            && request.resource.data.monthKey == monthId;
+        }
+      }
+
+      // Storno-Anfragen: Fahrer legen nur 'pending' für sich selbst an
+      // und lesen nur die eigenen — Entscheidung trifft der Admin
+      // (Blanket-Rule). Muster analog absence_requests.
+      match /flexplan_cancellations/{requestId} {
+        allow read, create, update, delete: if isSelf(userId) && isApproved(userId);
+
+        allow create: if isDriverForUser(userId)
+          && isApproved(userId)
+          && request.resource.data.driverTransporterId == driverTransporterId()
+          && request.resource.data.status == 'pending';
+
+        allow read: if isDriverForUser(userId)
+          && isApproved(userId)
+          && resource.data.driverTransporterId == driverTransporterId();
+      }
+
       // ---------- calendar events ----------
       // users/{userId}/calendar_events/{eventId}
       // Admin-only — calendar lives entirely in the admin area.

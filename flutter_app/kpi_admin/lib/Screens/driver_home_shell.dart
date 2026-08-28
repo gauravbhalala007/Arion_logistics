@@ -34,6 +34,7 @@ import 'driver_rules_view.dart';
 import 'driver_tasks_view.dart';
 import 'driver_shift_plan_view.dart';
 import 'driver_waveplan_view.dart';
+import 'driver_flex_plan_page.dart';
 
 import 'driver_profile_page.dart';
 import 'driver_faq_page.dart';
@@ -96,6 +97,7 @@ enum DriverView {
   profile,
   waveplan,
   cotimer,
+  flexPlan,
 }
 
 class DriverHomeShell extends StatefulWidget {
@@ -123,6 +125,13 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
   bool _redirectingToLogin = false;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _notifSub;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _tasksSub;
+
+  /// Flexplan-Gating: nur Fahrer mit planType == 'flex' sehen die
+  /// Flex-Plan-Kachel und -Seite. Zusätzlich merken wir uns den Namen
+  /// aus dem Fahrer-Dokument für die Buchungen.
+  bool _isFlexDriver = false;
+  String _driverDocName = '';
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _driverDocSub;
 
   CollectionReference<Map<String, dynamic>> _driverNotifsCol() {
     return FirebaseFirestore.instance
@@ -212,10 +221,28 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
   void dispose() {
     _notifSub?.cancel();
     _tasksSub?.cancel();
+    _driverDocSub?.cancel();
     super.dispose();
   }
 
   void _startCountSubscriptions() {
+    _driverDocSub = FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.dspUid)
+        .collection('drivers')
+        .doc(widget.driverTransporterId.toUpperCase())
+        .snapshots()
+        .listen((snap) {
+      final data = snap.data() ?? const <String, dynamic>{};
+      final isFlex = (data['planType'] ?? 'fix').toString() == 'flex';
+      final name = (data['driverName'] ?? data['name'] ?? '').toString();
+      if (!mounted) return;
+      setState(() {
+        _isFlexDriver = isFlex;
+        _driverDocName = name;
+      });
+    }, onError: (_) {});
+
     _notifSub = _driverNotifsCol().snapshots().listen((snap) {
       final notifications = snap.docs.map(DriverNotification.fromDoc).toList();
       final unreadCount = notifications
@@ -535,6 +562,13 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
               _view = DriverView.cotimer;
             });
           },
+          showFlexPlan: _isFlexDriver,
+          onOpenFlexPlan: () {
+            setState(() {
+              _tabIndex = 0;
+              _view = DriverView.flexPlan;
+            });
+          },
         );
 
       case DriverView.academy:
@@ -595,6 +629,19 @@ class _DriverHomeShellState extends State<DriverHomeShell> {
         return DriverWaveplanView(
           dspUid: widget.dspUid,
           driverTransporterId: widget.driverTransporterId,
+        );
+
+      case DriverView.flexPlan:
+        return DriverFlexPlanPage(
+          dspUid: widget.dspUid,
+          driverTransporterId: widget.driverTransporterId,
+          driverName: _driverDocName,
+          onBack: () {
+            setState(() {
+              _tabIndex = 0;
+              _view = DriverView.home;
+            });
+          },
         );
 
       case DriverView.cotimer:

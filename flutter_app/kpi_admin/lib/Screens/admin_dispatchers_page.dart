@@ -31,6 +31,7 @@ const List<_PermissionDef> kDispatcherPermissions = [
   _PermissionDef('dwc', 'DWC / IADC'),
   _PermissionDef('contact_compliance', 'Contact Compliance'),
   _PermissionDef('waveplan', 'Waveplan'),
+  _PermissionDef('flexplan', 'Flexplan'),
   _PermissionDef('shift_plan', 'Shift Plan'),
   _PermissionDef('monthly_plan', 'Monthly Plan'),
   _PermissionDef('calendar', 'Kalender', 'Calendar'),

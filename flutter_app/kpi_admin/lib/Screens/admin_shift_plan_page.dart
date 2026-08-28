@@ -13,6 +13,7 @@ import '../services/driver_identity_service.dart';
 import '../services/shift_plan_parser.dart';
 import '../services/public_plan_service.dart';
 import '../services/shift_plan_repository.dart';
+import '../services/flexplan_repository.dart';
 import '../widgets/share_link_dialog.dart';
 import '../utils/xlsx_loader.dart';
 import '../theme/app_colors.dart';
@@ -2495,6 +2496,13 @@ class _AdminShiftPlanPageState extends State<AdminShiftPlanPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Flexplan-Meldungen des Tages: Minijobber, die für dieses Datum
+          // Schichten gewählt haben und noch NICHT im Plan stehen.
+          _FlexSignupsPanel(
+            adminUid: _adminUid ?? '',
+            dateKey: _currentDateKey,
+            inUseTids: _inUseTids,
+          ),
           // KW toggle — switches publish from single-day to whole-week.
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
@@ -6522,6 +6530,129 @@ class _TemplateTile extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+//  Flexplan-Meldungen (links oben im Shift Plan)
+// ═════════════════════════════════════════════════════════════════════════
+
+/// Zeigt die Minijobber, die über den Flexplan Schichten für den gewählten
+/// Tag übernommen haben und noch nicht im Plan stehen (Roster-Abgleich über
+/// die Transporter-ID). Ohne Meldungen bleibt das Panel unsichtbar.
+class _FlexSignupsPanel extends StatelessWidget {
+  const _FlexSignupsPanel({
+    required this.adminUid,
+    required this.dateKey,
+    required this.inUseTids,
+  });
+
+  final String adminUid;
+  final String dateKey; // 'yyyy-MM-dd'
+  final Set<String> inUseTids;
+
+  @override
+  Widget build(BuildContext context) {
+    if (adminUid.isEmpty || dateKey.length < 7) {
+      return const SizedBox.shrink();
+    }
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final monthKey = dateKey.substring(0, 7);
+    return StreamBuilder<List<FlexBooking>>(
+      stream: FlexplanRepository(adminUid).watchBookings(monthKey),
+      builder: (context, snap) {
+        final bookings = snap.data ?? const <FlexBooking>[];
+        final rows = <({String label, String time})>[];
+        for (final b in bookings) {
+          final tid = b.driverTransporterId.trim().toUpperCase();
+          if (inUseTids.contains(tid)) continue;
+          for (final e in b.entries) {
+            if (e.date != dateKey) continue;
+            rows.add((
+              label: b.driverName.isEmpty ? tid : '${b.driverName} ($tid)',
+              time: '${e.name} ${e.start}–${e.end}',
+            ));
+          }
+        }
+        if (rows.isEmpty) return const SizedBox.shrink();
+        rows.sort((a, b) => a.time.compareTo(b.time));
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              color: const Color(0xFFF3E8FF),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.event_repeat_rounded,
+                        size: 15,
+                        color: Color(0xFF7C3AED),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          de
+                              ? 'Flexplan-Meldungen (${rows.length})'
+                              : 'Flex plan signups (${rows.length})',
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF6B21A8),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  for (final r in rows)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            r.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF111827),
+                            ),
+                          ),
+                          Text(
+                            r.time,
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF6B7280),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  Text(
+                    de
+                        ? 'Noch nicht im Plan — per Suche zuordnen.'
+                        : 'Not in the plan yet — assign via search.',
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      fontStyle: FontStyle.italic,
+                      color: Color(0xFF7C3AED),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1, color: Color(0xFFE5E7EB)),
+          ],
+        );
+      },
     );
   }
 }

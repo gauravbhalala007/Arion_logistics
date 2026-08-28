@@ -82,6 +82,10 @@ class DriverHomePage extends StatelessWidget {
   final VoidCallback onOpenComingSoon;
   final VoidCallback onOpenCotimer;
 
+  /// Flexplan: Kachel nur für Fahrer mit planType == 'flex'.
+  final bool showFlexPlan;
+  final VoidCallback onOpenFlexPlan;
+
   const DriverHomePage({
     super.key,
     required this.dspUid,
@@ -99,6 +103,8 @@ class DriverHomePage extends StatelessWidget {
     required this.onOpenWaveplan,
     required this.onOpenComingSoon,
     required this.onOpenCotimer,
+    this.showFlexPlan = false,
+    required this.onOpenFlexPlan,
   });
 
   @override
@@ -119,6 +125,8 @@ class DriverHomePage extends StatelessWidget {
       onOpenWaveplan: onOpenWaveplan,
       onOpenComingSoon: onOpenComingSoon,
       onOpenCotimer: onOpenCotimer,
+      showFlexPlan: showFlexPlan,
+      onOpenFlexPlan: onOpenFlexPlan,
     );
   }
 }
@@ -139,6 +147,8 @@ class _DriverHomePageBody extends StatefulWidget {
   final VoidCallback onOpenWaveplan;
   final VoidCallback onOpenComingSoon;
   final VoidCallback onOpenCotimer;
+  final bool showFlexPlan;
+  final VoidCallback onOpenFlexPlan;
 
   const _DriverHomePageBody({
     required this.dspUid,
@@ -156,6 +166,8 @@ class _DriverHomePageBody extends StatefulWidget {
     required this.onOpenWaveplan,
     required this.onOpenComingSoon,
     required this.onOpenCotimer,
+    this.showFlexPlan = false,
+    required this.onOpenFlexPlan,
   });
 
   @override
@@ -597,6 +609,20 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
         iconBackground: const Color(0xFFE6F8F2),
         onTap: widget.onOpenWaveplan,
       ),
+      // Page: DriverFlexPlanPage — nur für Flex-Plan-Fahrer (Minijobber),
+      // Gating über users/{dsp}/drivers/{TID}.planType == 'flex'.
+      // Wiring: driver_home_shell.dart -> DriverView.flexPlan
+      if (widget.showFlexPlan)
+        _HomeCardData(
+          title: 'Flex Plan',
+          subtitle: Localizations.localeOf(context).languageCode == 'de'
+              ? 'Schichten für den Monat wählen'
+              : 'Pick your shifts for the month',
+          icon: Icons.event_repeat_rounded,
+          iconColor: const Color(0xFF7C3AED),
+          iconBackground: const Color(0xFFF3E8FF),
+          onTap: widget.onOpenFlexPlan,
+        ),
       // Page: DriverCotimerClockPage  (Add-On-Modul)
       // Wiring: driver_home_shell.dart -> DriverView.cotimer
       // Sichtbar wenn:

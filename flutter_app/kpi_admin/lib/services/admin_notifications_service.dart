@@ -134,6 +134,16 @@ class AdminNotificationsService {
         target: AppNav.feedback,
         count: watchResolvedFeedback(),
       ),
+      // Flexplan: offene Storno-Anfragen der Minijobber — entschieden
+      // wird auf der Flexplan-Seite, danach verschwindet der Zaehler.
+      AdminNotificationSource(
+        id: 'flexplan_cancellations',
+        icon: Icons.event_repeat_rounded,
+        labelDe: 'Flexplan Storno-Anfragen',
+        labelEn: 'Flex plan cancellation requests',
+        target: AppNav.flexplan,
+        count: watchPendingFlexCancellations(adminUid),
+      ),
     ];
   }
 
@@ -170,6 +180,20 @@ class AdminNotificationsService {
                 )
                 .length,
           );
+    });
+  }
+
+  /// Offene Flexplan-Storno-Anfragen in
+  /// `users/{adminUid}/flexplan_cancellations` (status == 'pending').
+  static Stream<int> watchPendingFlexCancellations(String? adminUid) {
+    return _guardedSelfStream(adminUid, (uid) {
+      return FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('flexplan_cancellations')
+          .where('status', isEqualTo: 'pending')
+          .snapshots()
+          .map((snap) => snap.docs.length);
     });
   }
 

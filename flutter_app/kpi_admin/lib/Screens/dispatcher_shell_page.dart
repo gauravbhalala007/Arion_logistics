@@ -24,6 +24,7 @@ import 'login_page.dart';
 // Module bodies — full parity with AdminShellPage.
 import 'admin_home_page.dart';
 import 'admin_waveplan_page.dart';
+import 'admin_flexplan_page.dart';
 import 'admin_calendar_page.dart';
 import 'admin_dispatcher_center_page.dart';
 import 'admin_faq_page.dart';
@@ -92,6 +93,12 @@ const List<_ModuleEntry> _kAllModules = [
     icon: Icons.waves_rounded,
     label: 'Waveplan',
     page: AdminWaveplanPage(),
+  ),
+  _ModuleEntry(
+    key: 'flexplan',
+    icon: Icons.event_repeat_rounded,
+    label: 'Flexplan',
+    page: AdminFlexplanPage(),
   ),
   _ModuleEntry(
     key: 'calendar',

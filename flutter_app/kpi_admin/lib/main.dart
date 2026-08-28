@@ -269,6 +269,9 @@ class App extends StatelessWidget {
             '/waveplan': (_) => _wrapSelectable(
               const AdminShellPage(initialNav: AppNav.waveplan),
             ),
+            '/flexplan': (_) => _wrapSelectable(
+              const AdminShellPage(initialNav: AppNav.flexplan),
+            ),
             '/calendar': (_) => _wrapSelectable(
               const AdminShellPage(initialNav: AppNav.calendar),
             ),

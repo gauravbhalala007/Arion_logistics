@@ -57,6 +57,7 @@ enum AppNav {
   paymentCheck,
   monthlyPlan,
   contactCompliance,
+  flexplan,
 }
 
 class AppSideMenu extends StatelessWidget {
@@ -256,6 +257,13 @@ class AppSideMenu extends StatelessWidget {
         label: 'Waveplan',
         active: active == AppNav.waveplan,
         onTap: () => _handleNav(context, AppNav.waveplan, '/waveplan'),
+      ),
+      // Flexplan: Minijobber wählen ihre Schichten im Monatstakt.
+      _MenuItem(
+        icon: Icons.event_repeat_rounded,
+        label: 'Flexplan',
+        active: active == AppNav.flexplan,
+        onTap: () => _handleNav(context, AppNav.flexplan, '/flexplan'),
       ),
       // Ticket: Monthly Plan direkt neben dem Waveplan (vorher am Ende
       // in der Finance-Sektion). Role-Gating wie dort beibehalten.
