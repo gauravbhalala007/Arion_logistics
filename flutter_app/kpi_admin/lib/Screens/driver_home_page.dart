@@ -619,8 +619,8 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
               ? 'Schichten für den Monat wählen'
               : 'Pick your shifts for the month',
           icon: Icons.event_repeat_rounded,
-          iconColor: const Color(0xFF7C3AED),
-          iconBackground: const Color(0xFFF3E8FF),
+          iconColor: const Color(0xFF00B287),
+          iconBackground: const Color(0xFFE6F8F2),
           onTap: widget.onOpenFlexPlan,
         ),
       // Page: DriverCotimerClockPage  (Add-On-Modul)
