@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
+import 'public_incident_view.dart';
 
 class PublicPlanPage extends StatelessWidget {
   const PublicPlanPage({super.key, required this.shareId});
@@ -42,6 +43,11 @@ class PublicPlanPage extends StatelessWidget {
           final data = snap.data?.data();
           if (snap.hasError || data == null) {
             return _NotFound(error: snap.error?.toString());
+          }
+          // Unfallberichte teilen sich die public_plans-Infrastruktur,
+          // bekommen aber eine eigene Ansicht (Fotos, Anhänge, PDF).
+          if ((data['type'] ?? '').toString() == 'incident') {
+            return PublicIncidentView(data: data);
           }
           return _PlanView(data: data);
         },

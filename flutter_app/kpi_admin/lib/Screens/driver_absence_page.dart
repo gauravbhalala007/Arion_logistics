@@ -994,13 +994,30 @@ class _DriverAbsencePageState extends State<DriverAbsencePage> {
 
   void _showSnack(String message, {bool error = false}) {
     if (!mounted) return;
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    messenger?.showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: error ? const Color(0xFFB91C1C) : null,
+    // Root-Overlay statt ScaffoldMessenger: SnackBars rendern im Scaffold
+    // und liegen damit HINTER modalen BottomSheets/Dialogen. Der Overlay-
+    // Toast liegt über allen Routen und bleibt auch im Request-Popup sichtbar.
+    final overlay = Overlay.maybeOf(context, rootOverlay: true);
+    if (overlay == null) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: error ? const Color(0xFFB91C1C) : null,
+        ),
+      );
+      return;
+    }
+    late OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (_) => _OverlayToast(
+        message: message,
+        error: error,
+        onDismissed: () {
+          if (entry.mounted) entry.remove();
+        },
       ),
     );
+    overlay.insert(entry);
   }
 
   _AbsenceLabels _absenceLabels(BuildContext context) {
@@ -1689,6 +1706,102 @@ class _AuUploadSection extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Toast im Root-Overlay: liegt über allen Routen (auch modalen Sheets),
+/// blendet sich ein und nach ein paar Sekunden selbst wieder aus.
+class _OverlayToast extends StatefulWidget {
+  final String message;
+  final bool error;
+  final VoidCallback onDismissed;
+
+  const _OverlayToast({
+    required this.message,
+    required this.error,
+    required this.onDismissed,
+  });
+
+  @override
+  State<_OverlayToast> createState() => _OverlayToastState();
+}
+
+class _OverlayToastState extends State<_OverlayToast>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 200),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.forward();
+    Future<void>.delayed(const Duration(seconds: 4), () async {
+      if (!mounted) return;
+      await _controller.reverse();
+      widget.onDismissed();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    return Positioned(
+      left: 16,
+      right: 16,
+      bottom: media.viewInsets.bottom + media.padding.bottom + 24,
+      child: FadeTransition(
+        opacity: CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: widget.error
+                  ? const Color(0xFFB91C1C)
+                  : const Color(0xFF1E293B),
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x33000000),
+                  blurRadius: 16,
+                  offset: Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  widget.error
+                      ? Icons.error_outline_rounded
+                      : Icons.check_circle_outline_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    widget.message,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

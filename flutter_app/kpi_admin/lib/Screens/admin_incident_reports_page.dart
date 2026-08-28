@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../services/incident_attachments.dart';
 import '../services/incident_reports.dart';
+import '../services/incident_share_service.dart';
 import '../services/vehicle_check_service.dart' show kVehicleCheckKind;
 import '../widgets/admin_scope.dart';
 import '../widgets/co_button.dart';
@@ -1591,6 +1592,70 @@ class _CopyReportButton extends StatelessWidget {
   }
 }
 
+/// Ticket "INCIDENT REPORT": erzeugt (oder aktualisiert) den öffentlichen
+/// Share-Link des Falls und kopiert ihn in die Zwischenablage. Jeder Fall
+/// behält seinen eigenen, stabilen Link; erneutes Teilen aktualisiert den
+/// Snapshot hinter dem bereits verteilten Link.
+class _ShareLinkButton extends StatefulWidget {
+  const _ShareLinkButton({required this.docRef, required this.data});
+
+  final DocumentReference<Map<String, dynamic>> docRef;
+  final Map<String, dynamic> data;
+
+  @override
+  State<_ShareLinkButton> createState() => _ShareLinkButtonState();
+}
+
+class _ShareLinkButtonState extends State<_ShareLinkButton> {
+  bool _busy = false;
+
+  Future<void> _share() async {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    setState(() => _busy = true);
+    try {
+      final url = await IncidentShareService().share(
+        docId: widget.docRef.id,
+        data: widget.data,
+      );
+      await Clipboard.setData(ClipboardData(text: url));
+      messenger?.showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(
+            de
+                ? 'Öffentlicher Link kopiert — ohne Login abrufbar.'
+                : 'Public link copied — viewable without login.',
+          ),
+        ),
+      );
+    } catch (e) {
+      messenger?.showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: const Color(0xFFB91C1C),
+          content: Text(
+            de ? 'Link konnte nicht erstellt werden: $e' : 'Sharing failed: $e',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final de = Localizations.localeOf(context).languageCode == 'de';
+    return CoButton(
+      onPressed: _busy ? null : _share,
+      icon: _busy ? Icons.hourglass_top_rounded : Icons.link_rounded,
+      label: de ? 'Link teilen' : 'Share link',
+      variant: CoButtonVariant.secondaryOutlined,
+    );
+  }
+}
+
 // ═════════════════════════════════════════════════════════════════════════
 // Detail-Dialog
 // ═════════════════════════════════════════════════════════════════════════
@@ -1677,7 +1742,17 @@ class _IncidentDetailDialog extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _CopyReportButton(data: data),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _CopyReportButton(data: data),
+                            // Fahrzeug-Checks haben keinen Fall-Charakter —
+                            // kein öffentlicher Bericht für sie.
+                            if (!_isVehicleCheckDoc(data))
+                              _ShareLinkButton(docRef: docRef, data: data),
+                          ],
+                        ),
                         const SizedBox(height: 20),
                         ..._rows(context, data, de),
                         if (!workAccident) ...[

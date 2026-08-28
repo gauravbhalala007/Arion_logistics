@@ -15,7 +15,12 @@
 // Firestore (`users/{dspUid}/published_waveplans/{date}`), the
 // view streams the data live.
 
+import 'dart:async';
+import 'dart:convert' show utf8;
+import 'dart:html' as html; // Web-App: localStorage für "Sticky Note bestätigt"
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:crypto/crypto.dart' show md5;
 import 'package:flutter/material.dart';
 
 import '../localization/app_localizations.dart';
@@ -84,24 +89,49 @@ class _DriverWaveplanViewState extends State<DriverWaveplanView>
         });
   }
 
-  /// Text of the admin's sticky note if it is valid today, else ''.
-  static String _stickyTextFrom(
+  /// Sticky note of the admin if it is valid today. Returns the text plus
+  /// a stable version hash (text + validFrom) so the confirm-popup can be
+  /// acknowledged once per note version.
+  static ({String text, String version}) _stickyFrom(
     List<DocumentSnapshot<Map<String, dynamic>>> docs,
   ) {
     for (final d in docs) {
       if (d.id != 'sticky_note') continue;
       final data = d.data();
-      if (data == null) return '';
+      if (data == null) break;
       final text = (data['text'] ?? '').toString().trim();
-      if (text.isEmpty) return '';
+      if (text.isEmpty) break;
       final now = DateTime.now();
       final vf = data['validFrom'];
-      if (vf is Timestamp && now.isBefore(vf.toDate())) return '';
+      if (vf is Timestamp && now.isBefore(vf.toDate())) break;
       final vu = data['validUntil'];
-      if (vu is Timestamp && now.isAfter(vu.toDate())) return '';
-      return text;
+      if (vu is Timestamp && now.isAfter(vu.toDate())) break;
+      final vfMs = vf is Timestamp ? vf.millisecondsSinceEpoch : 0;
+      final version = md5.convert(utf8.encode('$vfMs|$text')).toString();
+      return (text: text, version: version);
     }
-    return '';
+    return (text: '', version: '');
+  }
+
+  // ── Sticky-Note-Popup: einmal je Note-Version bestätigen ────────────
+  // Bestätigung landet in localStorage, damit das Popup nach Reload
+  // nicht erneut blockiert, solange dieselbe Note gilt.
+  String get _stickyAckStorageKey =>
+      'codriver_waveplan_sticky_ack_${widget.dspUid}';
+
+  bool _isStickyAcked(String version) {
+    try {
+      return html.window.localStorage[_stickyAckStorageKey] == version;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  void _ackSticky(String version) {
+    try {
+      html.window.localStorage[_stickyAckStorageKey] = version;
+    } catch (_) {}
+    if (mounted) setState(() {});
   }
 
   @override
@@ -119,7 +149,10 @@ class _DriverWaveplanViewState extends State<DriverWaveplanView>
                 return const Center(child: CircularProgressIndicator());
               }
               final allDocs = snap.data ?? const [];
-              final stickyText = _stickyTextFrom(allDocs);
+              final sticky = _stickyFrom(allDocs);
+              final stickyText = sticky.text;
+              final showStickyPopup =
+                  stickyText.isNotEmpty && !_isStickyAcked(sticky.version);
               final docs =
                   allDocs.where((d) => d.id != 'sticky_note').toList();
               // Find the doc that actually contains the driver. If
@@ -167,7 +200,7 @@ class _DriverWaveplanViewState extends State<DriverWaveplanView>
 
               final notes = (data?['notes'] ?? '').toString().trim();
               final dispatchers = _dispatchersFrom(data);
-              return Column(
+              final content = Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Tabs first — driver's primary action is to switch
@@ -203,6 +236,23 @@ class _DriverWaveplanViewState extends State<DriverWaveplanView>
                       ],
                     ),
                   ),
+                ],
+              );
+              // Ticket „WAVEPLAN": Sticky Note zusätzlich als blockierendes
+              // Popup — 10 s Lesezeit, dann per „Gelesen und bestätigt"-
+              // Slider wegwischen. Danach ist der Waveplan wieder sichtbar;
+              // das Banner darunter bleibt als Nachschlage-Alternative.
+              return Stack(
+                children: [
+                  content,
+                  if (showStickyPopup)
+                    Positioned.fill(
+                      child: _StickyNotePopup(
+                        key: ValueKey(sticky.version),
+                        text: stickyText,
+                        onConfirmed: () => _ackSticky(sticky.version),
+                      ),
+                    ),
                 ],
               );
             },
@@ -1291,6 +1341,326 @@ class _EmptyState extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  Sticky-Note-Popup mit Lese-Countdown + Slide-to-Confirm
+// ════════════════════════════════════════════════════════════════════════════
+
+/// Blocking popup for the admin's sticky note. The note is scrollable,
+/// a 10 second countdown enforces reading time, then the driver swipes
+/// the "I have read and confirm" slider to dismiss the popup.
+class _StickyNotePopup extends StatefulWidget {
+  final String text;
+  final VoidCallback onConfirmed;
+
+  const _StickyNotePopup({
+    super.key,
+    required this.text,
+    required this.onConfirmed,
+  });
+
+  @override
+  State<_StickyNotePopup> createState() => _StickyNotePopupState();
+}
+
+class _StickyNotePopupState extends State<_StickyNotePopup> {
+  static const int _readSeconds = 10;
+
+  int _secondsLeft = _readSeconds;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _startCountdown();
+  }
+
+  @override
+  void didUpdateWidget(covariant _StickyNotePopup oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.text != widget.text) {
+      _secondsLeft = _readSeconds;
+      _startCountdown();
+    }
+  }
+
+  void _startCountdown() {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      setState(() {
+        _secondsLeft = _secondsLeft > 0 ? _secondsLeft - 1 : 0;
+      });
+      if (_secondsLeft <= 0) timer.cancel();
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final unlocked = _secondsLeft <= 0;
+    return Container(
+      color: Colors.black.withOpacity(0.55),
+      alignment: Alignment.center,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 440,
+          maxHeight: MediaQuery.of(context).size.height * 0.72,
+        ),
+        child: Material(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: AppColors.green50,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.campaign_rounded,
+                        color: AppColors.codriverDeep,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        t.t('driver_waveplan_sticky_popup_title'),
+                        style: AppTypography.title3.copyWith(
+                          color: AppColors.codriverGraphite,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    if (!unlocked)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.green50,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          t.tf('driver_waveplan_sticky_popup_wait', {
+                            'seconds': '$_secondsLeft',
+                          }),
+                          style: AppTypography.caption1.copyWith(
+                            color: AppColors.codriverDeep,
+                            fontWeight: FontWeight.w700,
+                            fontFeatures: const [
+                              FontFeature.tabularFigures(),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                // Scrollbare Note — lange Texte sprengen das Popup nicht.
+                Flexible(
+                  child: Container(
+                    padding: const EdgeInsets.all(AppSpacing.sm),
+                    decoration: BoxDecoration(
+                      color: AppColors.green50,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: AppColors.codriverGreen.withOpacity(0.5),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Scrollbar(
+                      thumbVisibility: true,
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Text(
+                          widget.text,
+                          style: AppTypography.body.copyWith(
+                            color: AppColors.codriverDeep,
+                            fontWeight: FontWeight.w600,
+                            height: 1.45,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                _SlideToConfirm(
+                  label: t.t('driver_waveplan_sticky_popup_confirm'),
+                  enabled: unlocked,
+                  onConfirmed: widget.onConfirmed,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Slide-to-confirm control: drag the thumb across the track to trigger
+/// [onConfirmed]. While [enabled] is false the control is greyed out and
+/// ignores drags (read-time countdown still running).
+class _SlideToConfirm extends StatefulWidget {
+  final String label;
+  final bool enabled;
+  final VoidCallback onConfirmed;
+
+  const _SlideToConfirm({
+    required this.label,
+    required this.enabled,
+    required this.onConfirmed,
+  });
+
+  @override
+  State<_SlideToConfirm> createState() => _SlideToConfirmState();
+}
+
+class _SlideToConfirmState extends State<_SlideToConfirm> {
+  static const double _trackHeight = 54;
+  static const double _thumbSize = 46;
+
+  double _dragX = 0;
+  bool _dragging = false;
+  bool _confirmed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxDrag =
+            (constraints.maxWidth - _thumbSize - 8).clamp(0.0, double.infinity);
+        final progress = maxDrag <= 0 ? 0.0 : (_dragX / maxDrag).clamp(0.0, 1.0);
+        final active = widget.enabled && !_confirmed;
+        return GestureDetector(
+          onHorizontalDragStart: active
+              ? (_) => setState(() => _dragging = true)
+              : null,
+          onHorizontalDragUpdate: active
+              ? (details) => setState(() {
+                    _dragX =
+                        (_dragX + details.delta.dx).clamp(0.0, maxDrag);
+                  })
+              : null,
+          onHorizontalDragEnd: active
+              ? (_) {
+                  setState(() => _dragging = false);
+                  if (_dragX >= maxDrag * 0.85) {
+                    setState(() {
+                      _dragX = maxDrag;
+                      _confirmed = true;
+                    });
+                    widget.onConfirmed();
+                  } else {
+                    setState(() => _dragX = 0);
+                  }
+                }
+              : null,
+          child: Container(
+            height: _trackHeight,
+            decoration: BoxDecoration(
+              color: widget.enabled
+                  ? AppColors.codriverDeep.withOpacity(0.10)
+                  : const Color(0xFFE2E8F0),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: widget.enabled
+                    ? AppColors.codriverGreen.withOpacity(0.6)
+                    : const Color(0xFFCBD5E1),
+                width: 1.2,
+              ),
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Fortschritts-Füllung hinter dem Thumb.
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: _thumbSize + 8 + _dragX,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: AppColors.codriverGreen
+                          .withOpacity(0.25 + 0.35 * progress),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: _thumbSize + 12,
+                  ),
+                  child: Text(
+                    widget.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: AppTypography.subheadline.copyWith(
+                      color: widget.enabled
+                          ? AppColors.codriverDeep
+                          : AppColors.labelTertiaryLight,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                AnimatedPositioned(
+                  duration: _dragging
+                      ? Duration.zero
+                      : const Duration(milliseconds: 180),
+                  curve: Curves.easeOut,
+                  left: 4 + _dragX,
+                  top: (_trackHeight - _thumbSize) / 2,
+                  child: Container(
+                    width: _thumbSize,
+                    height: _thumbSize,
+                    decoration: BoxDecoration(
+                      color: widget.enabled
+                          ? AppColors.codriverGreen
+                          : const Color(0xFF94A3B8),
+                      shape: BoxShape.circle,
+                      boxShadow: widget.enabled ? AppElevation.level2 : null,
+                    ),
+                    child: Icon(
+                      _confirmed
+                          ? Icons.check_rounded
+                          : Icons.chevron_right_rounded,
+                      color: Colors.white,
+                      size: 26,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

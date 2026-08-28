@@ -13000,6 +13000,9 @@ class AppLocalizations {
         'Once the waveplan is published, you\'ll see all other drivers in '
         'your wave here — handy for carpools.',
     'driver_waveplan_me_suffix': '(you)',
+    'driver_waveplan_sticky_popup_title': 'Important notice',
+    'driver_waveplan_sticky_popup_wait': 'Please read — {seconds}s',
+    'driver_waveplan_sticky_popup_confirm': 'I have read and confirm',
   };
 
   static final Map<String, Map<String, String>> _driverWaveplanLocalizedValues =
@@ -13034,6 +13037,9 @@ class AppLocalizations {
           'Sobald der Waveplan veröffentlicht ist, siehst du hier alle '
           'anderen Fahrer in deiner Wave — praktisch für Fahrgemeinschaften.',
       'driver_waveplan_me_suffix': '(du)',
+      'driver_waveplan_sticky_popup_title': 'Wichtiger Hinweis',
+      'driver_waveplan_sticky_popup_wait': 'Bitte lesen — {seconds}s',
+      'driver_waveplan_sticky_popup_confirm': 'Gelesen und bestätigt',
     },
     'sq': {
       ..._driverWaveplanSharedValues,
