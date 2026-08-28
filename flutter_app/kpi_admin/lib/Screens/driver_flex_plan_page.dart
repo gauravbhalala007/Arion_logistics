@@ -317,13 +317,21 @@ class _DriverFlexPlanPageState extends State<DriverFlexPlanPage> {
                 '${d.data()['date']}|${d.data()['shiftId']}',
             };
             final remaining = month.maxMinutes - booking.totalMinutes;
-            final dayKeys = month.days.keys.toList()..sort();
+            // Alle Arbeitstage des Monats (Mo–Sa, keine Feiertage) — die
+            // Schichten sind einmal angelegt und gelten für jeden davon.
+            final workDays = <DateTime>[
+              for (var d = 1; d <= month.daysInMonth; d++)
+                if (month
+                    .shiftsForDate(DateTime(month.year, month.month, d))
+                    .isNotEmpty)
+                  DateTime(month.year, month.month, d),
+            ];
 
             return ListView(
               children: [
                 _totalsCard(month, booking, remaining),
                 const SizedBox(height: AppSpacing.sm),
-                if (dayKeys.isEmpty)
+                if (workDays.isEmpty)
                   Padding(
                     padding: const EdgeInsets.all(AppSpacing.lg),
                     child: Text(
@@ -337,10 +345,10 @@ class _DriverFlexPlanPageState extends State<DriverFlexPlanPage> {
                       ),
                     ),
                   ),
-                for (final dayKey in dayKeys)
+                for (final day in workDays)
                   _dayCard(
                     month,
-                    dayKey,
+                    day,
                     booking,
                     pendingCancellations,
                     remaining,
@@ -425,19 +433,14 @@ class _DriverFlexPlanPageState extends State<DriverFlexPlanPage> {
 
   Widget _dayCard(
     FlexMonth month,
-    String dayKey,
+    DateTime date,
     FlexBooking booking,
     Set<String> pendingCancellations,
     int remaining,
   ) {
     final de = _de;
-    final shifts = month.days[dayKey] ?? const <FlexShift>[];
-    final parts = dayKey.split('-');
-    final date = DateTime(
-      int.tryParse(parts[0]) ?? 2000,
-      int.tryParse(parts.length > 1 ? parts[1] : '1') ?? 1,
-      int.tryParse(parts.length > 2 ? parts[2] : '1') ?? 1,
-    );
+    final dayKey = FlexplanRepository.dateKeyOf(date);
+    final shifts = month.shiftsForDate(date);
     final weekday = (de ? _kWeekdaysDe : _kWeekdaysEn)[date.weekday - 1];
 
     return Container(

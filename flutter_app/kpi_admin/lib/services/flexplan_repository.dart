@@ -6,7 +6,11 @@
 // Datenmodell:
 //   users/{dspUid}/flexplan_months/{yyyy-MM}
 //     { monthKey, status: 'draft'|'open'|'closed', hourlyWage,
-//       maxMonthlyEarnings, days: { 'yyyy-MM-dd': [ {id,name,start,end} ] } }
+//       maxMonthlyEarnings, region: 'NW',
+//       shifts: [ {id,name,start,end} ] }
+//   Die Schichten werden EINMAL angelegt und gelten für jeden Tag des
+//   Monats außer Sonntag und gesetzliche Feiertage (je Bundesland,
+//   siehe utils/german_holidays.dart).
 //   users/{dspUid}/flexplan_months/{yyyy-MM}/bookings/{TID}
 //     { driverTransporterId, monthKey, driverName, entries: [
 //         {date, shiftId, name, start, end, minutes} ], totalMinutes }
@@ -21,6 +25,8 @@
 // Maximalverdienst kommt.
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+
+import '../utils/german_holidays.dart';
 
 // ── Stunden-/Geld-Mathematik ─────────────────────────────────────────────
 
@@ -92,12 +98,13 @@ class FlexShift {
 }
 
 class FlexMonth {
-  const FlexMonth({
+  FlexMonth({
     required this.monthKey,
     required this.status,
     required this.hourlyWage,
     required this.maxEarnings,
-    required this.days,
+    required this.region,
+    required this.shifts,
   });
 
   final String monthKey; // 'yyyy-MM'
@@ -105,28 +112,47 @@ class FlexMonth {
   final double hourlyWage;
   final double maxEarnings;
 
-  /// 'yyyy-MM-dd' → Schichten des Tages.
-  final Map<String, List<FlexShift>> days;
+  /// Bundesland-Code (z. B. 'NW') für die Feiertagsberechnung.
+  final String region;
+
+  /// Die einmal angelegten Schichten — gelten an jedem Werktag
+  /// (Mo–Sa, kein Feiertag) des Monats.
+  final List<FlexShift> shifts;
 
   bool get isOpen => status == 'open';
   int get maxMinutes =>
       flexMaxMinutes(hourlyWage: hourlyWage, maxEarnings: maxEarnings);
 
+  int get year => int.tryParse(monthKey.split('-').first) ?? 2000;
+  int get month =>
+      int.tryParse(monthKey.split('-').length > 1 ? monthKey.split('-')[1] : '1') ??
+      1;
+  int get daysInMonth => DateTime(year, month + 1, 0).day;
+
+  /// Feiertage des Monatsjahres im gewählten Bundesland
+  /// (Datums-Key → Name). Lazy berechnet und gecacht.
+  Map<String, String> get holidays =>
+      _holidays ??= germanHolidays(year, region);
+  Map<String, String>? _holidays;
+
+  /// Grund, warum ein Tag KEINE Schichten hat: 'sunday', Feiertagsname —
+  /// oder null, wenn der Tag ein Flex-Arbeitstag ist.
+  String? blockedReason(DateTime date) {
+    if (date.weekday == DateTime.sunday) return 'sunday';
+    return holidays[FlexplanRepository.dateKeyOf(date)];
+  }
+
+  /// Schichten für ein konkretes Datum: leer an Sonntagen/Feiertagen.
+  List<FlexShift> shiftsForDate(DateTime date) =>
+      blockedReason(date) == null ? shifts : const <FlexShift>[];
+
   static FlexMonth fromDoc(String monthKey, Map<String, dynamic>? data) {
     final d = data ?? const <String, dynamic>{};
-    final days = <String, List<FlexShift>>{};
-    final rawDays = d['days'];
-    if (rawDays is Map) {
-      rawDays.forEach((key, value) {
-        if (value is! List) return;
-        final shifts = value
-            .map(FlexShift.fromMap)
-            .whereType<FlexShift>()
-            .toList()
-          ..sort((a, b) => a.start.compareTo(b.start));
-        if (shifts.isNotEmpty) days[key.toString()] = shifts;
-      });
-    }
+    final rawShifts = d['shifts'];
+    final shifts = rawShifts is List
+        ? (rawShifts.map(FlexShift.fromMap).whereType<FlexShift>().toList()
+          ..sort((a, b) => a.start.compareTo(b.start)))
+        : <FlexShift>[];
     double numOf(dynamic v, double fallback) =>
         v is num ? v.toDouble() : fallback;
     return FlexMonth(
@@ -134,7 +160,8 @@ class FlexMonth {
       status: (d['status'] ?? 'draft').toString(),
       hourlyWage: numOf(d['hourlyWage'], 16.20),
       maxEarnings: numOf(d['maxMonthlyEarnings'], 603.0),
-      days: days,
+      region: (d['region'] ?? 'NW').toString(),
+      shifts: shifts,
     );
   }
 }
@@ -193,7 +220,7 @@ class FlexBooking {
   final List<FlexBookingEntry> entries;
 
   int get totalMinutes =>
-      entries.fold(0, (sum, e) => sum + e.minutes);
+      entries.fold(0, (acc, e) => acc + e.minutes);
 
   static FlexBooking fromDoc(String tid, Map<String, dynamic>? data) {
     final d = data ?? const <String, dynamic>{};
@@ -298,6 +325,19 @@ class FlexplanRepository {
       final month = FlexMonth.fromDoc(monthKey, monthSnap.data());
       if (!month.isOpen) throw StateError('month_closed');
 
+      // Datum muss ein Flex-Arbeitstag sein (kein Sonntag/Feiertag) und
+      // die Schicht muss (noch) zu den angelegten Schichten gehören.
+      final parts = date.split('-');
+      final parsed = DateTime(
+        int.tryParse(parts[0]) ?? 0,
+        int.tryParse(parts.length > 1 ? parts[1] : '1') ?? 1,
+        int.tryParse(parts.length > 2 ? parts[2] : '1') ?? 1,
+      );
+      final valid = month
+          .shiftsForDate(parsed)
+          .any((s) => s.id == shift.id);
+      if (!valid) throw StateError('shift_unavailable');
+
       final snap = await tx.get(ref);
       final booking =
           FlexBooking.fromDoc(tid.trim().toUpperCase(), snap.data());
@@ -377,7 +417,7 @@ class FlexplanRepository {
         tx.set(ref, {
           'entries': [for (final e in remaining) e.toMap()],
           'totalMinutes':
-              remaining.fold<int>(0, (sum, e) => sum + e.minutes),
+              remaining.fold<int>(0, (acc, e) => acc + e.minutes),
           'updatedAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
       }

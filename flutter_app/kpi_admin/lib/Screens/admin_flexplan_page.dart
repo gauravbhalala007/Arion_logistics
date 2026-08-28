@@ -10,6 +10,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../services/flexplan_repository.dart';
+import '../utils/german_holidays.dart';
 import '../widgets/admin_scope.dart';
 
 const _kBorder = Color(0xFFE5E7EB);
@@ -81,7 +82,7 @@ class _AdminFlexplanPageState extends State<AdminFlexplanPage> {
 
   Future<void> _openMonth(FlexplanRepository repo, FlexMonth month) async {
     final de = _de;
-    if (month.days.isEmpty) {
+    if (month.shifts.isEmpty) {
       _snack(
         de
             ? 'Bitte zuerst Schichten anlegen, dann freigeben.'
@@ -264,94 +265,77 @@ class _AdminFlexplanPageState extends State<AdminFlexplanPage> {
     }, SetOptions(merge: true));
   }
 
-  // ── Schichten anlegen / löschen ────────────────────────────────────────
+  // ── Schichten anlegen / löschen (einmal je Monat, gelten Mo–Sa) ────────
 
-  Future<void> _addShift(
-    FlexplanRepository repo,
-    FlexMonth month,
-    DateTime day,
-  ) async {
+  Future<void> _addShift(FlexplanRepository repo, FlexMonth month) async {
     final de = _de;
     final nameCtrl = TextEditingController();
     final startCtrl = TextEditingController(text: '08:00');
     final endCtrl = TextEditingController(text: '12:00');
-    // 0 = nur dieser Tag, 1 = alle gleichen Wochentage, 2 = alle Tage.
-    var applyMode = 0;
 
     final saved = await showDialog<bool>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setLocal) => AlertDialog(
-          title: Text(
-            de
-                ? 'Schicht am ${day.day}.${day.month}. anlegen'
-                : 'Add shift on ${day.day}.${day.month}.',
-          ),
-          content: SizedBox(
-            width: 380,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: nameCtrl,
-                  autofocus: true,
-                  decoration: InputDecoration(
-                    labelText: de ? 'Name (z. B. Frühschicht)' : 'Name',
-                  ),
+      builder: (ctx) => AlertDialog(
+        title: Text(de ? 'Schicht anlegen' : 'Add shift'),
+        content: SizedBox(
+          width: 380,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: de ? 'Name (z. B. Frühschicht)' : 'Name',
                 ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: startCtrl,
-                        decoration: InputDecoration(
-                          labelText: de ? 'Start (HH:mm)' : 'Start (HH:mm)',
-                        ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: startCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Start (HH:mm)',
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: TextField(
-                        controller: endCtrl,
-                        decoration: InputDecoration(
-                          labelText: de ? 'Ende (HH:mm)' : 'End (HH:mm)',
-                        ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: TextField(
+                      controller: endCtrl,
+                      decoration: InputDecoration(
+                        labelText: de ? 'Ende (HH:mm)' : 'End (HH:mm)',
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                for (final (i, label) in [
-                  de ? 'Nur dieser Tag' : 'This day only',
-                  de
-                      ? 'Alle ${_kWeekdaysDe[day.weekday - 1]}. im Monat'
-                      : 'Every ${_kWeekdaysEn[day.weekday - 1]} this month',
-                  de ? 'Jeden Tag im Monat' : 'Every day this month',
-                ].indexed)
-                  RadioListTile<int>(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    value: i,
-                    groupValue: applyMode,
-                    onChanged: (v) => setLocal(() => applyMode = v ?? 0),
-                    title: Text(label, style: const TextStyle(fontSize: 14)),
                   ),
-              ],
-            ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                de
+                    ? 'Gilt automatisch für jeden Tag des Monats außer '
+                        'Sonntage und Feiertage '
+                        '(${germanRegionName(month.region)}).'
+                    : 'Automatically applies to every day of the month '
+                        'except Sundays and public holidays '
+                        '(${germanRegionName(month.region)}).',
+                style: const TextStyle(fontSize: 12.5, color: _kMuted),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(de ? 'Abbrechen' : 'Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text(de ? 'Anlegen' : 'Add'),
-            ),
-          ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(de ? 'Abbrechen' : 'Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(de ? 'Anlegen' : 'Add'),
+          ),
+        ],
       ),
     );
     if (saved != true) return;
@@ -369,58 +353,46 @@ class _AdminFlexplanPageState extends State<AdminFlexplanPage> {
       return;
     }
 
-    final targets = <DateTime>[];
-    final daysInMonth = DateTime(_month.year, _month.month + 1, 0).day;
-    for (var d = 1; d <= daysInMonth; d++) {
-      final date = DateTime(_month.year, _month.month, d);
-      final matches = switch (applyMode) {
-        1 => date.weekday == day.weekday,
-        2 => true,
-        _ => d == day.day,
-      };
-      if (matches) targets.add(date);
-    }
-
-    final updates = <String, dynamic>{
-      'monthKey': _monthKey,
-      'updatedAt': FieldValue.serverTimestamp(),
-    };
-    for (final date in targets) {
-      final key = FlexplanRepository.dateKeyOf(date);
-      final existing = month.days[key] ?? const <FlexShift>[];
-      final shift = FlexShift(
-        id: '${DateTime.now().microsecondsSinceEpoch}_${date.day}',
-        name: name,
-        start: start,
-        end: end,
-      );
-      updates['days.$key'] = [
-        for (final s in existing) s.toMap(),
-        shift.toMap(),
-      ];
-    }
+    final shift = FlexShift(
+      id: '${DateTime.now().microsecondsSinceEpoch}',
+      name: name,
+      start: start,
+      end: end,
+    );
     await repo.monthRef(_monthKey).set({
       'monthKey': _monthKey,
       'status': month.status,
       'hourlyWage': month.hourlyWage,
       'maxMonthlyEarnings': month.maxEarnings,
+      'region': month.region,
+      'shifts': [
+        for (final s in month.shifts) s.toMap(),
+        shift.toMap(),
+      ],
+      'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
-    await repo.monthRef(_monthKey).update(updates);
   }
 
   Future<void> _removeShift(
     FlexplanRepository repo,
     FlexMonth month,
-    String dateKey,
     FlexShift shift,
   ) async {
-    final remaining = (month.days[dateKey] ?? const <FlexShift>[])
-        .where((s) => s.id != shift.id)
-        .toList();
-    await repo.monthRef(_monthKey).update({
-      'days.$dateKey': [for (final s in remaining) s.toMap()],
+    await repo.monthRef(_monthKey).set({
+      'shifts': [
+        for (final s in month.shifts)
+          if (s.id != shift.id) s.toMap(),
+      ],
       'updatedAt': FieldValue.serverTimestamp(),
-    });
+    }, SetOptions(merge: true));
+  }
+
+  Future<void> _setRegion(FlexplanRepository repo, String region) async {
+    await repo.monthRef(_monthKey).set({
+      'monthKey': _monthKey,
+      'region': region,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
   }
 
   // ── Storno-Anfragen ────────────────────────────────────────────────────
@@ -525,8 +497,9 @@ class _AdminFlexplanPageState extends State<AdminFlexplanPage> {
                         _header(repo, month, bookings),
                         const SizedBox(height: 12),
                         _cancellationsPanel(repo),
-                        _driverTotalsPanel(month, bookings),
+                        _shiftsPanel(repo, month),
                         const SizedBox(height: 12),
+                        _driverTotalsPanel(month, bookings),
                         _daysPanel(repo, month, bookings),
                         const SizedBox(height: 24),
                       ],
@@ -656,6 +629,41 @@ class _AdminFlexplanPageState extends State<AdminFlexplanPage> {
                       const SizedBox(width: 6),
                       const Icon(Icons.edit_outlined, size: 14, color: _kMuted),
                     ],
+                  ),
+                ),
+              ),
+              // Bundesland — bestimmt, welche Feiertage schichtfrei sind.
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _kBorder),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: kGermanRegions
+                            .any((r) => r.code == month.region)
+                        ? month.region
+                        : 'NW',
+                    isDense: true,
+                    borderRadius: BorderRadius.circular(12),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: _kText,
+                    ),
+                    icon: const Icon(Icons.expand_more_rounded, size: 18),
+                    items: [
+                      for (final r in kGermanRegions)
+                        DropdownMenuItem(
+                          value: r.code,
+                          child: Text(r.name),
+                        ),
+                    ],
+                    onChanged: (v) {
+                      if (v != null) _setRegion(repo, v);
+                    },
                   ),
                 ),
               ),
@@ -860,14 +868,91 @@ class _AdminFlexplanPageState extends State<AdminFlexplanPage> {
     );
   }
 
-  // Tage des Monats: Schichten pflegen + Meldungen sehen.
+  // Die einmal angelegten Schichten des Monats.
+  Widget _shiftsPanel(FlexplanRepository repo, FlexMonth month) {
+    final de = _de;
+    return _card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            de ? 'Schichten' : 'Shifts',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: _kText,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            de
+                ? 'Einmal anlegen — gilt für jeden Tag des Monats außer '
+                    'Sonntage und Feiertage in '
+                    '${germanRegionName(month.region)}.'
+                : 'Create once — applies to every day of the month except '
+                    'Sundays and public holidays in '
+                    '${germanRegionName(month.region)}.',
+            style: const TextStyle(fontSize: 12.5, color: _kMuted),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final s in month.shifts)
+                Container(
+                  padding: const EdgeInsets.fromLTRB(12, 6, 6, 6),
+                  decoration: BoxDecoration(
+                    color: _kGreenBg,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: const Color(0xFFABEFC6)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${s.name} ${s.start}–${s.end} '
+                        '(${formatMinutes(s.minutes)})',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: _kGreen,
+                        ),
+                      ),
+                      InkWell(
+                        onTap: () => _removeShift(repo, month, s),
+                        child: const Padding(
+                          padding: EdgeInsets.all(4),
+                          child: Icon(
+                            Icons.close_rounded,
+                            size: 15,
+                            color: _kGreen,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              OutlinedButton.icon(
+                onPressed: () => _addShift(repo, month),
+                icon: const Icon(Icons.add_rounded, size: 16),
+                label: Text(de ? 'Schicht anlegen' : 'Add shift'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Tagesübersicht: wer hat sich für welchen Tag gemeldet; Sonntage und
+  // Feiertage sind sichtbar gesperrt.
   Widget _daysPanel(
     FlexplanRepository repo,
     FlexMonth month,
     List<FlexBooking> bookings,
   ) {
     final de = _de;
-    final daysInMonth = DateTime(_month.year, _month.month + 1, 0).day;
 
     // dateKey → Liste "Fahrer · Schicht"
     final signupsByDay = <String, List<String>>{};
@@ -887,26 +972,16 @@ class _AdminFlexplanPageState extends State<AdminFlexplanPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            de ? 'Schichten & Meldungen je Tag' : 'Shifts & signups per day',
+            de ? 'Meldungen je Tag' : 'Signups per day',
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w800,
               color: _kText,
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            de
-                ? 'Je Tag nur die verschiedenen Schichten mit Name und Zeiten '
-                    '— keine Anzahl.'
-                : 'Per day just the different shifts with name and times — '
-                    'no capacity.',
-            style: const TextStyle(fontSize: 12.5, color: _kMuted),
-          ),
           const SizedBox(height: 10),
-          for (var d = 1; d <= daysInMonth; d++)
+          for (var d = 1; d <= month.daysInMonth; d++)
             _dayRow(
-              repo,
               month,
               DateTime(_month.year, _month.month, d),
               signupsByDay,
@@ -917,152 +992,107 @@ class _AdminFlexplanPageState extends State<AdminFlexplanPage> {
   }
 
   Widget _dayRow(
-    FlexplanRepository repo,
     FlexMonth month,
     DateTime day,
     Map<String, List<String>> signupsByDay,
   ) {
     final de = _de;
     final key = FlexplanRepository.dateKeyOf(day);
-    final shifts = month.days[key] ?? const <FlexShift>[];
     final signups = signupsByDay[key] ?? const <String>[];
-    final weekend = day.weekday >= 6;
+    final blocked = month.blockedReason(day);
     final weekday =
         (de ? _kWeekdaysDe : _kWeekdaysEn)[day.weekday - 1];
+
+    final String? blockedLabel = blocked == null
+        ? null
+        : blocked == 'sunday'
+            ? (de ? 'Sonntag — keine Schichten' : 'Sunday — no shifts')
+            : (de ? 'Feiertag: $blocked' : 'Public holiday: $blocked');
 
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: weekend ? const Color(0xFFF8FAFC) : Colors.white,
+        color: blocked != null ? const Color(0xFFF8FAFC) : Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: _kBorder),
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              SizedBox(
-                width: 74,
-                child: Text(
-                  '$weekday ${day.day.toString().padLeft(2, '0')}.'
-                  '${day.month.toString().padLeft(2, '0')}.',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: weekend ? _kMuted : _kText,
-                  ),
-                ),
+          SizedBox(
+            width: 74,
+            child: Text(
+              '$weekday ${day.day.toString().padLeft(2, '0')}.'
+              '${day.month.toString().padLeft(2, '0')}.',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: blocked != null ? _kMuted : _kText,
               ),
-              Expanded(
-                child: Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    for (final s in shifts)
-                      Container(
-                        padding: const EdgeInsets.fromLTRB(10, 4, 4, 4),
-                        decoration: BoxDecoration(
-                          color: _kGreenBg,
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(
-                            color: const Color(0xFFABEFC6),
+            ),
+          ),
+          Expanded(
+            child: blocked != null
+                ? Row(
+                    children: [
+                      Icon(
+                        blocked == 'sunday'
+                            ? Icons.weekend_outlined
+                            : Icons.celebration_outlined,
+                        size: 14,
+                        color: _kMuted,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          blockedLabel!,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                            color: _kMuted,
                           ),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              '${s.name} ${s.start}–${s.end}',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: _kGreen,
+                      ),
+                    ],
+                  )
+                : signups.isEmpty
+                    ? Text(
+                        de ? 'Noch keine Meldungen' : 'No signups yet',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: _kMuted,
+                        ),
+                      )
+                    : Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          for (final s in signups)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
                               ),
-                            ),
-                            InkWell(
-                              onTap: () =>
-                                  _removeShift(repo, month, key, s),
-                              child: const Padding(
-                                padding: EdgeInsets.all(3),
-                                child: Icon(
-                                  Icons.close_rounded,
-                                  size: 14,
-                                  color: _kGreen,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEFF6FF),
+                                borderRadius: BorderRadius.circular(999),
+                                border: Border.all(
+                                  color: const Color(0xFFBFDBFE),
+                                ),
+                              ),
+                              child: Text(
+                                s,
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF1D4ED8),
                                 ),
                               ),
                             ),
-                          ],
-                        ),
+                        ],
                       ),
-                    InkWell(
-                      onTap: () => _addShift(repo, month, day),
-                      borderRadius: BorderRadius.circular(999),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: _kBorder),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.add_rounded,
-                                size: 14, color: _kMuted),
-                            const SizedBox(width: 2),
-                            Text(
-                              de ? 'Schicht' : 'Shift',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: _kMuted,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
           ),
-          if (signups.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Padding(
-              padding: const EdgeInsets.only(left: 74),
-              child: Wrap(
-                spacing: 6,
-                runSpacing: 4,
-                children: [
-                  for (final s in signups)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEFF6FF),
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(color: const Color(0xFFBFDBFE)),
-                      ),
-                      child: Text(
-                        s,
-                        style: const TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF1D4ED8),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ],
         ],
       ),
     );
