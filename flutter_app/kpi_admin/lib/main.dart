@@ -172,6 +172,11 @@ class App extends StatelessWidget {
               // customAnswers.viaAgency.
               final isAgency = typeRaw == 'agency';
               final legacyUid = uri.queryParameters['dsp'] ?? '';
+              // ?lang=bg|de|en|hu|ro überspringt die Sprachauswahl des
+              // Local-Formulars (z. B. bulgarische Landingpage → direkt
+              // bulgarisches Formular).
+              final lang =
+                  (uri.queryParameters['lang'] ?? '').toLowerCase().trim();
 
               return MaterialPageRoute<void>(
                 settings: settings,
@@ -181,6 +186,7 @@ class App extends StatelessWidget {
                     legacyAdminUid: legacyUid,
                     channel: channel,
                     isAgency: isAgency,
+                    initialLang: lang,
                   ),
                 ),
               );
@@ -372,11 +378,15 @@ class _RecruitingFormLoader extends StatefulWidget {
   /// driver application form.
   final bool isAgency;
 
+  /// `?lang=…` → Sprachauswahl des Local-Formulars überspringen.
+  final String initialLang;
+
   const _RecruitingFormLoader({
     required this.slug,
     required this.legacyAdminUid,
     required this.channel,
     this.isAgency = false,
+    this.initialLang = '',
   });
 
   @override
@@ -452,6 +462,7 @@ class _RecruitingFormLoaderState extends State<_RecruitingFormLoader> {
     return RecruitingFormPage(
       adminUid: _resolvedUid!,
       channel: widget.channel,
+      initialLang: widget.initialLang,
     );
   }
 }

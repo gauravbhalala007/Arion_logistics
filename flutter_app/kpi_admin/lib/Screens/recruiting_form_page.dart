@@ -29,12 +29,17 @@ class RecruitingFormPage extends StatefulWidget {
     super.key,
     required this.adminUid,
     required this.channel,
+    this.initialLang = '',
   });
 
   /// Target admin / DSP namespace. The form refuses to render if this
   /// is empty — the link is malformed.
   final String adminUid;
   final RecruitingChannel channel;
+
+  /// Optional per URL (`?lang=bg` …) vorgewählte Sprache des
+  /// Local-Formulars — überspringt die Sprachauswahl-Seite.
+  final String initialLang;
 
   @override
   State<RecruitingFormPage> createState() => _RecruitingFormPageState();
@@ -395,6 +400,12 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
   @override
   void initState() {
     super.initState();
+    // Per Link vorgewählte Sprache (z. B. bulgarische Landingpage →
+    // ?lang=bg): Sprachauswahl überspringen, Formular direkt einsprachig.
+    const supported = {'de', 'en', 'bg', 'hu', 'ro'};
+    if (supported.contains(widget.initialLang)) {
+      _localLang = widget.initialLang;
+    }
     _loadConfig();
   }
 

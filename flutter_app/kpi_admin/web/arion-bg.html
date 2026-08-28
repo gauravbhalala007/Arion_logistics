@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!--
+    Arion Logistics — bulgarische Job-Landingpage (nur per Direktlink,
+    bewusst NICHT in der CoDriver-App verlinkt). Fixer Bewerben-Button
+    führt in das bulgarische Bewerbungsformular (/jobs/arion?lang=bg),
+    am Seitenende WhatsApp-Business-Button.
+  -->
+  <title>Куриер / Шофьор за доставки – Pommersfelden</title>
+  <meta name="description" content="Работа като куриер за доставки при партньор на Amazon в Pommersfelden, Бавария. 16,20 € на час + дневни пари и бонуси. Кандидатствай на български за няколко минути.">
+  <meta property="og:title" content="📦 Куриер / Шофьор за доставки – Pommersfelden, Бавария">
+  <meta property="og:description" content="16,20 € бруто на час · до ~2 250 € нето месечно · платено обучение · квартира възможна. Кандидатствай на български!">
+  <meta property="og:type" content="website">
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="favicon.png">
+  <style>
+    :root {
+      --green: #0D8A60;
+      --green-deep: #06543B;
+      --green-bg: #E6F8F2;
+      --text: #1A212B;
+      --muted: #5B6572;
+      --border: #E5E9EE;
+      --card: #FFFFFF;
+      --bg: #F2F4F7;
+      --whatsapp: #25D366;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+      /* Platz für die fixe Bewerben-Leiste unten */
+      padding-bottom: 92px;
+    }
+    .wrap { max-width: 680px; margin: 0 auto; padding: 0 16px; }
+
+    /* ── Hero ─────────────────────────────────────────────── */
+    .hero {
+      background: linear-gradient(135deg, var(--green) 0%, var(--green-deep) 100%);
+      color: #fff;
+      padding: 34px 0 30px;
+    }
+    .hero .brand {
+      font-size: 13px; font-weight: 800; letter-spacing: 2px;
+      text-transform: uppercase; opacity: .85; margin-bottom: 10px;
+    }
+    .hero h1 { font-size: 26px; font-weight: 900; margin: 0 0 12px; line-height: 1.25; }
+    .hero .loc { font-size: 15px; opacity: .95; margin: 3px 0; }
+    .hero .badge {
+      display: inline-block; background: rgba(255,255,255,.16);
+      border: 1px solid rgba(255,255,255,.35); border-radius: 999px;
+      padding: 6px 14px; font-size: 13.5px; font-weight: 700; margin-top: 14px;
+    }
+
+    /* ── Sections ─────────────────────────────────────────── */
+    section {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 16px; padding: 20px 18px; margin: 14px 0;
+    }
+    h2 { font-size: 19px; font-weight: 800; margin: 0 0 10px; }
+    h3 { font-size: 16px; font-weight: 800; margin: 18px 0 8px; }
+    p { margin: 8px 0; font-size: 15px; }
+    ul { margin: 8px 0; padding-left: 22px; }
+    li { margin: 5px 0; font-size: 15px; }
+    .muted { color: var(--muted); font-size: 13.5px; }
+    .hl { background: var(--green-bg); border: 1px solid #ABEFC6;
+          border-radius: 12px; padding: 12px 14px; margin: 10px 0; }
+    .hl strong { color: var(--green-deep); }
+    .big-num { font-size: 22px; font-weight: 900; color: var(--green-deep); }
+
+    .benefits li { list-style: none; margin: 7px 0; padding-left: 0; }
+    .benefits { padding-left: 4px; }
+
+    /* ── Buttons ──────────────────────────────────────────── */
+    .applybar {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+      background: rgba(255,255,255,.96);
+      border-top: 1px solid var(--border);
+      padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+      backdrop-filter: blur(8px);
+    }
+    .applybar .inner { max-width: 680px; margin: 0 auto; }
+    .btn-apply {
+      display: block; width: 100%; text-align: center; text-decoration: none;
+      background: linear-gradient(135deg, var(--green) 0%, var(--green-deep) 100%);
+      color: #fff; font-size: 17px; font-weight: 800;
+      padding: 15px 20px; border-radius: 14px;
+      box-shadow: 0 6px 18px rgba(13,138,96,.35);
+    }
+    .btn-apply:active { transform: scale(.985); }
+
+    .btn-whatsapp {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      text-decoration: none; background: var(--whatsapp); color: #fff;
+      font-size: 16px; font-weight: 800; padding: 15px 20px;
+      border-radius: 14px; box-shadow: 0 6px 18px rgba(37,211,102,.35);
+      margin-top: 12px;
+    }
+    .btn-whatsapp svg { width: 22px; height: 22px; flex: none; }
+
+    footer { text-align: center; padding: 22px 16px 10px; }
+    footer p { font-size: 12px; color: var(--muted); }
+  </style>
+</head>
+<body>
+
+  <div class="hero">
+    <div class="wrap">
+      <div class="brand">Arion Logistics</div>
+      <h1>📦 Куриер / Шофьор за доставки (м/ж/д)</h1>
+      <div class="loc"><strong>Месторабота:</strong> Pommersfelden, Бавария</div>
+      <div class="loc">📍 около 20 мин. от Erlangen</div>
+      <div class="loc">📍 около 20 мин. от Bamberg</div>
+      <div class="loc">📍 около 30 мин. от Nürnberg</div>
+      <span class="badge">Ние сме партньор на Amazon</span>
+    </div>
+  </div>
+
+  <div class="wrap">
+
+    <section>
+      <p>Ние сме <strong>партньор на Amazon</strong> и търсим надеждни
+      куриери/шофьори за доставки за нашия екип.</p>
+    </section>
+
+    <section>
+      <h2>💰 Заплащане</h2>
+      <div class="hl">
+        <span class="big-num">16,20 € бруто на час</span>
+      </div>
+      <ul>
+        <li>Средно около <strong>173 работни часа месечно</strong></li>
+        <li>При 173 часа това е <strong>2 802,60 € бруто</strong></li>
+        <li>При данъчен клас 1 това е приблизително <strong>1 950 € нето</strong></li>
+      </ul>
+      <p class="muted">Действителният брой работни часове може да варира.
+      В някои месеци има повече часове, а в други по-малко.</p>
+
+      <h3>⭐ Допълнителни дневни пари</h3>
+      <p>При поне средно представяне получаваш допълнително:</p>
+      <ul>
+        <li><strong>14 € нето на работен ден</strong></li>
+        <li>При среден брой работни часове това е около
+            <strong>295 € нето допълнително на месец</strong></li>
+      </ul>
+      <div class="hl">
+        Така при поне средно представяне и <strong>без произшествие</strong>
+        можеш да достигнеш около <span class="big-num">2 250 € нето</span>
+        месечно при данъчен клас 1.
+      </div>
+      <p class="muted">Оценката на представянето се извършва
+      <strong>всяка седмица</strong> по система с 5 категории.
+      Ако си в една от двете най-ниски категории, за съответната седмица
+      не се изплащат дневни пари.</p>
+      <p><strong>Договорената ти заплата се изплаща винаги.</strong></p>
+
+      <h3>🏆 Бонус за отлично представяне</h3>
+      <p>При много добро представяне има допълнителни бонуси.</p>
+      <p>В категория <strong>„Fantastic Plus" (категория 1)</strong> фирмата
+      получава бонус. Ако и ти си в най-високата категория, получаваш
+      допълнително <strong>50 € бонус на седмица</strong>.</p>
+
+      <h3>🎁 Бонус за препоръка</h3>
+      <p>Ако препоръчаш човек за работа при нас и той започне работа и
+      работи при нас поне <strong>1 месец</strong>, получаваш допълнителен
+      <strong>бонус от 100 €</strong>.</p>
+      <p class="muted">Бонусът се изплаща за всеки препоръчан човек, който
+      започне работа и остане при нас поне един месец.</p>
+    </section>
+
+    <section>
+      <h2>🎓 Платено обучение</h2>
+      <p>Получаваш <strong>напълно платено обучение</strong>:</p>
+      <ul>
+        <li><strong>1-ви ден:</strong> Теоретично обучение</li>
+        <li><strong>2-ри и 3-ти ден:</strong> Практическо обучение с опитен шофьор</li>
+      </ul>
+      <p>Така ще бъдеш обучен стъпка по стъпка и ще се запознаеш с работата
+      директно на практика.</p>
+    </section>
+
+    <section>
+      <h2>🕐 Работни смени</h2>
+      <ul>
+        <li>Около <strong>80% от туровете</strong> са от
+            <strong>10:30 до 19:30</strong> с 45 мин почивка</li>
+        <li>Около <strong>20% от туровете</strong> са разделена смяна:
+            <strong>6:30 – 13:00</strong> и <strong>18:00 – 22:00</strong> вечерта</li>
+        <li>Понякога има и смени <strong>само сутрин</strong> или
+            <strong>само вечер</strong></li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>⏱️ Работно време</h2>
+      <p><strong>Сам регистрираш началото и края на работното си време.</strong></p>
+      <p>Работното време се отчита <strong>до минута</strong>, така че реално
+      отработеното време се документира точно.</p>
+    </section>
+
+    <section>
+      <h2>🏖️ Отпуск и договор</h2>
+      <ul>
+        <li><strong>20 дни платен отпуск годишно</strong></li>
+        <li>Договорът първоначално е <strong>срочен за 1 година</strong></li>
+        <li><strong>6 месеца изпитателен срок</strong></li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>🏠 Настаняване</h2>
+      <p>Ако имаш нужда от квартира, тя може да бъде организирана чрез
+      <strong>външен партньор</strong>.</p>
+      <p class="muted">Настаняването е организационно независимо от работата.</p>
+      <h3>Условия:</h3>
+      <ul>
+        <li><strong>470 € на месец</strong></li>
+        <li><strong>Токът е включен</strong></li>
+        <li><strong>Максимум 2 души в една стая</strong></li>
+        <li><strong>200 € еднократен депозит</strong></li>
+        <li>Депозитът се възстановява при правилно предаване на квартирата</li>
+        <li><strong>Само 1 месец предизвестие</strong> за прекратяване на настаняването</li>
+      </ul>
+      <div class="hl">
+        За да бъде началото финансово по-лесно, през <strong>първите два
+        месеца</strong> с удоволствие можем да предоставим
+        <strong>аванс от заплатата</strong>, така че да не се налага да поемаш
+        финансово разходите предварително.
+      </div>
+      <p class="muted">Наемът се заплаща самостоятелно чрез онлайн банков
+      превод към външния наемодател.</p>
+    </section>
+
+    <section>
+      <h2>🚗 Придвижване до работата</h2>
+      <p>В идеалния случай разполагаш със <strong>собствен автомобил</strong>.</p>
+      <p>Ако в началото нямаш собствен автомобил, има различни възможности:</p>
+      <ul>
+        <li>Възможно е колеги да те вземат със себе си. Как ще разделите
+            разходите помежду си, решавате сами.</li>
+        <li>Като <strong>помощ в началото</strong> при нужда можем да
+            предоставим бус само за придвижването до и от работата.</li>
+        <li>Цената е <strong>100 € на човек месечно</strong>.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>📦 Твоите предимства накратко</h2>
+      <ul class="benefits">
+        <li>✅ <strong>16,20 € бруто на час</strong></li>
+        <li>✅ около <strong>2 802,60 € бруто</strong> при 173 часа</li>
+        <li>✅ около <strong>1 950 € нето основна заплата</strong> при данъчен клас 1</li>
+        <li>✅ около <strong>295 € допълнителни дневни пари</strong> при поне средно представяне</li>
+        <li>✅ около <strong>2 250 € нето</strong> при поне средно представяне и без произшествие</li>
+        <li>✅ <strong>50 € седмичен бонус</strong> при отлично представяне и съответната категория на фирмата</li>
+        <li>✅ <strong>100 € бонус за препоръчан човек</strong>, който работи при нас поне 1 месец</li>
+        <li>✅ <strong>Платено обучение и практическо въвеждане в работата</strong></li>
+        <li>✅ <strong>Отчитане на работното време до минута</strong></li>
+        <li>✅ <strong>20 дни отпуск годишно</strong></li>
+        <li>✅ Възможност за квартира за <strong>470 € месечно с включен ток</strong></li>
+        <li>✅ <strong>Максимум 2 души в една стая</strong></li>
+        <li>✅ <strong>Само 1 месец предизвестие</strong> за квартирата</li>
+        <li>✅ <strong>200 € депозит</strong>, който се възстановява при правилно предаване на квартирата</li>
+        <li>✅ <strong>Аванс от заплатата през първите два месеца</strong></li>
+        <li>✅ Подкрепа при организирането на транспорта до работата</li>
+      </ul>
+    </section>
+
+    <section style="text-align:center; border-color:#ABEFC6; background:var(--green-bg);">
+      <h2 style="margin-bottom:6px;">Имаш въпроси?</h2>
+      <p class="muted" style="margin-bottom:4px;">Пиши ни директно в WhatsApp —
+      отговаряме бързо.</p>
+      <a class="btn-whatsapp" href="https://wa.me/message/ENNQM7HQAM2GA1"
+         target="_blank" rel="noopener">
+        <svg viewBox="0 0 32 32" fill="currentColor" aria-hidden="true">
+          <path d="M16 3C9.4 3 4 8.4 4 15c0 2.3.7 4.5 1.9 6.4L4 29l7.8-1.8c1.8 1 3.9 1.5 6.2 1.5 6.6 0 12-5.4 12-12S22.6 3 16 3zm0 21.8c-2 0-3.9-.6-5.5-1.5l-.4-.2-4.6 1.1 1.1-4.4-.3-.4C5.1 17.7 4.5 16 4.5 15 4.5 9.2 9.7 4.5 16 4.5S27.5 9.2 27.5 15 22.3 24.8 16 24.8zm6.3-7.3c-.3-.2-2-1-2.3-1.1-.3-.1-.5-.2-.8.2-.2.3-.9 1.1-1.1 1.3-.2.2-.4.3-.7.1-.3-.2-1.4-.5-2.6-1.6-1-.9-1.6-1.9-1.8-2.3-.2-.3 0-.5.1-.7l.5-.6c.2-.2.2-.3.3-.6.1-.2.1-.4 0-.6-.1-.2-.8-1.9-1-2.6-.3-.6-.6-.5-.8-.5h-.7c-.2 0-.6.1-.9.4-.3.3-1.2 1.2-1.2 2.9s1.2 3.3 1.4 3.6c.2.2 2.4 3.7 5.9 5.2.8.4 1.5.6 2 .7.8.3 1.6.2 2.2.1.7-.1 2-.8 2.3-1.6.3-.8.3-1.5.2-1.6-.1-.2-.3-.3-.6-.4z"/>
+        </svg>
+        WhatsApp — пиши ни сега
+      </a>
+    </section>
+
+    <footer>
+      <p>Arion Logistics · Партньор на Amazon · Pommersfelden, Бавария</p>
+    </footer>
+  </div>
+
+  <!-- Fixe Bewerben-Leiste — immer sichtbar -->
+  <div class="applybar">
+    <div class="inner">
+      <a class="btn-apply" href="/jobs/arion?lang=bg">
+        📝 Кандидатствай сега — само няколко минути
+      </a>
+    </div>
+  </div>
+
+</body>
+</html>
