@@ -14,6 +14,7 @@
 // ein Punkt im Rechte-Modul des Kurses (Art. 13 Abs. 2 lit. b DSGVO).
 // Der Weg zur Ausübung ist die hier genannte Kontaktadresse.
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -50,6 +51,11 @@ class _DriverPrivacyCenterPageState extends State<DriverPrivacyCenterPage> {
   bool _loading = true;
   bool _loadStarted = false;
 
+  /// Datenschutz-Kontakt des DSP: `privacyContactEmail` aus dem
+  /// Admin-Profil, sonst die Admin-Login-E-Mail. Ersetzt den
+  /// Template-Platzhalter im Kontakt-Abschnitt.
+  String _contactEmailOverride = '';
+
   String get _lang =>
       Localizations.localeOf(context).languageCode.toLowerCase();
 
@@ -65,9 +71,24 @@ class _DriverPrivacyCenterPageState extends State<DriverPrivacyCenterPage> {
   Future<void> _load() async {
     try {
       final state = await _repo.load(_lang);
+      var contact = '';
+      try {
+        // Vom Admin-Profil gespiegelter Datenschutz-Kontakt (Standard:
+        // Admin-Login-E-Mail). settings/* ist für Fahrer lesbar.
+        final snap = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(widget.dspUid)
+            .collection('settings')
+            .doc('privacy_contact')
+            .get();
+        contact = (snap.data()?['email'] ?? '').toString().trim();
+      } catch (_) {
+        // Kontakt bleibt leer — dann greift der Template-Platzhalter.
+      }
       if (!mounted) return;
       setState(() {
         _state = state;
+        _contactEmailOverride = contact.contains('@') ? contact : '';
         _loading = false;
       });
     } catch (_) {
@@ -98,10 +119,17 @@ class _DriverPrivacyCenterPageState extends State<DriverPrivacyCenterPage> {
     );
   }
 
+  /// Anzeige-/Mail-Adresse: Admin-Konfiguration schlägt den Platzhalter
+  /// aus der Vorlage.
+  String _contactEmailFor(PrivacyCenterCopy copy) =>
+      _contactEmailOverride.isNotEmpty
+          ? _contactEmailOverride
+          : copy.contactEmail.trim();
+
   Future<void> _openMail(PrivacyCenterCopy copy) async {
     final uri = Uri(
       scheme: 'mailto',
-      path: copy.contactEmail.trim(),
+      path: _contactEmailFor(copy),
       query: 'subject=${Uri.encodeComponent(copy.contactMailSubject)}',
     );
     final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -366,7 +394,9 @@ class _DriverPrivacyCenterPageState extends State<DriverPrivacyCenterPage> {
   );
 
   Widget _contactCard(PrivacyCenterCopy copy) {
-    final placeholder = copy.contactIsPlaceholder;
+    final email = _contactEmailFor(copy);
+    final placeholder =
+        _contactEmailOverride.isEmpty && copy.contactIsPlaceholder;
     return _card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -381,7 +411,7 @@ class _DriverPrivacyCenterPageState extends State<DriverPrivacyCenterPage> {
           ),
           const SizedBox(height: 10),
           Text(
-            copy.contactEmail,
+            email,
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w800,

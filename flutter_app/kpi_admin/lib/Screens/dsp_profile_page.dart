@@ -60,6 +60,10 @@ class _DspProfilePageState extends State<DspProfilePage> {
   final _companyAddressCtrl = TextEditingController();
   final _companyPhoneCtrl = TextEditingController();
 
+  /// Datenschutz-Kontakt (Fahrer-App → Datenschutz-Center). Leer =
+  /// Standard: die Login-E-Mail des Admin-Kontos.
+  final _privacyEmailCtrl = TextEditingController();
+
   bool _companySeeded = false;
   bool _savingCompany = false;
 
@@ -68,6 +72,7 @@ class _DspProfilePageState extends State<DspProfilePage> {
     _companyNameCtrl.dispose();
     _companyAddressCtrl.dispose();
     _companyPhoneCtrl.dispose();
+    _privacyEmailCtrl.dispose();
     super.dispose();
   }
 
@@ -80,6 +85,7 @@ class _DspProfilePageState extends State<DspProfilePage> {
         (profile['companyName'] ?? profile['dspName'] ?? '').toString();
     _companyAddressCtrl.text = (profile['companyAddress'] ?? '').toString();
     _companyPhoneCtrl.text = (profile['companyPhone'] ?? '').toString();
+    _privacyEmailCtrl.text = (profile['privacyContactEmail'] ?? '').toString();
   }
 
   Future<void> _saveCompany() async {
@@ -88,12 +94,35 @@ class _DspProfilePageState extends State<DspProfilePage> {
     final de = Localizations.localeOf(context).languageCode == 'de';
     setState(() => _savingCompany = true);
     try {
+      // Effektiver Datenschutz-Kontakt: Eingabe, sonst Admin-Login-E-Mail.
+      final privacyEmail = _privacyEmailCtrl.text.trim().isNotEmpty
+          ? _privacyEmailCtrl.text.trim()
+          : (_user?.email ?? '').trim();
       await FirebaseFirestore.instance.collection('users').doc(uid).set({
         'companyName': _companyNameCtrl.text.trim(),
         'companyAddress': _companyAddressCtrl.text.trim(),
         'companyPhone': _companyPhoneCtrl.text.trim(),
+        // Leer = Standard (Admin-Login-E-Mail) — dann Feld entfernen,
+        // damit das Profil-Formular den Default als Hint zeigt.
+        'privacyContactEmail': _privacyEmailCtrl.text.trim().isEmpty
+            ? FieldValue.delete()
+            : _privacyEmailCtrl.text.trim(),
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
+      // Fahrer dürfen das Admin-Hauptdokument NICHT lesen — der Kontakt
+      // wird deshalb zusätzlich in das fahrer-lesbare Settings-Doc
+      // gespiegelt (users/{uid}/settings/privacy_contact).
+      if (privacyEmail.contains('@')) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('settings')
+            .doc('privacy_contact')
+            .set({
+          'email': privacyEmail,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -548,6 +577,32 @@ class _DspProfilePageState extends State<DspProfilePage> {
                             label: de ? 'Telefon' : 'Phone',
                             hint: '+49 …',
                             icon: Icons.phone_outlined,
+                          ),
+                          const SizedBox(height: 12),
+                          _companyField(
+                            controller: _privacyEmailCtrl,
+                            label: de
+                                ? 'Datenschutz-Kontakt (E-Mail)'
+                                : 'Privacy contact (email)',
+                            hint: _user?.email ??
+                                (de ? 'Standard: Admin-E-Mail' : 'Default: admin email'),
+                            icon: Icons.privacy_tip_outlined,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            de
+                                ? 'Wird Fahrern im Datenschutz-Bereich als '
+                                      'Kontakt für Auskunft/Berichtigung/'
+                                      'Löschung angezeigt. Leer = Admin-E-Mail.'
+                                : 'Shown to drivers in the data protection '
+                                      'section as the contact for access/'
+                                      'rectification/erasure. Empty = admin '
+                                      'email.',
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              color: _kSub,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                           const SizedBox(height: 16),
                           Align(
