@@ -6756,33 +6756,44 @@ class _AbsenceDriversOverviewPageState
                 ],
               ),
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: _AbsenceSearchField(
-                      controller: _searchCtrl,
-                      focusNode: _searchFocus,
-                      onChanged: (value) {
-                        if (_search == value) return;
-                        setState(() => _search = value);
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  _DaSortMenu(
-                    value: _sort,
-                    de: de,
-                    onChanged: (v) => setState(() => _sort = v),
-                  ),
-                  const SizedBox(width: 10),
-                  _ArchiveToggle(
-                    showArchived: _showArchived,
-                    activeCount: activeCount,
-                    archivedCount: archivedCount,
-                    de: de,
-                    onChanged: (v) => setState(() => _showArchived = v),
-                  ),
-                ],
+              // Mobil (<560px) schrumpfen Sortierung und Archiv auf reine
+              // Icon-Buttons, damit die Suche die Breite bekommt, die sie
+              // braucht (Ticket „Suchleiste muss größer sein").
+              LayoutBuilder(
+                builder: (context, c) {
+                  final compact = c.maxWidth < 560;
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: _AbsenceSearchField(
+                          controller: _searchCtrl,
+                          focusNode: _searchFocus,
+                          onChanged: (value) {
+                            if (_search == value) return;
+                            setState(() => _search = value);
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      _DaSortMenu(
+                        value: _sort,
+                        de: de,
+                        compact: compact,
+                        onChanged: (v) => setState(() => _sort = v),
+                      ),
+                      const SizedBox(width: 10),
+                      _ArchiveToggle(
+                        showArchived: _showArchived,
+                        activeCount: activeCount,
+                        archivedCount: archivedCount,
+                        de: de,
+                        compact: compact,
+                        onChanged: (v) =>
+                            setState(() => _showArchived = v),
+                      ),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 16),
               Expanded(
@@ -7492,9 +7503,15 @@ class _DriverRow extends StatelessWidget {
     final overtime = profile.overtimeBalanceMinutes;
     final hasOvertime = profile.hasOvertime;
 
-    final metrics = <Widget>[
+    // [compact] = schmale Kachel (mobil): kurze einzeilige Labels und
+    // gleiche Boxhöhen, damit die Zeile aufgeräumt wirkt statt dass
+    // „Sick leave days" / „Overtime Balance" zweizeilig umbrechen.
+    List<Widget> metricsFor({required bool compact}) => <Widget>[
       _BalanceMetric(
-        label: de ? 'Krankheitstage' : 'Sick leave days',
+        compact: compact,
+        label: compact
+            ? (de ? 'Krankheit' : 'Sick days')
+            : (de ? 'Krankheitstage' : 'Sick leave days'),
         value: '${profile.approvedSickDays}',
         unit: de ? 'Tage' : 'days',
         color: const Color(0xFFB45309),
@@ -7505,8 +7522,9 @@ class _DriverRow extends StatelessWidget {
                 'sick leave',
       ),
       _BalanceMetric(
+        compact: compact,
         // DE wie EN „PTO Balance" — der Kunde nutzt den Begriff so.
-        label: 'PTO Balance',
+        label: compact ? 'PTO' : 'PTO Balance',
         value: _daFormatDays(profile.ptoBalanceDays),
         unit: de ? 'Tage' : 'days',
         // Negativer Saldo (mehr genommen als erworben) in Rot.
@@ -7527,7 +7545,8 @@ class _DriverRow extends StatelessWidget {
         ].join('\n'),
       ),
       _BalanceMetric(
-        label: 'Overtime Balance',
+        compact: compact,
+        label: compact ? 'Overtime' : 'Overtime Balance',
         value: hasOvertime ? '${_daFormatDuration(overtime)} h' : '—',
         unit: null,
         color: !hasOvertime
@@ -7679,6 +7698,7 @@ class _DriverRow extends StatelessWidget {
             builder: (context, constraints) {
               final wide = constraints.maxWidth >= _kWideRow;
               if (wide) {
+                final metrics = metricsFor(compact: false);
                 return Row(
                   children: [
                     Expanded(flex: 5, child: identity),
@@ -7695,6 +7715,7 @@ class _DriverRow extends StatelessWidget {
                   ],
                 );
               }
+              final metrics = metricsFor(compact: true);
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -7709,14 +7730,18 @@ class _DriverRow extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      for (var i = 0; i < metrics.length; i++) ...[
-                        if (i > 0) const SizedBox(width: 8),
-                        Expanded(child: metrics[i]),
+                  // Gleiche Höhe für alle drei Boxen — sonst franst die
+                  // Zeile durch unterschiedlich hohe Kacheln aus.
+                  IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (var i = 0; i < metrics.length; i++) ...[
+                          if (i > 0) const SizedBox(width: 8),
+                          Expanded(child: metrics[i]),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ],
               );
@@ -7736,6 +7761,7 @@ class _BalanceMetric extends StatelessWidget {
     required this.unit,
     required this.color,
     required this.tooltip,
+    this.compact = false,
   });
 
   final String label;
@@ -7743,6 +7769,9 @@ class _BalanceMetric extends StatelessWidget {
   final String? unit;
   final Color color;
   final String tooltip;
+
+  /// Schmale Kachel (mobil): einzeiliges Label, keine Umbrüche.
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -7757,10 +7786,12 @@ class _BalanceMetric extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment:
+              compact ? MainAxisAlignment.center : MainAxisAlignment.start,
           children: [
             Text(
               label,
-              maxLines: 2,
+              maxLines: compact ? 1 : 2,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: Color(0xFF64748B),
@@ -8568,11 +8599,16 @@ class _DaSortMenu extends StatelessWidget {
     required this.value,
     required this.de,
     required this.onChanged,
+    this.compact = false,
   });
 
   final _DaSort value;
   final bool de;
   final ValueChanged<_DaSort> onChanged;
+
+  /// Mobil: nur das Icon (Ticket „Filter und Archiv in mobil nur Button
+  /// mit Icon") — die Suche daneben braucht die Breite.
+  final bool compact;
 
   String _label(_DaSort sort) {
     switch (sort) {
@@ -8644,8 +8680,13 @@ class _DaSortMenu extends StatelessWidget {
           )
           .toList(growable: false),
       child: Container(
-        constraints: const BoxConstraints(minHeight: 44),
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        constraints: compact
+            ? const BoxConstraints.tightFor(width: 48, height: 48)
+            : const BoxConstraints(minHeight: 44),
+        padding: compact
+            ? EdgeInsets.zero
+            : const EdgeInsets.symmetric(horizontal: 12),
+        alignment: compact ? Alignment.center : null,
         decoration: BoxDecoration(
           color: active ? const Color(0xFF111827) : Colors.white,
           borderRadius: BorderRadius.circular(12),
@@ -8653,31 +8694,37 @@ class _DaSortMenu extends StatelessWidget {
             color: active ? const Color(0xFF111827) : const Color(0xFFE5E7EB),
           ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              _icon(value),
-              size: 17,
-              color: active ? Colors.white : const Color(0xFF6B7280),
-            ),
-            const SizedBox(width: 7),
-            Text(
-              _shortLabel(value),
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w800,
+        child: compact
+            ? Icon(
+                _icon(value),
+                size: 20,
                 color: active ? Colors.white : const Color(0xFF6B7280),
+              )
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _icon(value),
+                    size: 17,
+                    color: active ? Colors.white : const Color(0xFF6B7280),
+                  ),
+                  const SizedBox(width: 7),
+                  Text(
+                    _shortLabel(value),
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w800,
+                      color: active ? Colors.white : const Color(0xFF6B7280),
+                    ),
+                  ),
+                  const SizedBox(width: 3),
+                  Icon(
+                    Icons.expand_more_rounded,
+                    size: 17,
+                    color: active ? Colors.white : const Color(0xFF9CA3AF),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(width: 3),
-            Icon(
-              Icons.expand_more_rounded,
-              size: 17,
-              color: active ? Colors.white : const Color(0xFF9CA3AF),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -8690,6 +8737,7 @@ class _ArchiveToggle extends StatelessWidget {
     required this.archivedCount,
     required this.de,
     required this.onChanged,
+    this.compact = false,
   });
 
   final bool showArchived;
@@ -8698,8 +8746,54 @@ class _ArchiveToggle extends StatelessWidget {
   final bool de;
   final ValueChanged<bool> onChanged;
 
+  /// Mobil: statt der Aktiv/Archiv-Segmentleiste nur ein Icon-Button,
+  /// der zwischen beiden Ansichten umschaltet (aktiv = dunkel).
+  final bool compact;
+
   @override
   Widget build(BuildContext context) {
+    if (compact) {
+      return Tooltip(
+        message: showArchived
+            ? (de
+                ? 'Archiv ($archivedCount) — tippen für Aktive ($activeCount)'
+                : 'Archive ($archivedCount) — tap for active ($activeCount)')
+            : (de
+                ? 'Aktive ($activeCount) — tippen für Archiv ($archivedCount)'
+                : 'Active ($activeCount) — tap for archive ($archivedCount)'),
+        child: Material(
+          color: showArchived ? const Color(0xFF111827) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () => onChanged(!showArchived),
+            child: Container(
+              width: 48,
+              height: 48,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: showArchived
+                      ? const Color(0xFF111827)
+                      : const Color(0xFFE5E7EB),
+                ),
+              ),
+              child: Icon(
+                showArchived
+                    ? Icons.archive_rounded
+                    : Icons.archive_outlined,
+                size: 20,
+                color: showArchived
+                    ? Colors.white
+                    : const Color(0xFF6B7280),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     Widget segment({
       required String label,
       required int count,
