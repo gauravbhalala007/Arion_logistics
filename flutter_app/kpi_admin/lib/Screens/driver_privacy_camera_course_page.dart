@@ -938,10 +938,31 @@ class _PrivacyDocumentReaderPageState extends State<PrivacyDocumentReaderPage> {
 
   void _onScroll() {
     if (_reachedEnd || !_scroll.hasClients) return;
-    final max = _scroll.position.maxScrollExtent;
-    // Kurze Dokumente ohne Scrollbereich gelten sofort als gelesen.
-    if (max <= 0 || _scroll.offset >= max - 24) {
-      setState(() => _reachedEnd = true);
+    // Über ALLE angehängten Positionen prüfen: während Route-Transitions
+    // kann der Controller kurzzeitig mehrere Clients haben — der
+    // Einzel-Getter `position` liefert dann im Release-Build die falsche.
+    for (final pos in _scroll.positions) {
+      final max = pos.maxScrollExtent;
+      // Kurze Dokumente ohne Scrollbereich gelten sofort als gelesen.
+      if (max <= 0 || pos.pixels >= max - 24) {
+        setState(() => _reachedEnd = true);
+        return;
+      }
+    }
+  }
+
+  /// Eine Bildschirmseite weiter — Fallback-Pfeil, falls die
+  /// Scroll-Geste auf einem Gerät nicht greift. Bewusst jumpTo je
+  /// Position (statt animateTo über den Controller): Pointer-Events
+  /// stoppen laufende Animationen, und bei mehreren angehängten
+  /// Positionen rechnet jede mit ihren eigenen Maßen.
+  void _pageDown() {
+    if (!_scroll.hasClients) return;
+    for (final pos in _scroll.positions) {
+      final step = pos.viewportDimension > 200
+          ? pos.viewportDimension * 0.85
+          : 400.0;
+      pos.jumpTo((pos.pixels + step).clamp(0.0, pos.maxScrollExtent));
     }
   }
 
@@ -993,18 +1014,44 @@ class _PrivacyDocumentReaderPageState extends State<PrivacyDocumentReaderPage> {
             ),
           ),
         ),
-        body: ListView(
-          controller: _scroll,
-          padding: const EdgeInsets.fromLTRB(18, 16, 18, 28),
-          children: [
-            Text(
-              '${privacyCameraText(lang, 'doc_version', vars: {'version': ref.version})} · '
-              '${privacyCameraText(lang, 'doc_checksum', vars: {'hash': hash})}',
-              style: const TextStyle(fontSize: 11.5, color: kPcMuted),
-            ),
-            const SizedBox(height: 12),
-            ...buildPrivacyMarkdown(widget.document.markdown),
-          ],
+        // SelectionContainer.disabled: Die App ist global in eine
+        // SelectionArea gewickelt — im langen Pflichttext wurde die
+        // Scroll-Geste dadurch zur TEXTAUSWAHL, Fahrer erreichten das
+        // Ende nie und der Abschluss-Button blieb gesperrt (Ticket
+        // „Bei dem Test kommen die Mitarbeiter nicht weiter").
+        body: SelectionContainer.disabled(
+          child: Stack(
+            children: [
+              ListView(
+                controller: _scroll,
+                padding: const EdgeInsets.fromLTRB(18, 16, 18, 28),
+                children: [
+                  Text(
+                    '${privacyCameraText(lang, 'doc_version', vars: {'version': ref.version})} · '
+                    '${privacyCameraText(lang, 'doc_checksum', vars: {'hash': hash})}',
+                    style: const TextStyle(fontSize: 11.5, color: kPcMuted),
+                  ),
+                  const SizedBox(height: 12),
+                  ...buildPrivacyMarkdown(widget.document.markdown),
+                ],
+              ),
+              // Fallback, falls Scrollen auf einem Gerät trotzdem klemmt:
+              // Pfeil springt schrittweise Richtung Ende — derselbe Weg,
+              // den auch echtes Scrollen nimmt (Listener setzt reachedEnd).
+              if (!_reachedEnd)
+                Positioned(
+                  right: 16,
+                  bottom: 16,
+                  child: FloatingActionButton.small(
+                    heroTag: 'privacy_doc_scroll_down',
+                    backgroundColor: kPcText,
+                    foregroundColor: Colors.white,
+                    onPressed: _pageDown,
+                    child: const Icon(Icons.keyboard_arrow_down_rounded),
+                  ),
+                ),
+            ],
+          ),
         ),
         bottomNavigationBar: _BottomBar(
           child: Column(
