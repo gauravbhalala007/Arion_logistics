@@ -257,8 +257,7 @@ pw.Widget _clause(WcAssets a, int? n, String text) => pw.Padding(
         ),
         pw.Expanded(
           child: pw.Text(text,
-              textAlign: pw.TextAlign.justify,
-              style: pw.TextStyle(
+                  style: pw.TextStyle(
                   font: a.body, fontSize: 8.8, color: _ink, lineSpacing: 1.1)),
         ),
       ]),
@@ -424,34 +423,6 @@ Future<Uint8List> wcBuildContractPdf(WorkContractData d, WcAssets a) async {
     ),
   ));
 
-  // 2) Adressblatt (wie im bisherigen Vollpaket).
-  doc.addPage(pw.Page(
-    pageFormat: PdfPageFormat.a4,
-    margin: const pw.EdgeInsets.fromLTRB(40, 36, 40, 30),
-    build: (ctx) => pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Image(a.logoDelivery, width: 210),
-        pw.SizedBox(height: 30),
-        pw.Text(
-          '${WcEmployer.name}, ${WcEmployer.street}, ${WcEmployer.zipCity}',
-          style: pw.TextStyle(font: a.bodyBold, fontSize: 7.5, color: _orange),
-        ),
-        pw.SizedBox(height: 8),
-        pw.Text(d.employeeName,
-            style: pw.TextStyle(font: a.body, fontSize: 12, color: _ink)),
-        pw.SizedBox(height: 3),
-        pw.Text(d.employeeStreet,
-            style: pw.TextStyle(font: a.body, fontSize: 12, color: _ink)),
-        pw.SizedBox(height: 3),
-        pw.Text(d.employeeZipCity,
-            style: pw.TextStyle(font: a.body, fontSize: 12, color: _ink)),
-        pw.Spacer(),
-        _coverFooter(a),
-      ],
-    ),
-  ));
-
   // "Zweitschrift / FÜR MITARBEITER"-Kennzeichnung (oben rechts, wie im
   // bisherigen Vollpaket).
   pw.Widget copyMark() => pw.Align(
@@ -477,9 +448,15 @@ Future<Uint8List> wcBuildContractPdf(WorkContractData d, WcAssets a) async {
     final firstPage = <int?>[null];
     doc.addPage(pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.fromLTRB(46, 30, 46, 34),
-      header: (ctx) =>
-          copy ? copyMark() : pw.SizedBox(height: ctx.pageNumber == 0 ? 0 : 6),
+      margin: pw.EdgeInsets.fromLTRB(46, copy ? 20 : 30, 46, 34),
+      // Zweitschrift-Kennzeichnung sitzt bewusst weit oben mit klarem
+      // Abstand zum Haupttext.
+      header: (ctx) => copy
+          ? pw.Padding(
+              padding: const pw.EdgeInsets.only(bottom: 16),
+              child: copyMark(),
+            )
+          : pw.SizedBox(height: ctx.pageNumber == 0 ? 0 : 6),
       footer: (ctx) {
         firstPage[0] ??= ctx.pageNumber;
         return pw.Align(
@@ -554,7 +531,7 @@ Future<Uint8List> wcBuildContractPdf(WorkContractData d, WcAssets a) async {
           ],
         ),
         pw.SizedBox(height: 10),
-        for (var i = 0; i < sections.length; i++) ...[
+        for (var i = 0; i < sections.length - 1; i++) ...[
           _sectionTitle(a, i + 1, sections[i].title),
           if (sections[i].clauses.length == 1)
             _clause(a, null, sections[i].clauses.first)
@@ -562,8 +539,24 @@ Future<Uint8List> wcBuildContractPdf(WorkContractData d, WcAssets a) async {
             for (var c = 0; c < sections[i].clauses.length; c++)
               _clause(a, c + 1, sections[i].clauses[c]),
         ],
-        pw.SizedBox(height: 26),
-        _signatureBlock(a, d),
+        // Letzter Paragraph + Unterschriften als EIN Block, damit die
+        // Unterschriften nie allein auf einer Seite stehen (pw.Column ist
+        // ein SpanningWidget — erst der Container macht den Block atomar).
+        pw.Container(
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              _sectionTitle(a, sections.length, sections.last.title),
+              if (sections.last.clauses.length == 1)
+                _clause(a, null, sections.last.clauses.first)
+              else
+                for (var c = 0; c < sections.last.clauses.length; c++)
+                  _clause(a, c + 1, sections.last.clauses[c]),
+              pw.SizedBox(height: 22),
+              _signatureBlock(a, d),
+            ],
+          ),
+        ),
       ],
     ));
   }
@@ -572,12 +565,12 @@ Future<Uint8List> wcBuildContractPdf(WorkContractData d, WcAssets a) async {
   void addAnnex({required bool copy}) {
     doc.addPage(pw.Page(
       pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.fromLTRB(48, 30, 48, 44),
+      margin: pw.EdgeInsets.fromLTRB(48, copy ? 20 : 30, 48, 44),
       build: (ctx) => pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
           if (copy) copyMark(),
-          pw.SizedBox(height: copy ? 6 : 14),
+          pw.SizedBox(height: copy ? 18 : 14),
           pw.Text('Anlage: DSGVO',
               style:
                   pw.TextStyle(font: a.bodyBold, fontSize: 12, color: _ink)),
@@ -603,8 +596,7 @@ Future<Uint8List> wcBuildContractPdf(WorkContractData d, WcAssets a) async {
             pw.Padding(
               padding: const pw.EdgeInsets.only(bottom: 8),
               child: pw.Text(p,
-                  textAlign: pw.TextAlign.justify,
-                  style: pw.TextStyle(
+                          style: pw.TextStyle(
                       font: a.body,
                       fontSize: 9.5,
                       color: _ink,
@@ -632,24 +624,88 @@ Future<Uint8List> wcBuildContractPdf(WorkContractData d, WcAssets a) async {
   final anhang = (await rootBundle.load('assets/contracts/anhang_amazon.pdf'))
       .buffer
       .asUint8List();
-  return _appendStaticPdf(generated, anhang);
+  return _appendStaticPdf(generated, anhang, d);
 }
 
-/// Fügt generierte PDF + statischen Vorlagen-Anhang zu EINER PDF zusammen.
+/// Fügt generierte PDF + statischen Vorlagen-Anhang zu EINER PDF zusammen
+/// und personalisiert die Unterschrifts-Seiten des Anhangs (AMZL Privacy,
+/// Background Check, Unterweisungsnachweis): alte eingebrannte Werte der
+/// Vorlage werden geweißt und Name/Ort/Datum des Mitarbeiters eingedruckt.
 ///
 /// Wichtig: In ein NEUES Dokument mergen — bei einem geladenen Dokument
 /// ignoriert Syncfusion `pageSettings.margins` für `pages.add()` und
 /// clippt die Seiteninhalte auf die Default-Ränder (40 pt).
-Uint8List _appendStaticPdf(Uint8List base, Uint8List attachment) {
+Future<Uint8List> _appendStaticPdf(
+    Uint8List base, Uint8List attachment, WorkContractData d) async {
   final target = sf.PdfDocument();
   target.pageSettings.margins.all = 0;
+
+  final fontData = (await rootBundle.load('assets/contracts/OpenSans-Regular.ttf'))
+      .buffer
+      .asUint8List();
+  final font = sf.PdfTrueTypeFont(fontData, 9);
+  final white = sf.PdfSolidBrush(sf.PdfColor(255, 255, 255));
+  final black = sf.PdfSolidBrush(sf.PdfColor(31, 35, 39));
+
+  // Vorlagen-Seiten 1–12 wurden von US-Letter auf A4 skaliert — der
+  // Inhalt sitzt dadurch UNTEN im A4 (PDF-Ursprung links unten), in
+  // Top-Koordinaten also um (A4-Höhe − skalierte Letter-Höhe) versetzt.
+  const s = 595.276 / 612.0;
+  const yOff = 841.89 - 792.0 * s;
+  final placeDate = '${d.signCity}, ${wcDate(d.signDate)}';
+
+  void stamp(sf.PdfGraphics g, double scale, double dy,
+      List<({double x, double y, double w, String? text})> items) {
+    for (final it in items) {
+      if (it.w > 0) {
+        g.drawRectangle(
+          brush: white,
+          bounds: Rect.fromLTWH(it.x * scale, it.y * scale + dy,
+              it.w * scale, 15 * scale),
+        );
+      }
+      if (it.text != null) {
+        // Höhe großzügig — Syncfusion clippt Zeilen, die nicht komplett in
+        // die Bounds passen.
+        g.drawString(it.text!, font,
+            brush: black,
+            bounds: Rect.fromLTWH(
+                (it.x + 2) * scale, (it.y + 1) * scale + dy, 320, 18));
+      }
+    }
+  }
+
+  var attachmentIndex = -1;
   for (final part in [base, attachment]) {
+    final isAttachment = !identical(part, base);
     final src = sf.PdfDocument(inputBytes: part);
     for (var i = 0; i < src.pages.count; i++) {
       final srcPage = src.pages[i];
       target.pageSettings.size = srcPage.size;
       final template = srcPage.createTemplate();
-      target.pages.add().graphics.drawPdfTemplate(template, Offset.zero);
+      final page = target.pages.add();
+      page.graphics.drawPdfTemplate(template, Offset.zero);
+      if (!isAttachment) continue;
+      attachmentIndex = i;
+      switch (attachmentIndex) {
+        case 6: // AMZL Privacy Notice — Bestätigungsblock.
+          stamp(page.graphics, s, yOff, [
+            (x: 142, y: 325, w: 180, text: d.employeeName),
+            (x: 142, y: 355, w: 180, text: placeDate),
+          ]);
+        case 9: // Background-Check-Consent — Datum + Name.
+          stamp(page.graphics, s, yOff, [
+            (x: 115, y: 300, w: 190, text: placeDate),
+            (x: 320, y: 300, w: 0, text: 'Name: ${d.employeeName}'),
+          ]);
+        case 12: // Unterweisungsnachweis ArbSchG.
+          stamp(page.graphics, 1, 0, [
+            (x: 219, y: 164, w: 148, text: placeDate),
+            (x: 443, y: 164, w: 0, text: d.employeeName),
+            (x: 60, y: 517, w: 122, text: placeDate),
+            (x: 331, y: 517, w: 122, text: placeDate),
+          ]);
+      }
     }
     src.dispose();
   }
@@ -750,14 +806,24 @@ Future<Uint8List> wcBuildZeitkontoPdf(WorkContractData d, WcAssets a) async {
         'Arbeitsvertrages vereinbaren die Parteien, zur Flexibilisierung '
         'der Arbeitszeit, die Einrichtung eines Arbeitszeitkontos ab dem '
         '${wcDate(d.startDate)}:',
-        textAlign: pw.TextAlign.justify,
         style: pw.TextStyle(
             font: a.body, fontSize: 9.5, color: _ink, lineSpacing: 1.6),
       ),
       pw.SizedBox(height: 8),
-      for (var i = 0; i < clauses.length; i++) _clause(a, i + 1, clauses[i]),
-      pw.SizedBox(height: 26),
-      _signatureBlock(a, d),
+      for (var i = 0; i < clauses.length - 1; i++)
+        _clause(a, i + 1, clauses[i]),
+      // Letzte Klausel + Unterschriften zusammenhalten (kein verwaister
+      // Unterschriftenblock auf einer eigenen Seite).
+      pw.Container(
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            _clause(a, clauses.length, clauses.last),
+            pw.SizedBox(height: 22),
+            _signatureBlock(a, d),
+          ],
+        ),
+      ),
     ],
   ));
   return doc.save();
@@ -803,7 +869,6 @@ Future<Uint8List> wcBuildCameraPrivacyPdf(
         'Lieferfahrzeugen installierten kamerabasierten '
         'Verkehrssicherheitssystem und Fahrsicherheitstools '
         '(„Verkehrssicherheitstechnologien“) verarbeiten.',
-        textAlign: pw.TextAlign.justify,
         style: pw.TextStyle(
             font: a.body, fontSize: 9.5, color: _ink, lineSpacing: 1.6),
       ),
@@ -819,28 +884,38 @@ Future<Uint8List> wcBuildCameraPrivacyPdf(
           pw.Padding(
             padding: const pw.EdgeInsets.only(bottom: 5),
             child: pw.Text(c,
-                textAlign: pw.TextAlign.justify,
-                style: pw.TextStyle(
+                      style: pw.TextStyle(
                     font: a.body,
                     fontSize: 9.5,
                     color: _ink,
                     lineSpacing: 1.6)),
           ),
       ],
-      pw.SizedBox(height: 26),
-      pw.Text('Erhalten am:',
-          style: pw.TextStyle(font: a.bodyBold, fontSize: 10, color: _ink)),
-      pw.SizedBox(height: 22),
-      pw.Row(children: [
-        pw.Expanded(child: _fieldLine(a, '', 'Datum')),
-        pw.SizedBox(width: 24),
-        pw.Expanded(
-            child:
-                _fieldLine(a, d.employeeName, 'Name in Druckbuchstaben')),
-      ]),
-      pw.SizedBox(height: 26),
-      pw.SizedBox(
-          width: 220, child: _fieldLine(a, '', 'Unterschrift Arbeitnehmer')),
+      // Bestätigungsblock als EIN Element — steht nie allein/zerissen.
+      pw.Container(
+          child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.SizedBox(height: 24),
+          pw.Text('Erhalten am:',
+              style:
+                  pw.TextStyle(font: a.bodyBold, fontSize: 10, color: _ink)),
+          pw.SizedBox(height: 20),
+          pw.Row(children: [
+            pw.Expanded(
+                child: _fieldLine(
+                    a, '${d.signCity}, ${wcDate(d.signDate)}', 'Datum')),
+            pw.SizedBox(width: 24),
+            pw.Expanded(
+                child: _fieldLine(
+                    a, d.employeeName, 'Name in Druckbuchstaben')),
+          ]),
+          pw.SizedBox(height: 26),
+          pw.SizedBox(
+              width: 220,
+              child: _fieldLine(a, '', 'Unterschrift Arbeitnehmer')),
+        ],
+      )),
     ],
   ));
   return doc.save();
@@ -993,7 +1068,10 @@ Future<Uint8List> wcFillEzbOriginalPdf(
     // (Top-Koordinaten). Unterschrift in den 59er-Bereich rechts daneben.
     page.graphics.drawImage(
       sf.PdfBitmap(signaturePng),
-      const Rect.fromLTWH(340, 688, 74, 38),
+      // Direkt IM Unterschriften-Kasten von Feld 59 (Kasten ~735–753 pt,
+      // Top-Koordinaten) — die Signatur ragt wie handschriftlich leicht
+      // darüber hinaus.
+      const Rect.fromLTWH(338, 718, 72, 36),
     );
   }
 
@@ -1031,7 +1109,6 @@ Future<Uint8List> wcBuildLicenseLetterPdf(
           'unserem Unternehmen als Fahrer für Fahrzeuge bis zu einem '
           'Gesamtgewicht von 3,5 Tonnen tätig sein wird. Für diese Aufgabe '
           'ist die Fahrerlaubnis der Kategorie B vollkommen ausreichend.',
-          textAlign: pw.TextAlign.justify,
           style: pw.TextStyle(
               font: a.body, fontSize: 10.5, color: _ink, lineSpacing: 1.8),
         ),
@@ -1043,7 +1120,6 @@ Future<Uint8List> wcBuildLicenseLetterPdf(
           'sind. Unser Fuhrpark besteht aus Fahrzeugen der Typen Mercedes '
           'Vito und Mercedes Sprinter, die jeweils ein maximales Gewicht '
           'von 3,5 Tonnen aufweisen.',
-          textAlign: pw.TextAlign.justify,
           style: pw.TextStyle(
               font: a.body, fontSize: 10.5, color: _ink, lineSpacing: 1.8),
         ),

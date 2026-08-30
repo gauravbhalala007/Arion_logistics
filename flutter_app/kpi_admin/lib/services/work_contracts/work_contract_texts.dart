@@ -383,10 +383,38 @@ List<WcSection> wcBuildSections(WorkContractData d) {
   ));
 
   // ── § Untersuchungen ────────────────────────────────────────────────
-  s.add(WcSection(
-    'Verdachtsunabhängige ärztliche Untersuchungen, Teilnahme an Alkohol- '
-        'oder Drogenscreenings, Entbindung von der Schweigepflicht',
-    [
+  // Beim Arbeitsvisum gilt die entschärfte Fassung aus der Visa-Vorlage
+  // (nur anlassbezogene ärztliche Untersuchungen, keine
+  // verdachtsunabhängigen Alkohol-/Drogenscreenings, Ergebnis nur
+  // geeignet/nicht geeignet, Übermittlung nur mit Einwilligung).
+  if (d.isVisa) {
+    s.add(WcSection(
+      'Ärztliche Untersuchungen',
+      [
+        'Der Arbeitgeber ist berechtigt, eine ärztliche Untersuchung zur '
+            'Feststellung der gesundheitlichen Eignung des Arbeitnehmers '
+            'für die vertraglich geschuldete Tätigkeit zu verlangen, soweit '
+            'gesetzliche Vorschriften dies vorsehen oder konkrete '
+            'tatsächliche Anhaltspunkte Zweifel an der Arbeitsfähigkeit '
+            'oder Eignung begründen.',
+        'Die Untersuchung beschränkt sich ausschließlich auf die '
+            'Feststellung, ob der Arbeitnehmer für die vertraglich '
+            'geschuldete Tätigkeit geeignet oder nicht geeignet ist. '
+            'Diagnosen oder weitergehende Gesundheitsdaten werden dem '
+            'Arbeitgeber nicht mitgeteilt.',
+        'Eine Übermittlung des Untersuchungsergebnisses an den Arbeitgeber '
+            'erfolgt nur mit gesonderter, freiwilliger und jederzeit '
+            'widerruflicher Einwilligung des Arbeitnehmers gemäß Art. 9 '
+            'DSGVO.',
+        'Die Kosten einer vom Arbeitgeber veranlassten Untersuchung trägt '
+            'der Arbeitgeber.',
+      ],
+    ));
+  } else {
+    s.add(WcSection(
+      'Verdachtsunabhängige ärztliche Untersuchungen, Teilnahme an Alkohol- '
+          'oder Drogenscreenings, Entbindung von der Schweigepflicht',
+      [
       'Der Arbeitnehmer verpflichtet sich, sich auf Verlangen des '
           'Arbeitgebers regelmäßig hinsichtlich der gesundheitlichen '
           'Eignung für die übernommene/n Arbeitsaufgabe/n ärztlich oder '
@@ -417,8 +445,9 @@ List<WcSection> wcBuildSections(WorkContractData d) {
           'damit der Arzt dem Arbeitgeber (nur) das Ergebnis der '
           'Untersuchung (Eignung oder Nichteignung für die geschuldete '
           'Tätigkeit) mitteilt.',
-    ],
-  ));
+      ],
+    ));
+  }
 
   // ── § Dienstfahrzeug ────────────────────────────────────────────────
   s.add(WcSection(

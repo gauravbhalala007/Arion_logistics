@@ -54,13 +54,15 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage> {
   final _nationalityCtrl = TextEditingController();
   DateTime? _birthDate;
   DateTime? _residenceSince;
-  String _gender = '';
+  // Standard-Geschlecht: männlich (Vorgabe Arion).
+  String _gender = 'm';
 
   // Vertrag
   WcType _type = WcType.fulltime5;
   WcPay _pay = WcPay.monthly;
   bool _fixedTerm = true;
-  DateTime _startDate = DateTime.now().add(const Duration(days: 14));
+  // Vertragsbeginn ist standardmäßig HEUTE (Vorgabe Arion).
+  DateTime _startDate = DateTime.now();
   DateTime? _endDate;
   final _wageCtrl = TextEditingController(text: '16,20');
   final _salaryCtrl = TextEditingController();
@@ -178,6 +180,9 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage> {
         _pay = WcPay.hourly;
       } else if (t == WcType.visa) {
         _pay = WcPay.monthly;
+        // Beim Arbeitsvisum ist das einzige Extra-Dokument die EzB.
+        _withZeitkonto = false;
+        _withCameraPrivacy = false;
       }
       _recalcSalary();
     });
@@ -244,14 +249,11 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage> {
         ));
       }
       if (d.isVisa) {
-        // Original-BA-Formular (ba047549) automatisch ausgefüllt.
+        // Beim Arbeitsvisum ist das einzige Extra-Dokument die EzB —
+        // das Original-BA-Formular (ba047549), automatisch ausgefüllt.
         out.add((
           name: 'Erklaerung_Beschaeftigungsverhaeltnis_$slug.pdf',
           bytes: await wcFillEzbOriginalPdf(d, _signaturePng),
-        ));
-        out.add((
-          name: 'Fuehrerschein_Bestaetigung_$slug.pdf',
-          bytes: await wcBuildLicenseLetterPdf(d, assets),
         ));
       }
       setState(() => _results = out);
@@ -446,60 +448,80 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage> {
               ),
           ]),
           const SizedBox(height: 10),
-          TextField(
-            controller: _searchCtrl,
-            decoration: InputDecoration(
-              hintText: de ? 'Name suchen …' : 'Search name …',
-              prefixIcon: const Icon(Icons.search_rounded, size: 20),
-              isDense: true,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: _kBorder),
-              ),
+          Container(
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFBFCFD),
+              border: Border.all(color: _kBorder),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.search_rounded, size: 18, color: _kMuted),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _searchCtrl,
+                    style: _kFieldValueStyle,
+                    decoration: InputDecoration(
+                      isCollapsed: true,
+                      border: InputBorder.none,
+                      hintText: de ? 'Name suchen …' : 'Search name …',
+                      hintStyle: const TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFFB6BCC6)),
+                    ),
+                  ),
+                ),
+                if (_search.isNotEmpty)
+                  InkWell(
+                    onTap: _searchCtrl.clear,
+                    customBorder: const CircleBorder(),
+                    child: const Padding(
+                      padding: EdgeInsets.all(4),
+                      child: Icon(Icons.close_rounded,
+                          size: 16, color: _kMuted),
+                    ),
+                  ),
+              ],
             ),
           ),
           if (_search.length >= 2 && uid != null)
             _fromDrivers ? _driverResults(uid) : _applicantResults(uid),
-          const SizedBox(height: 14),
-          // Manuell nachbearbeitbare Stammdaten.
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              _textField(_nameCtrl, de ? 'Vorname, Nachname' : 'Full name',
-                  width: 260),
-              _textField(
-                  _streetCtrl, de ? 'Straße, Hausnr.' : 'Street, no.',
-                  width: 260),
-              _textField(_zipCityCtrl, de ? 'PLZ, Ort' : 'ZIP, city',
-                  width: 200),
+          const Divider(height: 28, color: _kBorder),
+          // Manuell nachbearbeitbare Stammdaten — einheitliches Raster.
+          _groupLabel(de ? 'Stammdaten' : 'Personal data'),
+          _fieldGrid([
+            _textField(_nameCtrl, de ? 'Vorname, Nachname' : 'Full name'),
+            _textField(_streetCtrl, de ? 'Straße, Hausnr.' : 'Street, no.'),
+            _textField(_zipCityCtrl, de ? 'PLZ, Ort' : 'ZIP, city'),
+            _dateField(
+              de ? 'Geburtsdatum' : 'Birth date',
+              _birthDate,
+              (v) => setState(() => _birthDate = v),
+            ),
+            if (_type == WcType.visa) ...[
+              _textField(_nationalityCtrl,
+                  de ? 'Staatsangehörigkeit' : 'Nationality'),
               _dateField(
-                de ? 'Geburtsdatum' : 'Birth date',
-                _birthDate,
-                (v) => setState(() => _birthDate = v),
+                de ? 'Wohnsitz seit' : 'Residence since',
+                _residenceSince,
+                (v) => setState(() => _residenceSince = v),
               ),
-              if (_type == WcType.visa) ...[
-                _textField(_nationalityCtrl,
-                    de ? 'Staatsangehörigkeit' : 'Nationality',
-                    width: 180),
-                _dateField(
-                  de ? 'Wohnsitz seit' : 'Residence since',
-                  _residenceSince,
-                  (v) => setState(() => _residenceSince = v),
-                ),
-                _dropdown<String>(
-                  label: de ? 'Geschlecht' : 'Gender',
-                  value: _gender.isEmpty ? null : _gender,
-                  items: {
-                    'm': de ? 'männlich' : 'male',
-                    'w': de ? 'weiblich' : 'female',
-                    'd': 'divers',
-                  },
-                  onChanged: (v) => setState(() => _gender = v ?? ''),
-                ),
-              ],
+              _dropdown<String>(
+                label: de ? 'Geschlecht' : 'Gender',
+                value: _gender.isEmpty ? null : _gender,
+                items: {
+                  'm': de ? 'männlich' : 'male',
+                  'w': de ? 'weiblich' : 'female',
+                  'd': 'divers',
+                },
+                onChanged: (v) => setState(() => _gender = v ?? ''),
+              ),
             ],
-          ),
+          ]),
         ],
       ),
     );
@@ -670,13 +692,15 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage> {
           Text(de ? '2 · Vertrag' : '2 · Contract',
               style: const TextStyle(
                   fontSize: 14, fontWeight: FontWeight.w800, color: _kText)),
-          const SizedBox(height: 10),
+          const SizedBox(height: 14),
+          _groupLabel(de ? 'Vertragstyp' : 'Contract type'),
           Wrap(spacing: 8, runSpacing: 8, children: [
             for (final t in WcType.values)
               _choicePill(de ? t.labelDe() : t.labelEn(), _type == t,
                   () => _applyTypeDefaults(t)),
           ]),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
+          _groupLabel(de ? 'Vergütung & Laufzeit' : 'Pay & term'),
           Wrap(spacing: 8, runSpacing: 8, children: [
             _choicePill(
                 de ? 'Festvertrag (Monatsgehalt)' : 'Fixed (monthly salary)',
@@ -688,7 +712,7 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage> {
                 _pay == WcPay.hourly, () {
               setState(() => _pay = WcPay.hourly);
             }),
-            const SizedBox(width: 8),
+            const SizedBox(width: 16, height: 36),
             _choicePill(de ? 'Befristet (1 Jahr)' : 'Fixed term (1 year)',
                 _fixedTerm, () {
               setState(() => _fixedTerm = true);
@@ -697,8 +721,9 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage> {
               setState(() => _fixedTerm = false);
             }),
           ]),
-          const SizedBox(height: 14),
-          Wrap(spacing: 12, runSpacing: 12, children: [
+          const Divider(height: 32, color: _kBorder),
+          _groupLabel(de ? 'Eckdaten' : 'Key data'),
+          _fieldGrid([
             _dateField(
               de ? 'Vertragsbeginn' : 'Start date',
               _startDate,
@@ -713,13 +738,18 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage> {
                 _endDate,
                 (v) => setState(() => _endDate = v),
               ),
-            _numField(_wageCtrl, de ? 'Stundenlohn €' : 'Hourly wage €',
+            _dateField(
+              de ? 'Vertragsdatum (Unterschrift)' : 'Contract date',
+              _signDate,
+              (v) => setState(() => _signDate = v),
+            ),
+            _numField(_wageCtrl, de ? 'Stundenlohn (€)' : 'Hourly wage (€)',
                 onChanged: (_) => setState(_recalcSalary)),
-            _numField(_hoursCtrl, de ? 'Std / Woche' : 'Hours / week',
+            _numField(_hoursCtrl, de ? 'Stunden / Woche' : 'Hours / week',
                 onChanged: (_) => setState(_recalcSalary)),
             if (_pay == WcPay.monthly)
-              _numField(
-                  _salaryCtrl, de ? 'Gehalt € / Monat' : 'Salary € / month'),
+              _numField(_salaryCtrl,
+                  de ? 'Gehalt / Monat (€, auto)' : 'Salary / month (€)'),
             _numField(_vacationCtrl,
                 de ? 'Urlaubstage (auto)' : 'Vacation days (auto)'),
             _dropdown<int>(
@@ -731,25 +761,15 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage> {
               },
               onChanged: (v) => setState(() => _probation = v ?? 6),
             ),
-            _textField(_signCityCtrl, de ? 'Ort (Unterschrift)' : 'City',
-                width: 150),
-            _dateField(
-              de ? 'Vertragsdatum' : 'Contract date',
-              _signDate,
-              (v) => setState(() => _signDate = v),
-            ),
+            _textField(
+                _signCityCtrl, de ? 'Ort (Unterschrift)' : 'City (signature)'),
           ]),
           if (_type == WcType.visa) ...[
-            const SizedBox(height: 14),
-            Text(
-              de
-                  ? 'Erklärung zum Beschäftigungsverhältnis (EzB)'
-                  : 'Employment declaration (EzB)',
-              style: const TextStyle(
-                  fontSize: 12.5, fontWeight: FontWeight.w800, color: _kText),
-            ),
-            const SizedBox(height: 8),
-            Wrap(spacing: 12, runSpacing: 12, children: [
+            const Divider(height: 32, color: _kBorder),
+            _groupLabel(de
+                ? 'Erklärung zum Beschäftigungsverhältnis (EzB)'
+                : 'Employment declaration (EzB)'),
+            _fieldGrid([
               _dropdown<String>(
                 label: de ? 'Verfahren' : 'Procedure',
                 value: _ezbProcedure,
@@ -904,17 +924,44 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage> {
                             fontWeight: FontWeight.w700,
                             color: _kText)),
                   ),
-                  TextButton.icon(
-                    onPressed: () =>
-                        Printing.layoutPdf(onLayout: (_) async => r.bytes),
-                    icon: const Icon(Icons.print_rounded, size: 17),
-                    label: Text(de ? 'Drucken' : 'Print'),
+                  SizedBox(
+                    height: 34,
+                    width: 108,
+                    child: OutlinedButton.icon(
+                      onPressed: () =>
+                          Printing.layoutPdf(onLayout: (_) async => r.bytes),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _kGreen,
+                        side: const BorderSide(color: _kGreen),
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
+                      icon: const Icon(Icons.print_rounded, size: 15),
+                      label: Text(de ? 'Drucken' : 'Print',
+                          style: const TextStyle(
+                              fontSize: 12.5, fontWeight: FontWeight.w700)),
+                    ),
                   ),
-                  TextButton.icon(
-                    onPressed: () =>
-                        Printing.sharePdf(bytes: r.bytes, filename: r.name),
-                    icon: const Icon(Icons.download_rounded, size: 17),
-                    label: const Text('PDF'),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    height: 34,
+                    width: 108,
+                    child: OutlinedButton.icon(
+                      onPressed: () =>
+                          Printing.sharePdf(bytes: r.bytes, filename: r.name),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _kText,
+                        side: const BorderSide(color: _kBorder),
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
+                      icon: const Icon(Icons.download_rounded, size: 15),
+                      label: const Text('PDF',
+                          style: TextStyle(
+                              fontSize: 12.5, fontWeight: FontWeight.w700)),
+                    ),
                   ),
                 ]),
               ),
@@ -926,37 +973,126 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage> {
 
   // ── Kleine Form-Helfer ────────────────────────────────────────────────
 
+  /// Einheitliche Feldhöhe — alle Eingaben (Text, Zahl, Datum, Dropdown)
+  /// sitzen in derselben Box, damit nichts springt oder überlappt.
+  static const double _kFieldHeight = 58;
+
+  /// Gleich breite Feld-Spalten: 3 auf breiten, 2 auf mittleren, 1 auf
+  /// schmalen Screens — jede Zelle exakt gleich groß.
+  Widget _fieldGrid(List<Widget> fields) => LayoutBuilder(
+        builder: (context, c) {
+          const gap = 12.0;
+          final cols = c.maxWidth >= 700 ? 3 : (c.maxWidth >= 460 ? 2 : 1);
+          final w = (c.maxWidth - gap * (cols - 1)) / cols;
+          return Wrap(
+            spacing: gap,
+            runSpacing: gap,
+            children: [
+              for (final f in fields) SizedBox(width: w, child: f),
+            ],
+          );
+        },
+      );
+
+  /// Kleine Gruppen-Überschrift über Pill-Reihen und Feld-Rastern.
+  Widget _groupLabel(String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Text(
+          text.toUpperCase(),
+          style: const TextStyle(
+            fontSize: 10.5,
+            fontWeight: FontWeight.w800,
+            color: _kMuted,
+            letterSpacing: 0.6,
+          ),
+        ),
+      );
+
+  /// Gemeinsame Hülle aller Felder: Rahmen, festes Maß, Label oben.
+  Widget _fieldShell({
+    required String label,
+    required Widget child,
+    VoidCallback? onTap,
+  }) {
+    final box = Container(
+      height: _kFieldHeight,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFBFCFD),
+        border: Border.all(color: _kBorder),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 10.5, color: _kMuted)),
+          const SizedBox(height: 2),
+          child,
+        ],
+      ),
+    );
+    if (onTap == null) return box;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: box,
+    );
+  }
+
+  static const _kFieldValueStyle = TextStyle(
+    fontSize: 13.5,
+    fontWeight: FontWeight.w700,
+    color: _kText,
+  );
+
   Widget _choicePill(String label, bool active, VoidCallback onTap) =>
       InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(999),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          height: 36,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
             color: active ? _kGreen : Colors.white,
             borderRadius: BorderRadius.circular(999),
             border: Border.all(color: active ? _kGreen : _kBorder),
           ),
-          child: Text(label,
-              style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
-                  color: active ? Colors.white : _kText)),
+          // widthFactor: 1 → Pill bleibt so breit wie ihr Text (Container
+          // mit alignment würde sich sonst auf volle Breite dehnen).
+          child: Center(
+            widthFactor: 1,
+            child: Text(label,
+                style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: active ? Colors.white : _kText)),
+          ),
         ),
       );
 
   Widget _textField(TextEditingController ctrl, String label,
-          {double width = 160}) =>
-      SizedBox(
-        width: width,
-        child: TextField(
-          controller: ctrl,
-          decoration: InputDecoration(
-            labelText: label,
-            isDense: true,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: _kBorder),
+          {TextInputType? keyboardType, ValueChanged<String>? onChanged}) =>
+      _fieldShell(
+        label: label,
+        child: SizedBox(
+          height: 20,
+          child: TextField(
+            controller: ctrl,
+            onChanged: onChanged,
+            keyboardType: keyboardType,
+            style: _kFieldValueStyle,
+            decoration: const InputDecoration(
+              isCollapsed: true,
+              border: InputBorder.none,
+              hintText: '—',
+              hintStyle: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFFB6BCC6)),
             ),
           ),
         ),
@@ -964,51 +1100,30 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage> {
 
   Widget _numField(TextEditingController ctrl, String label,
           {ValueChanged<String>? onChanged}) =>
-      SizedBox(
-        width: 150,
-        child: TextField(
-          controller: ctrl,
-          onChanged: onChanged,
-          keyboardType:
-              const TextInputType.numberWithOptions(decimal: true),
-          decoration: InputDecoration(
-            labelText: label,
-            isDense: true,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: _kBorder),
-            ),
-          ),
-        ),
+      _textField(
+        ctrl,
+        label,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        onChanged: onChanged,
       );
 
   Widget _dateField(
           String label, DateTime? value, ValueChanged<DateTime> onPicked) =>
-      InkWell(
-        onTap: () => _pickDate(
-            initial: value ?? DateTime.now(), onPicked: onPicked),
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          width: 170,
-          padding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          decoration: BoxDecoration(
-            border: Border.all(color: _kBorder),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label,
-                  style: const TextStyle(fontSize: 10.5, color: _kMuted)),
-              const SizedBox(height: 2),
-              Text(value == null ? '—' : wcDate(value),
-                  style: const TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w700,
-                      color: _kText)),
-            ],
-          ),
+      _fieldShell(
+        label: label,
+        onTap: () =>
+            _pickDate(initial: value ?? DateTime.now(), onPicked: onPicked),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                value == null ? '—' : wcDate(value),
+                style: _kFieldValueStyle,
+              ),
+            ),
+            const Icon(Icons.calendar_today_outlined,
+                size: 14, color: _kMuted),
+          ],
         ),
       );
 
@@ -1018,34 +1133,31 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage> {
     required Map<T, String> items,
     required ValueChanged<T?> onChanged,
   }) =>
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        decoration: BoxDecoration(
-          border: Border.all(color: _kBorder),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label,
-                style: const TextStyle(fontSize: 10.5, color: _kMuted)),
-            DropdownButtonHideUnderline(
-              child: DropdownButton<T>(
-                value: value,
-                isDense: true,
-                borderRadius: BorderRadius.circular(12),
-                style: const TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w700,
-                    color: _kText),
-                items: [
-                  for (final e in items.entries)
-                    DropdownMenuItem(value: e.key, child: Text(e.value)),
-                ],
-                onChanged: onChanged,
-              ),
+      _fieldShell(
+        label: label,
+        child: SizedBox(
+          height: 20,
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<T>(
+              value: value,
+              isDense: true,
+              isExpanded: true,
+              borderRadius: BorderRadius.circular(12),
+              style: _kFieldValueStyle,
+              hint: const Text('—',
+                  style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFB6BCC6))),
+              icon: const Icon(Icons.expand_more_rounded,
+                  size: 16, color: _kMuted),
+              items: [
+                for (final e in items.entries)
+                  DropdownMenuItem(value: e.key, child: Text(e.value)),
+              ],
+              onChanged: onChanged,
             ),
-          ],
+          ),
         ),
       );
 
