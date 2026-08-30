@@ -25,7 +25,6 @@ void main() {
       gender: 'm',
       startDate: DateTime(2026, 10, 1),
       endDate: DateTime(2027, 10, 1),
-      trainingWeek: '39/2026',
       hourlyWage: 16.20,
       monthlySalary: wcMonthlySalary(16.20, 40),
       hoursPerWeek: 40,
@@ -42,6 +41,12 @@ void main() {
         .writeAsBytesSync(await wcBuildZeitkontoPdf(d, a));
     File('$out/test_kamera.pdf')
         .writeAsBytesSync(await wcBuildCameraPrivacyPdf(d, a));
-    File('$out/test_ezb.pdf').writeAsBytesSync(await wcBuildEzbPdf(d, a));
+    File('$out/test_ezb.pdf').writeAsBytesSync(await wcFillEzbOriginalPdf(
+        d, sig.existsSync() ? sig.readAsBytesSync() : null));
+    File('$out/test_fuehrerschein.pdf')
+        .writeAsBytesSync(await wcBuildLicenseLetterPdf(d, a));
+    // Zur Sichtprüfung:
+    // ignore: avoid_print
+    print('PDF-Ausgabe: $out');
   });
 }

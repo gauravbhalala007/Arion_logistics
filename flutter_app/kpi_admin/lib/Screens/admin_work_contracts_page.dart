@@ -62,7 +62,6 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage> {
   bool _fixedTerm = true;
   DateTime _startDate = DateTime.now().add(const Duration(days: 14));
   DateTime? _endDate;
-  final _trainingWeekCtrl = TextEditingController();
   final _wageCtrl = TextEditingController(text: '16,20');
   final _salaryCtrl = TextEditingController();
   final _hoursCtrl = TextEditingController(text: '40');
@@ -103,7 +102,6 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage> {
     _streetCtrl.dispose();
     _zipCityCtrl.dispose();
     _nationalityCtrl.dispose();
-    _trainingWeekCtrl.dispose();
     _wageCtrl.dispose();
     _salaryCtrl.dispose();
     _hoursCtrl.dispose();
@@ -145,6 +143,22 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage> {
     if (mounted) setState(() => _signatureLoaded = true);
   }
 
+  /// Setzt die Personenauswahl komplett zurück (nächster Vertrag).
+  void _clearPerson() {
+    setState(() {
+      _pickedLabel = '';
+      _nameCtrl.clear();
+      _streetCtrl.clear();
+      _zipCityCtrl.clear();
+      _nationalityCtrl.clear();
+      _birthDate = null;
+      _residenceSince = null;
+      _gender = '';
+      _searchCtrl.clear();
+      _results = [];
+    });
+  }
+
   double _parseNum(String s, double fallback) =>
       double.tryParse(s.replaceAll(',', '.').trim()) ?? fallback;
 
@@ -182,7 +196,6 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage> {
         gender: _gender,
         startDate: _startDate,
         endDate: _fixedTerm ? _endDate : null,
-        trainingWeek: _trainingWeekCtrl.text.trim(),
         hourlyWage: _wage,
         monthlySalary: _parseNum(_salaryCtrl.text, 0),
         hoursPerWeek: _hours,
@@ -231,9 +244,14 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage> {
         ));
       }
       if (d.isVisa) {
+        // Original-BA-Formular (ba047549) automatisch ausgefüllt.
         out.add((
           name: 'Erklaerung_Beschaeftigungsverhaeltnis_$slug.pdf',
-          bytes: await wcBuildEzbPdf(d, assets),
+          bytes: await wcFillEzbOriginalPdf(d, _signaturePng),
+        ));
+        out.add((
+          name: 'Fuehrerschein_Bestaetigung_$slug.pdf',
+          bytes: await wcBuildLicenseLetterPdf(d, assets),
         ));
       }
       setState(() => _results = out);
@@ -393,18 +411,37 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage> {
               Expanded(
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 6),
+                      horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: _kGreenBg,
                     borderRadius: BorderRadius.circular(999),
                   ),
-                  child: Text('✓ $_pickedLabel',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: _kGreen)),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text('✓ $_pickedLabel',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: _kGreen)),
+                      ),
+                      const SizedBox(width: 4),
+                      // Auswahl aufheben — alle Personen-Felder leeren, um
+                      // direkt den nächsten Vertrag zu machen.
+                      InkWell(
+                        onTap: _clearPerson,
+                        customBorder: const CircleBorder(),
+                        child: const Padding(
+                          padding: EdgeInsets.all(3),
+                          child: Icon(Icons.close_rounded,
+                              size: 15, color: _kGreen),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
           ]),
@@ -522,6 +559,24 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage> {
           .collection('recruiting_applications')
           .snapshots(),
       builder: (context, snap) {
+        if (snap.hasError) {
+          return Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              _de
+                  ? 'Bewerber konnten nicht geladen werden: ${snap.error}'
+                  : 'Could not load applicants: ${snap.error}',
+              style: const TextStyle(fontSize: 12, color: Color(0xFFB91C1C)),
+            ),
+          );
+        }
+        if (!snap.hasData) {
+          return Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(_de ? 'Lade Bewerber …' : 'Loading applicants …',
+                style: const TextStyle(fontSize: 12.5, color: _kMuted)),
+          );
+        }
         final docs = (snap.data?.docs ?? const []).where((d) {
           final m = d.data();
           final name =
@@ -645,7 +700,7 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage> {
           const SizedBox(height: 14),
           Wrap(spacing: 12, runSpacing: 12, children: [
             _dateField(
-              de ? 'Arbeitsaufnahme' : 'Work start',
+              de ? 'Vertragsbeginn' : 'Start date',
               _startDate,
               (v) => setState(() {
                 _startDate = v;
@@ -658,9 +713,6 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage> {
                 _endDate,
                 (v) => setState(() => _endDate = v),
               ),
-            _textField(_trainingWeekCtrl,
-                de ? 'Training KW (z. B. 12/2026)' : 'Training week',
-                width: 180),
             _numField(_wageCtrl, de ? 'Stundenlohn €' : 'Hourly wage €',
                 onChanged: (_) => setState(_recalcSalary)),
             _numField(_hoursCtrl, de ? 'Std / Woche' : 'Hours / week',

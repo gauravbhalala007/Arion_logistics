@@ -26,21 +26,9 @@ class WcSection {
   final String? token;
 }
 
-/// Präambel (vor § 1, unnummeriert).
-const String wcPreamble =
-    'Der Arbeitnehmer soll als Paketzusteller für den Arbeitgeber tätig '
-    'werden. Voraussetzung für die Ausübung der Tätigkeit des Arbeitnehmers '
-    'ist die Teilnahme an einem zweitägigen Training beim Kunden und das '
-    'erfolgreiche Bestehen einer am zweiten Tag stattfindenden Prüfung, was '
-    'in der Regel einige Tage vor der Arbeitsaufnahme erfolgt. Im Anschluss '
-    'an die Prüfung findet ein zweitägiges Ride Along statt, in dessen '
-    'Rahmen der Arbeitnehmer an einer oder mehreren Touren zu '
-    'Beobachtungszwecken teilnimmt. Zwischen Training und Ride Along und '
-    'der eigentlichen Arbeitsaufnahme wird keine Arbeitsleistung und keine '
-    'Vergütung geschuldet.\n\n'
-    'Vor diesem Hintergrund vereinbaren die Parteien folgendes:';
-
 /// Baut die nummerierten Paragraphen für die gewählte Variante.
+/// Struktur wie die bisherigen Arion-Verträge (ohne Präambel, ohne
+/// Training-Klauseln), Formulierungen mit der Ogletree-Vorlage abgeglichen.
 List<WcSection> wcBuildSections(WorkContractData d) {
   final s = <WcSection>[];
 
@@ -52,25 +40,12 @@ List<WcSection> wcBuildSections(WorkContractData d) {
         'von Fahrzeugen, Auslieferung/Zustellung von Paketen und '
         'Warensendungen, Wagenpflege, Be- und Entladen der Fahrzeuge, '
         'Betanken der Fahrzeuge).',
-    'Das Arbeitsverhältnis beginnt am ersten Tag des Trainings, welches '
-        'voraussichtlich in der KW ${d.trainingWeek.isEmpty ? '____' : d.trainingWeek} '
-        'stattfindet. Das genaue Datum und Uhrzeit des Trainings wird der '
-        'Arbeitgeber dem Arbeitnehmer angemessen im Voraus mitteilen. Für '
-        'die Teilnahme am Training und der Prüfung sowie für das Ride Along '
-        'erhält der Arbeitnehmer eine Vergütung in Höhe von EUR '
-        '${wcEur(d.hourlyWage)} brutto pro Stunde, zahlbar mit dem '
-        'regulären Gehaltslauf des Folgemonats.',
-    'Der Arbeitnehmer nimmt seine Tätigkeit am ${wcDate(d.startDate)}, '
-        'frühestens jedoch nach Bestehen der Prüfung und nach Teilnahme am '
-        'Ride Along auf („Arbeitsaufnahme“). Das Bestehen der Prüfung ist '
-        'Voraussetzung für die Arbeitsaufnahme und Ausübung der Tätigkeit '
-        'des Arbeitnehmers. Zwischen Training und Ride Along auf der einen '
-        'Seite und Arbeitsaufnahme auf der anderen Seite wird weder '
-        'Arbeitsleistung noch Vergütung oder Urlaub geschuldet.',
-    if (d.fixedTerm)
-      'Das Arbeitsverhältnis ist befristet bis zum ${wcDate(d.endDate)} '
-          'und endet mit Ablauf der Befristung, ohne dass es einer '
-          'Kündigung bedarf.',
+    d.fixedTerm
+        ? 'Das Arbeitsverhältnis beginnt am ${wcDate(d.startDate)} und ist '
+            'befristet bis zum ${wcDate(d.endDate)}. Es endet mit Ablauf '
+            'der Befristung, ohne dass es einer Kündigung bedarf.'
+        : 'Das Arbeitsverhältnis beginnt am ${wcDate(d.startDate)} und '
+            'wird auf unbestimmte Zeit geschlossen.',
     'Der Arbeitnehmer erbringt seine Tätigkeit an verschiedenen Orten, '
         'abhängig von der jeweiligen Tourenplanung.',
     'Der Arbeitgeber ist berechtigt, soweit dies zumutbar ist, den '
@@ -84,10 +59,10 @@ List<WcSection> wcBuildSections(WorkContractData d) {
   ];
   s.add(WcSection(
     d.fixedTerm
-        ? 'Position, Beginn des Arbeitsverhältnisses, Training, '
-            'Arbeitsaufnahme, Befristung, Arbeitsort, Versetzungsvorbehalt'
-        : 'Position, Beginn des Arbeitsverhältnisses, Training, '
-            'Arbeitsaufnahme, Arbeitsort, Versetzungsvorbehalt',
+        ? 'Position, Beginn des Arbeitsverhältnisses, Befristung, '
+            'Arbeitsort, Versetzungsvorbehalt'
+        : 'Position, Beginn des Arbeitsverhältnisses, Arbeitsort, '
+            'Versetzungsvorbehalt',
     pos,
     token: 'S_POSITION',
   ));
@@ -835,8 +810,8 @@ List<String> wcZeitkontoClauses(WorkContractData d) => [
           'Bestimmung, die dem mit der unwirksamen Bestimmung Gewollten '
           'wirtschaftlich am nächsten kommt. Entsprechendes gilt für den '
           'Fall einer vertraglichen Lücke.',
-      'Diese Vereinbarung tritt mit Wirkung zum ${wcDate(d.startDate)} in '
-          'Kraft.',
+      'Diese Vereinbarung tritt mit Wirkung zum ${wcDate(d.startDate)} '
+          'in Kraft.',
     ];
 
 /// Kamera-DSGVO (VAS Road Safety — Fahrer-Datenschutzerklärung), Abschnitte

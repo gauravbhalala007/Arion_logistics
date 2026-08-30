@@ -107,9 +107,10 @@ int wcVacationDays(WcType type, int daysPerWeek) {
   return (20 * d / 5).round();
 }
 
-/// Monatsgehalt aus Stundenlohn: Wochenstunden × 4,33 Wochen/Monat.
+/// Monatsgehalt aus Stundenlohn: Wochenstunden × 4,325 Wochen/Monat —
+/// so ergibt der Arion-Standard (16,20 € × 40 h) exakt 2.802,60 €.
 double wcMonthlySalary(double hourlyWage, double hoursPerWeek) {
-  final v = hourlyWage * hoursPerWeek * 4.33;
+  final v = hourlyWage * hoursPerWeek * 4.325;
   return (v * 100).roundToDouble() / 100;
 }
 
@@ -142,7 +143,6 @@ class WorkContractData {
     this.gender = '',
     required this.startDate,
     this.endDate,
-    this.trainingWeek = '',
     required this.hourlyWage,
     required this.monthlySalary,
     required this.hoursPerWeek,
@@ -168,11 +168,9 @@ class WorkContractData {
   /// 'm' | 'w' | 'd' | '' — nur für das EzB-Formular (Visum).
   final String gender;
 
+  /// Beginn des Arbeitsverhältnisses (Vertrags- und Befristungsbasis).
   final DateTime startDate;
   final DateTime? endDate;
-
-  /// Kalenderwoche des Trainings, z. B. "12/2026" — freier Text.
-  final String trainingWeek;
 
   final double hourlyWage;
   final double monthlySalary;

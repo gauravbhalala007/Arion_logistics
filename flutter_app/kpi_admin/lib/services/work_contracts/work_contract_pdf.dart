@@ -6,11 +6,13 @@
 // DSGVO-Anlage — plus Extra-Dokumente (Zeitkonto, Kamera-DSGVO, EzB).
 
 import 'dart:typed_data';
+import 'dart:ui' show Offset, Rect;
 
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:syncfusion_flutter_pdf/pdf.dart' as sf;
 
 import 'work_contract_model.dart';
 import 'work_contract_texts.dart';
@@ -226,38 +228,38 @@ pw.Widget _signatureBlock(WcAssets a, WorkContractData d,
 }
 
 pw.Widget _sectionTitle(WcAssets a, int n, String title) => pw.Padding(
-      padding: const pw.EdgeInsets.only(top: 10, bottom: 4),
+      padding: const pw.EdgeInsets.only(top: 7, bottom: 3),
       child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
         pw.SizedBox(
-          width: 34,
+          width: 30,
           child: pw.Text('$n.',
               style:
-                  pw.TextStyle(font: a.bodyBold, fontSize: 10.5, color: _ink)),
+                  pw.TextStyle(font: a.bodyBold, fontSize: 9.8, color: _ink)),
         ),
         pw.Expanded(
           child: pw.Text(title,
               style:
-                  pw.TextStyle(font: a.bodyBold, fontSize: 10.5, color: _ink)),
+                  pw.TextStyle(font: a.bodyBold, fontSize: 9.8, color: _ink)),
         ),
       ]),
     );
 
 pw.Widget _clause(WcAssets a, int? n, String text) => pw.Padding(
-      padding: const pw.EdgeInsets.only(bottom: 6),
+      padding: const pw.EdgeInsets.only(bottom: 4),
       child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
         pw.SizedBox(
-          width: 34,
+          width: 30,
           child: n == null
               ? pw.SizedBox()
               : pw.Text('($n)',
                   style:
-                      pw.TextStyle(font: a.body, fontSize: 9.5, color: _ink)),
+                      pw.TextStyle(font: a.body, fontSize: 8.8, color: _ink)),
         ),
         pw.Expanded(
           child: pw.Text(text,
               textAlign: pw.TextAlign.justify,
               style: pw.TextStyle(
-                  font: a.body, fontSize: 9.5, color: _ink, lineSpacing: 1.6)),
+                  font: a.body, fontSize: 8.8, color: _ink, lineSpacing: 1.1)),
         ),
       ]),
     );
@@ -422,7 +424,7 @@ Future<Uint8List> wcBuildContractPdf(WorkContractData d, WcAssets a) async {
     ),
   ));
 
-  // 2) Adressblatt.
+  // 2) Adressblatt (wie im bisherigen Vollpaket).
   doc.addPage(pw.Page(
     pageFormat: PdfPageFormat.a4,
     margin: const pw.EdgeInsets.fromLTRB(40, 36, 40, 30),
@@ -450,149 +452,210 @@ Future<Uint8List> wcBuildContractPdf(WorkContractData d, WcAssets a) async {
     ),
   ));
 
-  // 3) Vertragstext.
-  doc.addPage(pw.MultiPage(
-    pageFormat: PdfPageFormat.a4,
-    margin: const pw.EdgeInsets.fromLTRB(48, 44, 48, 44),
-    footer: (ctx) => pw.Align(
-      alignment: pw.Alignment.centerRight,
-      child: pw.Text('${ctx.pageNumber - 2}',
-          style: pw.TextStyle(font: a.body, fontSize: 9, color: _grey)),
-    ),
-    build: (ctx) => [
-      pw.Row(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Expanded(
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text('ARBEITSVERTRAG',
-                    style: pw.TextStyle(
-                        font: a.display, fontSize: 26, color: _ink)),
-                pw.SizedBox(height: 4),
-                pw.Text(
-                    'Arbeitsvertragliche Vereinbarung zwischen folgenden '
-                    'Parteien:',
-                    style: pw.TextStyle(
-                        font: a.body, fontSize: 9.5, color: _ink)),
-              ],
-            ),
-          ),
-          pw.Image(a.logoLogistics, width: 170),
-        ],
-      ),
-      pw.SizedBox(height: 34),
-      pw.Row(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Expanded(
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                _fieldLine(a, WcEmployer.name, 'Firmenname', width: 210),
-                pw.SizedBox(height: 10),
-                _fieldLine(a, WcEmployer.street, 'Straße, Hausnr.',
-                    width: 210),
-                pw.SizedBox(height: 10),
-                _fieldLine(a, WcEmployer.zipCity, 'PLZ, Ort', width: 210),
-                pw.SizedBox(height: 10),
-                pw.Text('- ARBEITGEBER -',
-                    style: pw.TextStyle(
-                        font: a.bodyBold, fontSize: 7.5, color: _grey)),
-              ],
-            ),
-          ),
-          pw.SizedBox(width: 30),
-          pw.Expanded(
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                _fieldLine(a, d.employeeName, 'Vorname, Nachname',
-                    width: 210),
-                pw.SizedBox(height: 10),
-                _fieldLine(a, d.employeeStreet, 'Straße, Hausnr.',
-                    width: 210),
-                pw.SizedBox(height: 10),
-                _fieldLine(a, d.employeeZipCity, 'PLZ, Ort', width: 210),
-                pw.SizedBox(height: 10),
-                pw.Text('- ARBEITNEHMER -',
-                    style: pw.TextStyle(
-                        font: a.bodyBold, fontSize: 7.5, color: _grey)),
-              ],
-            ),
-          ),
-        ],
-      ),
-      pw.SizedBox(height: 22),
-      pw.Text('Präambel',
-          style: pw.TextStyle(font: a.bodyBold, fontSize: 10.5, color: _ink)),
-      pw.SizedBox(height: 4),
-      pw.Text(wcPreamble,
-          textAlign: pw.TextAlign.justify,
-          style: pw.TextStyle(
-              font: a.body, fontSize: 9.5, color: _ink, lineSpacing: 1.6)),
-      pw.SizedBox(height: 6),
-      for (var i = 0; i < sections.length; i++) ...[
-        _sectionTitle(a, i + 1, sections[i].title),
-        if (sections[i].clauses.length == 1)
-          _clause(a, null, sections[i].clauses.first)
-        else
-          for (var c = 0; c < sections[i].clauses.length; c++)
-            _clause(a, c + 1, sections[i].clauses[c]),
-      ],
-      pw.SizedBox(height: 26),
-      _signatureBlock(a, d),
-    ],
-  ));
-
-  // 4) Anlage DSGVO.
-  doc.addPage(pw.Page(
-    pageFormat: PdfPageFormat.a4,
-    margin: const pw.EdgeInsets.fromLTRB(48, 44, 48, 44),
-    build: (ctx) => pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Text('Anlage: DSGVO',
-            style: pw.TextStyle(font: a.bodyBold, fontSize: 12, color: _ink)),
-        pw.SizedBox(height: 4),
-        pw.Text(wcDsgvoAnnexTitle,
-            style:
-                pw.TextStyle(font: a.bodyBold, fontSize: 10.5, color: _ink)),
-        pw.SizedBox(height: 14),
-        pw.Row(children: [
-          pw.Expanded(
-            child: _fieldLine(
-                a,
-                '${d.signCity}, ${wcDate(d.signDate)}',
-                'Anlage zum Arbeitsvertrag vom'),
-          ),
-          pw.SizedBox(width: 24),
-          pw.Expanded(
-            child: _fieldLine(a, d.employeeName, 'Arbeitnehmer'),
-          ),
-        ]),
-        pw.SizedBox(height: 18),
-        for (final p in wcDsgvoAnnexBody)
-          pw.Padding(
-            padding: const pw.EdgeInsets.only(bottom: 8),
-            child: pw.Text(p,
-                textAlign: pw.TextAlign.justify,
+  // "Zweitschrift / FÜR MITARBEITER"-Kennzeichnung (oben rechts, wie im
+  // bisherigen Vollpaket).
+  pw.Widget copyMark() => pw.Align(
+        alignment: pw.Alignment.topRight,
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.end,
+          children: [
+            pw.Text('Zweitschrift',
+                style:
+                    pw.TextStyle(font: a.bodyBold, fontSize: 12, color: _ink)),
+            pw.Text('FÜR MITARBEITER',
                 style: pw.TextStyle(
-                    font: a.body,
-                    fontSize: 9.5,
-                    color: _ink,
-                    lineSpacing: 1.6)),
-          ),
-        pw.SizedBox(height: 30),
-        _signatureBlock(a, d),
-        pw.Spacer(),
-        _coverFooter(a),
-      ],
-    ),
-  ));
+                    font: a.bodyBold,
+                    fontSize: 6.5,
+                    color: _grey,
+                    letterSpacing: 1)),
+          ],
+        ),
+      );
 
-  return doc.save();
+  // 3) Vertragstext — einmal als Original, einmal als Zweitschrift.
+  void addContract({required bool copy}) {
+    final firstPage = <int?>[null];
+    doc.addPage(pw.MultiPage(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.fromLTRB(46, 30, 46, 34),
+      header: (ctx) =>
+          copy ? copyMark() : pw.SizedBox(height: ctx.pageNumber == 0 ? 0 : 6),
+      footer: (ctx) {
+        firstPage[0] ??= ctx.pageNumber;
+        return pw.Align(
+          alignment: pw.Alignment.centerRight,
+          child: pw.Text('${ctx.pageNumber - firstPage[0]! + 1}',
+              style: pw.TextStyle(font: a.body, fontSize: 9, color: _grey)),
+        );
+      },
+      build: (ctx) => [
+        pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Expanded(
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text('ARBEITSVERTRAG',
+                      style: pw.TextStyle(
+                          font: a.display, fontSize: 26, color: _ink)),
+                  pw.SizedBox(height: 4),
+                  pw.Text(
+                      'Arbeitsvertragliche Vereinbarung zwischen folgenden '
+                      'Parteien:',
+                      style: pw.TextStyle(
+                          font: a.body, fontSize: 9.5, color: _ink)),
+                ],
+              ),
+            ),
+            pw.Image(a.logoLogistics, width: 170),
+          ],
+        ),
+        pw.SizedBox(height: 24),
+        pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Expanded(
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  _fieldLine(a, WcEmployer.name, 'Firmenname', width: 210),
+                  pw.SizedBox(height: 10),
+                  _fieldLine(a, WcEmployer.street, 'Straße, Hausnr.',
+                      width: 210),
+                  pw.SizedBox(height: 10),
+                  _fieldLine(a, WcEmployer.zipCity, 'PLZ, Ort', width: 210),
+                  pw.SizedBox(height: 10),
+                  pw.Text('- ARBEITGEBER -',
+                      style: pw.TextStyle(
+                          font: a.bodyBold, fontSize: 7.5, color: _grey)),
+                ],
+              ),
+            ),
+            pw.SizedBox(width: 30),
+            pw.Expanded(
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  _fieldLine(a, d.employeeName, 'Vorname, Nachname',
+                      width: 210),
+                  pw.SizedBox(height: 10),
+                  _fieldLine(a, d.employeeStreet, 'Straße, Hausnr.',
+                      width: 210),
+                  pw.SizedBox(height: 10),
+                  _fieldLine(a, d.employeeZipCity, 'PLZ, Ort', width: 210),
+                  pw.SizedBox(height: 10),
+                  pw.Text('- ARBEITNEHMER -',
+                      style: pw.TextStyle(
+                          font: a.bodyBold, fontSize: 7.5, color: _grey)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        pw.SizedBox(height: 10),
+        for (var i = 0; i < sections.length; i++) ...[
+          _sectionTitle(a, i + 1, sections[i].title),
+          if (sections[i].clauses.length == 1)
+            _clause(a, null, sections[i].clauses.first)
+          else
+            for (var c = 0; c < sections[i].clauses.length; c++)
+              _clause(a, c + 1, sections[i].clauses[c]),
+        ],
+        pw.SizedBox(height: 26),
+        _signatureBlock(a, d),
+      ],
+    ));
+  }
+
+  // 4) Anlage DSGVO — ebenfalls je einmal für Original und Zweitschrift.
+  void addAnnex({required bool copy}) {
+    doc.addPage(pw.Page(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.fromLTRB(48, 30, 48, 44),
+      build: (ctx) => pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          if (copy) copyMark(),
+          pw.SizedBox(height: copy ? 6 : 14),
+          pw.Text('Anlage: DSGVO',
+              style:
+                  pw.TextStyle(font: a.bodyBold, fontSize: 12, color: _ink)),
+          pw.SizedBox(height: 4),
+          pw.Text(wcDsgvoAnnexTitle,
+              style:
+                  pw.TextStyle(font: a.bodyBold, fontSize: 10.5, color: _ink)),
+          pw.SizedBox(height: 14),
+          pw.Row(children: [
+            pw.Expanded(
+              child: _fieldLine(
+                  a,
+                  '${d.signCity}, ${wcDate(d.signDate)}',
+                  'Anlage zum Arbeitsvertrag vom'),
+            ),
+            pw.SizedBox(width: 24),
+            pw.Expanded(
+              child: _fieldLine(a, d.employeeName, 'Arbeitnehmer'),
+            ),
+          ]),
+          pw.SizedBox(height: 18),
+          for (final p in wcDsgvoAnnexBody)
+            pw.Padding(
+              padding: const pw.EdgeInsets.only(bottom: 8),
+              child: pw.Text(p,
+                  textAlign: pw.TextAlign.justify,
+                  style: pw.TextStyle(
+                      font: a.body,
+                      fontSize: 9.5,
+                      color: _ink,
+                      lineSpacing: 1.6)),
+            ),
+          pw.SizedBox(height: 30),
+          _signatureBlock(a, d),
+          pw.Spacer(),
+          _coverFooter(a),
+        ],
+      ),
+    ));
+  }
+
+  addContract(copy: false);
+  addAnnex(copy: false);
+  addContract(copy: true);
+  addAnnex(copy: true);
+
+  // 5) Statische Anhänge (AMZL Privacy Notice, Background-Check-Consent,
+  // Postgesetz-Lieferanweisungen, Unterweisungsnachweis ArbSchG) aus dem
+  // bisherigen Vollpaket anhängen — alles in EINER PDF. Die
+  // Teilnahmebescheinigung Training bleibt bewusst draußen.
+  final generated = await doc.save();
+  final anhang = (await rootBundle.load('assets/contracts/anhang_amazon.pdf'))
+      .buffer
+      .asUint8List();
+  return _appendStaticPdf(generated, anhang);
+}
+
+/// Fügt generierte PDF + statischen Vorlagen-Anhang zu EINER PDF zusammen.
+///
+/// Wichtig: In ein NEUES Dokument mergen — bei einem geladenen Dokument
+/// ignoriert Syncfusion `pageSettings.margins` für `pages.add()` und
+/// clippt die Seiteninhalte auf die Default-Ränder (40 pt).
+Uint8List _appendStaticPdf(Uint8List base, Uint8List attachment) {
+  final target = sf.PdfDocument();
+  target.pageSettings.margins.all = 0;
+  for (final part in [base, attachment]) {
+    final src = sf.PdfDocument(inputBytes: part);
+    for (var i = 0; i < src.pages.count; i++) {
+      final srcPage = src.pages[i];
+      target.pageSettings.size = srcPage.size;
+      final template = srcPage.createTemplate();
+      target.pages.add().graphics.drawPdfTemplate(template, Offset.zero);
+    }
+    src.dispose();
+  }
+  final out = Uint8List.fromList(target.saveSync());
+  target.dispose();
+  return out;
 }
 
 // ── Zeitkontovereinbarung ───────────────────────────────────────────────
@@ -784,287 +847,166 @@ Future<Uint8List> wcBuildCameraPrivacyPdf(
 }
 
 // ── EzB: Erklärung zum Beschäftigungsverhältnis (Visum) ─────────────────
+//
+// Füllt das ORIGINAL-Formular der Bundesagentur für Arbeit (ba047549,
+// AcroForm, 5 Seiten) und bettet die GF-Unterschrift auf Seite 5 ein.
+// Anschließend werden die Felder geflattet, damit die Werte beim Drucken
+// in jedem Viewer sicher sichtbar sind.
 
-Future<Uint8List> wcBuildEzbPdf(WorkContractData d, WcAssets a) async {
+Future<Uint8List> wcFillEzbOriginalPdf(
+    WorkContractData d, Uint8List? signaturePng) async {
+  final blank = (await rootBundle.load('assets/contracts/ezb_form.pdf'))
+      .buffer
+      .asUint8List();
+  final doc = sf.PdfDocument(inputBytes: blank);
+  final form = doc.form;
+
+  final byName = <String, sf.PdfField>{};
+  for (var i = 0; i < form.fields.count; i++) {
+    final f = form.fields[i];
+    byName[f.name ?? ''] = f;
+  }
+
+  void setText(String name, String value) {
+    final f = byName[name];
+    if (f is sf.PdfTextBoxField) f.text = value;
+  }
+
+  void setRadio(String name, int index) {
+    final f = byName[name];
+    if (f is sf.PdfRadioButtonListField &&
+        index >= 0 &&
+        index < f.items.count) {
+      f.selectedIndex = index;
+    }
+  }
+
+  void setCheck(String name, {bool value = true}) {
+    final f = byName[name];
+    if (f is sf.PdfCheckBoxField) f.isChecked = value;
+  }
+
+  // A. Erklärung und Anlass
+  setRadio('rbtn_1_Erklaerung', switch (d.ezbProcedure) {
+    'aufenthaltstitel' => 0,
+    'arbeitserlaubnis' => 4,
+    _ => 3, // Vorabzustimmung
+  });
+  setRadio('rbtn_2_Anlass', switch (d.ezbOccasion) {
+    'verlaengerung' => 1,
+    'wechsel' => 2,
+    _ => 0, // Ersterteilung
+  });
+
+  // B. Arbeitnehmer/in
+  final parts = d.employeeName.trim().split(RegExp(r'\s+'));
+  final lastName = parts.isEmpty ? '' : parts.removeLast();
+  setText('txtf_3_Vorname', parts.join(' '));
+  setText('txtf_4_Nachname', lastName);
+  setText('txtf_5_Geburtsdatum', wcDate(d.birthDate));
+  if (d.gender == 'm') setRadio('rbtn_6_Geschlecht', 0);
+  if (d.gender == 'w') setRadio('rbtn_6_Geschlecht', 1);
+  if (d.gender == 'd') setRadio('rbtn_6_Geschlecht', 2);
+  setText('txtf_7_Staatsangehoerigkeit', d.nationality);
+  setText('txtf_8_Wohnsitz', '${d.employeeStreet}, ${d.employeeZipCity}');
+  setText('txtf_9_seit', wcDate(d.residenceSince));
+
+  // C. Arbeitgeber (Arion-Konstanten)
+  setText('txtf_10_Firma', WcEmployer.name);
+  setText('txtf_11_Strasse', 'Industriestr.');
+  setText('txtf_12_Hausnummer', '12a');
+  setText('txtf_13_Postleitzahl', '91325');
+  setText('txtf_14_Ort', 'Adelsdorf');
+  setText('txtf_15_Kontaktperson', WcEmployer.managingDirector);
+  setText('txtf_16_Telefon', WcEmployer.contactPhone);
+  setText('txtf_17_E-Mail', WcEmployer.email);
+  setText('txtf_19_Betriebsnummer', WcEmployer.betriebsnummer);
+  setRadio('rbtn_20_Unternehmen_gegruendet', 1); // Nein
+
+  // D. Beschäftigung
+  setText('txtf_21_Beschaeftigungsverhaeltniss', wcDate(d.startDate));
+  setRadio('rbtn_22_Beschaeftigungsverhaeltniss', d.fixedTerm ? 1 : 0);
+  if (d.fixedTerm) {
+    setText('txtf_22_Beschaeftigungsverhaeltniss', wcDate(d.endDate));
+  }
+  setRadio('rbtn_23_Dritte', 1); // Nein
+  setRadio('rbtn_24_Arbeitsort', 1); // wechselnde Arbeits-/Einsatzorte
+  setText(
+    'txtf_25_Berufsbezeichnung',
+    'Berufsbezeichnung: Kurierfahrer/Paketzusteller. Beschreibung: '
+        'Auslieferung und Zustellung von Waren und Gebrauchsgütern (Pakete) '
+        'nach einer vorgeplanten Route; Be- und Entladen der Fahrzeuge; '
+        'Fahrzeugpflege.',
+  );
+
+  // E. Qualifikation — Helfertätigkeit ohne Ausbildungsvoraussetzung.
+  setCheck('chbx_34_keine_Ausbildung');
+
+  // F. Berufsausübungserlaubnis
+  setRadio('rbtn_35_Berufsausuebungserlaubnis', 1); // Nein
+
+  // G. Arbeitszeit
+  setRadio(
+      'rbtn_37_Arbeitszeit',
+      d.isMinijob
+          ? 2
+          : (d.hoursPerWeek >= 35 ? 0 : 1));
+  setText('txtf_37_Arbeitsstunden_Woche', wcHours(d.hoursPerWeek));
+
+  // H. Überstunden
+  setRadio('rbtn_38_Ueberstunden', 0); // Ja
+  setText('txtf_39_Ueberstundenumpfang', 'im gesetzlich zulässigen Rahmen');
+  setText('txtf_40_Ueberstundenausgleich',
+      'Freizeit oder Vergütung (Arbeitszeitkonto)');
+
+  // I. Urlaub
+  setText('txtf_41_Urlaubsanpruch', '${d.vacationDays}');
+
+  // J. Arbeitsentgelt
+  setRadio('rbtn_42_Arbeitgeber_tarifgebunden', 1); // Nein
+  final entgelt = byName['chbx_46_Arbeitsentgelt'];
+  if (entgelt is sf.PdfCheckBoxField && entgelt.items != null) {
+    // Kind 0 = "pro Stunde", Kind 1 = "pro Monat".
+    final idx = d.pay == WcPay.hourly ? 0 : 1;
+    final item = entgelt.items![idx];
+    if (item is sf.PdfCheckBoxItem) item.checked = true;
+  }
+  if (d.pay == WcPay.hourly) {
+    setText('txtf_46_Entgelt_pro_Stunde', wcEur(d.hourlyWage));
+  } else {
+    setText('txtf_46_Entgelt_pro_Monat', wcEur(d.monthlySalary));
+  }
+
+  // K. Sozialversicherungspflicht
+  setRadio('rbtn_52_besteht_Versicherungspflicht', 0); // Ja
+
+  // L. Unterschrift
+  setText('txtf_57_Ort', d.signCity);
+  setText('txtf_58_Datum', wcDate(d.signDate));
+
+  // Werte fest einbrennen, dann Unterschrift rechts neben Ort/Datum
+  // (Feld 59) auf der letzten Seite platzieren.
+  form.flattenAllFields();
+  if (signaturePng != null) {
+    final page = doc.pages[doc.pages.count - 1];
+    // Seite ist A4 (595×842 pt); das Ort/Datum-Band liegt bei y≈735
+    // (Top-Koordinaten). Unterschrift in den 59er-Bereich rechts daneben.
+    page.graphics.drawImage(
+      sf.PdfBitmap(signaturePng),
+      const Rect.fromLTWH(340, 688, 74, 38),
+    );
+  }
+
+  final bytes = Uint8List.fromList(await doc.save());
+  doc.dispose();
+  return bytes;
+}
+
+// ── Führerschein-Bestätigung (Visum) ────────────────────────────────────
+
+Future<Uint8List> wcBuildLicenseLetterPdf(
+    WorkContractData d, WcAssets a) async {
   final doc = pw.Document();
-
-  pw.Widget label(String t) => pw.Padding(
-        padding: const pw.EdgeInsets.only(top: 7, bottom: 2),
-        child: pw.Text(t,
-            style: pw.TextStyle(font: a.bodyBold, fontSize: 8.5, color: _ink)),
-      );
-  pw.Widget value(String t) => pw.Text(t.isEmpty ? '—' : t,
-      style: pw.TextStyle(font: a.body, fontSize: 9.5, color: _ink));
-  pw.Widget head(String t) => pw.Padding(
-        padding: const pw.EdgeInsets.only(top: 12, bottom: 4),
-        child: pw.Container(
-          width: double.infinity,
-          color: PdfColor.fromInt(0xFFEDEFF2),
-          padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-          child: pw.Text(t,
-              style:
-                  pw.TextStyle(font: a.bodyBold, fontSize: 10, color: _ink)),
-        ),
-      );
-  pw.Widget check(bool on, String t) => pw.Padding(
-        padding: const pw.EdgeInsets.only(bottom: 3),
-        child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-          pw.Container(
-            width: 9,
-            height: 9,
-            margin: const pw.EdgeInsets.only(top: 1),
-            decoration: pw.BoxDecoration(
-                border: pw.Border.all(color: _ink, width: 0.9)),
-            alignment: pw.Alignment.center,
-            child: on
-                ? pw.Text('X',
-                    style: pw.TextStyle(
-                        font: a.bodyBold, fontSize: 7, color: _ink))
-                : null,
-          ),
-          pw.SizedBox(width: 5),
-          pw.Expanded(
-            child: pw.Text(t,
-                style: pw.TextStyle(font: a.body, fontSize: 9, color: _ink)),
-          ),
-        ]),
-      );
-
-  final salaryLine = d.pay == WcPay.monthly
-      ? 'pro Monat: ${wcEur(d.monthlySalary)} EUR (brutto)'
-      : 'pro Stunde: ${wcEur(d.hourlyWage)} EUR (brutto)';
-
-  doc.addPage(pw.MultiPage(
-    pageFormat: PdfPageFormat.a4,
-    margin: const pw.EdgeInsets.fromLTRB(44, 40, 44, 40),
-    footer: (ctx) => pw.Row(
-      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-      children: [
-        pw.Text('nach Vorlage EzB - 02/2024',
-            style: pw.TextStyle(font: a.body, fontSize: 8, color: _grey)),
-        pw.Text('Seite ${ctx.pageNumber}',
-            style: pw.TextStyle(font: a.body, fontSize: 8, color: _grey)),
-      ],
-    ),
-    build: (ctx) => [
-      pw.Text('Erklärung zum Beschäftigungsverhältnis',
-          style: pw.TextStyle(font: a.display, fontSize: 16, color: _ink)),
-      pw.Text('Bei Arbeitskräften aus Drittstaaten auszufüllen',
-          style: pw.TextStyle(font: a.body, fontSize: 9.5, color: _grey)),
-      pw.SizedBox(height: 8),
-      pw.Container(
-        padding: const pw.EdgeInsets.all(8),
-        decoration: pw.BoxDecoration(
-            border: pw.Border.all(color: _line, width: 0.8)),
-        child: pw.Text(
-          'Hinweis: Das Formular dient zur Vorlage bei der zuständigen '
-          'Auslandsvertretung oder Ausländerbehörde zur Beantragung eines '
-          'Aufenthaltstitels zum Zweck der Beschäftigung bzw. zur Vorlage '
-          'bei der Bundesagentur für Arbeit für die Beantragung einer '
-          'Vorabzustimmung oder Arbeitserlaubnis. Mit dieser Erklärung '
-          'bestätigt der Arbeitgeber verbindlich, dass er dem/der unter '
-          '„Abschnitt B“ genannten ausländischen Arbeitnehmer/in einen '
-          'konkreten Arbeitsplatz anbietet (§ 18 Abs. 2 Nr. 1 AufenthG) '
-          'und dass die Beschäftigung tatsächlich ausgeübt werden soll '
-          '(§ 18 Abs. 2 Nr. 4a AufenthG).',
-          textAlign: pw.TextAlign.justify,
-          style: pw.TextStyle(font: a.body, fontSize: 8.5, color: _ink),
-        ),
-      ),
-      head('A. Erklärung und Anlass'),
-      label('1  Erklärung zum Beschäftigungsverhältnis zur Vorlage in '
-          'folgendem Verfahren:'),
-      check(d.ezbProcedure == 'aufenthaltstitel',
-          'zur Erteilung eines Aufenthaltstitels zum Zweck der Beschäftigung'),
-      check(d.ezbProcedure == 'vorabzustimmung',
-          'zur Erteilung einer Vorabzustimmung der Bundesagentur für Arbeit'),
-      check(d.ezbProcedure == 'arbeitserlaubnis',
-          'zur Erteilung einer Arbeitserlaubnis der Bundesagentur für Arbeit'),
-      label('2  Anlass der Vorlage der Erklärung:'),
-      pw.Row(children: [
-        pw.Expanded(
-            child: check(d.ezbOccasion == 'ersterteilung', 'Ersterteilung')),
-        pw.Expanded(
-            child: check(d.ezbOccasion == 'verlaengerung', 'Verlängerung')),
-        pw.Expanded(
-            child:
-                check(d.ezbOccasion == 'wechsel', 'Arbeitgeberwechsel')),
-      ]),
-      head('B. Angaben zur Arbeitnehmerin/zum Arbeitnehmer'),
-      label('3/4  Vorname(n), Nachname'),
-      value(d.employeeName),
-      label('5  Geburtsdatum'),
-      value(wcDate(d.birthDate)),
-      label('6  Geschlecht'),
-      pw.Row(children: [
-        pw.Expanded(child: check(d.gender == 'm', 'männlich')),
-        pw.Expanded(child: check(d.gender == 'w', 'weiblich')),
-        pw.Expanded(child: check(d.gender == 'd', 'divers')),
-      ]),
-      label('7  Staatsangehörigkeit'),
-      value(d.nationality),
-      label('8  Derzeitiger Wohnsitz oder gewöhnlicher Aufenthaltsort'),
-      value('${d.employeeStreet}, ${d.employeeZipCity}'),
-      label('9  Seit wann besteht der Wohnsitz/gewöhnliche Aufenthaltsort?'),
-      value(wcDate(d.residenceSince)),
-      head('C. Angaben zum Arbeitgeber'),
-      label('10  Firma'),
-      value(WcEmployer.name),
-      label('11–14  Anschrift'),
-      value('${WcEmployer.street}, ${WcEmployer.zipCity}'),
-      pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-        pw.Expanded(
-          child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                label('15  Kontaktperson'),
-                value(WcEmployer.managingDirector),
-              ]),
-        ),
-        pw.Expanded(
-          child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                label('16  Telefon'),
-                value(WcEmployer.contactPhone),
-              ]),
-        ),
-      ]),
-      label('17  E-Mail'),
-      value(WcEmployer.email),
-      label('19  Betriebsnummer des Beschäftigungsbetriebes'),
-      value(WcEmployer.betriebsnummer),
-      label('20  Wurde das Unternehmen in den letzten 24 Monaten gegründet?'),
-      pw.Row(children: [
-        pw.Expanded(child: check(false, 'Ja')),
-        pw.Expanded(child: check(true, 'Nein')),
-      ]),
-      head('D. Angaben zur Beschäftigung'),
-      label('21  Das Beschäftigungsverhältnis beginnt am'),
-      value(wcDate(d.startDate)),
-      label('22  Befristung des Beschäftigungsverhältnisses:'),
-      pw.Row(children: [
-        pw.Expanded(child: check(!d.fixedTerm, 'unbefristet')),
-        pw.Expanded(
-            child: check(d.fixedTerm,
-                'befristet bis ${d.fixedTerm ? wcDate(d.endDate) : ''}')),
-      ]),
-      label('23  Soll die Arbeitnehmerin/der Arbeitnehmer an Dritte '
-          'überlassen werden?'),
-      pw.Row(children: [
-        pw.Expanded(child: check(false, 'Ja')),
-        pw.Expanded(child: check(true, 'Nein')),
-      ]),
-      label('24  Angaben zum Arbeitsort:'),
-      check(true,
-          'Arbeitnehmerin oder Arbeitnehmer wird an wechselnden '
-          'Arbeits-/Einsatzorten beschäftigt'),
-      label('25  Berufsbezeichnung und Beschreibung der Tätigkeit'),
-      value('Berufsbezeichnung: Kurierfahrer/Paketzusteller. Beschreibung: '
-          'Auslieferung und Zustellung von Waren und Gebrauchsgütern '
-          '(Pakete) nach einer vorgeplanten Route; Be- und Entladen der '
-          'Fahrzeuge; Fahrzeugpflege.'),
-      head('E. Angaben zur Qualifikation'),
-      check(true,
-          'Nach meiner Kenntnis setzt die Tätigkeit keine qualifizierte '
-          'Berufsausbildung (reguläre Ausbildungsdauer mindestens zwei '
-          'Jahre) und keinen Hochschulabschluss voraus; zum Beispiel weil '
-          'es sich um eine Helfertätigkeit oder Anlerntätigkeit handelt '
-          'oder weil die Beschäftigung aufgrund einer bestimmten Vorschrift '
-          'der Beschäftigungsverordnung erfolgen soll, nach der eine '
-          'bestimmte Qualifikation nicht erforderlich ist.'),
-      head('F. Angaben zur Berufsausübungserlaubnis'),
-      label('35  Ist die Berufsausübung an eine bestimmte Qualifikation '
-          'beziehungsweise eine Erlaubnis gebunden?'),
-      pw.Row(children: [
-        pw.Expanded(child: check(false, 'Ja')),
-        pw.Expanded(child: check(true, 'Nein (weiter mit Abschnitt G.)')),
-      ]),
-      head('G. Angaben zur Arbeitszeit'),
-      label('37  Welche Arbeitszeit hat die Arbeitnehmerin/der '
-          'Arbeitnehmer?'),
-      pw.Row(children: [
-        pw.Expanded(child: check(true, 'Vollzeit')),
-        pw.Expanded(child: check(false, 'Teilzeit')),
-        pw.Expanded(child: check(false, 'Geringfügige Beschäftigung')),
-      ]),
-      value('Arbeitsstunden pro Woche: ${wcHours(d.hoursPerWeek)}'),
-      head('H. Überstunden'),
-      label('38  Ist die Arbeitnehmerin/der Arbeitnehmer verpflichtet, '
-          'Überstunden zu leisten?'),
-      pw.Row(children: [
-        pw.Expanded(child: check(true, 'Ja')),
-        pw.Expanded(child: check(false, 'Nein')),
-      ]),
-      label('39/40  Überstundenumfang / Ausgleich'),
-      value('Im gesetzlich zulässigen Rahmen; Ausgleich durch Freizeit oder '
-          'Vergütung (Arbeitszeitkonto).'),
-      head('I. Urlaubsanspruch'),
-      label('41  Auf wie viele Arbeitstage je Urlaubsjahr besteht '
-          'Anspruch?'),
-      value('${d.vacationDays}'),
-      head('J. Arbeitsentgelt'),
-      label('42  Ist der Arbeitgeber tarifgebunden (§ 3 oder § 5 TVG)?'),
-      pw.Row(children: [
-        pw.Expanded(child: check(false, 'Ja')),
-        pw.Expanded(child: check(true, 'Nein (weiter mit 46)')),
-      ]),
-      label('46  Höhe und Berechnungsart des Arbeitsentgelts:'),
-      value(salaryLine),
-      head('K. Inländisches Beschäftigungsverhältnis'),
-      label('52  Besteht für den Arbeitnehmer/die Arbeitnehmerin '
-          'Sozialversicherungspflicht in Deutschland?'),
-      pw.Row(children: [
-        pw.Expanded(child: check(true, 'Ja (weiter mit 54)')),
-        pw.Expanded(child: check(false, 'Nein')),
-      ]),
-      head('L. Unterschrift'),
-      pw.Text(
-        'Alle Angaben in diesem Formular entsprechen dem Inhalt des '
-        'Arbeitsvertrages, der zwischen dem bezeichneten Unternehmen und '
-        'dem/der Antragsteller/in geschlossen wird. Mir ist bekannt, dass '
-        'dieses Formular an Dritte (Kommune, Gemeinsame Einrichtung nach '
-        'SGB II) zur Suche nach bevorrechtigten Bewerbern weitergegeben '
-        'werden kann, falls eine Vorrangprüfung durchgeführt wird. Die '
-        'datenschutzrechtlichen Hinweise der Bundesagentur für Arbeit '
-        'finden Sie unter: www.arbeitsagentur.de/datenerhebung. Die '
-        'Richtigkeit der Angaben wird durch Datum und Unterschrift '
-        'bestätigt.',
-        textAlign: pw.TextAlign.justify,
-        style: pw.TextStyle(font: a.body, fontSize: 8.5, color: _ink),
-      ),
-      pw.SizedBox(height: 16),
-      pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
-        pw.Expanded(child: _fieldLine(a, d.signCity, '57  Ort')),
-        pw.SizedBox(width: 16),
-        pw.Expanded(child: _fieldLine(a, wcDate(d.signDate), '58  Datum')),
-        pw.SizedBox(width: 16),
-        pw.Expanded(
-          child: pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Container(
-                height: 40,
-                alignment: pw.Alignment.bottomLeft,
-                child: a.signature == null
-                    ? pw.SizedBox()
-                    : pw.Image(a.signature!,
-                        height: 40, fit: pw.BoxFit.contain),
-              ),
-              pw.Container(height: 0.8, color: _line),
-              pw.SizedBox(height: 2),
-              pw.Text('59  UNTERSCHRIFT ARBEITGEBER',
-                  style: pw.TextStyle(
-                      font: a.bodyBold, fontSize: 6.5, color: _grey)),
-            ],
-          ),
-        ),
-      ]),
-    ],
-  ));
-
-  // Zusatzblatt: Bestätigung Führerschein Kategorie B (wie bisher bei
-  // Visa-Anträgen beigelegt).
   doc.addPage(pw.Page(
     pageFormat: PdfPageFormat.a4,
     margin: const pw.EdgeInsets.fromLTRB(48, 44, 48, 44),
@@ -1126,6 +1068,5 @@ Future<Uint8List> wcBuildEzbPdf(WorkContractData d, WcAssets a) async {
       ],
     ),
   ));
-
   return doc.save();
 }
