@@ -488,10 +488,25 @@ class _AdminFlexplanPageState extends State<AdminFlexplanPage> {
               stream: repo.watchBookings(_monthKey),
               builder: (context, bookingsSnap) {
                 final bookings = bookingsSnap.data ?? const <FlexBooking>[];
-                return Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1040),
-                    child: ListView(
+                // Alle Fahrer mit planType == 'flex' — eigene Box rechts.
+                return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(uid)
+                      .collection('drivers')
+                      .where('planType', isEqualTo: 'flex')
+                      .snapshots(),
+                  builder: (context, driversSnap) {
+                    final flexDrivers = (driversSnap.data?.docs ?? const [])
+                        .map((d) => (
+                              tid: d.id,
+                              name: (d.data()['driverName'] ?? '').toString(),
+                              active: d.data()['active'] != false,
+                            ))
+                        .toList()
+                      ..sort((a, b) => a.name.compareTo(b.name));
+
+                    final mainList = ListView(
                       padding: const EdgeInsets.all(16),
                       children: [
                         _header(repo, month, bookings),
@@ -503,8 +518,60 @@ class _AdminFlexplanPageState extends State<AdminFlexplanPage> {
                         _daysPanel(repo, month, bookings),
                         const SizedBox(height: 24),
                       ],
-                    ),
-                  ),
+                    );
+
+                    return LayoutBuilder(
+                      builder: (context, constraints) {
+                        final wide = constraints.maxWidth >= 1000;
+                        if (!wide) {
+                          // Schmal: Box als Karte oberhalb der Tagesliste.
+                          return Center(
+                            child: ConstrainedBox(
+                              constraints:
+                                  const BoxConstraints(maxWidth: 1040),
+                              child: ListView(
+                                padding: const EdgeInsets.all(16),
+                                children: [
+                                  _header(repo, month, bookings),
+                                  const SizedBox(height: 12),
+                                  _cancellationsPanel(repo),
+                                  _flexDriversPanel(flexDrivers, bookings),
+                                  const SizedBox(height: 12),
+                                  _shiftsPanel(repo, month),
+                                  const SizedBox(height: 12),
+                                  _driverTotalsPanel(month, bookings),
+                                  _daysPanel(repo, month, bookings),
+                                  const SizedBox(height: 24),
+                                ],
+                              ),
+                            ),
+                          );
+                        }
+                        return Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 1360),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(child: mainList),
+                                SizedBox(
+                                  width: 300,
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                        0, 16, 16, 16),
+                                    child: SingleChildScrollView(
+                                      child: _flexDriversPanel(
+                                          flexDrivers, bookings),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
                 );
               },
             );
@@ -869,6 +936,119 @@ class _AdminFlexplanPageState extends State<AdminFlexplanPage> {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Eigene Box mit allen Flex-Fahrern (planType == 'flex') — inklusive
+  /// gebuchter Stunden im angezeigten Monat, damit man sofort sieht,
+  /// wer sich schon gemeldet hat.
+  Widget _flexDriversPanel(
+    List<({String tid, String name, bool active})> drivers,
+    List<FlexBooking> bookings,
+  ) {
+    final de = _de;
+    final minutesByTid = <String, int>{
+      for (final b in bookings) b.driverTransporterId: b.totalMinutes,
+    };
+    return _card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.groups_rounded, size: 18, color: _kGreen),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  de
+                      ? 'Flex-Fahrer (${drivers.length})'
+                      : 'Flex drivers (${drivers.length})',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: _kText,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            de
+                ? 'Wird im Drivers Hub über das Fix/Flex-Pill gepflegt.'
+                : 'Managed via the fix/flex pill in the Drivers Hub.',
+            style: const TextStyle(fontSize: 11.5, color: _kMuted),
+          ),
+          const SizedBox(height: 10),
+          if (drivers.isEmpty)
+            Text(
+              de ? 'Noch keine Flex-Fahrer.' : 'No flex drivers yet.',
+              style: const TextStyle(fontSize: 12.5, color: _kMuted),
+            ),
+          for (final d in drivers)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: d.active
+                          ? const Color(0xFF34C759)
+                          : const Color(0xFF9CA3AF),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          d.name.isEmpty ? d.tid : d.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: _kText,
+                          ),
+                        ),
+                        Text(
+                          d.tid,
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            color: _kMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if ((minutesByTid[d.tid] ?? 0) > 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _kGreenBg,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        formatMinutes(minutesByTid[d.tid]!),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: _kGreen,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }
