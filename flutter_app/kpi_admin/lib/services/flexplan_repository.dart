@@ -373,6 +373,10 @@ class FlexplanRepository {
           minutes: shift.minutes,
         ).toMap(),
       ];
+      // merge: true ist hier PFLICHT — ohne merge würde die Buchung das
+      // Freischalt-Flag `doubleLimitUnlocked` (2×-Minijob-Limit) aus dem
+      // Dokument werfen: nach der ersten Buchung über 603 € wäre wieder
+      // alles gesperrt und der Jahres-Zähler fiele auf 0 zurück.
       tx.set(ref, {
         'driverTransporterId': tid.trim().toUpperCase(),
         'monthKey': monthKey,
@@ -380,7 +384,7 @@ class FlexplanRepository {
         'entries': entries,
         'totalMinutes': newTotal,
         'updatedAt': FieldValue.serverTimestamp(),
-      });
+      }, SetOptions(merge: true));
     });
   }
 
