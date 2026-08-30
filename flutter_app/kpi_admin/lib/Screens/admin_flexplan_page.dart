@@ -9,6 +9,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../models/driver_contract_type.dart';
 import '../services/flexplan_repository.dart';
 import '../utils/german_holidays.dart';
 import '../widgets/admin_scope.dart';
@@ -80,6 +81,14 @@ class _AdminFlexplanPageState extends State<AdminFlexplanPage>
 
   String _monthLabel(DateTime m) =>
       '${(_de ? _kMonthsDe : _kMonthsEn)[m.month - 1]} ${m.year}';
+
+  /// Kompakter Monatsname für die Pill im Header — bleibt auch auf
+  /// schmalen Screens einzeilig neben dem Titel.
+  String _monthLabelShort(DateTime m) {
+    final name = (_de ? _kMonthsDe : _kMonthsEn)[m.month - 1];
+    final short = name.length > 4 ? '${name.substring(0, 3)}.' : name;
+    return '$short ${m.year}';
+  }
 
   void _shiftMonth(int delta) {
     setState(() => _month = DateTime(_month.year, _month.month + delta, 1));
@@ -594,12 +603,26 @@ class _AdminFlexplanPageState extends State<AdminFlexplanPage>
                       .where('planType', isEqualTo: 'flex')
                       .snapshots(),
                   builder: (context, driversSnap) {
+                    final year = DateTime.now().year.toString();
                     final flexDrivers = (driversSnap.data?.docs ?? const [])
-                        .map((d) => (
-                              tid: d.id,
-                              name: (d.data()['driverName'] ?? '').toString(),
-                              active: d.data()['active'] != false,
-                            ))
+                        .map((d) {
+                          final data = d.data();
+                          // Bereits genutzte 2×-Limit-Monate dieses Jahr —
+                          // dasselbe Feld wie im Drivers-Hub-Detail.
+                          final rawUsed = data['flexplanDoubleUsed'];
+                          var used = 0;
+                          if (rawUsed is Map && rawUsed[year] is num) {
+                            used = (rawUsed[year] as num).toInt().clamp(0, 2);
+                          }
+                          return (
+                            tid: d.id,
+                            name: (data['driverName'] ?? '').toString(),
+                            active: data['active'] != false,
+                            contractType: DriverContractType.fromValue(
+                                data['contractType']),
+                            doubleUsed: used,
+                          );
+                        })
                         .toList()
                       ..sort((a, b) => a.name.compareTo(b.name));
 
@@ -737,38 +760,69 @@ class _AdminFlexplanPageState extends State<AdminFlexplanPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Wrap(
-            spacing: 10,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
+          Row(
             children: [
-              Text(
+              const Text(
                 'Flexplan',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
                   color: _kText,
                 ),
               ),
+              const SizedBox(width: 8),
               statusChip,
-              const SizedBox(width: 4),
-              IconButton(
-                onPressed: () => _shiftMonth(-1),
-                icon: const Icon(Icons.chevron_left_rounded),
-                tooltip: de ? 'Vormonat' : 'Previous month',
-              ),
-              Text(
-                _monthLabel(_month),
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: _kText,
+              const Spacer(),
+              // Monats-Pill — klein und einzeilig, rutscht nicht um.
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: _kBorder),
                 ),
-              ),
-              IconButton(
-                onPressed: () => _shiftMonth(1),
-                icon: const Icon(Icons.chevron_right_rounded),
-                tooltip: de ? 'Folgemonat' : 'Next month',
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    InkWell(
+                      onTap: () => _shiftMonth(-1),
+                      customBorder: const CircleBorder(),
+                      child: Tooltip(
+                        message: de ? 'Vormonat' : 'Previous month',
+                        child: const Padding(
+                          padding: EdgeInsets.all(5),
+                          child: Icon(
+                            Icons.chevron_left_rounded,
+                            size: 18,
+                            color: _kMuted,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Text(
+                      _monthLabelShort(_month),
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        color: _kText,
+                      ),
+                    ),
+                    InkWell(
+                      onTap: () => _shiftMonth(1),
+                      customBorder: const CircleBorder(),
+                      child: Tooltip(
+                        message: de ? 'Folgemonat' : 'Next month',
+                        child: const Padding(
+                          padding: EdgeInsets.all(5),
+                          child: Icon(
+                            Icons.chevron_right_rounded,
+                            size: 18,
+                            color: _kMuted,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -1068,10 +1122,19 @@ class _AdminFlexplanPageState extends State<AdminFlexplanPage>
   /// gebuchter Stunden im angezeigten Monat, damit man sofort sieht,
   /// wer sich schon gemeldet hat.
   Widget _flexDriversPanel(
-    List<({String tid, String name, bool active})> drivers,
+    List<
+            ({
+              String tid,
+              String name,
+              bool active,
+              DriverContractType? contractType,
+              int doubleUsed,
+            })>
+        drivers,
     List<FlexBooking> bookings,
   ) {
     final de = _de;
+    final year = DateTime.now().year.toString();
     final minutesByTid = <String, int>{
       for (final b in bookings) b.driverTransporterId: b.totalMinutes,
     };
@@ -1100,8 +1163,10 @@ class _AdminFlexplanPageState extends State<AdminFlexplanPage>
           const SizedBox(height: 4),
           Text(
             de
-                ? 'Wird im Drivers Hub über das Fix/Flex-Pill gepflegt.'
-                : 'Managed via the fix/flex pill in the Drivers Hub.',
+                ? 'Schloss = bereits genutzte 2×-Limit-Monate $year '
+                    '(nur Minijob, synchron mit dem Drivers Hub).'
+                : 'Lock = double-limit months already used in $year '
+                    '(minijob only, synced with the Drivers Hub).',
             style: const TextStyle(fontSize: 11.5, color: _kMuted),
           ),
           const SizedBox(height: 10),
@@ -1110,71 +1175,181 @@ class _AdminFlexplanPageState extends State<AdminFlexplanPage>
               de ? 'Noch keine Flex-Fahrer.' : 'No flex drivers yet.',
               style: const TextStyle(fontSize: 12.5, color: _kMuted),
             ),
-          for (final d in drivers)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: d.active
-                          ? const Color(0xFF34C759)
-                          : const Color(0xFF9CA3AF),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          d.name.isEmpty ? d.tid : d.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: _kText,
-                          ),
-                        ),
-                        Text(
-                          d.tid,
-                          style: const TextStyle(
-                            fontSize: 10.5,
-                            color: _kMuted,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if ((minutesByTid[d.tid] ?? 0) > 0)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _kGreenBg,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        formatMinutes(minutesByTid[d.tid]!),
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: _kGreen,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+          // Weiß/grau alternierende Listenzeilen.
+          for (var i = 0; i < drivers.length; i++)
+            _flexDriverRow(
+              drivers[i],
+              minutesByTid[drivers[i].tid] ?? 0,
+              grey: i.isOdd,
+              year: year,
             ),
         ],
       ),
     );
+  }
+
+  Widget _flexDriverRow(
+    ({
+      String tid,
+      String name,
+      bool active,
+      DriverContractType? contractType,
+      int doubleUsed,
+    }) d,
+    int minutes, {
+    required bool grey,
+    required String year,
+  }) {
+    final de = _de;
+    final isMinijob = d.contractType == DriverContractType.minijob;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: grey ? const Color(0xFFF8FAFC) : Colors.white,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          // Name + Vertragsart darunter.
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(
+                        color: d.active
+                            ? const Color(0xFF34C759)
+                            : const Color(0xFF9CA3AF),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 7),
+                    Expanded(
+                      child: Text(
+                        d.name.isEmpty ? d.tid : d.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: _kText,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(left: 14),
+                  child: Text(
+                    d.contractType?.label ??
+                        (de ? 'Vertragsart offen' : 'No contract type'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 10.5, color: _kMuted),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Gezählte (gebuchte) Zeit im angezeigten Monat.
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+            decoration: BoxDecoration(
+              color: minutes > 0 ? _kGreenBg : const Color(0xFFF3F4F6),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              formatMinutes(minutes),
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: minutes > 0 ? _kGreen : _kMuted,
+              ),
+            ),
+          ),
+          // Doppelmonat-Zähler 0/1/2 — nur Minijob, schreibt dasselbe
+          // Feld wie das Drivers-Hub-Detail (flexplanDoubleUsed.<Jahr>).
+          if (isMinijob) ...[
+            const SizedBox(width: 8),
+            Tooltip(
+              message: de
+                  ? '2×-Limit bereits genutzt ($year) — bei 2 gesperrt'
+                  : 'Double limit already used ($year) — locked at 2',
+              child: Container(
+                padding: const EdgeInsets.only(left: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: _kBorder),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      d.doubleUsed >= 2
+                          ? Icons.lock_rounded
+                          : Icons.lock_open_rounded,
+                      size: 13,
+                      color: d.doubleUsed >= 2 ? _kOrange : _kMuted,
+                    ),
+                    const SizedBox(width: 2),
+                    DropdownButtonHideUnderline(
+                      child: DropdownButton<int>(
+                        value: d.doubleUsed,
+                        isDense: true,
+                        borderRadius: BorderRadius.circular(8),
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w800,
+                          color: _kText,
+                        ),
+                        icon: const Icon(Icons.expand_more_rounded, size: 14),
+                        items: const [
+                          DropdownMenuItem(value: 0, child: Text('0')),
+                          DropdownMenuItem(value: 1, child: Text('1')),
+                          DropdownMenuItem(value: 2, child: Text('2')),
+                        ],
+                        onChanged: (v) =>
+                            _setDoubleUsed(d.tid, year: year, value: v),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Schreibt die bereits genutzten 2×-Limit-Monate ins Fahrer-Dokument —
+  /// identisches Feld wie im Drivers-Hub-Detail, dadurch überall synchron.
+  Future<void> _setDoubleUsed(
+    String tid, {
+    required String year,
+    required int? value,
+  }) async {
+    final uid = _uid;
+    if (uid == null || value == null) return;
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('drivers')
+          .doc(tid)
+          .set({
+        'flexplanDoubleUsed': {year: value},
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      _snack(_de ? 'Fehler: $e' : 'Error: $e', error: true);
+    }
   }
 
   // Die einmal angelegten Schichten des Monats.
