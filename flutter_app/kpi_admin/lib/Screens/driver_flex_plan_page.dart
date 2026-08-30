@@ -763,21 +763,23 @@ class _DriverFlexPlanPageState extends State<DriverFlexPlanPage> {
         pendingCancellations.contains('$dayKey|${shift.id}');
     final fits = shift.minutes <= remaining;
 
+    // Schichtfarbe kommt vom Admin (je Station unterscheidbar).
+    final accent = Color(shift.colorValue);
     final Color bg;
     final Color fg;
     final Color border;
     if (booked) {
-      bg = AppColors.green50;
-      fg = AppColors.codriverDeep;
-      border = AppColors.codriverGreen;
+      bg = accent.withOpacity(0.12);
+      fg = accent;
+      border = accent;
     } else if (!fits) {
       bg = const Color(0xFFF3F4F6);
       fg = AppColors.labelTertiaryLight;
       border = const Color(0xFFE5E7EB);
     } else {
-      bg = Colors.white;
+      bg = accent.withOpacity(0.05);
       fg = AppColors.codriverGraphite;
-      border = const Color(0xFFCBD5E1);
+      border = accent.withOpacity(0.45);
     }
 
     return InkWell(
@@ -808,7 +810,7 @@ class _DriverFlexPlanPageState extends State<DriverFlexPlanPage> {
                           : Icons.check_circle_rounded)
                       : Icons.add_circle_outline_rounded,
                   size: 15,
-                  color: booked ? AppColors.codriverGreen : fg,
+                  color: booked ? accent : fg,
                 ),
                 const SizedBox(width: 5),
                 Text(
@@ -824,7 +826,8 @@ class _DriverFlexPlanPageState extends State<DriverFlexPlanPage> {
             ),
             const SizedBox(height: 2),
             Text(
-              '${shift.start}–${shift.end} · ${formatMinutes(shift.minutes)}',
+              '${shift.start}–${shift.end} · ${formatMinutes(shift.minutes)}'
+              '${shift.station.isNotEmpty ? ' · ${shift.station}' : ''}',
               style: AppTypography.caption1.copyWith(
                 color: fg,
                 fontWeight: FontWeight.w600,

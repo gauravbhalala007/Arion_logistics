@@ -74,6 +74,8 @@ class FlexShift {
     required this.name,
     required this.start,
     required this.end,
+    this.station = '',
+    this.colorValue = 0xFF1D7F5A,
   });
 
   final String id;
@@ -81,10 +83,23 @@ class FlexShift {
   final String start; // 'HH:mm'
   final String end; // 'HH:mm'
 
+  /// Station/Standort der Schicht (z. B. 'DBY5') — frei eingebbar,
+  /// weil weitere Stationen dazukommen.
+  final String station;
+
+  /// ARGB-Farbwert der Schicht (Admin wählt aus einer Palette).
+  final int colorValue;
+
   int get minutes => shiftMinutes(start, end);
 
-  Map<String, dynamic> toMap() =>
-      {'id': id, 'name': name, 'start': start, 'end': end};
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'name': name,
+        'start': start,
+        'end': end,
+        if (station.isNotEmpty) 'station': station,
+        'color': colorValue,
+      };
 
   static FlexShift? fromMap(dynamic raw) {
     if (raw is! Map) return null;
@@ -93,7 +108,15 @@ class FlexShift {
     final start = (raw['start'] ?? '').toString();
     final end = (raw['end'] ?? '').toString();
     if (id.isEmpty || start.isEmpty || end.isEmpty) return null;
-    return FlexShift(id: id, name: name, start: start, end: end);
+    return FlexShift(
+      id: id,
+      name: name,
+      start: start,
+      end: end,
+      station: (raw['station'] ?? '').toString(),
+      colorValue:
+          raw['color'] is num ? (raw['color'] as num).toInt() : 0xFF1D7F5A,
+    );
   }
 }
 
@@ -174,6 +197,7 @@ class FlexBookingEntry {
     required this.start,
     required this.end,
     required this.minutes,
+    this.station = '',
   });
 
   final String date; // 'yyyy-MM-dd'
@@ -182,6 +206,7 @@ class FlexBookingEntry {
   final String start;
   final String end;
   final int minutes;
+  final String station;
 
   Map<String, dynamic> toMap() => {
         'date': date,
@@ -190,6 +215,7 @@ class FlexBookingEntry {
         'start': start,
         'end': end,
         'minutes': minutes,
+        if (station.isNotEmpty) 'station': station,
       };
 
   static FlexBookingEntry? fromMap(dynamic raw) {
@@ -204,6 +230,7 @@ class FlexBookingEntry {
       start: (raw['start'] ?? '').toString(),
       end: (raw['end'] ?? '').toString(),
       minutes: raw['minutes'] is num ? (raw['minutes'] as num).toInt() : 0,
+      station: (raw['station'] ?? '').toString(),
     );
   }
 }
@@ -371,6 +398,7 @@ class FlexplanRepository {
           start: shift.start,
           end: shift.end,
           minutes: shift.minutes,
+          station: shift.station,
         ).toMap(),
       ];
       // merge: true ist hier PFLICHT — ohne merge würde die Buchung das

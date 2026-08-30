@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import '../services/flexplan_repository.dart';
 import '../utils/german_holidays.dart';
 import '../widgets/admin_scope.dart';
+import '../widgets/pill_tab_bar.dart';
 
 const _kBorder = Color(0xFFE5E7EB);
 const _kMuted = Color(0xFF6B7280);
@@ -39,16 +40,32 @@ class AdminFlexplanPage extends StatefulWidget {
   State<AdminFlexplanPage> createState() => _AdminFlexplanPageState();
 }
 
-class _AdminFlexplanPageState extends State<AdminFlexplanPage> {
+class _AdminFlexplanPageState extends State<AdminFlexplanPage>
+    with SingleTickerProviderStateMixin {
   /// Erster Tag des angezeigten Monats. Planung passiert typischerweise
   /// für den Folgemonat — deshalb startet die Seite dort.
   late DateTime _month;
+
+  /// Mobil: PillTabBar zwischen „Schichten" und „Flex-Fahrer"
+  /// (gleiches Muster wie auf der Scorecard-Seite).
+  late final TabController _mobileTabs = TabController(length: 2, vsync: this);
+  int _mobileTab = 0;
 
   @override
   void initState() {
     super.initState();
     final now = DateTime.now();
     _month = DateTime(now.year, now.month + 1, 1);
+    _mobileTabs.addListener(() {
+      if (_mobileTabs.index == _mobileTab) return;
+      setState(() => _mobileTab = _mobileTabs.index);
+    });
+  }
+
+  @override
+  void dispose() {
+    _mobileTabs.dispose();
+    super.dispose();
   }
 
   String? get _uid {
@@ -189,15 +206,6 @@ class _AdminFlexplanPageState extends State<AdminFlexplanPage> {
     return total;
   }
 
-  Future<void> _closeMonth(FlexplanRepository repo) async {
-    await repo.monthRef(_monthKey).set({
-      'monthKey': _monthKey,
-      'status': 'closed',
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-    _snack(_de ? 'Monat geschlossen.' : 'Month closed.');
-  }
-
   // ── Lohn / Limit bearbeiten ────────────────────────────────────────────
 
   Future<void> _editLimits(FlexplanRepository repo, FlexMonth month) async {
@@ -265,77 +273,161 @@ class _AdminFlexplanPageState extends State<AdminFlexplanPage> {
     }, SetOptions(merge: true));
   }
 
-  // ── Schichten anlegen / löschen (einmal je Monat, gelten Mo–Sa) ────────
+  // ── Schichten anlegen / bearbeiten / löschen (gelten Mo–Sa) ────────────
 
-  Future<void> _addShift(FlexplanRepository repo, FlexMonth month) async {
+  /// Farbpalette für Schichten — Stationen bekommen so auf einen Blick
+  /// unterscheidbare Farben.
+  static const List<int> _kShiftColors = [
+    0xFF1D7F5A, // Grün
+    0xFF1D4ED8, // Blau
+    0xFF7C3AED, // Lila
+    0xFFB45309, // Orange
+    0xFFB91C1C, // Rot
+    0xFF0D9488, // Türkis
+    0xFFDB2777, // Pink
+    0xFF475569, // Grau
+  ];
+
+  /// Anlegen ([existing] == null) oder Bearbeiten einer Schicht — mit
+  /// Name, Zeiten, Station (weitere Station kommt) und Farbe.
+  Future<void> _editShift(
+    FlexplanRepository repo,
+    FlexMonth month, {
+    FlexShift? existing,
+  }) async {
     final de = _de;
-    final nameCtrl = TextEditingController();
-    final startCtrl = TextEditingController(text: '08:00');
-    final endCtrl = TextEditingController(text: '12:00');
+    final nameCtrl = TextEditingController(text: existing?.name ?? '');
+    final startCtrl =
+        TextEditingController(text: existing?.start ?? '08:00');
+    final endCtrl = TextEditingController(text: existing?.end ?? '12:00');
+    final stationCtrl =
+        TextEditingController(text: existing?.station ?? '');
+    var color = existing?.colorValue ?? _kShiftColors.first;
 
     final saved = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(de ? 'Schicht anlegen' : 'Add shift'),
-        content: SizedBox(
-          width: 380,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextField(
-                controller: nameCtrl,
-                autofocus: true,
-                decoration: InputDecoration(
-                  labelText: de ? 'Name (z. B. Frühschicht)' : 'Name',
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text(
+            existing == null
+                ? (de ? 'Schicht anlegen' : 'Add shift')
+                : (de ? 'Schicht bearbeiten' : 'Edit shift'),
+          ),
+          content: SizedBox(
+            width: 380,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  autofocus: existing == null,
+                  decoration: InputDecoration(
+                    labelText: de ? 'Name (z. B. Frühschicht)' : 'Name',
+                  ),
                 ),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: startCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Start (HH:mm)',
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: startCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Start (HH:mm)',
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextField(
-                      controller: endCtrl,
-                      decoration: InputDecoration(
-                        labelText: de ? 'Ende (HH:mm)' : 'End (HH:mm)',
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextField(
+                        controller: endCtrl,
+                        decoration: InputDecoration(
+                          labelText: de ? 'Ende (HH:mm)' : 'End (HH:mm)',
+                        ),
                       ),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: stationCtrl,
+                  decoration: InputDecoration(
+                    labelText: de
+                        ? 'Station (z. B. DBY5, optional)'
+                        : 'Station (e.g. DBY5, optional)',
                   ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Text(
-                de
-                    ? 'Gilt automatisch für jeden Tag des Monats außer '
-                        'Sonntage und Feiertage '
-                        '(${germanRegionName(month.region)}).'
-                    : 'Automatically applies to every day of the month '
-                        'except Sundays and public holidays '
-                        '(${germanRegionName(month.region)}).',
-                style: const TextStyle(fontSize: 12.5, color: _kMuted),
-              ),
-            ],
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  de ? 'Farbe' : 'Color',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: _kMuted,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final c in _kShiftColors)
+                      InkWell(
+                        onTap: () => setLocal(() => color = c),
+                        borderRadius: BorderRadius.circular(999),
+                        child: Container(
+                          width: 30,
+                          height: 30,
+                          decoration: BoxDecoration(
+                            color: Color(c),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: color == c
+                                  ? _kText
+                                  : Colors.transparent,
+                              width: 2.5,
+                            ),
+                          ),
+                          child: color == c
+                              ? const Icon(
+                                  Icons.check_rounded,
+                                  size: 16,
+                                  color: Colors.white,
+                                )
+                              : null,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  de
+                      ? 'Gilt automatisch für jeden Tag des Monats außer '
+                          'Sonntage und Feiertage '
+                          '(${germanRegionName(month.region)}).'
+                      : 'Automatically applies to every day of the month '
+                          'except Sundays and public holidays '
+                          '(${germanRegionName(month.region)}).',
+                  style: const TextStyle(fontSize: 12.5, color: _kMuted),
+                ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(de ? 'Abbrechen' : 'Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(
+                existing == null
+                    ? (de ? 'Anlegen' : 'Add')
+                    : (de ? 'Speichern' : 'Save'),
+              ),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(de ? 'Abbrechen' : 'Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(de ? 'Anlegen' : 'Add'),
-          ),
-        ],
       ),
     );
     if (saved != true) return;
@@ -354,10 +446,14 @@ class _AdminFlexplanPageState extends State<AdminFlexplanPage> {
     }
 
     final shift = FlexShift(
-      id: '${DateTime.now().microsecondsSinceEpoch}',
+      // Beim Bearbeiten bleibt die ID erhalten — bestehende Buchungen
+      // referenzieren die Schicht über die ID.
+      id: existing?.id ?? '${DateTime.now().microsecondsSinceEpoch}',
       name: name,
       start: start,
       end: end,
+      station: stationCtrl.text.trim().toUpperCase(),
+      colorValue: color,
     );
     await repo.monthRef(_monthKey).set({
       'monthKey': _monthKey,
@@ -366,7 +462,8 @@ class _AdminFlexplanPageState extends State<AdminFlexplanPage> {
       'maxMonthlyEarnings': month.maxEarnings,
       'region': month.region,
       'shifts': [
-        for (final s in month.shifts) s.toMap(),
+        for (final s in month.shifts)
+          if (s.id != shift.id) s.toMap(),
         shift.toMap(),
       ],
       'updatedAt': FieldValue.serverTimestamp(),
@@ -524,24 +621,55 @@ class _AdminFlexplanPageState extends State<AdminFlexplanPage> {
                       builder: (context, constraints) {
                         final wide = constraints.maxWidth >= 1000;
                         if (!wide) {
-                          // Schmal: Box als Karte oberhalb der Tagesliste.
+                          // Mobil: PillTabBar „Schichten" ↔ „Flex-Fahrer"
+                          // (gleiche Optik wie auf der Scorecard-Seite).
+                          final de = _de;
                           return Center(
                             child: ConstrainedBox(
                               constraints:
                                   const BoxConstraints(maxWidth: 1040),
-                              child: ListView(
-                                padding: const EdgeInsets.all(16),
+                              child: Column(
                                 children: [
-                                  _header(repo, month, bookings),
-                                  const SizedBox(height: 12),
-                                  _cancellationsPanel(repo),
-                                  _flexDriversPanel(flexDrivers, bookings),
-                                  const SizedBox(height: 12),
-                                  _shiftsPanel(repo, month),
-                                  const SizedBox(height: 12),
-                                  _driverTotalsPanel(month, bookings),
-                                  _daysPanel(repo, month, bookings),
-                                  const SizedBox(height: 24),
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                        16, 12, 16, 0),
+                                    child: PillTabBar(
+                                      controller: _mobileTabs,
+                                      tabs: [
+                                        de ? 'Schichten' : 'Shifts',
+                                        de ? 'Flex-Fahrer' : 'Flex drivers',
+                                      ],
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: _mobileTab == 0
+                                        ? ListView(
+                                            padding:
+                                                const EdgeInsets.all(16),
+                                            children: [
+                                              _header(
+                                                  repo, month, bookings),
+                                              const SizedBox(height: 12),
+                                              _cancellationsPanel(repo),
+                                              _shiftsPanel(repo, month),
+                                              const SizedBox(height: 12),
+                                              _driverTotalsPanel(
+                                                  month, bookings),
+                                              _daysPanel(
+                                                  repo, month, bookings),
+                                              const SizedBox(height: 24),
+                                            ],
+                                          )
+                                        : ListView(
+                                            padding:
+                                                const EdgeInsets.all(16),
+                                            children: [
+                                              _flexDriversPanel(
+                                                  flexDrivers, bookings),
+                                              const SizedBox(height: 24),
+                                            ],
+                                          ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -734,6 +862,8 @@ class _AdminFlexplanPageState extends State<AdminFlexplanPage> {
                   ),
                 ),
               ),
+              // Bewusst KEIN "Monat schließen" — einmal freigegeben
+              // bleibt ein Monat offen (Kundenvorgabe).
               if (!month.isOpen)
                 FilledButton.icon(
                   onPressed: () => _openMonth(repo, month),
@@ -741,12 +871,6 @@ class _AdminFlexplanPageState extends State<AdminFlexplanPage> {
                   label: Text(
                     de ? 'Monat freigeben' : 'Open month',
                   ),
-                )
-              else
-                OutlinedButton.icon(
-                  onPressed: () => _closeMonth(repo),
-                  icon: const Icon(Icons.lock_outline_rounded, size: 18),
-                  label: Text(de ? 'Monat schließen' : 'Close month'),
                 ),
               _chip(
                 de
@@ -1085,41 +1209,65 @@ class _AdminFlexplanPageState extends State<AdminFlexplanPage> {
             runSpacing: 8,
             children: [
               for (final s in month.shifts)
-                Container(
-                  padding: const EdgeInsets.fromLTRB(12, 6, 6, 6),
-                  decoration: BoxDecoration(
-                    color: _kGreenBg,
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: const Color(0xFFABEFC6)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '${s.name} ${s.start}–${s.end} '
-                        '(${formatMinutes(s.minutes)})',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: _kGreen,
-                        ),
+                InkWell(
+                  // Tippen = bearbeiten (Name, Zeiten, Station, Farbe).
+                  onTap: () => _editShift(repo, month, existing: s),
+                  borderRadius: BorderRadius.circular(999),
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(12, 6, 6, 6),
+                    decoration: BoxDecoration(
+                      color: Color(s.colorValue).withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: Color(s.colorValue).withValues(alpha: 0.45),
                       ),
-                      InkWell(
-                        onTap: () => _removeShift(repo, month, s),
-                        child: const Padding(
-                          padding: EdgeInsets.all(4),
-                          child: Icon(
-                            Icons.close_rounded,
-                            size: 15,
-                            color: _kGreen,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: Color(s.colorValue),
+                            shape: BoxShape.circle,
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 7),
+                        Text(
+                          '${s.name}'
+                          '${s.station.isNotEmpty ? ' · ${s.station}' : ''}'
+                          ' ${s.start}–${s.end} '
+                          '(${formatMinutes(s.minutes)})',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Color(s.colorValue),
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        Icon(
+                          Icons.edit_outlined,
+                          size: 13,
+                          color: Color(s.colorValue).withValues(alpha: 0.7),
+                        ),
+                        InkWell(
+                          onTap: () => _removeShift(repo, month, s),
+                          child: Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: Icon(
+                              Icons.close_rounded,
+                              size: 15,
+                              color: Color(s.colorValue),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               OutlinedButton.icon(
-                onPressed: () => _addShift(repo, month),
+                onPressed: () => _editShift(repo, month),
                 icon: const Icon(Icons.add_rounded, size: 16),
                 label: Text(de ? 'Schicht anlegen' : 'Add shift'),
               ),
@@ -1146,9 +1294,11 @@ class _AdminFlexplanPageState extends State<AdminFlexplanPage> {
         final who = b.driverName.isEmpty
             ? b.driverTransporterId
             : b.driverName;
-        signupsByDay
-            .putIfAbsent(e.date, () => [])
-            .add('$who · ${e.name} ${e.start}–${e.end}');
+        signupsByDay.putIfAbsent(e.date, () => []).add(
+              '$who · ${e.name}'
+              '${e.station.isNotEmpty ? ' · ${e.station}' : ''}'
+              ' ${e.start}–${e.end}',
+            );
       }
     }
 
