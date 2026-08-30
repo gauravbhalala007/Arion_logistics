@@ -31,6 +31,7 @@ import 'drivers_hub_page.dart';
 import 'admin_recruiting_page.dart';
 import 'admin_waveplan_page.dart';
 import 'admin_flexplan_page.dart';
+import 'admin_work_contracts_page.dart';
 import 'admin_calendar_page.dart';
 import 'admin_contacts_page.dart';
 import 'task_sheet_page.dart';
@@ -482,6 +483,10 @@ class _AdminShellPageState extends State<AdminShellPage> {
                           AppNav.flexplan,
                           () => const AdminFlexplanPage(),
                         ),
+                        _lazy(
+                          AppNav.workContracts,
+                          () => const AdminWorkContractsPage(),
+                        ),
                       ],
                     ),
                   ),
@@ -642,6 +647,8 @@ class _AdminShellPageState extends State<AdminShellPage> {
         return 35;
       case AppNav.flexplan:
         return 36;
+      case AppNav.workContracts:
+        return 37;
       default:
         return 0;
     }

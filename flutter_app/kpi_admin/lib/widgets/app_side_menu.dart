@@ -58,6 +58,7 @@ enum AppNav {
   monthlyPlan,
   contactCompliance,
   flexplan,
+  workContracts,
 }
 
 class AppSideMenu extends StatelessWidget {
@@ -314,6 +315,16 @@ class AppSideMenu extends StatelessWidget {
           label: 'co:timer',
           active: active == AppNav.cotimer,
           onTap: () => _handleNav(context, AppNav.cotimer, '/cotimer'),
+        ),
+      ),
+      // Work Contracts: Vertrags-PDFs in wenigen Klicks (nur Arion).
+      _ownerOnly(
+        _MenuItem(
+          icon: Icons.history_edu_rounded,
+          label: 'Work Contracts',
+          active: active == AppNav.workContracts,
+          onTap: () =>
+              _handleNav(context, AppNav.workContracts, '/work-contracts'),
         ),
       ),
 

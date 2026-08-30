@@ -130,6 +130,7 @@ flutter:
     - assets/
     - assets/forms/
     - assets/flags/
+    - assets/contracts/
     - assets/icons/
     - assets/academy/safety/
     - assets/academy/driving/

@@ -38,3 +38,7 @@ samples/
 .vscode/
 *.iml
 landing/.firebase/
+
+
+# Vertragsquellen mit Personendaten + GF-Unterschrift: nur lokal halten
+docs/contracts/
