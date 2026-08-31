@@ -14965,6 +14965,295 @@ class AppLocalizations {
     },
   };
 
+
+  // ---- DA Requests (Fahrer-Antraege: Vorschuss, freie Schicht, Sonstiges) ----
+  static final Map<String, Map<String, String>> _daRequestsLocalizedValues = {
+    'en': {
+      'da_req_subtitle':
+          'Requests to your admin — e.g. salary advance or a free shift.',
+      'da_req_btn_advance': 'Request advance',
+      'da_req_btn_free_shift': 'Free shift',
+      'da_req_btn_other': 'Other request',
+      'da_req_load_failed': 'Could not load requests.',
+      'da_req_empty': 'No requests yet.',
+      'da_req_fs_title': 'Request free shift',
+      'da_req_fs_hint':
+          'Pick the day you need off and add a short reason. '
+              'Your admin will review the request.',
+      'da_req_date': 'Date',
+      'da_req_pick_date': 'Pick a date',
+      'da_req_reason': 'Reason',
+      'da_req_reason_hint': 'e.g. doctor appointment, family matter …',
+      'da_req_subject': 'Subject',
+      'da_req_message': 'Message',
+      'da_req_cancel': 'Cancel',
+      'da_req_send': 'Send',
+      'da_req_sent': 'Request sent.',
+      'da_req_send_failed': 'Failed to send: {error}',
+      'da_req_fill_all': 'Please pick a date and enter a reason.',
+      'da_req_type_advance': 'Salary advance',
+      'da_req_type_free_shift': 'Free shift',
+      'da_req_type_other': 'Request',
+      'da_req_status_open': 'OPEN',
+      'da_req_status_paid': 'PAID',
+      'da_req_status_done': 'DONE',
+      'da_req_status_rejected': 'REJECTED',
+    },
+    'de': {
+      'da_req_subtitle':
+          'Anträge an deinen Admin — z. B. Gehaltsvorschuss oder eine '
+              'freie Schicht.',
+      'da_req_btn_advance': 'Vorschuss beantragen',
+      'da_req_btn_free_shift': 'Freie Schicht',
+      'da_req_btn_other': 'Sonstiges Anliegen',
+      'da_req_load_failed': 'Anträge konnten nicht geladen werden.',
+      'da_req_empty': 'Noch keine Anträge gestellt.',
+      'da_req_fs_title': 'Freie Schicht beantragen',
+      'da_req_fs_hint':
+          'Wähle den Tag, an dem du frei brauchst, und gib kurz den Grund '
+              'an. Dein Admin prüft die Anfrage.',
+      'da_req_date': 'Datum',
+      'da_req_pick_date': 'Datum wählen',
+      'da_req_reason': 'Grund',
+      'da_req_reason_hint': 'z. B. Arzttermin, familiärer Grund …',
+      'da_req_subject': 'Betreff',
+      'da_req_message': 'Nachricht',
+      'da_req_cancel': 'Abbrechen',
+      'da_req_send': 'Senden',
+      'da_req_sent': 'Antrag gesendet.',
+      'da_req_send_failed': 'Senden fehlgeschlagen: {error}',
+      'da_req_fill_all': 'Bitte Datum wählen und einen Grund angeben.',
+      'da_req_type_advance': 'Gehaltsvorschuss',
+      'da_req_type_free_shift': 'Freie Schicht',
+      'da_req_type_other': 'Anliegen',
+      'da_req_status_open': 'OFFEN',
+      'da_req_status_paid': 'ÜBERWIESEN',
+      'da_req_status_done': 'ERLEDIGT',
+      'da_req_status_rejected': 'ABGELEHNT',
+    },
+    'sq': {
+      'da_req_subtitle':
+          'Kërkesa për adminin tënd — p.sh. paradhënie page ose një turn '
+              'i lirë.',
+      'da_req_btn_advance': 'Kërko paradhënie',
+      'da_req_btn_free_shift': 'Turn i lirë',
+      'da_req_btn_other': 'Kërkesë tjetër',
+      'da_req_load_failed': 'Kërkesat nuk u ngarkuan dot.',
+      'da_req_empty': 'Ende asnjë kërkesë.',
+      'da_req_fs_title': 'Kërko turn të lirë',
+      'da_req_fs_hint':
+          'Zgjidh ditën që të duhet e lirë dhe shkruaj shkurt arsyen. '
+              'Admini do ta shqyrtojë kërkesën.',
+      'da_req_date': 'Data',
+      'da_req_pick_date': 'Zgjidh datën',
+      'da_req_reason': 'Arsyeja',
+      'da_req_reason_hint': 'p.sh. takim te mjeku, arsye familjare …',
+      'da_req_subject': 'Tema',
+      'da_req_message': 'Mesazhi',
+      'da_req_cancel': 'Anulo',
+      'da_req_send': 'Dërgo',
+      'da_req_sent': 'Kërkesa u dërgua.',
+      'da_req_send_failed': 'Dërgimi dështoi: {error}',
+      'da_req_fill_all': 'Zgjidh datën dhe shkruaj arsyen.',
+      'da_req_type_advance': 'Paradhënie page',
+      'da_req_type_free_shift': 'Turn i lirë',
+      'da_req_type_other': 'Kërkesë',
+      'da_req_status_open': 'HAPUR',
+      'da_req_status_paid': 'PAGUAR',
+      'da_req_status_done': 'KRYER',
+      'da_req_status_rejected': 'REFUZUAR',
+    },
+    'hu': {
+      'da_req_subtitle':
+          'Kérelmek az adminodnak — pl. fizetési előleg vagy szabad '
+              'műszak.',
+      'da_req_btn_advance': 'Előleg igénylése',
+      'da_req_btn_free_shift': 'Szabad műszak',
+      'da_req_btn_other': 'Egyéb kérés',
+      'da_req_load_failed': 'A kérelmeket nem sikerült betölteni.',
+      'da_req_empty': 'Még nincs kérelem.',
+      'da_req_fs_title': 'Szabad műszak igénylése',
+      'da_req_fs_hint':
+          'Válaszd ki a napot, amikor szabadnap kell, és add meg röviden '
+              'az okát. Az admin elbírálja a kérést.',
+      'da_req_date': 'Dátum',
+      'da_req_pick_date': 'Válassz dátumot',
+      'da_req_reason': 'Indok',
+      'da_req_reason_hint': 'pl. orvosi időpont, családi ok …',
+      'da_req_subject': 'Tárgy',
+      'da_req_message': 'Üzenet',
+      'da_req_cancel': 'Mégse',
+      'da_req_send': 'Küldés',
+      'da_req_sent': 'Kérelem elküldve.',
+      'da_req_send_failed': 'A küldés nem sikerült: {error}',
+      'da_req_fill_all': 'Válassz dátumot és add meg az indokot.',
+      'da_req_type_advance': 'Fizetési előleg',
+      'da_req_type_free_shift': 'Szabad műszak',
+      'da_req_type_other': 'Kérelem',
+      'da_req_status_open': 'NYITOTT',
+      'da_req_status_paid': 'ÁTUTALVA',
+      'da_req_status_done': 'KÉSZ',
+      'da_req_status_rejected': 'ELUTASÍTVA',
+    },
+    'ro': {
+      'da_req_subtitle':
+          'Cereri către adminul tău — de ex. avans salarial sau o tură '
+              'liberă.',
+      'da_req_btn_advance': 'Cere avans',
+      'da_req_btn_free_shift': 'Tură liberă',
+      'da_req_btn_other': 'Altă cerere',
+      'da_req_load_failed': 'Cererile nu au putut fi încărcate.',
+      'da_req_empty': 'Nicio cerere încă.',
+      'da_req_fs_title': 'Cere tură liberă',
+      'da_req_fs_hint':
+          'Alege ziua în care ai nevoie de liber și scrie pe scurt '
+              'motivul. Adminul va analiza cererea.',
+      'da_req_date': 'Data',
+      'da_req_pick_date': 'Alege data',
+      'da_req_reason': 'Motiv',
+      'da_req_reason_hint': 'de ex. programare la medic, motiv familial …',
+      'da_req_subject': 'Subiect',
+      'da_req_message': 'Mesaj',
+      'da_req_cancel': 'Anulează',
+      'da_req_send': 'Trimite',
+      'da_req_sent': 'Cerere trimisă.',
+      'da_req_send_failed': 'Trimiterea a eșuat: {error}',
+      'da_req_fill_all': 'Alege data și scrie motivul.',
+      'da_req_type_advance': 'Avans salarial',
+      'da_req_type_free_shift': 'Tură liberă',
+      'da_req_type_other': 'Cerere',
+      'da_req_status_open': 'DESCHIS',
+      'da_req_status_paid': 'PLĂTIT',
+      'da_req_status_done': 'FINALIZAT',
+      'da_req_status_rejected': 'RESPINS',
+    },
+    'hr': {
+      'da_req_subtitle':
+          'Zahtjevi tvom adminu — npr. predujam plaće ili slobodna '
+              'smjena.',
+      'da_req_btn_advance': 'Zatraži predujam',
+      'da_req_btn_free_shift': 'Slobodna smjena',
+      'da_req_btn_other': 'Ostali zahtjev',
+      'da_req_load_failed': 'Zahtjevi se nisu mogli učitati.',
+      'da_req_empty': 'Još nema zahtjeva.',
+      'da_req_fs_title': 'Zatraži slobodnu smjenu',
+      'da_req_fs_hint':
+          'Odaberi dan kada trebaš slobodno i kratko navedi razlog. '
+              'Admin će pregledati zahtjev.',
+      'da_req_date': 'Datum',
+      'da_req_pick_date': 'Odaberi datum',
+      'da_req_reason': 'Razlog',
+      'da_req_reason_hint': 'npr. liječnički termin, obiteljski razlog …',
+      'da_req_subject': 'Predmet',
+      'da_req_message': 'Poruka',
+      'da_req_cancel': 'Odustani',
+      'da_req_send': 'Pošalji',
+      'da_req_sent': 'Zahtjev poslan.',
+      'da_req_send_failed': 'Slanje nije uspjelo: {error}',
+      'da_req_fill_all': 'Odaberi datum i navedi razlog.',
+      'da_req_type_advance': 'Predujam plaće',
+      'da_req_type_free_shift': 'Slobodna smjena',
+      'da_req_type_other': 'Zahtjev',
+      'da_req_status_open': 'OTVORENO',
+      'da_req_status_paid': 'ISPLAĆENO',
+      'da_req_status_done': 'GOTOVO',
+      'da_req_status_rejected': 'ODBIJENO',
+    },
+    'ar': {
+      'da_req_subtitle':
+          'طلبات إلى المشرف — مثل سلفة على الراتب أو وردية حرة.',
+      'da_req_btn_advance': 'طلب سلفة',
+      'da_req_btn_free_shift': 'وردية حرة',
+      'da_req_btn_other': 'طلب آخر',
+      'da_req_load_failed': 'تعذّر تحميل الطلبات.',
+      'da_req_empty': 'لا توجد طلبات بعد.',
+      'da_req_fs_title': 'طلب وردية حرة',
+      'da_req_fs_hint':
+          'اختر اليوم الذي تحتاج فيه إجازة واذكر السبب باختصار. '
+              'سيراجع المشرف الطلب.',
+      'da_req_date': 'التاريخ',
+      'da_req_pick_date': 'اختر التاريخ',
+      'da_req_reason': 'السبب',
+      'da_req_reason_hint': 'مثل موعد طبيب أو سبب عائلي …',
+      'da_req_subject': 'الموضوع',
+      'da_req_message': 'الرسالة',
+      'da_req_cancel': 'إلغاء',
+      'da_req_send': 'إرسال',
+      'da_req_sent': 'تم إرسال الطلب.',
+      'da_req_send_failed': 'فشل الإرسال: {error}',
+      'da_req_fill_all': 'يرجى اختيار التاريخ وذكر السبب.',
+      'da_req_type_advance': 'سلفة على الراتب',
+      'da_req_type_free_shift': 'وردية حرة',
+      'da_req_type_other': 'طلب',
+      'da_req_status_open': 'مفتوح',
+      'da_req_status_paid': 'تم التحويل',
+      'da_req_status_done': 'منجز',
+      'da_req_status_rejected': 'مرفوض',
+    },
+    'tr': {
+      'da_req_subtitle':
+          'Adminine talepler — örn. maaş avansı veya boş vardiya.',
+      'da_req_btn_advance': 'Avans talep et',
+      'da_req_btn_free_shift': 'Boş vardiya',
+      'da_req_btn_other': 'Diğer talep',
+      'da_req_load_failed': 'Talepler yüklenemedi.',
+      'da_req_empty': 'Henüz talep yok.',
+      'da_req_fs_title': 'Boş vardiya talep et',
+      'da_req_fs_hint':
+          'İzin istediğin günü seç ve kısaca nedenini yaz. '
+              'Admin talebi inceleyecek.',
+      'da_req_date': 'Tarih',
+      'da_req_pick_date': 'Tarih seç',
+      'da_req_reason': 'Neden',
+      'da_req_reason_hint': 'örn. doktor randevusu, ailevi neden …',
+      'da_req_subject': 'Konu',
+      'da_req_message': 'Mesaj',
+      'da_req_cancel': 'İptal',
+      'da_req_send': 'Gönder',
+      'da_req_sent': 'Talep gönderildi.',
+      'da_req_send_failed': 'Gönderilemedi: {error}',
+      'da_req_fill_all': 'Lütfen tarih seç ve nedenini yaz.',
+      'da_req_type_advance': 'Maaş avansı',
+      'da_req_type_free_shift': 'Boş vardiya',
+      'da_req_type_other': 'Talep',
+      'da_req_status_open': 'AÇIK',
+      'da_req_status_paid': 'ÖDENDİ',
+      'da_req_status_done': 'TAMAM',
+      'da_req_status_rejected': 'REDDEDİLDİ',
+    },
+    'ru': {
+      'da_req_subtitle':
+          'Запросы вашему админу — напр. аванс или свободная смена.',
+      'da_req_btn_advance': 'Запросить аванс',
+      'da_req_btn_free_shift': 'Свободная смена',
+      'da_req_btn_other': 'Другой запрос',
+      'da_req_load_failed': 'Не удалось загрузить запросы.',
+      'da_req_empty': 'Запросов пока нет.',
+      'da_req_fs_title': 'Запросить свободную смену',
+      'da_req_fs_hint':
+          'Выберите день, когда вам нужен выходной, и кратко укажите '
+              'причину. Админ рассмотрит запрос.',
+      'da_req_date': 'Дата',
+      'da_req_pick_date': 'Выбрать дату',
+      'da_req_reason': 'Причина',
+      'da_req_reason_hint': 'напр. визит к врачу, семейные обстоятельства …',
+      'da_req_subject': 'Тема',
+      'da_req_message': 'Сообщение',
+      'da_req_cancel': 'Отмена',
+      'da_req_send': 'Отправить',
+      'da_req_sent': 'Запрос отправлен.',
+      'da_req_send_failed': 'Не удалось отправить: {error}',
+      'da_req_fill_all': 'Выберите дату и укажите причину.',
+      'da_req_type_advance': 'Аванс',
+      'da_req_type_free_shift': 'Свободная смена',
+      'da_req_type_other': 'Запрос',
+      'da_req_status_open': 'ОТКРЫТ',
+      'da_req_status_paid': 'ПЕРЕВЕДЕНО',
+      'da_req_status_done': 'ГОТОВО',
+      'da_req_status_rejected': 'ОТКЛОНЁН',
+    },
+  };
+
   String _lang() => locale.languageCode.toLowerCase();
 
   String t(String key) {
@@ -15017,6 +15306,8 @@ class AppLocalizations {
     final miscMap = _miscLocalizedValues[lang] ?? _miscLocalizedValues['en']!;
     final faqTrainingMap = _faqTrainingLocalizedValues[lang] ??
         _faqTrainingLocalizedValues['en']!;
+    final daRequestsMap = _daRequestsLocalizedValues[lang] ??
+        _daRequestsLocalizedValues['en']!;
     final text =
         fleetHubMap[key] ??
         langMap[key] ??
@@ -15034,6 +15325,7 @@ class AppLocalizations {
         driverWaveplanMap[key] ??
         miscMap[key] ??
         faqTrainingMap[key] ??
+        daRequestsMap[key] ??
         _localizedValues['en']![key] ??
         _driverNotificationLocalizedValues['en']![key] ??
         _driverAbsenceLocalizedValues['en']![key] ??
@@ -15048,6 +15340,7 @@ class AppLocalizations {
         _driverWaveplanLocalizedValues['en']![key] ??
         _miscLocalizedValues['en']![key] ??
         _faqTrainingLocalizedValues['en']![key] ??
+        _daRequestsLocalizedValues['en']![key] ??
         key;
     return _normalizeScorecardTerms(text);
   }

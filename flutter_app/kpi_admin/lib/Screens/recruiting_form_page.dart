@@ -224,7 +224,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
   // Local/EU-Formular: gewählte Sprache (null = noch nicht gewählt →
   // Sprachauswahl zuerst, gleiches Muster wie im Visa-Kanal). Danach wird
   // das Formular einsprachig angezeigt.
-  // 'de' | 'en' | 'bg' | 'hu' | 'ro'.
+  // 'de' | 'en' | 'bg' | 'hu' | 'ro' | 'pt' | 'sq'.
   String? _localLang;
 
   /// Local/EU-Texthelfer: gibt den Text in der gewählten Sprache zurück
@@ -236,6 +236,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
     required String hu,
     required String ro,
     String? pt,
+    String? sq,
   }) {
     switch (_localLang) {
       case 'en':
@@ -250,6 +251,10 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
         // Portugiesisch fällt auf Englisch zurück, falls (noch) nicht
         // übersetzt — so bleibt das Formular immer vollständig.
         return pt ?? en;
+      case 'sq':
+        // Albanisch fällt auf Englisch zurück, falls (noch) nicht
+        // übersetzt — so bleibt das Formular immer vollständig.
+        return sq ?? en;
       default:
         return de;
     }
@@ -276,6 +281,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
           hu: 'Útlevél / személyi igazolvány előlap',
           ro: 'Pașaport / carte de identitate, față',
           pt: 'Passaporte / cartão de identidade, frente',
+          sq: 'Pasaporta / letërnjoftimi, faqja e përparme',
         );
       case 'id_back':
         return _lt(
@@ -285,6 +291,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
           hu: 'Személyi igazolvány hátlap',
           ro: 'Carte de identitate, verso',
           pt: 'Cartão de identidade, verso',
+          sq: 'Letërnjoftimi, faqja e pasme',
         );
       case 'selfie':
         return _lt(
@@ -294,6 +301,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
           hu: 'Szelfi a sofőrkártyához',
           ro: 'Selfie pentru ecusonul de șofer',
           pt: 'Selfie para o crachá de motorista',
+          sq: 'Selfie për distinktivin e shoferit',
         );
       case 'license_front':
         return _lt(
@@ -303,6 +311,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
           hu: 'Jogosítvány előlap',
           ro: 'Permis de conducere, față',
           pt: 'Carta de condução, frente',
+          sq: 'Patenta e shoferit, faqja e përparme',
         );
       default:
         return _lt(
@@ -312,6 +321,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
           hu: 'Jogosítvány hátlap',
           ro: 'Permis de conducere, verso',
           pt: 'Carta de condução, verso',
+          sq: 'Patenta e shoferit, faqja e pasme',
         );
     }
   }
@@ -331,6 +341,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
         hu: 'Válasszon dátumot',
         ro: 'Alegeți o dată',
         pt: 'Escolhe uma data',
+        sq: 'Zgjidh një datë',
       );
 
   String _pickSizeLabel() => _lt(
@@ -340,6 +351,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
         hu: 'Válasszon méretet',
         ro: 'Alegeți mărimea',
         pt: 'Escolhe o tamanho',
+        sq: 'Zgjidh madhësinë',
       );
 
   String _submitLaterLabel() => _lt(
@@ -349,6 +361,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
         hu: 'Később pótolom',
         ro: 'Voi trimite mai târziu',
         pt: 'Envio mais tarde',
+        sq: 'Do ta dorëzoj më vonë',
       );
 
   String _cancelLabel() => _lt(
@@ -358,6 +371,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
         hu: 'Mégse',
         ro: 'Anulare',
         pt: 'Cancelar',
+        sq: 'Anulo',
       );
 
   String _doneLabel() => _lt(
@@ -367,20 +381,21 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
         hu: 'Kész',
         ro: 'Gata',
         pt: 'Concluído',
+        sq: 'Gati',
       );
 
   /// Short weekday label in the selected local language. The Visa channel
   /// keeps the static German labels from [_kWeekdayOptions].
   String _localWeekdayLabel(String code) {
     const labels = <String, List<String>>{
-      // de, en, bg, hu, ro, pt
-      'mon': ['Mo', 'Mon', 'Пн', 'H', 'Lu', 'Seg'],
-      'tue': ['Di', 'Tue', 'Вт', 'K', 'Ma', 'Ter'],
-      'wed': ['Mi', 'Wed', 'Ср', 'Sze', 'Mi', 'Qua'],
-      'thu': ['Do', 'Thu', 'Чт', 'Cs', 'Jo', 'Qui'],
-      'fri': ['Fr', 'Fri', 'Пт', 'P', 'Vi', 'Sex'],
-      'sat': ['Sa', 'Sat', 'Сб', 'Szo', 'Sâ', 'Sáb'],
-      'sun': ['So', 'Sun', 'Нд', 'V', 'Du', 'Dom'],
+      // de, en, bg, hu, ro, pt, sq
+      'mon': ['Mo', 'Mon', 'Пн', 'H', 'Lu', 'Seg', 'Hën'],
+      'tue': ['Di', 'Tue', 'Вт', 'K', 'Ma', 'Ter', 'Mar'],
+      'wed': ['Mi', 'Wed', 'Ср', 'Sze', 'Mi', 'Qua', 'Mër'],
+      'thu': ['Do', 'Thu', 'Чт', 'Cs', 'Jo', 'Qui', 'Enj'],
+      'fri': ['Fr', 'Fri', 'Пт', 'P', 'Vi', 'Sex', 'Pre'],
+      'sat': ['Sa', 'Sat', 'Сб', 'Szo', 'Sâ', 'Sáb', 'Sht'],
+      'sun': ['So', 'Sun', 'Нд', 'V', 'Du', 'Dom', 'Die'],
     };
     final row = labels[code];
     if (row == null) return code;
@@ -395,6 +410,8 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
         return row[4];
       case 'pt':
         return row[5];
+      case 'sq':
+        return row[6];
       default:
         return row[0];
     }
@@ -419,7 +436,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
     super.initState();
     // Per Link vorgewählte Sprache (z. B. bulgarische Landingpage →
     // ?lang=bg): Sprachauswahl überspringen, Formular direkt einsprachig.
-    const supported = {'de', 'en', 'bg', 'hu', 'ro', 'pt'};
+    const supported = {'de', 'en', 'bg', 'hu', 'ro', 'pt', 'sq'};
     if (supported.contains(widget.initialLang)) {
       _localLang = widget.initialLang;
     }
@@ -525,6 +542,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Kérjük, válaszoljon a(z) „${f.label}" kérdésre.',
                   ro: 'Vă rugăm să răspundeți la „${f.label}".',
                   pt: 'Por favor, responde a "${f.label}".',
+                  sq: 'Të lutem përgjigju "${f.label}".',
                 )
               : 'Bitte „${f.label}" beantworten.';
         }
@@ -540,6 +558,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
           hu: 'Hiányzik az IBAN.',
           ro: 'Lipsește IBAN-ul.',
           pt: 'Falta o IBAN.',
+          sq: 'IBAN-i mungon.',
         );
       }
       if (!_noIbanYet && !_ibanPattern.hasMatch(_cleanedIban())) {
@@ -550,6 +569,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
           hu: 'Az IBAN érvénytelennek tűnik.',
           ro: 'IBAN-ul pare invalid.',
           pt: 'O IBAN parece inválido.',
+          sq: 'IBAN-i duket i pavlefshëm.',
         );
       }
       if (!_taxIdLater && _taxId.text.trim().isEmpty) {
@@ -560,6 +580,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
           hu: 'Hiányzik az adóazonosító szám.',
           ro: 'Lipsește numărul de identificare fiscală.',
           pt: 'Falta o número de identificação fiscal.',
+          sq: 'Numri i identifikimit tatimor mungon.',
         );
       }
       if (!_socialSecurityLater &&
@@ -571,6 +592,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
           hu: 'Hiányzik a társadalombiztosítási szám.',
           ro: 'Lipsește numărul de asigurare socială.',
           pt: 'Falta o número de segurança social.',
+          sq: 'Numri i sigurimeve shoqërore mungon.',
         );
       }
       if (_healthInsuranceChoice.isEmpty) {
@@ -581,6 +603,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
           hu: 'Hiányzik az egészségbiztosításra vonatkozó adat.',
           ro: 'Lipsesc informațiile despre asigurarea de sănătate.',
           pt: 'Falta a informação sobre o seguro de saúde.',
+          sq: 'Informacioni për sigurimin shëndetësor mungon.',
         );
       }
       if (_healthInsuranceChoice == 'has' &&
@@ -592,6 +615,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
           hu: 'Hiányzik az egészségbiztosító neve.',
           ro: 'Lipsește numele casei de asigurări de sănătate.',
           pt: 'Falta o nome do seguro de saúde.',
+          sq: 'Emri i sigurimit shëndetësor mungon.',
         );
       }
       if (_healthInsuranceChoice == 'none' && _aokBayernRegister.isEmpty) {
@@ -605,6 +629,8 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
               'la casa de asigurări de sănătate.',
           pt: 'Por favor, responde à pergunta sobre a inscrição no seguro de '
               'saúde.',
+          sq: 'Të lutem përgjigju pyetjes për regjistrimin në sigurimin '
+              'shëndetësor.',
         );
       }
       if (_maritalStatus.isEmpty) {
@@ -615,6 +641,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
           hu: 'Hiányzik a családi állapot.',
           ro: 'Lipsește starea civilă.',
           pt: 'Falta o estado civil.',
+          sq: 'Gjendja civile mungon.',
         );
       }
       if (_childrenChoice.isEmpty) {
@@ -625,6 +652,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
           hu: 'Hiányzik a gyermekekre vonatkozó adat.',
           ro: 'Lipsesc informațiile despre copii.',
           pt: 'Falta a informação sobre filhos.',
+          sq: 'Informacioni për fëmijët mungon.',
         );
       }
       if (_childrenChoice == 'count' &&
@@ -636,6 +664,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
           hu: 'Hiányzik a gyermekek száma.',
           ro: 'Lipsește numărul de copii.',
           pt: 'Falta o número de filhos.',
+          sq: 'Numri i fëmijëve mungon.',
         );
       }
       if (_earliestStart == null) {
@@ -646,6 +675,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
           hu: 'Kérjük, válasszon egy lehetséges kezdési dátumot.',
           ro: 'Vă rugăm să alegeți o dată de început posibilă.',
           pt: 'Por favor, escolhe uma possível data de início.',
+          sq: 'Të lutem zgjidh një datë të mundshme fillimi.',
         );
       }
       return null;
@@ -660,6 +690,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                 hu: 'Kérjük, válasszon foglalkoztatási formát.',
                 ro: 'Vă rugăm să alegeți tipul de angajare.',
                 pt: 'Por favor, escolhe o tipo de emprego.',
+                sq: 'Të lutem zgjidh llojin e punësimit.',
               )
             : _vt('Ju lutemi zgjidhni llojin e punës.',
                 'Bitte Beschäftigungs-Wunsch auswählen.');
@@ -673,6 +704,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                 hu: 'Kérjük, válasszon heti 2, 3 vagy 4 napot.',
                 ro: 'Vă rugăm să alegeți 2, 3 sau 4 zile pe săptămână.',
                 pt: 'Por favor, escolhe 2, 3 ou 4 dias por semana.',
+                sq: 'Të lutem zgjidh 2, 3 ose 4 ditë në javë.',
               )
             : _vt('Ju lutemi zgjidhni 2, 3 ose 4 ditë në javë.',
                 'Bitte 2, 3 oder 4 Tage pro Woche auswählen.');
@@ -686,6 +718,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                 hu: 'Kérjük, jelölje meg, mely napokon elérhető.',
                 ro: 'Vă rugăm să alegeți zilele în care sunteți disponibil.',
                 pt: 'Por favor, escolhe os dias em que estás disponível.',
+                sq: 'Të lutem zgjidh ditët kur je i disponueshëm.',
               )
             : _vt('Ju lutemi zgjidhni ditët kur jeni i disponueshëm.',
                 'Bitte die verfügbaren Wochentage auswählen.');
@@ -699,6 +732,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                 hu: 'Hiányzik a keresztnév.',
                 ro: 'Lipsește prenumele.',
                 pt: 'Falta o nome próprio.',
+                sq: 'Emri mungon.',
               )
             : _vt('Emri mungon.', 'Vorname fehlt.');
       }
@@ -711,6 +745,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                 hu: 'Hiányzik a vezetéknév.',
                 ro: 'Lipsește numele de familie.',
                 pt: 'Falta o apelido.',
+                sq: 'Mbiemri mungon.',
               )
             : _vt('Mbiemri mungon.', 'Nachname fehlt.');
       }
@@ -723,6 +758,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                 hu: 'Hiányzik a születési dátum.',
                 ro: 'Lipsește data nașterii.',
                 pt: 'Falta a data de nascimento.',
+                sq: 'Data e lindjes mungon.',
               )
             : _vt('Data e lindjes mungon.', 'Geburtsdatum fehlt.');
       }
@@ -735,6 +771,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                 hu: 'Hiányzik a születési hely.',
                 ro: 'Lipsește locul nașterii.',
                 pt: 'Falta o local de nascimento.',
+                sq: 'Vendlindja mungon.',
               )
             : _vt('Vendlindja mungon.', 'Geburtsort fehlt.');
       }
@@ -747,6 +784,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                 hu: 'Hiányzik a születési ország.',
                 ro: 'Lipsește țara nașterii.',
                 pt: 'Falta o país de nascimento.',
+                sq: 'Shteti i lindjes mungon.',
               )
             : _vt('Shteti i lindjes mungon.', 'Geburtsland fehlt.');
       }
@@ -759,6 +797,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                 hu: 'Hiányzik az állampolgárság.',
                 ro: 'Lipsește cetățenia.',
                 pt: 'Falta a nacionalidade.',
+                sq: 'Shtetësia mungon.',
               )
             : _vt('Shtetësia mungon.', 'Nationalität fehlt.');
       }
@@ -774,6 +813,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                 hu: 'Hiányzik a cím.',
                 ro: 'Lipsește adresa.',
                 pt: 'Falta a morada.',
+                sq: 'Adresa mungon.',
               )
             : _vt('Rruga mungon.', 'Adresse fehlt.');
       }
@@ -786,6 +826,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                 hu: 'Hiányzik az irányítószám.',
                 ro: 'Lipsește codul poștal.',
                 pt: 'Falta o código postal.',
+                sq: 'Kodi postar mungon.',
               )
             : _vt('Kodi postar mungon.', 'PLZ fehlt.');
       }
@@ -798,6 +839,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                 hu: 'Hiányzik a város.',
                 ro: 'Lipsește orașul.',
                 pt: 'Falta a cidade.',
+                sq: 'Qyteti mungon.',
               )
             : _vt('Qyteti mungon.', 'Stadt fehlt.');
       }
@@ -810,6 +852,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
           hu: 'Kérjük, válaszoljon a szállásra vonatkozó kérdésre.',
           ro: 'Vă rugăm să răspundeți la întrebarea despre cazare.',
           pt: 'Por favor, responde à pergunta sobre o alojamento.',
+          sq: 'Të lutem përgjigju pyetjes për strehimin.',
         );
       }
       // Eigenes Fahrzeug für den Arbeitsweg — ebenfalls Pflicht (Local/EU).
@@ -821,6 +864,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
           hu: 'Kérjük, válaszoljon a saját járműre vonatkozó kérdésre.',
           ro: 'Vă rugăm să răspundeți la întrebarea despre vehiculul propriu.',
           pt: 'Por favor, responde à pergunta sobre o veículo próprio.',
+          sq: 'Të lutem përgjigju pyetjes për automjetin vetjak.',
         );
       }
       // livingSince is Visa-only — Local/EU dropped the field.
@@ -839,6 +883,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                 hu: 'Hiányzik a pólóméret.',
                 ro: 'Lipsește mărimea tricoului.',
                 pt: 'Falta o tamanho da t-shirt.',
+                sq: 'Madhësia e bluzës mungon.',
               )
             : _vt('Madhësia mungon.', 'Größe fehlt.');
       }
@@ -851,6 +896,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                 hu: 'Hiányzik a cipőméret.',
                 ro: 'Lipsește mărimea la încălțăminte.',
                 pt: 'Falta o número do calçado.',
+                sq: 'Numri i këpucëve mungon.',
               )
             : _vt('Numri i këpucëve mungon.', 'Schuhgröße fehlt.');
       }
@@ -863,6 +909,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                 hu: 'Hiányzik a telefonszám.',
                 ro: 'Lipsește numărul de telefon.',
                 pt: 'Falta o número de telefone.',
+                sq: 'Numri i telefonit mungon.',
               )
             : 'Telefon fehlt.';
       }
@@ -875,6 +922,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                 hu: 'Hiányzik az e-mail-cím.',
                 ro: 'Lipsește adresa de e-mail.',
                 pt: 'Falta o endereço de e-mail.',
+                sq: 'Adresa e emailit mungon.',
               )
             : 'Email fehlt.';
       }
@@ -887,6 +935,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                 hu: 'Az e-mail-cím érvénytelen.',
                 ro: 'Adresa de e-mail este invalidă.',
                 pt: 'O endereço de e-mail é inválido.',
+                sq: 'Adresa e emailit është e pavlefshme.',
               )
             : 'Email ist ungültig.';
       }
@@ -928,6 +977,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Hiányzik az útlevél / személyi igazolvány (előlap).',
                   ro: 'Lipsește pașaportul / cartea de identitate (față).',
                   pt: 'Falta o passaporte / cartão de identidade (frente).',
+                  sq: 'Pasaporta / letërnjoftimi (faqja e përparme) mungon.',
                 )
               : 'Pass / Personalausweis fehlt.';
         }
@@ -940,6 +990,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Hiányzik a személyi igazolvány (hátlap).',
                   ro: 'Lipsește cartea de identitate (verso).',
                   pt: 'Falta o cartão de identidade (verso).',
+                  sq: 'Letërnjoftimi (faqja e pasme) mungon.',
                 )
               : 'Personalausweis Rückseite fehlt / ID back side missing.';
         }
@@ -952,6 +1003,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Hiányzik a sofőrkártyához szükséges szelfi.',
                   ro: 'Lipsește selfie-ul pentru ecusonul de șofer.',
                   pt: 'Falta a selfie para o crachá de motorista.',
+                  sq: 'Selfie për distinktivin e shoferit mungon.',
                 )
               : 'Selfie für Driver-Badge fehlt / Selfie missing.';
         }
@@ -964,6 +1016,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Hiányzik a jogosítvány (előlap).',
                   ro: 'Lipsește permisul de conducere (față).',
                   pt: 'Falta a carta de condução (frente).',
+                  sq: 'Patenta e shoferit (faqja e përparme) mungon.',
                 )
               : 'Führerschein Vorderseite fehlt.';
         }
@@ -976,6 +1029,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Hiányzik a jogosítvány (hátlap).',
                   ro: 'Lipsește permisul de conducere (verso).',
                   pt: 'Falta a carta de condução (verso).',
+                  sq: 'Patenta e shoferit (faqja e pasme) mungon.',
                 )
               : 'Führerschein Rückseite fehlt.';
         }
@@ -990,6 +1044,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                       'protecția datelor.',
                   pt: 'Por favor, aceita o consentimento de proteção de '
                       'dados.',
+                  sq: 'Të lutem prano pëlqimin për mbrojtjen e të dhënave.',
                 )
               : _vt('Ju lutemi pranoni pëlqimin e privatësisë.',
                   'Bitte Datenschutz-Einwilligung akzeptieren.');
@@ -1046,6 +1101,8 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                 pt: 'A imagem é demasiado grande e não foi possível '
                     'comprimi-la. Por favor, escolhe uma versão mais '
                     'pequena.',
+                sq: 'Fotoja është shumë e madhe dhe nuk u kompresua dot. Të '
+                    'lutem zgjidh një version më të vogël.',
               )
             : 'Image too large and could not be compressed. Please '
                 'pick a smaller version.');
@@ -1064,6 +1121,8 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
               ro: 'Fișier prea mare ($mb MB). Maximum 10 MB per document.',
               pt: 'Ficheiro demasiado grande ($mb MB). Máximo 10 MB por '
                   'documento.',
+              sq: 'Skedari është shumë i madh ($mb MB). Maksimumi 10 MB për '
+                  'dokument.',
             )
           : 'File too large ($mb MB). Max 10 MB per document.');
       return;
@@ -1151,6 +1210,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
               hu: 'Előkészítés…',
               ro: 'Se pregătește…',
               pt: 'A preparar…',
+              sq: 'Po përgatitet…',
             )
           : 'Preparing…';
       _error = null;
@@ -1186,6 +1246,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                 hu: 'Feltöltés $n: ${s.$3}…',
                 ro: 'Se încarcă $n: ${s.$3}…',
                 pt: 'A carregar $n: ${s.$3}…',
+                sq: 'Po ngarkohet $n: ${s.$3}…',
               )
             : 'Lädt $n: ${s.$3}…');
         try {
@@ -1202,6 +1263,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                     hu: 'A(z) „${s.$3}" feltöltése sikertelen — $e',
                     ro: 'Încărcarea „${s.$3}" a eșuat — $e',
                     pt: 'O carregamento de "${s.$3}" falhou — $e',
+                    sq: 'Ngarkimi i "${s.$3}" dështoi — $e',
                   )
                 : 'Upload "${s.$3}" fehlgeschlagen — $e',
           );
@@ -1216,6 +1278,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
               hu: 'Mentés…',
               ro: 'Se salvează…',
               pt: 'A guardar…',
+              sq: 'Po ruhet…',
             )
           : 'Saving…');
       final composedLicense =
@@ -1314,6 +1377,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
               hu: 'A küldés sikertelen: $e',
               ro: 'Trimiterea a eșuat: $e',
               pt: 'O envio falhou: $e',
+              sq: 'Dërgimi dështoi: $e',
             )
           : 'Submit failed: $e');
     } finally {
@@ -1869,6 +1933,13 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                     sub: 'Continuar em português',
                     code: 'pt',
                   ),
+                  const SizedBox(height: 12),
+                  option(
+                    flag: '🇦🇱',
+                    label: 'Shqip',
+                    sub: 'Vazhdo në shqip',
+                    code: 'sq',
+                  ),
                 ],
               ),
             ),
@@ -1918,6 +1989,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                         hu: 'Sofőr jelentkezés',
                         ro: 'Candidatură șofer',
                         pt: 'Candidatura a motorista',
+                        sq: 'Aplikim për shofer',
                       ),
                 style: AppTypography.title3.copyWith(
                   color: const Color(0xFF111827),
@@ -1965,6 +2037,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'További kérdések',
                   ro: 'Întrebări suplimentare',
                   pt: 'Perguntas adicionais',
+                  sq: 'Pyetje shtesë',
                 )
               : _vt('Pyetjet shtesë', 'Weitere Fragen'),
         ),
@@ -1982,6 +2055,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                       hu: 'Írja be a válaszát',
                       ro: 'Introduceți răspunsul',
                       pt: 'Escreve a tua resposta',
+                      sq: 'Shkruaj përgjigjen tënde',
                     )
                   : 'Type your answer',
               yesLabel: _isLocal
@@ -1992,6 +2066,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                       hu: 'Igen',
                       ro: 'Da',
                       pt: 'Sim',
+                      sq: 'Po',
                     )
                   : 'Yes · Ja',
               noLabel: _isLocal
@@ -2002,6 +2077,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                       hu: 'Nem',
                       ro: 'Nu',
                       pt: 'Não',
+                      sq: 'Jo',
                     )
                   : 'No · Nein',
               onChanged: (v) => setState(() {
@@ -2029,6 +2105,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Kívánt foglalkoztatás',
                   ro: 'Tipul de angajare dorit',
                   pt: 'Tipo de emprego pretendido',
+                  sq: 'Lloji i punësimit të dëshiruar',
                 )
               : _vt('Lloji i punës', 'Beschäftigungs-Wunsch'),
         ),
@@ -2041,6 +2118,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Mire jelentkezik?',
                   ro: 'Pentru ce aplicați?',
                   pt: 'A que te candidatas?',
+                  sq: 'Për çfarë po aplikon?',
                 )
               : _vt('Për çfarë po aplikoni?', 'Was bewirbst du dich?'),
           child: Column(
@@ -2055,6 +2133,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                         hu: 'Teljes munkaidő',
                         ro: 'Normă întreagă',
                         pt: 'Tempo inteiro',
+                        sq: 'Kohë e plotë',
                       )
                     : _vt('Kohë e plotë', 'Vollzeit'),
                 selected: _employmentInterest == 'fulltime',
@@ -2070,6 +2149,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                         hu: 'Részmunkaidő',
                         ro: 'Normă parțială',
                         pt: 'Tempo parcial',
+                        sq: 'Kohë e pjesshme',
                       )
                     : _vt('Gjysmë-orari', 'Teilzeit'),
                 selected: _employmentInterest == 'parttime',
@@ -2088,6 +2168,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                             hu: 'Hány napot hetente?',
                             ro: 'Câte zile pe săptămână?',
                             pt: 'Quantos dias por semana?',
+                            sq: 'Sa ditë në javë?',
                           )
                         : _vt('Sa ditë në javë?', 'Wie viele Tage pro Woche?'),
                     style: AppTypography.caption1.copyWith(
@@ -2109,6 +2190,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                                   hu: '$d nap',
                                   ro: '$d zile',
                                   pt: '$d dias',
+                                  sq: '$d ditë',
                                 )
                               : _vt('$d ditë', '$d Tage'),
                           selected: _parttimeDays == d,
@@ -2132,6 +2214,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                             hu: 'Mely napokon tud dolgozni?',
                             ro: 'În ce zile sunteți disponibil?',
                             pt: 'Em que dias estás disponível?',
+                            sq: 'Në cilat ditë mund të punosh?',
                           )
                         : _vt('Në cilat ditë je i disponueshëm?',
                             'An welchen Tagen kannst du?'),
@@ -2175,6 +2258,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                         hu: 'Diákmunka (Werkstudent)',
                         ro: 'Student angajat (Werkstudent)',
                         pt: 'Estudante trabalhador (Werkstudent)',
+                        sq: 'Student punonjës (Werkstudent)',
                       )
                     : _vt('Student punëtor', 'Werkstudent'),
                 selected: _employmentInterest == 'werkstudent',
@@ -2194,6 +2278,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Személyes adatok',
                   ro: 'Date personale',
                   pt: 'Dados pessoais',
+                  sq: 'Të dhënat personale',
                 )
               : _vt('Të dhënat personale', 'Persönliche Daten'),
         ),
@@ -2206,6 +2291,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Keresztnév',
                   ro: 'Prenume',
                   pt: 'Nome próprio',
+                  sq: 'Emri',
                 )
               : _vt('Emri', 'Vorname'),
           child: TextField(
@@ -2219,6 +2305,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                       hu: 'pl. András',
                       ro: 'ex. Andrei',
                       pt: 'p. ex. André',
+                      sq: 'p.sh. Andreas',
                     )
                   : 'z.B. Andi',
             ),
@@ -2233,6 +2320,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Vezetéknév',
                   ro: 'Nume de familie',
                   pt: 'Apelido',
+                  sq: 'Mbiemri',
                 )
               : _vt('Mbiemri', 'Nachname'),
           child: TextField(
@@ -2246,6 +2334,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                       hu: 'pl. Kovács',
                       ro: 'ex. Popescu',
                       pt: 'p. ex. Silva',
+                      sq: 'p.sh. Krasniqi',
                     )
                   : 'z.B. Krasniqi',
             ),
@@ -2260,6 +2349,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Születési dátum',
                   ro: 'Data nașterii',
                   pt: 'Data de nascimento',
+                  sq: 'Data e lindjes',
                 )
               : _vt('Data e lindjes', 'Geburtsdatum'),
           child: _DatePickerField(
@@ -2279,6 +2369,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Születési hely (város)',
                   ro: 'Locul nașterii (oraș)',
                   pt: 'Local de nascimento (cidade)',
+                  sq: 'Vendlindja (qyteti)',
                 )
               : _vt('Vendlindja (Qyteti)', 'Geburtsort (Stadt)'),
           child: TextField(
@@ -2292,6 +2383,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                       hu: 'pl. Budapest',
                       ro: 'ex. București',
                       pt: 'p. ex. Lisboa',
+                      sq: 'p.sh. Tirana',
                     )
                   : 'z.B. Prishtina',
             ),
@@ -2306,6 +2398,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Születési ország',
                   ro: 'Țara nașterii',
                   pt: 'País de nascimento',
+                  sq: 'Shteti i lindjes',
                 )
               : _vt('Shteti i lindjes', 'Geburtsland'),
           child: TextField(
@@ -2320,6 +2413,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                       hu: 'pl. Magyarország',
                       ro: 'ex. România',
                       pt: 'p. ex. Portugal',
+                      sq: 'p.sh. Shqipëria',
                     )
                   : 'z.B. Kosovo / Deutschland',
             ),
@@ -2334,6 +2428,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Állampolgárság',
                   ro: 'Cetățenie',
                   pt: 'Nacionalidade',
+                  sq: 'Shtetësia',
                 )
               : _vt('Shtetësia', 'Nationalität'),
           child: _isLocal
@@ -2347,6 +2442,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                       hu: 'pl. magyar',
                       ro: 'ex. română',
                       pt: 'p. ex. portuguesa',
+                      sq: 'p.sh. shqiptare',
                     ),
                   ),
                   onChanged: (v) =>
@@ -2405,6 +2501,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Cím',
                   ro: 'Adresă',
                   pt: 'Morada',
+                  sq: 'Adresa',
                 )
               : _vt('Adresa', 'Adresse'),
         ),
@@ -2417,6 +2514,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Utca és házszám',
                   ro: 'Strada și numărul',
                   pt: 'Rua e número',
+                  sq: 'Rruga dhe numri i shtëpisë',
                 )
               : _vt('Rruga + Numri i shtëpisë', 'Straße + Hausnummer'),
           child: TextField(
@@ -2430,6 +2528,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                       hu: 'pl. Musterstraße 12',
                       ro: 'ex. Musterstraße 12',
                       pt: 'p. ex. Musterstraße 12',
+                      sq: 'p.sh. Musterstraße 12',
                     )
                   : 'z.B. Musterstraße 12',
             ),
@@ -2444,6 +2543,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Irányítószám',
                   ro: 'Cod poștal',
                   pt: 'Código postal',
+                  sq: 'Kodi postar',
                 )
               : _vt('Kodi postar', 'Postleitzahl'),
           child: TextField(
@@ -2458,6 +2558,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                       hu: 'pl. 51063',
                       ro: 'ex. 51063',
                       pt: 'p. ex. 51063',
+                      sq: 'p.sh. 51063',
                     )
                   : 'z.B. 51063',
             ),
@@ -2472,6 +2573,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Város / lakóhely',
                   ro: 'Oraș / localitate',
                   pt: 'Cidade / localidade',
+                  sq: 'Qyteti / vendbanimi',
                 )
               : _vt('Qyteti / Vendbanimi', 'Stadt / Wohnort'),
           child: TextField(
@@ -2485,6 +2587,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                       hu: 'pl. Köln',
                       ro: 'ex. Köln',
                       pt: 'p. ex. Köln',
+                      sq: 'p.sh. Köln',
                     )
                   : 'z.B. Köln',
             ),
@@ -2511,6 +2614,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
               hu: 'Szállás',
               ro: 'Cazare',
               pt: 'Alojamento',
+              sq: 'Strehimi',
             ),
           ),
           _LabeledField(
@@ -2521,6 +2625,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
               hu: 'Szüksége van szállásra is?',
               ro: 'Aveți nevoie și de cazare?',
               pt: 'Também precisas de alojamento?',
+              sq: 'A ke nevojë edhe për strehim?',
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2533,6 +2638,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                     hu: 'Igen, szükségem van szállásra',
                     ro: 'Da, am nevoie de cazare',
                     pt: 'Sim, preciso de alojamento',
+                    sq: 'Po, kam nevojë për strehim',
                   ),
                   selected: _needsAccommodation == true,
                   onTap: () => setState(() => _needsAccommodation = true),
@@ -2545,6 +2651,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                     hu: 'Nem, van szállásom',
                     ro: 'Nu, am deja o locuință',
                     pt: 'Não, já tenho alojamento',
+                    sq: 'Jo, e kam strehimin',
                   ),
                   selected: _needsAccommodation == false,
                   onTap: () => setState(() => _needsAccommodation = false),
@@ -2560,6 +2667,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
               hu: 'Van saját járműve a munkába járáshoz?',
               ro: 'Aveți un vehicul propriu pentru a ajunge la muncă?',
               pt: 'Tens veículo próprio para ir para o trabalho?',
+              sq: 'A ke automjet vetjak për të shkuar në punë?',
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2572,6 +2680,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                     hu: 'Igen, van saját járművem',
                     ro: 'Da, am un vehicul propriu',
                     pt: 'Sim, tenho veículo próprio',
+                    sq: 'Po, kam automjet vetjak',
                   ),
                   selected: _ownVehicleForCommute == true,
                   onTap: () => setState(() => _ownVehicleForCommute = true),
@@ -2584,6 +2693,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                     hu: 'Nem, nincs saját járművem',
                     ro: 'Nu, nu am un vehicul propriu',
                     pt: 'Não, não tenho veículo próprio',
+                    sq: 'Jo, nuk kam automjet vetjak',
                   ),
                   selected: _ownVehicleForCommute == false,
                   onTap: () => setState(() => _ownVehicleForCommute = false),
@@ -2608,6 +2718,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Méretek és elérhetőség',
                   ro: 'Mărimi și contact',
                   pt: 'Tamanhos e contacto',
+                  sq: 'Madhësitë dhe kontakti',
                 )
               : _vt('Madhësitë & Kontakti', 'Größen & Kontakt'),
         ),
@@ -2620,6 +2731,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Póló- és kabátméret',
                   ro: 'Mărime tricou și jachetă',
                   pt: 'Tamanho de t-shirt e casaco',
+                  sq: 'Madhësia e bluzës dhe e xhaketës',
                 )
               : _vt('Madhësia e bluzës dhe xhaketës', 'T-Shirt- & Jacken-Größe'),
           child: _SizePickerField(
@@ -2640,6 +2752,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Cipőméret',
                   ro: 'Mărime încălțăminte',
                   pt: 'Número do calçado',
+                  sq: 'Numri i këpucëve',
                 )
               : _vt('Numri i këpucëve', 'Schuhgröße'),
           child: _SizePickerField(
@@ -2660,6 +2773,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Telefonszám (WhatsApp)',
                   ro: 'Număr de telefon (WhatsApp)',
                   pt: 'Número de telefone (WhatsApp)',
+                  sq: 'Numri i telefonit (WhatsApp)',
                 )
               : _vt('Numri i telefonit (WhatsApp)', 'Telefonnummer'),
           child: Row(
@@ -2700,6 +2814,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                             hu: 'pl. 170 1234567',
                             ro: 'ex. 170 1234567',
                             pt: 'p. ex. 170 1234567',
+                            sq: 'p.sh. 170 1234567',
                           )
                         : 'z.B. 170 1234567',
                   ),
@@ -2717,6 +2832,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'E-mail',
                   ro: 'E-mail',
                   pt: 'E-mail',
+                  sq: 'Email',
                 )
               : 'Email',
           child: TextField(
@@ -2732,6 +2848,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                       hu: 'pl. name@example.com',
                       ro: 'ex. name@example.com',
                       pt: 'p. ex. name@example.com',
+                      sq: 'p.sh. name@example.com',
                     )
                   : 'z.B. andi@example.com',
             ),
@@ -2917,6 +3034,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
             hu: 'Bérszámfejtési adatok',
             ro: 'Date de salarizare',
             pt: 'Dados salariais',
+            sq: 'Të dhënat e pagës',
           ),
         ),
         Padding(
@@ -2932,6 +3050,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   'fluturaș de salariu.',
               pt: 'Encontras os dois números no teu último recibo de '
                   'vencimento.',
+              sq: 'Të dy numrat i gjen në fletëpagesën tënde të fundit.',
             ),
             style: AppTypography.caption1.copyWith(
               color: const Color(0xFF6B7280),
@@ -2947,6 +3066,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
             hu: 'IBAN (bankszámla)',
             ro: 'IBAN (cont bancar)',
             pt: 'IBAN (conta bancária)',
+            sq: 'IBAN (llogaria bankare)',
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2968,6 +3088,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Még nincs IBAN-om',
                   ro: 'Încă nu am IBAN',
                   pt: 'Ainda não tenho IBAN',
+                  sq: 'Nuk kam ende IBAN',
                 ),
               ),
             ],
@@ -2981,6 +3102,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
             hu: 'Adóazonosító szám',
             ro: 'Număr de identificare fiscală',
             pt: 'Número de identificação fiscal',
+            sq: 'Numri i identifikimit tatimor',
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2997,6 +3119,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                     hu: '11 számjegy',
                     ro: '11 cifre',
                     pt: '11 dígitos',
+                    sq: '11 shifra',
                   ),
                 ),
               ),
@@ -3016,6 +3139,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
             hu: 'Társadalombiztosítási szám',
             ro: 'Număr de asigurare socială',
             pt: 'Número de segurança social',
+            sq: 'Numri i sigurimeve shoqërore',
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -3031,6 +3155,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                     hu: '12 karakter',
                     ro: '12 caractere',
                     pt: '12 caracteres',
+                    sq: '12 karaktere',
                   ),
                 ),
               ),
@@ -3051,6 +3176,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
             hu: 'Egészségbiztosítás',
             ro: 'Asigurare de sănătate',
             pt: 'Seguro de saúde',
+            sq: 'Sigurimi shëndetësor',
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -3063,6 +3189,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Van egészségbiztosításom',
                   ro: 'Am asigurare de sănătate',
                   pt: 'Tenho seguro de saúde',
+                  sq: 'Kam sigurim shëndetësor',
                 ),
                 selected: _healthInsuranceChoice == 'has',
                 onTap: () => setState(() => _healthInsuranceChoice = 'has'),
@@ -3085,6 +3212,8 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                             'ex. TK, AOK, Barmer',
                         pt: 'Nome do seguro de saúde · p. ex. TK, AOK, '
                             'Barmer',
+                        sq: 'Emri i sigurimit shëndetësor · p.sh. TK, AOK, '
+                            'Barmer',
                       ),
                     ),
                   ),
@@ -3102,6 +3231,8 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                       'nu am casă de asigurări',
                   pt: 'De momento não estou segurado / não tenho seguro de '
                       'saúde',
+                  sq: 'Aktualisht nuk jam i siguruar / nuk kam sigurim '
+                      'shëndetësor',
                 ),
                 selected: _healthInsuranceChoice == 'none',
                 onTap: () => setState(() {
@@ -3125,6 +3256,8 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                       ro: 'Doriți să vă înscriem la o casă de asigurări '
                           'de sănătate?',
                       pt: 'Queres que te inscrevamos num seguro de saúde?',
+                      sq: 'A dëshiron që të të regjistrojmë në një sigurim '
+                          'shëndetësor?',
                     ),
                     style: AppTypography.body.copyWith(
                       color: const Color(0xFF1F2937),
@@ -3140,6 +3273,8 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                     hu: 'Igen, kérem a bejelentést egy egészségbiztosítóhoz',
                     ro: 'Da, vă rog să mă înscrieți la o casă de asigurări',
                     pt: 'Sim, por favor inscrevam-me num seguro de saúde',
+                    sq: 'Po, ju lutem më regjistroni në një sigurim '
+                        'shëndetësor',
                   ),
                   selected: _aokBayernRegister == 'yes',
                   onTap: () => setState(() => _aokBayernRegister = 'yes'),
@@ -3152,6 +3287,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                     hu: 'Nem, magam intézem',
                     ro: 'Nu, mă ocup eu însumi',
                     pt: 'Não, trato disso sozinho',
+                    sq: 'Jo, kujdesem vetë për këtë',
                   ),
                   selected: _aokBayernRegister == 'no',
                   onTap: () => setState(() => _aokBayernRegister = 'no'),
@@ -3169,6 +3305,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
             hu: 'Család',
             ro: 'Familie',
             pt: 'Família',
+            sq: 'Familja',
           ),
         ),
         _LabeledField(
@@ -3179,6 +3316,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
             hu: 'Családi állapot',
             ro: 'Stare civilă',
             pt: 'Estado civil',
+            sq: 'Gjendja civile',
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -3191,6 +3329,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Elvált',
                   ro: 'Divorțat(ă)',
                   pt: 'Divorciado(a)',
+                  sq: 'I/e divorcuar',
                 ),
                 selected: _maritalStatus == 'divorced',
                 onTap: () => setState(() => _maritalStatus = 'divorced'),
@@ -3203,6 +3342,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Egyedülálló',
                   ro: 'Necăsătorit(ă)',
                   pt: 'Solteiro(a)',
+                  sq: 'Beqar/e',
                 ),
                 selected: _maritalStatus == 'single',
                 onTap: () => setState(() => _maritalStatus = 'single'),
@@ -3215,6 +3355,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Házas vagy különélő',
                   ro: 'Căsătorit(ă) sau separat(ă)',
                   pt: 'Casado(a) ou a viver separado(a)',
+                  sq: 'I/e martuar ose i/e ndarë',
                 ),
                 selected: _maritalStatus == 'married_or_separated',
                 onTap: () => setState(
@@ -3229,6 +3370,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Özvegy',
                   ro: 'Văduv(ă)',
                   pt: 'Viúvo(a)',
+                  sq: 'I ve / e ve',
                 ),
                 selected: _maritalStatus == 'widowed',
                 onTap: () => setState(() => _maritalStatus = 'widowed'),
@@ -3244,6 +3386,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
             hu: 'Gyermekek',
             ro: 'Copii',
             pt: 'Filhos',
+            sq: 'Fëmijët',
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -3256,6 +3399,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Nincs gyermekem',
                   ro: 'Fără copii',
                   pt: 'Sem filhos',
+                  sq: 'Pa fëmijë',
                 ),
                 selected: _childrenChoice == 'none',
                 onTap: () => setState(() => _childrenChoice = 'none'),
@@ -3268,6 +3412,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Igen',
                   ro: 'Da',
                   pt: 'Sim',
+                  sq: 'Po',
                 ),
                 selected: _childrenChoice == 'count',
                 onTap: () => setState(() => _childrenChoice = 'count'),
@@ -3286,6 +3431,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                         hu: 'Szám',
                         ro: 'Număr',
                         pt: 'Número',
+                        sq: 'Numri',
                       ),
                     ),
                   ),
@@ -3307,6 +3453,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
             hu: 'Megjegyzések',
             ro: 'Observații',
             pt: 'Observações',
+            sq: 'Shënime',
           ),
         ),
         _LabeledField(
@@ -3317,6 +3464,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
             hu: 'Van még valami, amit tudnunk kellene?',
             ro: 'Mai doriți să ne comunicați ceva?',
             pt: 'Queres dizer-nos mais alguma coisa?',
+            sq: 'A dëshiron të na thuash diçka tjetër?',
           ),
           child: TextField(
             controller: _notes,
@@ -3331,6 +3479,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                 hu: 'Opcionális — pl. kívánt műszakok, kérdések',
                 ro: 'Opțional — ex. ture preferate, întrebări',
                 pt: 'Opcional — p. ex. turnos preferidos, dúvidas',
+                sq: 'Opsionale — p.sh. turnet e preferuara, pyetje',
               ),
             ),
           ),
@@ -3345,6 +3494,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
             hu: 'Kezdés időpontja',
             ro: 'Data de început',
             pt: 'Data de início',
+            sq: 'Data e fillimit',
           ),
         ),
         _LabeledField(
@@ -3355,6 +3505,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
             hu: 'Mikortól tudna kezdeni?',
             ro: 'De când ați putea începe?',
             pt: 'A partir de quando poderias começar?',
+            sq: 'Nga cila datë mund të fillosh?',
           ),
           child: _DatePickerField(
             value: _earliestStart,
@@ -3380,6 +3531,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
             hu: 'Ajánlói bónusz: 100 €',
             ro: 'Bonus de recomandare: 100 €',
             pt: 'Prémio por recomendação: 100 €',
+            sq: 'Bonus rekomandimi: 100 €',
           ),
           body: _lt(
             de: 'Aktion bis Ende September: Wenn Sie eine neue Mitarbeiterin '
@@ -3401,6 +3553,9 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
             pt: 'Promoção até ao final de setembro: se recomendares um novo '
                 'colaborador e essa pessoa ficar connosco pelo menos um '
                 'mês, recebes um prémio de 100 €.',
+            sq: 'Oferta zgjat deri në fund të shtatorit: nëse rekomandon një '
+                'punonjës të ri dhe ky person qëndron me ne të paktën një '
+                'muaj, merr 100 € bonus.',
           ),
         ),
         const SizedBox(height: 12),
@@ -3412,6 +3567,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
             hu: 'Ajánlotta Önt valaki? Az illető neve (opcionális)',
             ro: 'V-a recomandat cineva? Numele persoanei (opțional)',
             pt: 'Foste recomendado por alguém? Nome da pessoa (opcional)',
+            sq: 'A të rekomandoi dikush? Emri i personit (opsionale)',
           ),
           child: TextField(
             controller: _referredBy,
@@ -3424,6 +3580,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                 hu: 'Opcionális — vezeték- és keresztnév',
                 ro: 'Opțional — prenume și nume',
                 pt: 'Opcional — nome próprio e apelido',
+                sq: 'Opsionale — emri dhe mbiemri',
               ),
             ),
           ),
@@ -3444,6 +3601,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Dokumentumok',
                   ro: 'Documente',
                   pt: 'Documentos',
+                  sq: 'Dokumentet',
                 )
               : _vt('Dokumentet', 'Dokumente'),
         ),
@@ -3457,6 +3615,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Jól látható, teljes kép, semmi ne legyen levágva.',
                   ro: 'Fotografie clară, completă, fără părți tăiate.',
                   pt: 'Fotografia nítida, completa, sem partes cortadas.',
+                  sq: 'Foto e qartë, e plotë dhe pa pjesë të prera.',
                 )
               : _vt('Foto e qartë, e plotë dhe pa hije.',
                   'Bitte gut sichtbar, vollständig, nicht abgeschnitten.'),
@@ -3475,6 +3634,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Útlevél / személyi igazolvány (előlap)',
                   ro: 'Pașaport / carte de identitate (față)',
                   pt: 'Passaporte / cartão de identidade (frente)',
+                  sq: 'Pasaporta / letërnjoftimi (faqja e përparme)',
                 )
               : 'Pass / Personalausweis (Vorderseite)',
           subtitle: _isLocal
@@ -3485,6 +3645,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Az útlevél vagy igazolvány elülső oldala',
                   ro: 'Fața pașaportului sau a cărții de identitate',
                   pt: 'Frente do passaporte ou do cartão de identidade',
+                  sq: 'Faqja e përparme e pasaportës ose e letërnjoftimit',
                 )
               : _vt('Faqja e parë', 'Vorderseite'),
           icon: Icons.badge_outlined,
@@ -3501,6 +3662,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Személyi igazolvány (hátlap)',
                   ro: 'Carte de identitate (verso)',
                   pt: 'Cartão de identidade (verso)',
+                  sq: 'Letërnjoftimi (faqja e pasme)',
                 )
               : _vt('Karta e identitetit (Pjesa e prapme)',
                   'Personalausweis (Rückseite)'),
@@ -3512,6 +3674,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'A személyi igazolvány hátoldala',
                   ro: 'Versoul cărții de identitate',
                   pt: 'Verso do cartão de identidade',
+                  sq: 'Faqja e pasme e letërnjoftimit',
                 )
               : _vt('Faqja e prapme e kartës', 'Rückseite'),
           icon: Icons.badge_outlined,
@@ -3528,6 +3691,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Szelfi a sofőrkártyához',
                   ro: 'Selfie pentru ecusonul de șofer',
                   pt: 'Selfie para o crachá de motorista',
+                  sq: 'Selfie për distinktivin e shoferit',
                 )
               : _vt('Selfie për Driver-Badge', 'Selfie für Driver-Badge'),
           subtitle: _isLocal
@@ -3538,6 +3702,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Fehér háttér, egyenes fejtartás, napszemüveg nélkül',
                   ro: 'Fundal alb, capul drept, fără ochelari de soare',
                   pt: 'Fundo branco, cabeça direita, sem óculos de sol',
+                  sq: 'Sfond i bardhë, koka drejt, pa syze dielli',
                 )
               : _vt('Sfond i bardhë, koka drejt, pa syze dielli',
                   'Weißer Hintergrund, Kopf gerade, keine Sonnenbrille'),
@@ -3581,6 +3746,8 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                           pt: 'Fotografa a carta de condução de cima e a '
                               'direito, com boa qualidade. A carta tem de '
                               'estar toda visível.',
+                          sq: 'Fotografo patentën drejt nga lart, me cilësi '
+                              'të mirë. E gjithë patenta duhet të duket.',
                         )
                       : _vt(
                           'Të dhënat e patentës: foto nga lart, e qartë dhe '
@@ -3608,6 +3775,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Jogosítvány (előlap)',
                   ro: 'Permis de conducere (față)',
                   pt: 'Carta de condução (frente)',
+                  sq: 'Patenta e shoferit (faqja e përparme)',
                 )
               : _vt('Patenta', 'Führerschein (Vorderseite)'),
           subtitle: _isLocal
@@ -3618,6 +3786,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Elülső oldal',
                   ro: 'Fața',
                   pt: 'Frente',
+                  sq: 'Faqja e përparme',
                 )
               : _vt('Pjesa e parë', 'Vorderseite'),
           icon: Icons.credit_card_rounded,
@@ -3634,6 +3803,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Jogosítvány (hátlap)',
                   ro: 'Permis de conducere (verso)',
                   pt: 'Carta de condução (verso)',
+                  sq: 'Patenta e shoferit (faqja e pasme)',
                 )
               : _vt('Patenta', 'Führerschein (Rückseite)'),
           subtitle: _isLocal
@@ -3644,6 +3814,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                   hu: 'Hátoldal',
                   ro: 'Verso',
                   pt: 'Verso',
+                  sq: 'Faqja e pasme',
                 )
               : _vt('Pjesa e prapme', 'Rückseite'),
           icon: Icons.credit_card_outlined,
@@ -3682,6 +3853,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                     hu: 'Vissza',
                     ro: 'Înapoi',
                     pt: 'Voltar',
+                    sq: 'Prapa',
                   )
                 : 'Back',
             variant: CoButtonVariant.quiet,
@@ -3712,6 +3884,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                       hu: 'Elküldés',
                       ro: 'Trimite',
                       pt: 'Enviar',
+                      sq: 'Dërgo',
                     )
                   : _vt('Dërgo', 'Senden'))
               : (_isLocal
@@ -3722,6 +3895,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                       hu: 'Tovább',
                       ro: 'Continuă',
                       pt: 'Seguinte',
+                      sq: 'Vazhdo',
                     )
                   : _vt('Vazhdo', 'Weiter')),
           icon:
@@ -3763,6 +3937,7 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                       hu: 'Köszönjük a jelentkezésed!',
                       ro: 'Îți mulțumim pentru candidatură!',
                       pt: 'Obrigado pela tua candidatura!',
+                      sq: 'Faleminderit për aplikimin tënd!',
                     )
                   : _vt('Faleminderit për aplikimin!',
                       'Danke für deine Bewerbung!'),
@@ -3791,6 +3966,8 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
                       pt: 'A tua candidatura foi enviada. Entraremos em '
                           'contacto contigo dentro de poucos dias com os '
                           'próximos passos.',
+                      sq: 'Aplikimi yt u dërgua. Do të të kontaktojmë brenda '
+                          'pak ditësh për hapat e ardhshëm.',
                     )
                   : _vt(
                       'Aplikimi yt u dërgua. Do të të kontaktojmë brenda '
@@ -4398,7 +4575,8 @@ class _DsgvoConsent extends StatelessWidget {
   final bool isLocal;
 
   /// Selected language of the Local/EU form ('de' | 'en' | 'bg' | 'hu' |
-  /// 'ro'). Ignored in the Visa channel, which keeps its Albanian text.
+  /// 'ro' | 'pt' | 'sq'). Ignored in the Visa channel, which keeps its
+  /// Albanian text.
   final String lang;
   final String companyName;
   final bool accepted;
@@ -4546,6 +4724,10 @@ class _DsgvoConsent extends StatelessWidget {
         'Li a informação sobre proteção de dados e consinto no tratamento e '
         'no armazenamento seguro dos meus dados e documentos para os fins '
         'indicados.';
+    const consentSq =
+        'I kam lexuar udhëzimet e privatësisë dhe jap pëlqimin për '
+        'përpunimin dhe ruajtjen e sigurt të të dhënave dhe dokumenteve të '
+        'mia për qëllimet e përmendura.';
 
     // Local/EU: German legal text stays visible (the employer is German),
     // the second block repeats it in the language the applicant picked.
@@ -4557,6 +4739,7 @@ class _DsgvoConsent extends StatelessWidget {
             'hu' => infoHu,
             'ro' => infoRo,
             'pt' => infoPt,
+            'sq' => infoSq,
             _ => null,
           }
         : infoSq;
@@ -4567,6 +4750,7 @@ class _DsgvoConsent extends StatelessWidget {
             'hu' => consentHu,
             'ro' => consentRo,
             'pt' => consentPt,
+            'sq' => consentSq,
             _ => null,
           }
         : 'I kam lexuar udhëzimet e privatësisë dhe jap pëlqimin për përpunimin '
@@ -4580,6 +4764,7 @@ class _DsgvoConsent extends StatelessWidget {
             'hu' => 'Adatvédelem',
             'ro' => 'Protecția datelor',
             'pt' => 'Proteção de dados',
+            'sq' => 'Mbrojtja e të dhënave',
             _ => 'Datenschutz',
           }
         : 'Mbrojtja e të dhënave · Datenschutz';

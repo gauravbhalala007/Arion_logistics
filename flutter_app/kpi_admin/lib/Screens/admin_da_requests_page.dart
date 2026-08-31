@@ -278,6 +278,7 @@ class _AdminRequestCard extends StatelessWidget {
     final type = (data['type'] ?? 'other').toString();
     final status = (data['status'] ?? 'open').toString();
     final isAdvance = type == 'advance';
+    final isFreeShift = type == 'free_shift';
     final driver = (data['driverName'] ?? '').toString().trim().isEmpty
         ? (data['driverTransporterId'] ?? '').toString()
         : (data['driverName'] ?? '').toString();
@@ -322,7 +323,11 @@ class _AdminRequestCard extends StatelessWidget {
           Row(
             children: [
               Icon(
-                isAdvance ? Icons.euro_rounded : Icons.chat_bubble_outline,
+                isAdvance
+                    ? Icons.euro_rounded
+                    : isFreeShift
+                        ? Icons.event_busy_rounded
+                        : Icons.chat_bubble_outline,
                 size: 18,
                 color: const Color(0xFF1D7F5A),
               ),
@@ -333,7 +338,11 @@ class _AdminRequestCard extends StatelessWidget {
                       ? (de
                           ? 'Gehaltsvorschuss · $driver'
                           : 'Salary advance · $driver')
-                      : '${(data['subject'] ?? '').toString().trim().isEmpty ? (de ? 'Anliegen' : 'Request') : data['subject']} · $driver',
+                      : isFreeShift
+                          ? (de
+                              ? 'Freie Schicht · ${data['dateLabel'] ?? ''} · $driver'
+                              : 'Free shift · ${data['dateLabel'] ?? ''} · $driver')
+                          : '${(data['subject'] ?? '').toString().trim().isEmpty ? (de ? 'Anliegen' : 'Request') : data['subject']} · $driver',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -386,6 +395,21 @@ class _AdminRequestCard extends StatelessWidget {
                     de ? 'Personalnr.' : 'Employee ID',
                     (data['employeeNumber'] ?? '').toString(),
                   ),
+              ],
+            )
+          else if (isFreeShift)
+            Wrap(
+              spacing: 16,
+              runSpacing: 6,
+              children: [
+                _kv(
+                  de ? 'Datum' : 'Date',
+                  (data['dateLabel'] ?? '—').toString(),
+                ),
+                _kv(
+                  de ? 'Grund' : 'Reason',
+                  (data['reason'] ?? '—').toString(),
+                ),
               ],
             )
           else

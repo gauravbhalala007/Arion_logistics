@@ -2082,4 +2082,34 @@ const Map<String, String> kEsLocalizedValues = <String, String>{
       'Aún no hay preguntas frecuentes. Pide a tu dispatcher que añada algunas.',
   'faq_training_card_intro':
       'Abajo está la pregunta frecuente original. Léela y después confirma la afirmación en la siguiente tarjeta.',
+  // ---- DA Requests (Fahrer-Antraege) ----
+  'da_req_subtitle':
+      'Solicitudes a tu admin — p. ej. anticipo de sueldo o un turno libre.',
+  'da_req_btn_advance': 'Solicitar anticipo',
+  'da_req_btn_free_shift': 'Turno libre',
+  'da_req_btn_other': 'Otra solicitud',
+  'da_req_load_failed': 'No se pudieron cargar las solicitudes.',
+  'da_req_empty': 'Aún no hay solicitudes.',
+  'da_req_fs_title': 'Solicitar turno libre',
+  'da_req_fs_hint':
+      'Elige el día que necesitas libre e indica brevemente el motivo. '
+          'Tu admin revisará la solicitud.',
+  'da_req_date': 'Fecha',
+  'da_req_pick_date': 'Elegir fecha',
+  'da_req_reason': 'Motivo',
+  'da_req_reason_hint': 'p. ej. cita médica, motivo familiar …',
+  'da_req_subject': 'Asunto',
+  'da_req_message': 'Mensaje',
+  'da_req_cancel': 'Cancelar',
+  'da_req_send': 'Enviar',
+  'da_req_sent': 'Solicitud enviada.',
+  'da_req_send_failed': 'No se pudo enviar: {error}',
+  'da_req_fill_all': 'Elige una fecha e indica el motivo.',
+  'da_req_type_advance': 'Anticipo de sueldo',
+  'da_req_type_free_shift': 'Turno libre',
+  'da_req_type_other': 'Solicitud',
+  'da_req_status_open': 'ABIERTA',
+  'da_req_status_paid': 'PAGADO',
+  'da_req_status_done': 'HECHO',
+  'da_req_status_rejected': 'RECHAZADA',
 };

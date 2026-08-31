@@ -24,6 +24,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:signature/signature.dart';
 
+import '../localization/app_localizations.dart';
 import 'driver_safety_training_page.dart' show kSignatureInkBlue;
 
 class DriverDaRequestsView extends StatefulWidget {
@@ -48,6 +49,11 @@ class _DriverDaRequestsViewState extends State<DriverDaRequestsView> {
   static const _kGreen = Color(0xFF1D7F5A);
 
   bool get _de => Localizations.localeOf(context).languageCode == 'de';
+
+  /// Übersetzung in der eingestellten App-Sprache (alle 11 Sprachen).
+  String _t(String key) => AppLocalizations.of(context).t(key);
+  String _tf(String key, Map<String, String> params) =>
+      AppLocalizations.of(context).tf(key, params);
 
   CollectionReference<Map<String, dynamic>> get _col => FirebaseFirestore
       .instance
@@ -90,9 +96,7 @@ class _DriverDaRequestsViewState extends State<DriverDaRequestsView> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Text(
-            de
-                ? 'Anträge an deinen Admin — z. B. Gehaltsvorschuss.'
-                : 'Requests to your admin — e.g. salary advance.',
+            _t('da_req_subtitle'),
             style: const TextStyle(fontSize: 13, color: _kMuted),
           ),
         ),
@@ -104,7 +108,7 @@ class _DriverDaRequestsViewState extends State<DriverDaRequestsView> {
                 onPressed: _openAdvanceForm,
                 icon: const Icon(Icons.euro_rounded, size: 18),
                 label: Text(
-                  de ? 'Vorschuss beantragen' : 'Request advance',
+                  _t('da_req_btn_advance'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -119,18 +123,20 @@ class _DriverDaRequestsViewState extends State<DriverDaRequestsView> {
               ),
             ),
             const SizedBox(width: 10),
+            // Freie Schicht beantragen — Datum + Grund, geht als
+            // Ticket an den Admin.
             Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _openOtherForm,
-                icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+              child: FilledButton.tonalIcon(
+                onPressed: _openFreeShiftForm,
+                icon: const Icon(Icons.event_busy_rounded, size: 18),
                 label: Text(
-                  de ? 'Sonstiges Anliegen' : 'Other request',
+                  _t('da_req_btn_free_shift'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                style: OutlinedButton.styleFrom(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFE4F5EC),
                   foregroundColor: _kGreen,
-                  side: const BorderSide(color: _kGreen),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
@@ -139,6 +145,27 @@ class _DriverDaRequestsViewState extends State<DriverDaRequestsView> {
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: _openOtherForm,
+            icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+            label: Text(
+              _t('da_req_btn_other'),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: _kGreen,
+              side: const BorderSide(color: _kGreen),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          ),
         ),
         const SizedBox(height: 14),
         Expanded(
@@ -156,9 +183,7 @@ class _DriverDaRequestsViewState extends State<DriverDaRequestsView> {
               if (snap.hasError) {
                 return Center(
                   child: Text(
-                    de
-                        ? 'Anträge konnten nicht geladen werden.'
-                        : 'Could not load requests.',
+                    _t('da_req_load_failed'),
                     style: const TextStyle(color: _kMuted),
                   ),
                 );
@@ -176,9 +201,7 @@ class _DriverDaRequestsViewState extends State<DriverDaRequestsView> {
                   child: Padding(
                     padding: const EdgeInsets.all(24),
                     child: Text(
-                      de
-                          ? 'Noch keine Anträge gestellt.'
-                          : 'No requests yet.',
+                      _t('da_req_empty'),
                       style: const TextStyle(
                         color: _kMuted,
                         fontWeight: FontWeight.w600,
@@ -206,14 +229,13 @@ class _DriverDaRequestsViewState extends State<DriverDaRequestsView> {
   // ── Sonstiges Anliegen ────────────────────────────────────────────
 
   Future<void> _openOtherForm() async {
-    final de = _de;
     final subjectCtrl = TextEditingController();
     final messageCtrl = TextEditingController();
     final sent = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: Text(de ? 'Sonstiges Anliegen' : 'Other request'),
+        title: Text(_t('da_req_btn_other')),
         content: SizedBox(
           width: 420,
           child: Column(
@@ -222,7 +244,7 @@ class _DriverDaRequestsViewState extends State<DriverDaRequestsView> {
               TextField(
                 controller: subjectCtrl,
                 decoration: InputDecoration(
-                  labelText: de ? 'Betreff' : 'Subject',
+                  labelText: _t('da_req_subject'),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -234,7 +256,7 @@ class _DriverDaRequestsViewState extends State<DriverDaRequestsView> {
                 minLines: 4,
                 maxLines: 8,
                 decoration: InputDecoration(
-                  labelText: de ? 'Nachricht' : 'Message',
+                  labelText: _t('da_req_message'),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -246,11 +268,11 @@ class _DriverDaRequestsViewState extends State<DriverDaRequestsView> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text(de ? 'Abbrechen' : 'Cancel'),
+            child: Text(_t('da_req_cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text(de ? 'Senden' : 'Send'),
+            child: Text(_t('da_req_send')),
           ),
         ],
       ),
@@ -273,17 +295,147 @@ class _DriverDaRequestsViewState extends State<DriverDaRequestsView> {
       });
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(de ? 'Anliegen gesendet.' : 'Request sent.'),
-        ),
+        SnackBar(content: Text(_t('da_req_sent'))),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            de ? 'Senden fehlgeschlagen: $e' : 'Failed to send: $e',
+          content: Text(_tf('da_req_send_failed', {'error': '$e'})),
+        ),
+      );
+    }
+  }
+
+  // ── Freie Schicht beantragen ──────────────────────────────────────
+  //
+  // Datum + Grund, geht als Ticket (type 'free_shift') an den Admin.
+
+  Future<void> _openFreeShiftForm() async {
+    final reasonCtrl = TextEditingController();
+    DateTime? picked;
+    final sent = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: Text(_t('da_req_fs_title')),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _t('da_req_fs_hint'),
+                  style: const TextStyle(fontSize: 13, color: _kMuted),
+                ),
+                const SizedBox(height: 14),
+                InkWell(
+                  onTap: () async {
+                    final now = DateTime.now();
+                    final result = await showDatePicker(
+                      context: ctx,
+                      initialDate: picked ?? now.add(const Duration(days: 1)),
+                      firstDate: now,
+                      lastDate: now.add(const Duration(days: 365)),
+                    );
+                    if (result != null) {
+                      setDialogState(() => picked = result);
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: _t('da_req_date'),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      suffixIcon:
+                          const Icon(Icons.calendar_today_outlined, size: 18),
+                    ),
+                    child: Text(
+                      picked == null
+                          ? _t('da_req_pick_date')
+                          : DateFormat('dd.MM.yyyy').format(picked!),
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: picked == null ? _kMuted : _kText,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: reasonCtrl,
+                  minLines: 3,
+                  maxLines: 6,
+                  decoration: InputDecoration(
+                    labelText: _t('da_req_reason'),
+                    hintText: _t('da_req_reason_hint'),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(_t('da_req_cancel')),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: _kGreen,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(_t('da_req_send')),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (sent != true || !mounted) return;
+    final reason = reasonCtrl.text.trim();
+    if (picked == null || reason.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_t('da_req_fill_all'))),
+      );
+      return;
+    }
+    final date = picked!;
+    try {
+      final driverSnap = await _driverRef.get();
+      final driverName =
+          (driverSnap.data()?['driverName'] ?? '').toString().trim();
+      final dateLabel = DateFormat('dd.MM.yyyy').format(date);
+      await _col.add({
+        'type': 'free_shift',
+        'status': 'open',
+        'driverTransporterId': widget.driverTransporterId,
+        'driverName': driverName,
+        'date': Timestamp.fromDate(DateTime(date.year, date.month, date.day)),
+        'dateLabel': dateLabel,
+        'reason': reason,
+        // Fallback für generische Anzeigen (Admin-Liste, Alt-Clients).
+        'subject': 'Free Shift · $dateLabel',
+        'message': reason,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_t('da_req_sent'))),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_tf('da_req_send_failed', {'error': '$e'})),
         ),
       );
     }
@@ -333,6 +485,7 @@ class _RequestTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context).t;
     final type = (data['type'] ?? 'other').toString();
     final status = (data['status'] ?? 'open').toString();
     final createdAt = data['createdAt'];
@@ -341,17 +494,22 @@ class _RequestTile extends StatelessWidget {
         : '';
 
     final isAdvance = type == 'advance';
+    final isFreeShift = type == 'free_shift';
     final title = isAdvance
-        ? (de ? 'Gehaltsvorschuss' : 'Salary advance')
-        : ((data['subject'] ?? '').toString().trim().isEmpty
-            ? (de ? 'Anliegen' : 'Request')
-            : (data['subject'] ?? '').toString());
+        ? t('da_req_type_advance')
+        : isFreeShift
+            ? '${t('da_req_type_free_shift')} · ${data['dateLabel'] ?? ''}'
+            : ((data['subject'] ?? '').toString().trim().isEmpty
+                ? t('da_req_type_other')
+                : (data['subject'] ?? '').toString());
 
     String subtitle;
     if (isAdvance) {
       final cents = (data['amountCents'] as num?)?.toInt() ?? 0;
       final amount = (cents / 100).toStringAsFixed(2).replaceAll('.', ',');
       subtitle = '$amount EUR · ${data['periodLabel'] ?? ''}';
+    } else if (isFreeShift) {
+      subtitle = (data['reason'] ?? '').toString();
     } else {
       subtitle = (data['message'] ?? '').toString();
     }
@@ -360,22 +518,22 @@ class _RequestTile extends StatelessWidget {
       'paid' => (
           const Color(0xFFE4F5EC),
           const Color(0xFF1D7F5A),
-          de ? 'ÜBERWIESEN' : 'PAID',
+          t('da_req_status_paid'),
         ),
       'done' => (
           const Color(0xFFE4F5EC),
           const Color(0xFF1D7F5A),
-          de ? 'ERLEDIGT' : 'DONE',
+          t('da_req_status_done'),
         ),
       'rejected' => (
           const Color(0xFFFEE2E2),
           const Color(0xFFB91C1C),
-          de ? 'ABGELEHNT' : 'REJECTED',
+          t('da_req_status_rejected'),
         ),
       _ => (
           const Color(0xFFFFEDD5),
           const Color(0xFF9A3412),
-          de ? 'OFFEN' : 'OPEN',
+          t('da_req_status_open'),
         ),
     };
 
@@ -396,7 +554,11 @@ class _RequestTile extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
-              isAdvance ? Icons.euro_rounded : Icons.chat_bubble_outline,
+              isAdvance
+                  ? Icons.euro_rounded
+                  : isFreeShift
+                      ? Icons.event_busy_rounded
+                      : Icons.chat_bubble_outline,
               color: const Color(0xFF1D7F5A),
               size: 20,
             ),
