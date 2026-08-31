@@ -432,21 +432,30 @@ class _AdminRequestCard extends StatelessWidget {
           // Free Shift: Freigabe bewusst per Swipe-Bestätigung (kein
           // versehentlicher Klick), darunter der Ablehnen-Button.
           if (isFreeShift && status == 'open') ...[
-            _SlideToConfirm(
-              label: de
-                  ? 'Schieben zum Bestätigen'
-                  : 'Slide to confirm',
-              onConfirmed: onMarkDone,
+            // Beide Aktionen über die ganze Kachelbreite.
+            SizedBox(
+              width: double.infinity,
+              child: _SlideToConfirm(
+                label: de
+                    ? 'Schieben zum Bestätigen'
+                    : 'Slide to confirm',
+                onConfirmed: onMarkDone,
+              ),
             ),
             const SizedBox(height: 8),
             SizedBox(
               width: double.infinity,
-              child: TextButton.icon(
+              child: OutlinedButton.icon(
                 onPressed: onReject,
                 icon: const Icon(Icons.close_rounded, size: 16),
                 label: Text(de ? 'Ablehnen' : 'Reject'),
-                style: TextButton.styleFrom(
+                style: OutlinedButton.styleFrom(
                   foregroundColor: const Color(0xFFB91C1C),
+                  side: const BorderSide(color: Color(0xFFFECACA)),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(999),
+                  ),
                 ),
               ),
             ),
@@ -583,6 +592,7 @@ class _SlideToConfirmState extends State<_SlideToConfirm> {
               : null,
           child: Container(
             height: _trackHeight,
+            width: double.infinity,
             decoration: BoxDecoration(
               color: _green.withOpacity(0.08),
               borderRadius: BorderRadius.circular(999),
