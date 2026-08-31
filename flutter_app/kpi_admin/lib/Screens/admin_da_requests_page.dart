@@ -429,53 +429,76 @@ class _AdminRequestCard extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              if (isAdvance)
-                OutlinedButton.icon(
-                  onPressed: onOpenPdf,
-                  icon: const Icon(Icons.picture_as_pdf_outlined, size: 16),
-                  label: Text(de ? 'PDF herunterladen' : 'Download PDF'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF1D7F5A),
-                    side: const BorderSide(color: Color(0xFF1D7F5A)),
-                  ),
+          // Free Shift: Freigabe bewusst per Swipe-Bestätigung (kein
+          // versehentlicher Klick), darunter der Ablehnen-Button.
+          if (isFreeShift && status == 'open') ...[
+            _SlideToConfirm(
+              label: de
+                  ? 'Schieben zum Bestätigen'
+                  : 'Slide to confirm',
+              onConfirmed: onMarkDone,
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton.icon(
+                onPressed: onReject,
+                icon: const Icon(Icons.close_rounded, size: 16),
+                label: Text(de ? 'Ablehnen' : 'Reject'),
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFFB91C1C),
                 ),
-              if (status == 'open' && isAdvance)
-                FilledButton.icon(
-                  onPressed: onMarkPaid,
-                  icon: const Icon(Icons.check_rounded, size: 16),
-                  label: Text(
-                    de ? 'Als überwiesen markieren' : 'Mark as paid',
+              ),
+            ),
+          ] else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (isAdvance)
+                  OutlinedButton.icon(
+                    onPressed: onOpenPdf,
+                    icon: const Icon(Icons.picture_as_pdf_outlined, size: 16),
+                    label: Text(de ? 'PDF herunterladen' : 'Download PDF'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF1D7F5A),
+                      side: const BorderSide(color: Color(0xFF1D7F5A)),
+                    ),
                   ),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF1D7F5A),
-                    foregroundColor: Colors.white,
+                if (status == 'open' && isAdvance)
+                  FilledButton.icon(
+                    onPressed: onMarkPaid,
+                    icon: const Icon(Icons.check_rounded, size: 16),
+                    label: Text(
+                      de ? 'Als überwiesen markieren' : 'Mark as paid',
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF1D7F5A),
+                      foregroundColor: Colors.white,
+                    ),
                   ),
-                ),
-              if (status == 'open' && !isAdvance)
-                FilledButton.icon(
-                  onPressed: onMarkDone,
-                  icon: const Icon(Icons.check_rounded, size: 16),
-                  label: Text(de ? 'Als erledigt markieren' : 'Mark as done'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF1D7F5A),
-                    foregroundColor: Colors.white,
+                if (status == 'open' && !isAdvance)
+                  FilledButton.icon(
+                    onPressed: onMarkDone,
+                    icon: const Icon(Icons.check_rounded, size: 16),
+                    label:
+                        Text(de ? 'Als erledigt markieren' : 'Mark as done'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF1D7F5A),
+                      foregroundColor: Colors.white,
+                    ),
                   ),
-                ),
-              if (status == 'open')
-                TextButton.icon(
-                  onPressed: onReject,
-                  icon: const Icon(Icons.close_rounded, size: 16),
-                  label: Text(de ? 'Ablehnen' : 'Reject'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: const Color(0xFFB91C1C),
+                if (status == 'open')
+                  TextButton.icon(
+                    onPressed: onReject,
+                    icon: const Icon(Icons.close_rounded, size: 16),
+                    label: Text(de ? 'Ablehnen' : 'Reject'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFFB91C1C),
+                    ),
                   ),
-                ),
-            ],
-          ),
+              ],
+            ),
         ],
       ),
     );
@@ -499,6 +522,130 @@ class _AdminRequestCard extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── Swipe-Bestätigung für Free-Shift-Freigaben ───────────────────────
+//
+// Gleiches Muster wie im Fahrer-Waveplan: Der Thumb muss bis ~85 % der
+// Strecke gezogen werden, sonst springt er zurück — verhindert
+// versehentliche Freigaben durch einen einzelnen Klick.
+class _SlideToConfirm extends StatefulWidget {
+  final String label;
+  final VoidCallback onConfirmed;
+
+  const _SlideToConfirm({required this.label, required this.onConfirmed});
+
+  @override
+  State<_SlideToConfirm> createState() => _SlideToConfirmState();
+}
+
+class _SlideToConfirmState extends State<_SlideToConfirm> {
+  static const double _trackHeight = 52;
+  static const double _thumbSize = 44;
+  static const _green = Color(0xFF1D7F5A);
+
+  double _dragX = 0;
+  bool _dragging = false;
+  bool _confirmed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxDrag =
+            (constraints.maxWidth - _thumbSize - 8).clamp(0.0, double.infinity);
+        final progress =
+            maxDrag <= 0 ? 0.0 : (_dragX / maxDrag).clamp(0.0, 1.0);
+        final active = !_confirmed;
+        return GestureDetector(
+          onHorizontalDragStart:
+              active ? (_) => setState(() => _dragging = true) : null,
+          onHorizontalDragUpdate: active
+              ? (details) => setState(() {
+                    _dragX = (_dragX + details.delta.dx).clamp(0.0, maxDrag);
+                  })
+              : null,
+          onHorizontalDragEnd: active
+              ? (_) {
+                  setState(() => _dragging = false);
+                  if (_dragX >= maxDrag * 0.85) {
+                    setState(() {
+                      _dragX = maxDrag;
+                      _confirmed = true;
+                    });
+                    widget.onConfirmed();
+                  } else {
+                    setState(() => _dragX = 0);
+                  }
+                }
+              : null,
+          child: Container(
+            height: _trackHeight,
+            decoration: BoxDecoration(
+              color: _green.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: _green.withOpacity(0.55), width: 1.2),
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: _thumbSize + 8 + _dragX,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: _green.withOpacity(0.22 + 0.35 * progress),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: _thumbSize + 12),
+                  child: Text(
+                    widget.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: _green,
+                    ),
+                  ),
+                ),
+                AnimatedPositioned(
+                  duration: _dragging
+                      ? Duration.zero
+                      : const Duration(milliseconds: 180),
+                  curve: Curves.easeOut,
+                  left: 4 + _dragX,
+                  top: (_trackHeight - _thumbSize) / 2,
+                  child: Container(
+                    width: _thumbSize,
+                    height: _thumbSize,
+                    decoration: const BoxDecoration(
+                      color: _green,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      _confirmed
+                          ? Icons.check_rounded
+                          : Icons.chevron_right_rounded,
+                      color: Colors.white,
+                      size: 26,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
