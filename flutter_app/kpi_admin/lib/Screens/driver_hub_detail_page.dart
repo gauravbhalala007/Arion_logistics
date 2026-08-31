@@ -23,6 +23,7 @@ import '../models/employment_period.dart';
 import '../services/incident_reports.dart';
 import '../services/vacation_pools_repository.dart';
 import '../utils/driver_remark.dart';
+import '../utils/vacation_days.dart';
 import '../utils/vacation_pools.dart';
 import '../widgets/vacation_pool_lines.dart';
 import '../widgets/driver_performance_sections.dart';
@@ -326,6 +327,9 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
 
   // ── Urlaubs-Töpfe (DSP-weit, siehe utils/vacation_pools.dart) ───────
   VacationPoolsConfig _poolsConfig = VacationPoolsConfig.disabled;
+
+  /// Abwesenheiten-Karte: Historie ausgeklappt?
+  bool _absencesExpanded = false;
   bool _poolsRequested = false;
 
   Future<void> _loadPoolsOnce() async {
@@ -1831,6 +1835,10 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
           _flexplanCard(data),
           const SizedBox(height: 14),
         ],
+        // Ticket "TIME & ABSENCE": Historische + kommende Abwesenheiten
+        // (bezahlt/unbezahlt/krank) direkt im Mitarbeiterprofil.
+        _absencesCard(),
+        const SizedBox(height: 14),
         _remarkCard(doc, data),
         const SizedBox(height: 14),
         _personalCard(data, onboarding),
@@ -2078,6 +2086,222 @@ class _DriverHubDetailPageState extends State<DriverHubDetailPage> {
             value: employment,
             valueColor: active ? _C.green : _C.redValue,
           ),
+        ],
+      ),
+    );
+  }
+
+  /// Ticket „TIME & ABSENCE": Alle Abwesenheiten des Fahrers — kommend
+  /// und historisch, mit Art (bezahlter/unbezahlter Urlaub, Krankheit,
+  /// Sonderurlaub), Zeitraum, Tagen und Status. Gleiche Datenquelle wie
+  /// die Time-&-Absence-Seite (drivers/{tid}/absence_requests).
+  Widget _absencesCard() {
+    return _card(
+      title: _tr('Abwesenheiten', 'Absences'),
+      child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: widget.driverRef
+            .collection('absence_requests')
+            .orderBy('fromDate', descending: true)
+            .limit(80)
+            .snapshots(),
+        builder: (context, snap) {
+          if (snap.connectionState == ConnectionState.waiting &&
+              !snap.hasData) {
+            return const Padding(
+              padding: EdgeInsets.all(18),
+              child: Center(
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            );
+          }
+          final items =
+              <({DateTime from, DateTime to, String type, String status, bool paid})>[];
+          for (final d in snap.data?.docs ??
+              const <QueryDocumentSnapshot<Map<String, dynamic>>>[]) {
+            final m = d.data();
+            final from = parseVacationDate(m['fromDate']);
+            final to = parseVacationDate(m['toDate']);
+            if (from == null || to == null) continue;
+            items.add((
+              from: from,
+              to: to,
+              type: (m['type'] ?? '').toString().trim().toLowerCase(),
+              status: (m['status'] ?? '').toString().trim().toLowerCase(),
+              paid: m['paid'] is bool ? m['paid'] as bool : true,
+            ));
+          }
+          if (items.isEmpty) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+              child: Text(
+                _tr('Keine Abwesenheiten erfasst.', 'No absences recorded.'),
+                style: const TextStyle(fontSize: 12.5, color: _C.text2),
+              ),
+            );
+          }
+
+          final now = DateTime.now();
+          final today = DateTime(now.year, now.month, now.day);
+          bool isActive(String s) => s == 'approved' || s == 'pending';
+          final upcoming = items
+              .where((a) => !a.to.isBefore(today) && isActive(a.status))
+              .toList()
+            ..sort((a, b) => a.from.compareTo(b.from));
+          final history = items
+              .where((a) => a.to.isBefore(today) || !isActive(a.status))
+              .toList();
+          final historyVisible =
+              _absencesExpanded ? history : history.take(6).toList();
+
+          Widget groupTitle(String text, int count) => Padding(
+                padding: const EdgeInsets.only(top: 10, bottom: 6),
+                child: Text(
+                  '${text.toUpperCase()} · $count',
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    color: _C.text3,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              );
+
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                groupTitle(_tr('Kommend', 'Upcoming'), upcoming.length),
+                if (upcoming.isEmpty)
+                  Text(
+                    _tr('Nichts geplant.', 'Nothing planned.'),
+                    style: const TextStyle(fontSize: 12.5, color: _C.text2),
+                  ),
+                for (final a in upcoming) _absenceRow(a),
+                groupTitle(_tr('Historie', 'History'), history.length),
+                if (history.isEmpty)
+                  Text(
+                    _tr('Noch keine Historie.', 'No history yet.'),
+                    style: const TextStyle(fontSize: 12.5, color: _C.text2),
+                  ),
+                for (final a in historyVisible) _absenceRow(a),
+                if (history.length > 6)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: InkWell(
+                      onTap: () => setState(
+                          () => _absencesExpanded = !_absencesExpanded),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 4, vertical: 4),
+                        child: Text(
+                          _absencesExpanded
+                              ? _tr('Weniger anzeigen', 'Show less')
+                              : _tr(
+                                  'Alle anzeigen (+${history.length - 6})',
+                                  'Show all (+${history.length - 6})',
+                                ),
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: _C.green,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// Eine Abwesenheits-Zeile: Art-Chip · Zeitraum · Tage · Status.
+  Widget _absenceRow(
+      ({DateTime from, DateTime to, String type, String status, bool paid})
+          a) {
+    final (label, fg, bg) = switch (a.type) {
+      'sick_leave' => (
+          _tr('Krank', 'Sick'),
+          const Color(0xFFB91C1C),
+          const Color(0xFFFEF2F2),
+        ),
+      'special_leave' => (
+          _tr('Sonderurlaub', 'Special leave'),
+          const Color(0xFF7C3AED),
+          const Color(0xFFF5F3FF),
+        ),
+      _ => a.paid
+          ? (
+              _tr('Urlaub bezahlt', 'Paid vacation'),
+              _C.green,
+              _C.greenTint,
+            )
+          : (
+              _tr('Urlaub unbezahlt', 'Unpaid vacation'),
+              const Color(0xFF1D4ED8),
+              const Color(0xFFEFF6FF),
+            ),
+    };
+    // Urlaub zählt nur belastbare Tage (ohne Wochenende/Feiertage) —
+    // Krankheit & Co. zählen Kalendertage, wie auf der
+    // Time-&-Absence-Seite.
+    final days = a.type == 'vacation'
+        ? vacationChargeableDays(a.from, a.to)
+        : inclusiveDays(a.from, a.to);
+    final statusLabel = switch (a.status) {
+      'pending' => _tr('Ausstehend', 'Pending'),
+      'rejected' => _tr('Abgelehnt', 'Rejected'),
+      'cancelled' => _tr('Storniert', 'Cancelled'),
+      _ => '',
+    };
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: fg,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '${formatVacationDate(a.from)} – ${formatVacationDate(a.to)}'
+              ' · $days ${_tr('Tage', 'days')}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12.5, color: _C.text),
+            ),
+          ),
+          if (statusLabel.isNotEmpty)
+            Text(
+              statusLabel,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: a.status == 'pending'
+                    ? const Color(0xFFB45309)
+                    : _C.text3,
+              ),
+            ),
         ],
       ),
     );

@@ -71,7 +71,8 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage> {
   int _probation = 6;
   final _signCityCtrl = TextEditingController(text: WcEmployer.city);
   DateTime _signDate = DateTime.now();
-  String _ezbProcedure = 'vorabzustimmung';
+  // EzB Frage 1: Standard ist die ERSTE Option (Aufenthaltstitel).
+  String _ezbProcedure = 'aufenthaltstitel';
   String _ezbOccasion = 'ersterteilung';
 
   // Extra-Dokumente
@@ -774,15 +775,15 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage> {
                 label: de ? 'Verfahren' : 'Procedure',
                 value: _ezbProcedure,
                 items: {
-                  'vorabzustimmung':
-                      de ? 'Vorabzustimmung BA' : 'BA pre-approval',
                   'aufenthaltstitel':
                       de ? 'Aufenthaltstitel' : 'Residence permit',
+                  'vorabzustimmung':
+                      de ? 'Vorabzustimmung BA' : 'BA pre-approval',
                   'arbeitserlaubnis':
                       de ? 'Arbeitserlaubnis BA' : 'BA work permit',
                 },
                 onChanged: (v) =>
-                    setState(() => _ezbProcedure = v ?? 'vorabzustimmung'),
+                    setState(() => _ezbProcedure = v ?? 'aufenthaltstitel'),
               ),
               _dropdown<String>(
                 label: de ? 'Anlass' : 'Occasion',

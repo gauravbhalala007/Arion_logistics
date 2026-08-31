@@ -611,6 +611,14 @@ Future<Uint8List> wcBuildContractPdf(WorkContractData d, WcAssets a) async {
     ));
   }
 
+  // Beim Arbeitsvisum: NUR der reine Arion-Vertrag (Deckblatt + Vertrag +
+  // DSGVO-Anlage) — keine Zweitschrift, keine Amazon-Anhänge.
+  if (d.isVisa) {
+    addContract(copy: false);
+    addAnnex(copy: false);
+    return doc.save();
+  }
+
   addContract(copy: false);
   addAnnex(copy: false);
   addContract(copy: true);
