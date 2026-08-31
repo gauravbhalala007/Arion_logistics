@@ -134,10 +134,16 @@ class _DriverDaRequestsViewState extends State<DriverDaRequestsView> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
+                // Sekundaerknopf: weisse Flaeche, gruene Schrift und Kontur.
+                // Gruen auf Hellgruen kam nur auf 4,38:1 und lag damit unter
+                // den 4,5:1, die fuer normalen Text gefordert sind; auf Weiss
+                // sind es 4,96:1. Die Kontur haelt den Knopf ausserdem vom
+                // hellgrauen Seitenhintergrund getrennt.
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFFE4F5EC),
+                  backgroundColor: Colors.white,
                   foregroundColor: _kGreen,
                   padding: const EdgeInsets.symmetric(vertical: 14),
+                  side: const BorderSide(color: _kGreen, width: 1.5),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),

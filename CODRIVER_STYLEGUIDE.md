@@ -437,14 +437,26 @@ class GlassContainer extends StatelessWidget {
 
 ### 6.1 Buttons
 
-Vier Varianten — **alle vollständig pillig** (`StadiumBorder()`), Höhe 50pt. Im iOS 26 Stil sind Buttons immer rund — niemals eckig.
+Fünf Varianten — **alle vollständig pillig** (`StadiumBorder()`), Höhe 50pt. Im iOS 26 Stil sind Buttons immer rund — niemals eckig.
 
 | Variante | Hintergrund | Text | Verwendung |
 |---|---|---|---|
 | **Primary** | `codriverGreen` (Solid) | weiß | Hauptaktion, max. 1 pro Screen |
-| **Glass** | Liquid Glass (regular) + Tint | `codriverDeep` | Sekundärer CTA, schwebende Buttons |
+| **Secondary** | **weiß** + Kontur `codriverGreen` | `codriverGreen` | Zweite Aktion neben dem Primary |
+| **Glass** | Liquid Glass (regular) + Tint | `codriverDeep` | Schwebende Buttons über Inhalt |
 | **Tertiary** | transparent | `codriverGreen` | Inline-Aktion, "Mehr" |
 | **Destructive** | `error` | weiß | Löschen, Abbrechen |
+
+**Grün auf hellgrün ist verboten.** Ein sekundärer Button mit hellgrüner
+Fläche (`green50`/`#E4F5EC`) und grüner Schrift kommt auf 4,38:1 und liegt
+damit unter den 4,5:1, die für normalen Text gefordert sind — auf dem Gerät
+sieht es aus, als wäre der Button deaktiviert. Der sekundäre Button ist
+deshalb **weiß mit grüner Schrift, grünem Icon und grüner Kontur** (4,96:1).
+Die Kontur ist nicht optional: ohne sie verschwindet die weiße Fläche vor
+dem hellgrauen Seitenhintergrund.
+
+Hellgrüne Flächen bleiben erlaubt für **Status-Badges und Markierungen** —
+dort steht dunkles Grün oder `labelPrimary` darauf, nicht die Markenfarbe.
 
 ```dart
 // Primary Pill Button
