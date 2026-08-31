@@ -187,6 +187,13 @@ class CoButton extends StatelessWidget {
           fg: Color(0xFF111827),
           border: Color(0xFFE5E7EB),
         );
+      case CoButtonVariant.secondaryGreenOutlined:
+        // Secondary-Button in Markengrün: weiß mit grünem Icon + Schrift.
+        return const _CoButtonColors(
+          bg: Colors.white,
+          fg: AppColors.codriverDeep,
+          border: AppColors.codriverGreen,
+        );
       case CoButtonVariant.quiet:
         return const _CoButtonColors(
           bg: Colors.transparent,
@@ -233,6 +240,7 @@ enum CoButtonVariant {
   primary,
   secondaryTinted,
   secondaryOutlined,
+  secondaryGreenOutlined,
   quiet,
   destructive,
   destructiveTinted,

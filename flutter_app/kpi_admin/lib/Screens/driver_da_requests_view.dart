@@ -123,20 +123,23 @@ class _DriverDaRequestsViewState extends State<DriverDaRequestsView> {
               ),
             ),
             const SizedBox(width: 10),
-            // Freie Schicht beantragen — Datum + Grund, geht als
-            // Ticket an den Admin.
+            // Freie Schicht beantragen — Secondary-Button: weiß mit
+            // grünem Icon + Schrift. Datum + Grund, geht als Ticket an
+            // den Admin.
             Expanded(
-              child: FilledButton.tonalIcon(
+              child: OutlinedButton.icon(
                 onPressed: _openFreeShiftForm,
-                icon: const Icon(Icons.event_busy_rounded, size: 18),
+                icon: const Icon(Icons.event_busy_rounded,
+                    size: 18, color: _kGreen),
                 label: Text(
                   _t('da_req_btn_free_shift'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFFE4F5EC),
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: Colors.white,
                   foregroundColor: _kGreen,
+                  side: const BorderSide(color: _kGreen),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),

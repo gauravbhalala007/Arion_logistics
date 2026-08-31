@@ -445,37 +445,54 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
     }
   }
 
+  // Streams der oberen Kacheln — je build() neu erzeugte Streams lassen
+  // die StreamBuilder bei JEDEM setState auf `waiting` zurückfallen (die
+  // Dispatcher-Karte verschwindet und poppt wieder rein). Deshalb einmal
+  // erzeugen und nur bei dspUid-/Tageswechsel erneuern.
+  Stream<DocumentSnapshot<Map<String, dynamic>>>? _dispatcherDocStream;
+  Stream<QuerySnapshot<Map<String, dynamic>>>? _waveplanTodayStream;
+  String _homeStreamsKey = '';
+
+  void _ensureHomeStreams(String todayId) {
+    final key = '${widget.dspUid}|$todayId';
+    if (key == _homeStreamsKey) return;
+    _homeStreamsKey = key;
+    if (widget.dspUid.trim().isEmpty) {
+      _dispatcherDocStream = null;
+      _waveplanTodayStream = null;
+      return;
+    }
+    _dispatcherDocStream = FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.dspUid)
+        .collection(_settingsCollection)
+        .doc(_dispatcherPillDoc)
+        .snapshots();
+    // Alle heute veröffentlichten Waveplan-Dokumente (ein Doc je
+    // Programm: sameday_a / nextday / sameday_c). Der Doc-Key beginnt
+    // mit dem ISO-Datum, deshalb reicht ein Präfix-Range über die ID.
+    _waveplanTodayStream = FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.dspUid)
+        .collection(_publishedWaveplansCollection)
+        .where(FieldPath.documentId, isGreaterThanOrEqualTo: todayId)
+        .where(FieldPath.documentId, isLessThan: '$todayId\uf8ff')
+        .snapshots();
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final now = DateTime.now();
     final dateLabel =
         '${now.day.toString().padLeft(2, '0')}.${now.month.toString().padLeft(2, '0')}.${(now.year % 100).toString().padLeft(2, '0')}';
-    final dispatcherDocStream = widget.dspUid.trim().isEmpty
-        ? null
-        : FirebaseFirestore.instance
-              .collection('users')
-              .doc(widget.dspUid)
-              .collection(_settingsCollection)
-              .doc(_dispatcherPillDoc)
-              .snapshots();
-    // Alle heute veröffentlichten Waveplan-Dokumente (ein Doc je
-    // Programm: sameday_a / nextday / sameday_c). Der Doc-Key beginnt
-    // mit dem ISO-Datum, deshalb reicht ein Präfix-Range über die ID.
     final todayId =
         '${now.year.toString().padLeft(4, '0')}-'
         '${now.month.toString().padLeft(2, '0')}-'
         '${now.day.toString().padLeft(2, '0')}';
-    final waveplanTodayStream = widget.dspUid.trim().isEmpty
-        ? null
-        : FirebaseFirestore.instance
-              .collection('users')
-              .doc(widget.dspUid)
-              .collection(_publishedWaveplansCollection)
-              .where(FieldPath.documentId,
-                  isGreaterThanOrEqualTo: todayId)
-              .where(FieldPath.documentId, isLessThan: '$todayId\uf8ff')
-              .snapshots();
+    _ensureHomeStreams(todayId);
+    final dispatcherDocStream = _dispatcherDocStream;
+    final waveplanTodayStream = _waveplanTodayStream;
 
     final cards = <_HomeCardData>[
       _HomeCardData(
@@ -669,6 +686,27 @@ class _DriverHomePageBodyState extends State<_DriverHomePageBody> {
                         final dispatchers =
                             _mergeDispatchers(dutyToday, contacts);
                         if (dispatchers.isEmpty) {
+                          // Noch am Laden → Skeleton statt Leerfläche,
+                          // damit die Kachel nicht "reinspringt".
+                          final loading = !snap.hasData || !waveSnap.hasData;
+                          if (loading) {
+                            return Container(
+                              height: 128,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              alignment: Alignment.center,
+                              child: const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Color(0xFFD1D5DB),
+                                ),
+                              ),
+                            );
+                          }
                           return const SizedBox.shrink();
                         }
                         // null = automatisch: Dispatcher nach Uhrzeit wählen.

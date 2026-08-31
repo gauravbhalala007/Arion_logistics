@@ -3374,9 +3374,10 @@ class _Header extends StatelessWidget {
               icon: tourCheckDone
                   ? Icons.check_circle_outline
                   : Icons.fact_check_outlined,
+              // Secondary-Button: weiß mit grünem Icon + Schrift.
               variant: tourCheckDone
                   ? CoButtonVariant.quiet
-                  : CoButtonVariant.secondaryTinted,
+                  : CoButtonVariant.secondaryGreenOutlined,
             ),
           ],
           // Internal save — persists to shift_plan_drafts without
