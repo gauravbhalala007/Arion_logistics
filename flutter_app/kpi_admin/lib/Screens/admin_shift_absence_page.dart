@@ -507,9 +507,9 @@ class _AdminShiftAbsencePageState extends State<AdminShiftAbsencePage> {
         _DriverOption(
           driverId: transporterId,
           driverName: driverName,
-          // Gleiche Quelle wie im Drivers Hub: aktive DAs sind die, die
-          // laut Fahrer-Dokument arbeiten — alles andere ist Archiv.
-          isActive: isDriverWorking(data),
+          // Wie im Drivers Hub, PLUS Karenz: bis zum Monatsende des
+          // Vertragsendes zählt ein DA hier noch als aktiv.
+          isActive: _isActiveForDaBalance(data, DateTime.now()),
         ),
       );
     }
@@ -4483,6 +4483,21 @@ _AbsenceBuckets _splitAbsenceBuckets({
   );
 }
 
+
+/// Ticket „TIME & ABSENCE": DAs bleiben bis zum ENDE DES MONATS ihres
+/// Vertragsendes in der Aktiv-Liste — erst ab dem Folgemonat zählen sie
+/// hier als Archiv. Beispiel: Vertragsende 10.08. → aktiv bis 31.08.,
+/// Archiv ab 01.09. Ohne hinterlegtes Vertragsende gilt weiterhin nur
+/// das Aktiv-Flag aus dem Fahrer-Dokument.
+bool _isActiveForDaBalance(Map<String, dynamic> data, DateTime now) {
+  if (isDriverWorking(data)) return true;
+  final end = currentEmploymentPeriod(employmentPeriodsOf(data))?.endDate;
+  if (end == null) return false;
+  final endOfMonth = DateTime(end.year, end.month + 1, 0);
+  final today = DateTime(now.year, now.month, now.day);
+  return !today.isAfter(endOfMonth);
+}
+
 bool _matchesAbsenceSearch(_AbsenceAdminItem item, String needle, bool de) {
   if (needle.isEmpty) return true;
   return item.driverName.toLowerCase().contains(needle) ||
@@ -6558,8 +6573,9 @@ class _AbsenceDriversOverviewPageState
       final data = doc.data();
       // Archivierte DAs werden mitgeladen und in der Ansicht ueber den
       // Archiv-Umschalter getrennt (Ticket „DA balance: show ARCHIVE
-      // employees"). Quelle der Aktiv-Kennung wie im Drivers Hub.
-      final isActive = isDriverWorking(data);
+      // employees"). Quelle der Aktiv-Kennung wie im Drivers Hub — PLUS
+      // Karenz bis zum Monatsende des Vertragsendes (Ticket).
+      final isActive = _isActiveForDaBalance(data, DateTime.now());
       final tid =
           ((data['transporterId'] ?? doc.id).toString()).trim().toUpperCase();
       if (tid.isEmpty) continue;
