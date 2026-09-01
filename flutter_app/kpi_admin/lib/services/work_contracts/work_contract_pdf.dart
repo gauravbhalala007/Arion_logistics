@@ -123,7 +123,7 @@ pw.Widget _coverFooter(WcAssets a) => pw.Column(children: [
               ],
             ),
           ),
-          pw.Image(a.qr, width: 58, height: 58),
+          // QR-Code bewusst entfernt (Vorgabe Arion).
         ],
       ),
       pw.SizedBox(height: 8),
@@ -1278,7 +1278,7 @@ Future<Uint8List> wcBuildTerminationPdf(
       pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Text(place,
+          pw.Text(place.isEmpty ? ' ' : place,
               style: pw.TextStyle(font: a.body, fontSize: 10, color: _ink)),
           pw.SizedBox(height: 2),
           pw.Container(height: 0.8, width: 200, color: _line),
@@ -1311,15 +1311,7 @@ Future<Uint8List> wcBuildTerminationPdf(
     build: (ctx) => pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        pw.Row(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Expanded(child: pw.Image(a.logoDelivery, width: 180)),
-            pw.Text(placeDate,
-                style:
-                    pw.TextStyle(font: a.body, fontSize: 10, color: _ink)),
-          ],
-        ),
+        pw.Image(a.logoDelivery, width: 180),
         pw.SizedBox(height: 22),
         pw.Text(
           '${WcEmployer.name}, ${WcEmployer.street}, ${WcEmployer.zipCity}',
@@ -1334,9 +1326,21 @@ Future<Uint8List> wcBuildTerminationPdf(
         pw.Text(d.employeeZipCity,
             style: pw.TextStyle(font: a.body, fontSize: 10.5, color: _ink)),
         pw.SizedBox(height: 20),
-        pw.Text(subject,
-            style:
-                pw.TextStyle(font: a.bodyBold, fontSize: 12, color: _ink)),
+        // Datum rechtsbündig auf Höhe des Betreffs (Briefstandard).
+        pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Expanded(
+              child: pw.Text(subject,
+                  style: pw.TextStyle(
+                      font: a.bodyBold, fontSize: 12, color: _ink)),
+            ),
+            pw.SizedBox(width: 16),
+            pw.Text(placeDate,
+                style:
+                    pw.TextStyle(font: a.body, fontSize: 10, color: _ink)),
+          ],
+        ),
         if (isAufhebung) ...[
           pw.SizedBox(height: 4),
           pw.Text(
@@ -1354,7 +1358,7 @@ Future<Uint8List> wcBuildTerminationPdf(
           pw.Text('Mit freundlichen Grüßen',
               style: pw.TextStyle(font: a.body, fontSize: 10, color: _ink)),
         ],
-        pw.Spacer(),
+        pw.SizedBox(height: 42),
         pw.Row(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
@@ -1377,7 +1381,7 @@ Future<Uint8List> wcBuildTerminationPdf(
             ),
           ],
         ),
-        pw.SizedBox(height: 10),
+        pw.Spacer(),
         _coverFooter(a),
       ],
     ),
