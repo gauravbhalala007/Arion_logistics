@@ -154,6 +154,8 @@ class _RecruitingFormPageState extends State<RecruitingFormPage> {
     ('🇮🇹', '+39'),
     ('🇫🇷', '+33'),
     ('🇬🇷', '+30'),
+    ('🇵🇹', '+351'),
+    ('🇪🇸', '+34'),
   ];
 
   /// Phone number with the selected dial code applied. Numbers that already
