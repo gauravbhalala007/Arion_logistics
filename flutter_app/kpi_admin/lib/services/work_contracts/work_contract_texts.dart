@@ -383,71 +383,32 @@ List<WcSection> wcBuildSections(WorkContractData d) {
   ));
 
   // ── § Untersuchungen ────────────────────────────────────────────────
-  // Beim Arbeitsvisum gilt die entschärfte Fassung aus der Visa-Vorlage
-  // (nur anlassbezogene ärztliche Untersuchungen, keine
-  // verdachtsunabhängigen Alkohol-/Drogenscreenings, Ergebnis nur
-  // geeignet/nicht geeignet, Übermittlung nur mit Einwilligung).
-  if (d.isVisa) {
-    s.add(WcSection(
-      'Ärztliche Untersuchungen',
-      [
-        'Der Arbeitgeber ist berechtigt, eine ärztliche Untersuchung zur '
-            'Feststellung der gesundheitlichen Eignung des Arbeitnehmers '
-            'für die vertraglich geschuldete Tätigkeit zu verlangen, soweit '
-            'gesetzliche Vorschriften dies vorsehen oder konkrete '
-            'tatsächliche Anhaltspunkte Zweifel an der Arbeitsfähigkeit '
-            'oder Eignung begründen.',
-        'Die Untersuchung beschränkt sich ausschließlich auf die '
-            'Feststellung, ob der Arbeitnehmer für die vertraglich '
-            'geschuldete Tätigkeit geeignet oder nicht geeignet ist. '
-            'Diagnosen oder weitergehende Gesundheitsdaten werden dem '
-            'Arbeitgeber nicht mitgeteilt.',
-        'Eine Übermittlung des Untersuchungsergebnisses an den Arbeitgeber '
-            'erfolgt nur mit gesonderter, freiwilliger und jederzeit '
-            'widerruflicher Einwilligung des Arbeitnehmers gemäß Art. 9 '
-            'DSGVO.',
-        'Die Kosten einer vom Arbeitgeber veranlassten Untersuchung trägt '
-            'der Arbeitgeber.',
-      ],
-    ));
-  } else {
-    s.add(WcSection(
-      'Verdachtsunabhängige ärztliche Untersuchungen, Teilnahme an Alkohol- '
-          'oder Drogenscreenings, Entbindung von der Schweigepflicht',
-      [
-      'Der Arbeitnehmer verpflichtet sich, sich auf Verlangen des '
-          'Arbeitgebers regelmäßig hinsichtlich der gesundheitlichen '
-          'Eignung für die übernommene/n Arbeitsaufgabe/n ärztlich oder '
-          'nicht-ärztlich untersuchen zu lassen. Dies erfasst auch '
-          '(Blut-)Untersuchungen bzw. die Teilnahme an Alkohol- bzw. '
-          'Drogenscreenings zur (vorbeugenden) Klärung des Bestehens einer '
-          'Alkohol- bzw. Drogenabhängigkeit oder Arbeitsunfähigkeit.',
-      'Außerhalb der regelmäßigen Untersuchungen bzw. Teilnahme an '
-          'Alkohol- oder Drogenscreenings nach Abs. 1 erklärt sich der '
-          'Arbeitnehmer darüber hinaus bereit, sich auf Verlangen des '
-          'Arbeitgebers hinsichtlich der gesundheitlichen Eignung für die '
-          'übernommene/n Arbeitsaufgabe/n untersuchen zu lassen bzw. an '
-          'Alkohol- oder Drogenscreenings teilzunehmen, wenn tatsächliche '
-          'Anhaltspunkte dafür vorliegen (z.B. Verhaltensauffälligkeit, '
-          'Alkoholgeruch), die Zweifel an der fortdauernden Eignung des '
-          'Arbeitnehmers, Bestehen einer Alkohol- oder Drogenabhängigkeit '
-          'oder der Arbeitsfähigkeit des Arbeitnehmers begründen bzw. ein '
-          'Wechsel der Tätigkeit oder des Arbeitsplatzes beabsichtigt ist.',
-      'Die durch eine ärztliche Untersuchung oder Teilnahme an den '
-          'Alkohol- oder Drogenscreenings nach Abs. 1 bzw. Abs. 2 '
-          'anfallenden Kosten werden vom Arbeitgeber übernommen. Der '
-          'Arbeitnehmer entbindet – für den Fall einer ärztlichen '
-          'Untersuchung – den untersuchenden Arzt insoweit von der '
-          'ärztlichen Schweigepflicht, als dass das Untersuchungsergebnis '
-          'Einfluss auf die Erfüllung der arbeitsvertraglich '
-          'vorausgesetzten Einsatzfähigkeit des Arbeitnehmers haben kann. '
-          'Er wird alle erforderlichen Erklärungen unverzüglich abgeben, '
-          'damit der Arzt dem Arbeitgeber (nur) das Ergebnis der '
-          'Untersuchung (Eignung oder Nichteignung für die geschuldete '
-          'Tätigkeit) mitteilt.',
-      ],
-    ));
-  }
+  // Vorgabe Arion: KEINE verdachtsunabhängigen Untersuchungen /
+  // Alkohol-/Drogenscreenings — in ALLEN Vertragstypen gilt nur die
+  // entschärfte Fassung (anlassbezogene ärztliche Untersuchung, Ergebnis
+  // nur geeignet/nicht geeignet, Übermittlung nur mit Einwilligung).
+  s.add(WcSection(
+    'Ärztliche Untersuchungen',
+    [
+      'Der Arbeitgeber ist berechtigt, eine ärztliche Untersuchung zur '
+          'Feststellung der gesundheitlichen Eignung des Arbeitnehmers '
+          'für die vertraglich geschuldete Tätigkeit zu verlangen, soweit '
+          'gesetzliche Vorschriften dies vorsehen oder konkrete '
+          'tatsächliche Anhaltspunkte Zweifel an der Arbeitsfähigkeit '
+          'oder Eignung begründen.',
+      'Die Untersuchung beschränkt sich ausschließlich auf die '
+          'Feststellung, ob der Arbeitnehmer für die vertraglich '
+          'geschuldete Tätigkeit geeignet oder nicht geeignet ist. '
+          'Diagnosen oder weitergehende Gesundheitsdaten werden dem '
+          'Arbeitgeber nicht mitgeteilt.',
+      'Eine Übermittlung des Untersuchungsergebnisses an den Arbeitgeber '
+          'erfolgt nur mit gesonderter, freiwilliger und jederzeit '
+          'widerruflicher Einwilligung des Arbeitnehmers gemäß Art. 9 '
+          'DSGVO.',
+      'Die Kosten einer vom Arbeitgeber veranlassten Untersuchung trägt '
+          'der Arbeitgeber.',
+    ],
+  ));
 
   // ── § Dienstfahrzeug ────────────────────────────────────────────────
   s.add(WcSection(

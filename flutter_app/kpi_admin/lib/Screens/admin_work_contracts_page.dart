@@ -6,6 +6,7 @@
 // die GF-Unterschrift ist eingedruckt. Zusätzlich: Zeitkontovereinbarung,
 // Kamera-DSGVO und (bei Visum) die Erklärung zum Beschäftigungsverhältnis.
 
+import 'dart:async' show unawaited;
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -66,6 +67,10 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage>
   final _searchCtrl = TextEditingController();
   String _search = '';
   String _pickedLabel = '';
+
+  /// Fahrer-Dokument-ID (TID), wenn die Person aus dem Drivers Hub
+  /// gewählt wurde — für das Zurückschreiben der Adresse.
+  String _pickedDriverTid = '';
 
   // Stammdaten
   final _nameCtrl = TextEditingController();
@@ -175,6 +180,7 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage>
   void _clearPerson() {
     setState(() {
       _pickedLabel = '';
+      _pickedDriverTid = '';
       _nameCtrl.clear();
       _streetCtrl.clear();
       _zipCityCtrl.clear();
@@ -185,6 +191,57 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage>
       _searchCtrl.clear();
       _results = [];
     });
+  }
+
+
+  /// Pflichtfelder vor dem Erzeugen: Name UND vollständige Adresse.
+  /// Adresse ist required, falls sie nicht automatisch aus dem Profil
+  /// übernommen wurde.
+  bool _validatePerson() {
+    final de = _de;
+    if (_nameCtrl.text.trim().isEmpty) {
+      _snack(de ? 'Bitte zuerst eine Person wählen.' : 'Pick a person first.',
+          error: true);
+      return false;
+    }
+    if (_streetCtrl.text.trim().isEmpty || _zipCityCtrl.text.trim().isEmpty) {
+      _snack(
+        de
+            ? 'Bitte Adresse ausfüllen (Straße + PLZ/Ort).'
+            : 'Please fill in the address (street + ZIP/city).',
+        error: true,
+      );
+      return false;
+    }
+    return true;
+  }
+
+  /// Manuell ergänzte/korrigierte Adresse ins Fahrer-Dokument im Drivers
+  /// Hub zurückschreiben (nur wenn die Person von dort gewählt wurde).
+  Future<void> _saveAddressToDriverHub() async {
+    final uid = _uid;
+    if (uid == null || _pickedDriverTid.isEmpty) return;
+    final street = _streetCtrl.text.trim();
+    final zipCity = _zipCityCtrl.text.trim();
+    if (street.isEmpty || zipCity.isEmpty) return;
+    final m = RegExp(r'^(\d{4,5})\s+(.+)\$').firstMatch(zipCity);
+    final postalCode = m?.group(1) ?? '';
+    final city = m?.group(2) ?? zipCity;
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('drivers')
+          .doc(_pickedDriverTid)
+          .set({
+        'street': street,
+        if (postalCode.isNotEmpty) 'postalCode': postalCode,
+        'city': city,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (_) {
+      // Rückschreiben ist Komfort — Fehler nicht blockierend.
+    }
   }
 
   double _parseNum(String s, double fallback) =>
@@ -241,12 +298,8 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage>
       );
 
   Future<void> _generate() async {
-    final de = _de;
-    if (_nameCtrl.text.trim().isEmpty) {
-      _snack(de ? 'Bitte zuerst eine Person wählen.' : 'Pick a person first.',
-          error: true);
-      return;
-    }
+    if (!_validatePerson()) return;
+    unawaited(_saveAddressToDriverHub());
     setState(() {
       _building = true;
       _results = [];
@@ -596,6 +649,7 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage>
               onTap: () {
                 final data = doc.data();
                 setState(() {
+                  _pickedDriverTid = doc.id;
                   _pickedLabel = (data['driverName'] ?? doc.id).toString();
                   _nameCtrl.text = _pickedLabel;
                   _streetCtrl.text = (data['street'] ?? '').toString();
@@ -671,6 +725,7 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage>
               onTap: () {
                 final data = doc.data();
                 setState(() {
+                  _pickedDriverTid = '';
                   _pickedLabel =
                       '${data['firstName'] ?? ''} ${data['lastName'] ?? ''}'
                           .trim();
@@ -1132,11 +1187,8 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage>
 
   Future<void> _generateExtension() async {
     final de = _de;
-    if (_nameCtrl.text.trim().isEmpty) {
-      _snack(de ? 'Bitte zuerst eine Person wählen.' : 'Pick a person first.',
-          error: true);
-      return;
-    }
+    if (!_validatePerson()) return;
+    unawaited(_saveAddressToDriverHub());
     setState(() {
       _building = true;
       _results = [];
@@ -1303,11 +1355,8 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage>
 
   Future<void> _generateTermination() async {
     final de = _de;
-    if (_nameCtrl.text.trim().isEmpty) {
-      _snack(de ? 'Bitte zuerst eine Person wählen.' : 'Pick a person first.',
-          error: true);
-      return;
-    }
+    if (!_validatePerson()) return;
+    unawaited(_saveAddressToDriverHub());
     setState(() {
       _building = true;
       _results = [];
