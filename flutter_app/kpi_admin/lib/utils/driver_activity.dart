@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../models/employment_period.dart';
+
 class ActiveRuleConfirmationStats {
   final int confirmedCount;
   final int pendingCount;
@@ -64,6 +66,25 @@ bool isDriverWorking(Map<String, dynamic> driverData) {
   }
 
   return true;
+}
+
+/// Ticket „TIME & ABSENCE": Aktiv-Kennung MIT Karenzmonat — ein
+/// deaktivierter Fahrer zählt noch als aktiv, solange der aktuelle Monat
+/// der Monat seines Vertragsendes ist (Ende 10.08. → aktiv bis 31.08.,
+/// Archiv ab 01.09.). Bewusst NUR der Endmonat selbst: früh
+/// Ausgeschiedene tragen oft noch ihr ursprüngliches (zukünftiges)
+/// Vertragsende im Profil und würden sonst monatelang aktiv bleiben.
+/// Verwendet in DA Balance und Time Account — NICHT in Shift Plan &
+/// Benachrichtigungen (dort gilt weiter isDriverWorking).
+bool isDriverActiveWithEndMonthGrace(
+  Map<String, dynamic> driverData,
+  DateTime now,
+) {
+  if (isDriverWorking(driverData)) return true;
+  final end =
+      currentEmploymentPeriod(employmentPeriodsOf(driverData))?.endDate;
+  if (end == null) return false;
+  return end.year == now.year && end.month == now.month;
 }
 
 Future<ActiveRuleConfirmationStats> loadActiveRuleConfirmationStats({

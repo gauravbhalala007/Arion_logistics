@@ -31,6 +31,7 @@ import '../theme/app_elevation.dart';
 import '../theme/app_typography.dart';
 import '../utils/vacation_days.dart';
 import '../widgets/clearable_search_field.dart';
+import '../utils/driver_activity.dart';
 
 // ── Zeit-Helfer (H:MM ↔ Minuten, wie im ARION-Zeitkonto-Beispiel) ──
 
@@ -1014,7 +1015,10 @@ class _ZeitkontoTabState extends State<ZeitkontoTab> {
 
           var filtered = docs.where((d) {
             final data = d.data();
-            final archived = ((data['active'] as bool?) ?? true) == false;
+            // Ticket „TIME ACCOUNT": gleiche Karenz wie in der DA
+            // Balance — bis zum Monatsende des Vertragsendes noch aktiv.
+            final archived =
+                !isDriverActiveWithEndMonthGrace(data, DateTime.now());
             if (archived != _showArchive) return false;
             if (_search.isEmpty) return true;
             final name =

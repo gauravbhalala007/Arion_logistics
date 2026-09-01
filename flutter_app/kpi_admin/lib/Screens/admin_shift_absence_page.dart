@@ -4489,17 +4489,8 @@ _AbsenceBuckets _splitAbsenceBuckets({
 /// hier als Archiv. Beispiel: Vertragsende 10.08. → aktiv bis 31.08.,
 /// Archiv ab 01.09. Ohne hinterlegtes Vertragsende gilt weiterhin nur
 /// das Aktiv-Flag aus dem Fahrer-Dokument.
-bool _isActiveForDaBalance(Map<String, dynamic> data, DateTime now) {
-  if (isDriverWorking(data)) return true;
-  final end = currentEmploymentPeriod(employmentPeriodsOf(data))?.endDate;
-  if (end == null) return false;
-  // Nur der MONAT des Vertragsendes zählt als Karenz. Bewusst NICHT
-  // „heute <= Monatsende des Endes": etliche früh ausgeschiedene Fahrer
-  // tragen noch ihr (weit in der Zukunft liegendes) ursprüngliches
-  // Vertragsende im Profil — die würden sonst monatelang fälschlich in
-  // der Aktiv-Liste hängen.
-  return end.year == now.year && end.month == now.month;
-}
+bool _isActiveForDaBalance(Map<String, dynamic> data, DateTime now) =>
+    isDriverActiveWithEndMonthGrace(data, now);
 
 bool _matchesAbsenceSearch(_AbsenceAdminItem item, String needle, bool de) {
   if (needle.isEmpty) return true;
