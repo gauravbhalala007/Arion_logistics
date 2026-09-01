@@ -158,6 +158,10 @@ class _AdminIncidentFormPageState extends State<AdminIncidentFormPage> {
   // Gemeinsame Felder
   final _addressCtrl = TextEditingController();
   final _descriptionCtrl = TextEditingController();
+
+  /// Name des Melders — Pflichtfeld, damit Dispatcher ihren eigenen
+  /// Namen eintragen (vorher stand immer der Account-Inhaber drin).
+  final _reporterCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
 
   // Fahrzeug-Vorfall
@@ -230,6 +234,7 @@ class _AdminIncidentFormPageState extends State<AdminIncidentFormPage> {
     for (final c in <TextEditingController>[
       _addressCtrl,
       _descriptionCtrl,
+      _reporterCtrl,
       _notesCtrl,
       _damageCtrl,
       _groundingReasonCtrl,
@@ -255,6 +260,7 @@ class _AdminIncidentFormPageState extends State<AdminIncidentFormPage> {
     if (data == null) return;
 
     _addressCtrl.text = incidentAddress(data);
+    _reporterCtrl.text = _str(data['reportedBy']);
     _descriptionCtrl.text = incidentDescription(data);
     _notesCtrl.text = _str(data['notes']);
     _damageCtrl.text = _str(data['damage']);
@@ -503,6 +509,11 @@ class _AdminIncidentFormPageState extends State<AdminIncidentFormPage> {
           ? 'Beschreibe kurz, was passiert ist.'
           : 'Describe briefly what happened.';
     }
+    if (_reporterCtrl.text.trim().isEmpty) {
+      errors['reporter'] = de
+          ? 'Trage deinen Namen ein (Gemeldet von).'
+          : 'Enter your name (reported by).';
+    }
     if (_isWorkAccident && _injuryTypeCtrl.text.trim().isEmpty) {
       errors['injuryType'] = de
           ? 'Trage die Art der Verletzung ein.'
@@ -524,9 +535,6 @@ class _AdminIncidentFormPageState extends State<AdminIncidentFormPage> {
 
   Map<String, dynamic> _buildPayload() {
     final auth = FirebaseAuth.instance.currentUser;
-    final reportedBy = (auth?.displayName ?? '').trim().isNotEmpty
-        ? auth!.displayName!.trim()
-        : (auth?.email ?? '').trim();
 
     final occurredAt = DateTime(
       _date.year,
@@ -558,6 +566,9 @@ class _AdminIncidentFormPageState extends State<AdminIncidentFormPage> {
       'plateKey': plateKeyOf(plateRaw),
       'address': _addressCtrl.text.trim(),
       'description': _descriptionCtrl.text.trim(),
+      // Pflichtfeld aus dem Formular — Dispatcher tragen ihren eigenen
+      // Namen ein; wird auch beim Bearbeiten bewusst uebernommen.
+      'reportedBy': _reporterCtrl.text.trim(),
       'notes': _notesCtrl.text.trim(),
       'updatedAt': FieldValue.serverTimestamp(),
     };
@@ -609,7 +620,6 @@ class _AdminIncidentFormPageState extends State<AdminIncidentFormPage> {
       payload['confidence'] = 1.0;
       payload['reviewFlag'] = false;
       payload['reportedAt'] = FieldValue.serverTimestamp();
-      payload['reportedBy'] = reportedBy;
       payload['createdAt'] = FieldValue.serverTimestamp();
       payload['createdBy'] = auth?.uid ?? '';
     }
@@ -886,6 +896,18 @@ class _AdminIncidentFormPageState extends State<AdminIncidentFormPage> {
   List<Widget> _sharedTopFields(bool de) {
     return <Widget>[
       _sectionLabel(de ? 'Wann und wer' : 'When and who'),
+      IncidentField(
+        label: de ? 'Gemeldet von (dein Name)' : 'Reported by (your name)',
+        required: true,
+        child: _text(
+          _reporterCtrl,
+          hint: de
+              ? 'Vor- und Nachname des Melders'
+              : 'First and last name of the reporter',
+          textCapitalization: TextCapitalization.words,
+          errorKey: 'reporter',
+        ),
+      ),
       Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
