@@ -14,6 +14,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 
+import '../models/employment_period.dart';
 import '../services/work_contracts/work_contract_model.dart';
 import '../services/work_contracts/work_contract_pdf.dart';
 import '../widgets/admin_scope.dart';
@@ -43,9 +44,15 @@ class AdminWorkContractsPage extends StatefulWidget {
 
 class _AdminWorkContractsPageState extends State<AdminWorkContractsPage>
     with SingleTickerProviderStateMixin {
-  /// Tab-Menü: Vertrag ↔ Kündigung.
-  late final TabController _tabs = TabController(length: 2, vsync: this);
+  /// Tab-Menü: Vertrag ↔ Verlängerung ↔ Kündigung.
+  late final TabController _tabs = TabController(length: 3, vsync: this);
   int _tab = 0;
+
+  // Vertragsverlängerung (§ 14 Abs. 2 TzBfG).
+  DateTime _extCurrentEnd = DateTime.now();
+  DateTime _extNewEnd = DateTime(
+      DateTime.now().year + 1, DateTime.now().month, DateTime.now().day);
+  bool _extWithSignature = true;
 
   // Kündigungs-/Aufhebungs-Formular.
   WcTerminationType _termType = WcTerminationType.ordentlich;
@@ -340,6 +347,7 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage>
                   controller: _tabs,
                   tabs: [
                     de ? 'Vertrag' : 'Contract',
+                    de ? 'Verlängerung' : 'Extension',
                     de ? 'Kündigung' : 'Termination',
                   ],
                 ),
@@ -352,6 +360,10 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage>
                   _extrasCard(),
                   const SizedBox(height: 12),
                   _generateCard(),
+                ] else if (_tab == 1) ...[
+                  _extensionCard(),
+                  const SizedBox(height: 12),
+                  _resultsCard(),
                 ] else ...[
                   _terminationCard(),
                   const SizedBox(height: 12),
@@ -598,6 +610,17 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage>
                   _residenceSince = (data['livingHereSince'] is Timestamp)
                       ? (data['livingHereSince'] as Timestamp).toDate()
                       : _residenceSince;
+                  // Verlängerung: bisheriges Vertragsende aus dem
+                  // Fahrer-Dokument vorbefüllen (laufende, sonst
+                  // jüngste Beschäftigungsperiode).
+                  final periodEnd =
+                      currentEmploymentPeriod(employmentPeriodsOf(data))
+                          ?.endDate;
+                  if (periodEnd != null) {
+                    _extCurrentEnd = periodEnd;
+                    _extNewEnd = DateTime(
+                        periodEnd.year + 1, periodEnd.month, periodEnd.day);
+                  }
                   _searchCtrl.clear();
                 });
               }
@@ -1017,7 +1040,137 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage>
     return _card(child: _resultsList());
   }
 
+
+  // ── Vertragsverlängerung ──────────────────────────────────────────────
+
+  Widget _extensionCard() {
+    final de = _de;
+    return _card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(de ? '2 · Verlängerung' : '2 · Extension',
+              style: const TextStyle(
+                  fontSize: 14, fontWeight: FontWeight.w800, color: _kText)),
+          const SizedBox(height: 6),
+          Text(
+            de
+                ? 'Verlängert die laufende Befristung um 1 Jahr (Standard) '
+                    '— nur die Laufzeit ändert sich, alle übrigen '
+                    'Vertragsbedingungen bleiben unverändert '
+                    '(§ 14 Abs. 2 TzBfG). Wichtig: VOR Ablauf der '
+                    'bisherigen Befristung unterschreiben.'
+                : 'Extends the current fixed term by 1 year (default) — '
+                    'only the duration changes (§ 14 (2) TzBfG). Sign '
+                    'BEFORE the current term expires.',
+            style: const TextStyle(fontSize: 12, color: _kMuted),
+          ),
+          const Divider(height: 28, color: _kBorder),
+          _groupLabel(de ? 'Eckdaten' : 'Key data'),
+          _fieldGrid([
+            _dateField(
+              de ? 'Bisheriges Vertragsende' : 'Current end date',
+              _extCurrentEnd,
+              (v) => setState(() {
+                _extCurrentEnd = v;
+                _extNewEnd = DateTime(v.year + 1, v.month, v.day);
+              }),
+            ),
+            _dateField(
+              de ? 'Neues Vertragsende (+1 Jahr)' : 'New end date (+1 year)',
+              _extNewEnd,
+              (v) => setState(() => _extNewEnd = v),
+            ),
+            _textField(
+                _signCityCtrl, de ? 'Ort (Unterschrift)' : 'City (signature)'),
+            _dateField(
+              de ? 'Datum der Vereinbarung' : 'Agreement date',
+              _signDate,
+              (v) => setState(() => _signDate = v),
+            ),
+          ]),
+          const SizedBox(height: 8),
+          _checkTile(
+            de ? 'Unterschrift eindrucken' : 'Embed signature',
+            de
+                ? 'Deine Unterschrift wird mit ausgedruckt — abwählbar für '
+                    'handschriftliche Unterschrift.'
+                : 'Your signature is printed — deselect to sign by hand.',
+            _extWithSignature,
+            (v) => setState(() => _extWithSignature = v),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _building ? null : _generateExtension,
+              style: FilledButton.styleFrom(
+                backgroundColor: _kGreen,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              icon: _building
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.picture_as_pdf_rounded, size: 18),
+              label: Text(
+                de ? 'Verlängerungs-PDF erzeugen' : 'Generate PDF',
+                style: const TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.w800),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _generateExtension() async {
+    final de = _de;
+    if (_nameCtrl.text.trim().isEmpty) {
+      _snack(de ? 'Bitte zuerst eine Person wählen.' : 'Pick a person first.',
+          error: true);
+      return;
+    }
+    setState(() {
+      _building = true;
+      _results = [];
+    });
+    try {
+      final d = WcExtensionData(
+        employeeName: _nameCtrl.text.trim(),
+        employeeStreet: _streetCtrl.text.trim(),
+        employeeZipCity: _zipCityCtrl.text.trim(),
+        currentEnd: _extCurrentEnd,
+        newEnd: _extNewEnd,
+        signCity: _signCityCtrl.text.trim().isEmpty
+            ? WcEmployer.city
+            : _signCityCtrl.text.trim(),
+        signDate: _signDate,
+        withSignature: _extWithSignature,
+      );
+      final assets = await wcLoadAssets(
+          signaturePng: _extWithSignature ? _signaturePng : null);
+      final slug = d.employeeName
+          .replaceAll(RegExp(r'[^A-Za-z0-9ÄÖÜäöüß ]'), '')
+          .replaceAll(' ', '_');
+      final bytes = await wcBuildExtensionPdf(d, assets);
+      setState(() =>
+          _results = [(name: 'Vertragsverlaengerung_$slug.pdf', bytes: bytes)]);
+    } catch (e) {
+      _snack(de ? 'Fehler: $e' : 'Error: $e', error: true);
+    } finally {
+      if (mounted) setState(() => _building = false);
+    }
+  }
+
   // ── Kündigung / Aufhebungsvertrag ─────────────────────────────────────
+
 
   Widget _terminationCard() {
     final de = _de;

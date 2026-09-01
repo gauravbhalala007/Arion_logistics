@@ -306,3 +306,35 @@ class WcTerminationData {
   /// unterschrieben werden soll.
   final bool withSignature;
 }
+
+// ── Vertragsverlängerung ─────────────────────────────────────────────
+
+/// Eingaben für die Verlängerungsvereinbarung (eine PDF-Seite).
+/// Rechtsbasis § 14 Abs. 2 TzBfG: Die Verlängerung muss VOR Ablauf der
+/// bisherigen Befristung vereinbart werden und darf nur die Laufzeit
+/// ändern — alle übrigen Vertragsbedingungen bleiben unverändert.
+class WcExtensionData {
+  WcExtensionData({
+    required this.employeeName,
+    required this.employeeStreet,
+    required this.employeeZipCity,
+    required this.currentEnd,
+    required this.newEnd,
+    required this.signCity,
+    required this.signDate,
+    this.withSignature = true,
+  });
+
+  final String employeeName;
+  final String employeeStreet;
+  final String employeeZipCity;
+
+  /// Bisheriges Befristungsende.
+  final DateTime currentEnd;
+
+  /// Neues Befristungsende (Standard: +1 Jahr, wählbar).
+  final DateTime newEnd;
+  final String signCity;
+  final DateTime signDate;
+  final bool withSignature;
+}

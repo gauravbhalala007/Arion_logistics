@@ -1388,3 +1388,140 @@ Future<Uint8List> wcBuildTerminationPdf(
   ));
   return doc.save();
 }
+
+// ── Vertragsverlängerung (eine A4-Seite) ────────────────────────────────
+//
+// § 14 Abs. 2 TzBfG: sachgrundlose Verlängerung nur VOR Ablauf der
+// laufenden Befristung, nur die Laufzeit ändert sich. Beidseitige
+// Unterschrift (Schriftform § 14 Abs. 4 TzBfG).
+
+Future<Uint8List> wcBuildExtensionPdf(WcExtensionData d, WcAssets a) async {
+  final doc = pw.Document();
+  final placeDate = '${d.signCity}, ${wcDate(d.signDate)}';
+
+  pw.Widget para(String text) => pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 8),
+        child: pw.Text(text,
+            style: pw.TextStyle(
+                font: a.body, fontSize: 10, color: _ink, lineSpacing: 1.5)),
+      );
+
+  pw.Widget signatureLine({
+    required String place,
+    required String label,
+    pw.MemoryImage? sig,
+  }) =>
+      pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(place.isEmpty ? ' ' : place,
+              style: pw.TextStyle(font: a.body, fontSize: 10, color: _ink)),
+          pw.SizedBox(height: 2),
+          pw.Container(height: 0.8, width: 200, color: _line),
+          pw.SizedBox(height: 2),
+          pw.Text('ORT, DATUM',
+              style: pw.TextStyle(
+                  font: a.bodyBold, fontSize: 6.5, color: _grey)),
+          pw.SizedBox(height: 10),
+          pw.Container(
+            height: 40,
+            alignment: pw.Alignment.bottomLeft,
+            child: sig == null
+                ? pw.SizedBox()
+                : pw.Image(sig, height: 40, fit: pw.BoxFit.contain),
+          ),
+          pw.SizedBox(height: 2),
+          pw.Container(height: 0.8, width: 200, color: _line),
+          pw.SizedBox(height: 2),
+          pw.Text(label,
+              style: pw.TextStyle(
+                  font: a.bodyBold, fontSize: 6.5, color: _grey)),
+        ],
+      );
+
+  doc.addPage(pw.Page(
+    pageFormat: PdfPageFormat.a4,
+    margin: const pw.EdgeInsets.fromLTRB(48, 36, 48, 30),
+    build: (ctx) => pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Image(a.logoDelivery, width: 180),
+        pw.SizedBox(height: 22),
+        pw.Text(
+          '${WcEmployer.name}, ${WcEmployer.street}, ${WcEmployer.zipCity}',
+          style:
+              pw.TextStyle(font: a.bodyBold, fontSize: 7, color: _orange),
+        ),
+        pw.SizedBox(height: 6),
+        pw.Text(d.employeeName,
+            style: pw.TextStyle(font: a.body, fontSize: 10.5, color: _ink)),
+        pw.Text(d.employeeStreet,
+            style: pw.TextStyle(font: a.body, fontSize: 10.5, color: _ink)),
+        pw.Text(d.employeeZipCity,
+            style: pw.TextStyle(font: a.body, fontSize: 10.5, color: _ink)),
+        pw.SizedBox(height: 20),
+        pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Expanded(
+              child: pw.Text(
+                  'Verlängerung des befristeten Arbeitsvertrags',
+                  style: pw.TextStyle(
+                      font: a.bodyBold, fontSize: 12, color: _ink)),
+            ),
+            pw.SizedBox(width: 16),
+            pw.Text(placeDate,
+                style:
+                    pw.TextStyle(font: a.body, fontSize: 10, color: _ink)),
+          ],
+        ),
+        pw.SizedBox(height: 4),
+        pw.Text(
+          'zwischen ${WcEmployer.name}, ${WcEmployer.street}, '
+          '${WcEmployer.zipCity} (Arbeitgeber) und ${d.employeeName}, '
+          '${d.employeeStreet}, ${d.employeeZipCity} (Arbeitnehmer)',
+          style: pw.TextStyle(
+              font: a.body, fontSize: 9.5, color: _ink, lineSpacing: 1.4),
+        ),
+        pw.SizedBox(height: 12),
+        para('1. Die Parteien sind sich darüber einig, dass das zwischen '
+            'ihnen bestehende, bis zum ${wcDate(d.currentEnd)} befristete '
+            'Arbeitsverhältnis gemäß § 14 Abs. 2 TzBfG über diesen '
+            'Zeitpunkt hinaus verlängert wird. Das Arbeitsverhältnis ist '
+            'nunmehr befristet bis zum ${wcDate(d.newEnd)} und endet mit '
+            'Ablauf dieser Befristung, ohne dass es einer Kündigung '
+            'bedarf.'),
+        para('2. Alle übrigen Bestimmungen des bestehenden '
+            'Arbeitsvertrags einschließlich seiner Anlagen bleiben durch '
+            'diese Verlängerung unberührt und gelten unverändert fort.'),
+        para('3. Das Recht beider Parteien zur ordentlichen Kündigung '
+            'nach Maßgabe des Arbeitsvertrags sowie zur außerordentlichen '
+            'Kündigung bleibt bestehen.'),
+        pw.SizedBox(height: 42),
+        pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Expanded(
+              child: signatureLine(
+                place: placeDate,
+                label:
+                    'UNTERSCHRIFT, GESCHÄFTSFÜHRER | ${WcEmployer.name}',
+                sig: d.withSignature ? a.signature : null,
+              ),
+            ),
+            pw.SizedBox(width: 24),
+            pw.Expanded(
+              child: signatureLine(
+                place: placeDate,
+                label: 'UNTERSCHRIFT, ARBEITNEHMER',
+              ),
+            ),
+          ],
+        ),
+        pw.Spacer(),
+        _coverFooter(a),
+      ],
+    ),
+  ));
+  return doc.save();
+}
