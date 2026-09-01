@@ -17,6 +17,7 @@ import 'package:printing/printing.dart';
 import '../services/work_contracts/work_contract_model.dart';
 import '../services/work_contracts/work_contract_pdf.dart';
 import '../widgets/admin_scope.dart';
+import '../widgets/pill_tab_bar.dart';
 
 const _kBorder = Color(0xFFE5E7EB);
 const _kMuted = Color(0xFF6B7280);
@@ -40,7 +41,19 @@ class AdminWorkContractsPage extends StatefulWidget {
       _AdminWorkContractsPageState();
 }
 
-class _AdminWorkContractsPageState extends State<AdminWorkContractsPage> {
+class _AdminWorkContractsPageState extends State<AdminWorkContractsPage>
+    with SingleTickerProviderStateMixin {
+  /// Tab-Menü: Vertrag ↔ Kündigung.
+  late final TabController _tabs = TabController(length: 2, vsync: this);
+  int _tab = 0;
+
+  // Kündigungs-/Aufhebungs-Formular.
+  WcTerminationType _termType = WcTerminationType.ordentlich;
+  DateTime _termEndDate = wcTerminationDefaultEndDate(
+      WcTerminationType.ordentlich, DateTime.now());
+  final _termReasonCtrl = TextEditingController();
+  bool _termWithSignature = true;
+
   // Personen-Quelle
   bool _fromDrivers = true;
   final _searchCtrl = TextEditingController();
@@ -96,6 +109,9 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage> {
       final v = _searchCtrl.text.trim().toLowerCase();
       if (v != _search) setState(() => _search = v);
     });
+    _tabs.addListener(() {
+      if (_tabs.index != _tab) setState(() => _tab = _tabs.index);
+    });
   }
 
   @override
@@ -110,6 +126,8 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage> {
     _hoursCtrl.dispose();
     _vacationCtrl.dispose();
     _signCityCtrl.dispose();
+    _termReasonCtrl.dispose();
+    _tabs.dispose();
     super.dispose();
   }
 
@@ -317,13 +335,28 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage> {
               children: [
                 _header(),
                 const SizedBox(height: 12),
+                // Tab-Menü: Vertrag erstellen ↔ Kündigung/Aufhebung.
+                PillTabBar(
+                  controller: _tabs,
+                  tabs: [
+                    de ? 'Vertrag' : 'Contract',
+                    de ? 'Kündigung' : 'Termination',
+                  ],
+                ),
+                const SizedBox(height: 12),
                 _personCard(),
                 const SizedBox(height: 12),
-                _contractCard(),
-                const SizedBox(height: 12),
-                _extrasCard(),
-                const SizedBox(height: 12),
-                _generateCard(),
+                if (_tab == 0) ...[
+                  _contractCard(),
+                  const SizedBox(height: 12),
+                  _extrasCard(),
+                  const SizedBox(height: 12),
+                  _generateCard(),
+                ] else ...[
+                  _terminationCard(),
+                  const SizedBox(height: 12),
+                  _resultsCard(),
+                ],
                 const SizedBox(height: 24),
               ],
             ),
@@ -902,74 +935,262 @@ class _AdminWorkContractsPageState extends State<AdminWorkContractsPage> {
           ]),
           if (_results.isNotEmpty) ...[
             const SizedBox(height: 14),
-            for (final r in _results)
-              Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: _kBorder),
-                ),
-                child: Row(children: [
-                  const Icon(Icons.description_outlined,
-                      size: 18, color: _kGreen),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(r.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: _kText)),
-                  ),
-                  SizedBox(
-                    height: 34,
-                    width: 108,
-                    child: OutlinedButton.icon(
-                      onPressed: () =>
-                          Printing.layoutPdf(onLayout: (_) async => r.bytes),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: _kGreen,
-                        side: const BorderSide(color: _kGreen),
-                        padding: EdgeInsets.zero,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                      ),
-                      icon: const Icon(Icons.print_rounded, size: 15),
-                      label: Text(de ? 'Drucken' : 'Print',
-                          style: const TextStyle(
-                              fontSize: 12.5, fontWeight: FontWeight.w700)),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  SizedBox(
-                    height: 34,
-                    width: 108,
-                    child: OutlinedButton.icon(
-                      onPressed: () =>
-                          Printing.sharePdf(bytes: r.bytes, filename: r.name),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: _kText,
-                        side: const BorderSide(color: _kBorder),
-                        padding: EdgeInsets.zero,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                      ),
-                      icon: const Icon(Icons.download_rounded, size: 15),
-                      label: const Text('PDF',
-                          style: TextStyle(
-                              fontSize: 12.5, fontWeight: FontWeight.w700)),
-                    ),
-                  ),
-                ]),
-              ),
+            _resultsList(),
           ],
         ],
       ),
     );
+  }
+
+  /// Ergebnis-Zeilen (Drucken/PDF) — geteilt zwischen Vertrags- und
+  /// Kündigungs-Tab.
+  Widget _resultsList() {
+    final de = _de;
+    return Column(children: [
+      for (final r in _results)
+        Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: _kBorder),
+          ),
+          child: Row(children: [
+            const Icon(Icons.description_outlined, size: 18, color: _kGreen),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(r.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: _kText)),
+            ),
+            SizedBox(
+              height: 34,
+              width: 108,
+              child: OutlinedButton.icon(
+                onPressed: () =>
+                    Printing.layoutPdf(onLayout: (_) async => r.bytes),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _kGreen,
+                  side: const BorderSide(color: _kGreen),
+                  padding: EdgeInsets.zero,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+                icon: const Icon(Icons.print_rounded, size: 15),
+                label: Text(de ? 'Drucken' : 'Print',
+                    style: const TextStyle(
+                        fontSize: 12.5, fontWeight: FontWeight.w700)),
+              ),
+            ),
+            const SizedBox(width: 8),
+            SizedBox(
+              height: 34,
+              width: 108,
+              child: OutlinedButton.icon(
+                onPressed: () =>
+                    Printing.sharePdf(bytes: r.bytes, filename: r.name),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _kText,
+                  side: const BorderSide(color: _kBorder),
+                  padding: EdgeInsets.zero,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+                icon: const Icon(Icons.download_rounded, size: 15),
+                label: const Text('PDF',
+                    style: TextStyle(
+                        fontSize: 12.5, fontWeight: FontWeight.w700)),
+              ),
+            ),
+          ]),
+        ),
+    ]);
+  }
+
+  Widget _resultsCard() {
+    if (_results.isEmpty) return const SizedBox.shrink();
+    return _card(child: _resultsList());
+  }
+
+  // ── Kündigung / Aufhebungsvertrag ─────────────────────────────────────
+
+  Widget _terminationCard() {
+    final de = _de;
+    return _card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(de ? '2 · Kündigung' : '2 · Termination',
+              style: const TextStyle(
+                  fontSize: 14, fontWeight: FontWeight.w800, color: _kText)),
+          const SizedBox(height: 14),
+          _groupLabel(de ? 'Art der Beendigung' : 'Type'),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            for (final t in WcTerminationType.values)
+              _choicePill(
+                de ? t.labelDe() : t.labelEn(),
+                _termType == t,
+                () => setState(() {
+                  _termType = t;
+                  // Fristen automatisch: fristlos/Aufhebung = heute,
+                  // Probezeit = +2 Wochen, ordentlich = § 622 BGB
+                  // (4 Wochen zum 15. oder Monatsende). Bleibt wählbar.
+                  _termEndDate =
+                      wcTerminationDefaultEndDate(t, DateTime.now());
+                }),
+              ),
+          ]),
+          const SizedBox(height: 8),
+          Text(
+            switch (_termType) {
+              WcTerminationType.ordentlich => de
+                  ? 'Frist automatisch: 4 Wochen zum 15. oder Monatsende '
+                      '(§ 622 BGB) — Datum bleibt anpassbar.'
+                  : 'Auto notice period: 4 weeks to the 15th or month end '
+                      '(§ 622 BGB) — date stays editable.',
+              WcTerminationType.probezeit => de
+                  ? 'Frist automatisch: 2 Wochen ab heute (§ 622 Abs. 3 '
+                      'BGB) — Datum bleibt anpassbar.'
+                  : 'Auto notice period: 2 weeks from today (§ 622 (3) '
+                      'BGB) — date stays editable.',
+              WcTerminationType.fristlos => de
+                  ? 'Wirksam sofort (heute), hilfsweise ordentlich zum '
+                      'nächstmöglichen Zeitpunkt — Datum bleibt anpassbar.'
+                  : 'Effective immediately (today) — date stays editable.',
+              WcTerminationType.aufhebung => de
+                  ? 'Beendigung einvernehmlich zum heutigen Datum — Datum '
+                      'bleibt anpassbar. Enthält den Sperrzeit-Hinweis '
+                      '(§ 159 SGB III).'
+                  : 'Mutual termination as of today — date stays editable.',
+            },
+            style: const TextStyle(fontSize: 12, color: _kMuted),
+          ),
+          const Divider(height: 28, color: _kBorder),
+          _groupLabel(de ? 'Eckdaten' : 'Key data'),
+          _fieldGrid([
+            _dateField(
+              de ? 'Beendigung zum' : 'End date',
+              _termEndDate,
+              (v) => setState(() => _termEndDate = v),
+            ),
+            _textField(
+                _signCityCtrl, de ? 'Ort (Unterschrift)' : 'City (signature)'),
+            _dateField(
+              de ? 'Datum des Schreibens' : 'Letter date',
+              _signDate,
+              (v) => setState(() => _signDate = v),
+            ),
+          ]),
+          if (_termType == WcTerminationType.fristlos) ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: _termReasonCtrl,
+              minLines: 2,
+              maxLines: 4,
+              decoration: InputDecoration(
+                labelText:
+                    de ? 'Grund (optional)' : 'Reason (optional)',
+                hintText: de
+                    ? 'Wird nur mitgedruckt, wenn ausgefüllt — sonst '
+                        '„Grund auf Verlangen" (§ 626 Abs. 2 BGB).'
+                    : 'Printed only if filled in.',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: 8),
+          _checkTile(
+            de ? 'Unterschrift eindrucken' : 'Embed signature',
+            de
+                ? 'Deine Unterschrift wird mit ausgedruckt. Abwählen, wenn '
+                    'du handschriftlich unterschreiben willst (Schriftform '
+                    '§ 623 BGB: eigenhändige Unterschrift empfohlen).'
+                : 'Your signature is printed on the document. Deselect to '
+                    'sign by hand.',
+            _termWithSignature,
+            (v) => setState(() => _termWithSignature = v),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _building ? null : _generateTermination,
+              style: FilledButton.styleFrom(
+                backgroundColor: _kGreen,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              icon: _building
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.picture_as_pdf_rounded, size: 18),
+              label: Text(
+                de ? 'Kündigungs-PDF erzeugen' : 'Generate PDF',
+                style: const TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.w800),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _generateTermination() async {
+    final de = _de;
+    if (_nameCtrl.text.trim().isEmpty) {
+      _snack(de ? 'Bitte zuerst eine Person wählen.' : 'Pick a person first.',
+          error: true);
+      return;
+    }
+    setState(() {
+      _building = true;
+      _results = [];
+    });
+    try {
+      final d = WcTerminationData(
+        type: _termType,
+        employeeName: _nameCtrl.text.trim(),
+        employeeStreet: _streetCtrl.text.trim(),
+        employeeZipCity: _zipCityCtrl.text.trim(),
+        endDate: _termEndDate,
+        signCity: _signCityCtrl.text.trim().isEmpty
+            ? WcEmployer.city
+            : _signCityCtrl.text.trim(),
+        signDate: _signDate,
+        reason: _termReasonCtrl.text.trim(),
+        withSignature: _termWithSignature,
+      );
+      final assets = await wcLoadAssets(
+          signaturePng: _termWithSignature ? _signaturePng : null);
+      final slug = d.employeeName
+          .replaceAll(RegExp(r'[^A-Za-z0-9ÄÖÜäöüß ]'), '')
+          .replaceAll(' ', '_');
+      final prefix = switch (_termType) {
+        WcTerminationType.ordentlich => 'Kuendigung',
+        WcTerminationType.probezeit => 'Kuendigung_Probezeit',
+        WcTerminationType.fristlos => 'Fristlose_Kuendigung',
+        WcTerminationType.aufhebung => 'Aufhebungsvertrag',
+      };
+      final bytes = await wcBuildTerminationPdf(d, assets);
+      setState(() => _results = [(name: '${prefix}_$slug.pdf', bytes: bytes)]);
+    } catch (e) {
+      _snack(de ? 'Fehler: $e' : 'Error: $e', error: true);
+    } finally {
+      if (mounted) setState(() => _building = false);
+    }
   }
 
   // ── Kleine Form-Helfer ────────────────────────────────────────────────

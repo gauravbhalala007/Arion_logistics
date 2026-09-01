@@ -1154,3 +1154,233 @@ Future<Uint8List> wcBuildLicenseLetterPdf(
   ));
   return doc.save();
 }
+
+// ── Kündigungen / Aufhebungsvertrag (je EINE A4-Seite) ─────────────────
+//
+// Rechtsbasis der Texte:
+// • Ordentliche Kündigung: gesetzliche Grundfrist § 622 Abs. 1 BGB
+//   (4 Wochen zum 15. oder Monatsende), „hilfsweise zum nächst-
+//   möglichen Zeitpunkt" als Absicherung.
+// • Probezeit: § 622 Abs. 3 BGB (2 Wochen, taggenau).
+// • Fristlos: § 626 BGB (aus wichtigem Grund, sofortige Wirkung),
+//   hilfsweise ordentlich zum nächstmöglichen Zeitpunkt.
+// • Meldepflicht-Hinweis § 38 SGB III (Pflicht des Arbeitgebers,
+//   auf die frühzeitige Arbeitsuchendmeldung hinzuweisen).
+// • Aufhebungsvertrag: einvernehmlich, mit Sperrzeit-Hinweis
+//   (§ 159 SGB III) und Erledigungsklausel.
+// Schriftform § 623 BGB: Ausdruck wird eigenhändig unterschrieben —
+// die eingedruckte Unterschrift ist deshalb abwählbar.
+
+Future<Uint8List> wcBuildTerminationPdf(
+    WcTerminationData d, WcAssets a) async {
+  final doc = pw.Document();
+  final isAufhebung = d.type == WcTerminationType.aufhebung;
+
+  final subject = switch (d.type) {
+    WcTerminationType.ordentlich =>
+      'Ordentliche Kündigung Ihres Arbeitsverhältnisses',
+    WcTerminationType.probezeit =>
+      'Kündigung Ihres Arbeitsverhältnisses innerhalb der Probezeit',
+    WcTerminationType.fristlos =>
+      'Außerordentliche fristlose Kündigung Ihres Arbeitsverhältnisses',
+    WcTerminationType.aufhebung => 'Aufhebungsvertrag',
+  };
+
+  final meldehinweis =
+      'Wir weisen Sie gemäß § 38 Abs. 1 SGB III darauf hin, dass Sie '
+      'verpflichtet sind, sich unverzüglich — spätestens drei Monate vor '
+      'Beendigung des Arbeitsverhältnisses bzw. innerhalb von drei Tagen '
+      'nach Kenntnis des Beendigungszeitpunkts — persönlich bei der '
+      'Agentur für Arbeit arbeitsuchend zu melden und selbst aktiv nach '
+      'einer neuen Beschäftigung zu suchen. Eine verspätete Meldung kann '
+      'zu Nachteilen beim Arbeitslosengeld führen.';
+
+  final bodyParas = <String>[
+    if (d.type == WcTerminationType.ordentlich) ...[
+      'Sehr geehrte/r ${d.employeeName},',
+      'hiermit kündigen wir das mit Ihnen bestehende Arbeitsverhältnis '
+          'ordentlich und fristgerecht unter Einhaltung der maßgeblichen '
+          'Kündigungsfrist (§ 622 BGB) zum ${wcDate(d.endDate)}, '
+          'hilfsweise zum nächstmöglichen Zeitpunkt.',
+      meldehinweis,
+      'Ihre Arbeitspapiere sowie ein Arbeitszeugnis erhalten Sie nach '
+          'Beendigung des Arbeitsverhältnisses. Bitte geben Sie sämtliche '
+          'Arbeitsmittel (z. B. Fahrzeugschlüssel, Scanner, '
+          'Dienstkleidung) spätestens am letzten Arbeitstag zurück.',
+    ],
+    if (d.type == WcTerminationType.probezeit) ...[
+      'Sehr geehrte/r ${d.employeeName},',
+      'hiermit kündigen wir das mit Ihnen bestehende Arbeitsverhältnis '
+          'innerhalb der vereinbarten Probezeit ordentlich mit der Frist '
+          'von zwei Wochen (§ 622 Abs. 3 BGB) zum ${wcDate(d.endDate)}, '
+          'hilfsweise zum nächstmöglichen Zeitpunkt.',
+      meldehinweis,
+      'Ihre Arbeitspapiere sowie ein Arbeitszeugnis erhalten Sie nach '
+          'Beendigung des Arbeitsverhältnisses. Bitte geben Sie sämtliche '
+          'Arbeitsmittel (z. B. Fahrzeugschlüssel, Scanner, '
+          'Dienstkleidung) spätestens am letzten Arbeitstag zurück.',
+    ],
+    if (d.type == WcTerminationType.fristlos) ...[
+      'Sehr geehrte/r ${d.employeeName},',
+      'hiermit kündigen wir das mit Ihnen bestehende Arbeitsverhältnis '
+          'außerordentlich und fristlos aus wichtigem Grund (§ 626 BGB) '
+          'mit Wirkung zum ${wcDate(d.endDate)}, hilfsweise ordentlich '
+          'und fristgerecht zum nächstmöglichen Zeitpunkt.'
+          '${d.reason.trim().isEmpty ? '' : ' Grund: ${d.reason.trim()}.'}',
+      'Auf Verlangen teilen wir Ihnen den Kündigungsgrund gemäß '
+          '§ 626 Abs. 2 Satz 3 BGB unverzüglich schriftlich mit.',
+      meldehinweis,
+      'Bitte geben Sie sämtliche Arbeitsmittel (z. B. Fahrzeugschlüssel, '
+          'Scanner, Dienstkleidung) unverzüglich zurück. Ihre '
+          'Arbeitspapiere sowie ein Arbeitszeugnis erhalten Sie nach '
+          'Beendigung des Arbeitsverhältnisses.',
+    ],
+    if (isAufhebung) ...[
+      '1. Die Parteien sind sich darüber einig, dass das zwischen ihnen '
+          'bestehende Arbeitsverhältnis einvernehmlich mit Ablauf des '
+          '${wcDate(d.endDate)} endet, ohne dass es einer Kündigung '
+          'bedarf. Die Beendigung erfolgt auf Veranlassung des '
+          'Arbeitgebers zur Vermeidung einer sonst erforderlichen '
+          'Kündigung.',
+      '2. Bis zur Beendigung wird das Arbeitsverhältnis ordnungsgemäß '
+          'abgerechnet. Etwaiger Resturlaub wird, soweit möglich, in '
+          'natura gewährt, andernfalls abgegolten.',
+      '3. Der Arbeitnehmer gibt sämtliche Arbeitsmittel (z. B. '
+          'Fahrzeugschlüssel, Scanner, Dienstkleidung) spätestens am '
+          'letzten Arbeitstag zurück und erhält seine Arbeitspapiere '
+          'sowie ein Arbeitszeugnis.',
+      '4. Der Arbeitnehmer wurde darauf hingewiesen, dass er sich '
+          'unverzüglich (innerhalb von drei Tagen) bei der Agentur für '
+          'Arbeit arbeitsuchend zu melden hat (§ 38 SGB III) und dass '
+          'durch den Abschluss dieses Aufhebungsvertrags eine Sperrzeit '
+          'beim Arbeitslosengeld (§ 159 SGB III) eintreten kann. Ihm '
+          'wurde empfohlen, sich vor Unterzeichnung bei der Agentur für '
+          'Arbeit beraten zu lassen.',
+      '5. Mit der Erfüllung dieser Vereinbarung sind alle gegenseitigen '
+          'Ansprüche aus dem Arbeitsverhältnis und seiner Beendigung '
+          'erledigt, soweit auf sie rechtswirksam verzichtet werden '
+          'kann. Unverzichtbare Ansprüche bleiben unberührt.',
+    ],
+  ];
+
+  pw.Widget para(String text) => pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 7),
+        child: pw.Text(text,
+            style: pw.TextStyle(
+                font: a.body, fontSize: 10, color: _ink, lineSpacing: 1.5)),
+      );
+
+  pw.Widget signatureLine({
+    required String place,
+    required String label,
+    pw.MemoryImage? sig,
+  }) =>
+      pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(place,
+              style: pw.TextStyle(font: a.body, fontSize: 10, color: _ink)),
+          pw.SizedBox(height: 2),
+          pw.Container(height: 0.8, width: 200, color: _line),
+          pw.SizedBox(height: 2),
+          pw.Text('ORT, DATUM',
+              style: pw.TextStyle(
+                  font: a.bodyBold, fontSize: 6.5, color: _grey)),
+          pw.SizedBox(height: 10),
+          pw.Container(
+            height: 40,
+            alignment: pw.Alignment.bottomLeft,
+            child: sig == null
+                ? pw.SizedBox()
+                : pw.Image(sig, height: 40, fit: pw.BoxFit.contain),
+          ),
+          pw.SizedBox(height: 2),
+          pw.Container(height: 0.8, width: 200, color: _line),
+          pw.SizedBox(height: 2),
+          pw.Text(label,
+              style: pw.TextStyle(
+                  font: a.bodyBold, fontSize: 6.5, color: _grey)),
+        ],
+      );
+
+  final placeDate = '${d.signCity}, ${wcDate(d.signDate)}';
+
+  doc.addPage(pw.Page(
+    pageFormat: PdfPageFormat.a4,
+    margin: const pw.EdgeInsets.fromLTRB(48, 36, 48, 30),
+    build: (ctx) => pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Expanded(child: pw.Image(a.logoDelivery, width: 180)),
+            pw.Text(placeDate,
+                style:
+                    pw.TextStyle(font: a.body, fontSize: 10, color: _ink)),
+          ],
+        ),
+        pw.SizedBox(height: 22),
+        pw.Text(
+          '${WcEmployer.name}, ${WcEmployer.street}, ${WcEmployer.zipCity}',
+          style:
+              pw.TextStyle(font: a.bodyBold, fontSize: 7, color: _orange),
+        ),
+        pw.SizedBox(height: 6),
+        pw.Text(d.employeeName,
+            style: pw.TextStyle(font: a.body, fontSize: 10.5, color: _ink)),
+        pw.Text(d.employeeStreet,
+            style: pw.TextStyle(font: a.body, fontSize: 10.5, color: _ink)),
+        pw.Text(d.employeeZipCity,
+            style: pw.TextStyle(font: a.body, fontSize: 10.5, color: _ink)),
+        pw.SizedBox(height: 20),
+        pw.Text(subject,
+            style:
+                pw.TextStyle(font: a.bodyBold, fontSize: 12, color: _ink)),
+        if (isAufhebung) ...[
+          pw.SizedBox(height: 4),
+          pw.Text(
+            'zwischen ${WcEmployer.name}, ${WcEmployer.street}, '
+            '${WcEmployer.zipCity} (Arbeitgeber) und ${d.employeeName}, '
+            '${d.employeeStreet}, ${d.employeeZipCity} (Arbeitnehmer)',
+            style: pw.TextStyle(
+                font: a.body, fontSize: 9.5, color: _ink, lineSpacing: 1.4),
+          ),
+        ],
+        pw.SizedBox(height: 12),
+        for (final p in bodyParas) para(p),
+        if (!isAufhebung) ...[
+          pw.SizedBox(height: 4),
+          pw.Text('Mit freundlichen Grüßen',
+              style: pw.TextStyle(font: a.body, fontSize: 10, color: _ink)),
+        ],
+        pw.Spacer(),
+        pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Expanded(
+              child: signatureLine(
+                place: placeDate,
+                label:
+                    'UNTERSCHRIFT, GESCHÄFTSFÜHRER | ${WcEmployer.name}',
+                sig: d.withSignature ? a.signature : null,
+              ),
+            ),
+            pw.SizedBox(width: 24),
+            pw.Expanded(
+              child: signatureLine(
+                place: isAufhebung ? placeDate : '',
+                label: isAufhebung
+                    ? 'UNTERSCHRIFT, ARBEITNEHMER'
+                    : 'ERHALTEN AM / UNTERSCHRIFT ARBEITNEHMER',
+              ),
+            ),
+          ],
+        ),
+        pw.SizedBox(height: 10),
+        _coverFooter(a),
+      ],
+    ),
+  ));
+  return doc.save();
+}

@@ -45,6 +45,23 @@ void main() {
         d, sig.existsSync() ? sig.readAsBytesSync() : null));
     File('$out/test_fuehrerschein.pdf')
         .writeAsBytesSync(await wcBuildLicenseLetterPdf(d, a));
+    // Kündigungen/Aufhebungsvertrag — jeweils genau EINE Seite.
+    for (final t in WcTerminationType.values) {
+      final term = WcTerminationData(
+        type: t,
+        employeeName: 'Max Mustermann',
+        employeeStreet: 'Musterstr. 1',
+        employeeZipCity: '91325 Adelsdorf',
+        endDate: wcTerminationDefaultEndDate(t, DateTime(2026, 9, 1)),
+        signCity: 'Adelsdorf',
+        signDate: DateTime(2026, 9, 1),
+        reason: t == WcTerminationType.fristlos
+            ? 'wiederholtes unentschuldigtes Fehlen trotz Abmahnung'
+            : '',
+      );
+      File('$out/test_term_${t.value}.pdf')
+          .writeAsBytesSync(await wcBuildTerminationPdf(term, a));
+    }
     // Zur Sichtprüfung:
     // ignore: avoid_print
     print('PDF-Ausgabe: $out');

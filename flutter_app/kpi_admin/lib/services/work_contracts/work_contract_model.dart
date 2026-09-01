@@ -206,3 +206,103 @@ String wcDate(DateTime? d) => d == null
 
 String wcHours(double h) =>
     h == h.roundToDouble() ? h.toStringAsFixed(0) : h.toStringAsFixed(1).replaceAll('.', ',');
+
+// ── Kündigungen / Aufhebungsvertrag ──────────────────────────────────
+
+/// Art der Beendigung — bestimmt Text und Standard-Beendigungsdatum.
+enum WcTerminationType {
+  ordentlich('ordentlich'),
+  probezeit('probezeit'),
+  fristlos('fristlos'),
+  aufhebung('aufhebung');
+
+  const WcTerminationType(this.value);
+  final String value;
+
+  String labelDe() {
+    switch (this) {
+      case WcTerminationType.ordentlich:
+        return 'Ordentliche Kündigung';
+      case WcTerminationType.probezeit:
+        return 'Kündigung in der Probezeit';
+      case WcTerminationType.fristlos:
+        return 'Fristlose Kündigung';
+      case WcTerminationType.aufhebung:
+        return 'Aufhebungsvertrag';
+    }
+  }
+
+  String labelEn() {
+    switch (this) {
+      case WcTerminationType.ordentlich:
+        return 'Regular termination';
+      case WcTerminationType.probezeit:
+        return 'Termination during probation';
+      case WcTerminationType.fristlos:
+        return 'Immediate termination';
+      case WcTerminationType.aufhebung:
+        return 'Mutual termination agreement';
+    }
+  }
+}
+
+/// Standard-Beendigungsdatum je Art (immer überschreibbar):
+/// • fristlos / Aufhebungsvertrag → heute
+/// • Probezeit → heute + 2 Wochen (taggenau, § 622 Abs. 3 BGB)
+/// • ordentlich → gesetzliche Grundfrist § 622 Abs. 1 BGB:
+///   4 Wochen (28 Tage) zum 15. ODER zum Ende eines Kalendermonats —
+///   also der früheste 15. bzw. Monatsletzte, der mindestens 28 Tage
+///   nach heute liegt.
+DateTime wcTerminationDefaultEndDate(WcTerminationType type, DateTime today) {
+  final t0 = DateTime(today.year, today.month, today.day);
+  switch (type) {
+    case WcTerminationType.fristlos:
+    case WcTerminationType.aufhebung:
+      return t0;
+    case WcTerminationType.probezeit:
+      return t0.add(const Duration(days: 14));
+    case WcTerminationType.ordentlich:
+      final earliest = t0.add(const Duration(days: 28));
+      // Kandidaten: 15. und Monatsletzter der nächsten Monate.
+      for (var m = 0; m < 4; m++) {
+        final month = DateTime(t0.year, t0.month + m, 1);
+        final mid = DateTime(month.year, month.month, 15);
+        final end = DateTime(month.year, month.month + 1, 0);
+        if (!mid.isBefore(earliest)) return mid;
+        if (!end.isBefore(earliest)) return end;
+      }
+      return earliest;
+  }
+}
+
+/// Eingaben für ein Kündigungs-/Aufhebungsdokument (eine PDF-Seite).
+class WcTerminationData {
+  WcTerminationData({
+    required this.type,
+    required this.employeeName,
+    required this.employeeStreet,
+    required this.employeeZipCity,
+    required this.endDate,
+    required this.signCity,
+    required this.signDate,
+    this.reason = '',
+    this.withSignature = true,
+  });
+
+  final WcTerminationType type;
+  final String employeeName;
+  final String employeeStreet;
+  final String employeeZipCity;
+
+  /// Beendigungs- bzw. Wirksamkeitsdatum.
+  final DateTime endDate;
+  final String signCity;
+  final DateTime signDate;
+
+  /// Optionaler Grund — nur bei fristloser Kündigung mit ausgegeben.
+  final String reason;
+
+  /// GF-Unterschrift eindrucken? Abwählbar, falls handschriftlich
+  /// unterschrieben werden soll.
+  final bool withSignature;
+}
